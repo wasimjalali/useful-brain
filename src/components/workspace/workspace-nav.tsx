@@ -1,13 +1,13 @@
 import type { ReactNode } from "react";
 
-import { NuraLogo } from "@/components/nura-logo";
+import { UsefulBrainLogo } from "@/components/useful-brain-logo";
 import {
   ChatIcon,
   EvaluationsIcon,
   KnowledgeIcon,
   TrashIcon,
 } from "@/components/icons";
-import { DEFAULT_NURA_CONFIG } from "@/lib/nura-config";
+import { DEFAULT_USEFUL_BRAIN_CONFIG } from "@/lib/useful-brain-config";
 import type { Conversation } from "@/lib/rag/chat-history";
 
 import type { WorkspaceView } from "./workspace-shell";
@@ -22,12 +22,12 @@ const NAV_ITEMS: NavItem[] = [
   { id: "chat", label: "Chat", icon: ChatIcon },
   {
     id: "knowledge",
-    label: DEFAULT_NURA_CONFIG.knowledgeLabel,
+    label: DEFAULT_USEFUL_BRAIN_CONFIG.knowledgeLabel,
     icon: KnowledgeIcon,
   },
   {
     id: "evaluations",
-    label: DEFAULT_NURA_CONFIG.evaluationsLabel,
+    label: DEFAULT_USEFUL_BRAIN_CONFIG.evaluationsLabel,
     icon: EvaluationsIcon,
   },
 ];
@@ -63,7 +63,7 @@ export function WorkspaceNav({
       ].join(" ")}
     >
       <div className="px-2">
-        <NuraLogo />
+        <UsefulBrainLogo />
       </div>
 
       <nav aria-label="Workspace" className="flex flex-col gap-1">

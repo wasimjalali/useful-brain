@@ -9,9 +9,9 @@ import {
   ThumbDownIcon,
   ThumbUpIcon,
 } from "@/components/icons";
-import { NuraMark } from "@/components/nura-logo";
+import { UsefulBrainMark } from "@/components/useful-brain-logo";
 import { StatusLabel } from "@/components/ui/status-label";
-import { DEFAULT_NURA_CONFIG } from "@/lib/nura-config";
+import { DEFAULT_USEFUL_BRAIN_CONFIG } from "@/lib/useful-brain-config";
 import type { GroundedAnswerResponse } from "@/lib/rag/grounded-answer";
 
 import type { EvidenceItem } from "./evidence-inspector";
@@ -59,13 +59,13 @@ export function ConversationTurn({
   return (
     <div className="msg-in flex gap-3">
       <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-brand shadow-sm">
-        <NuraMark className="size-5" tone="dark" />
+        <UsefulBrainMark className="size-5" tone="dark" />
       </span>
 
       <div className="min-w-0 flex-1">
         <div className="mb-2 flex items-center gap-2">
           <span className="text-sm font-semibold text-ink">
-            {DEFAULT_NURA_CONFIG.productName}
+            {DEFAULT_USEFUL_BRAIN_CONFIG.productName}
           </span>
           {!grounded ? (
             <StatusLabel tone="warning">insufficient evidence</StatusLabel>
