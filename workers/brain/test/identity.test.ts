@@ -145,4 +145,20 @@ describe("Web-to-Brain identity", () => {
     const body = (await response.json()) as { code: string };
     expect(body.code).toBe("INTERNAL_ERROR");
   });
+
+  it("maps malformed lock JSON to validation failure", async () => {
+    const token = await signToken(signing.privateKey, signing.kid);
+    const response = await fetchWorker(
+      new IncomingRequest("https://brain.internal/lock", {
+        method: "POST",
+        headers: {
+          "cf-access-jwt-assertion": token,
+          "content-type": "application/json",
+        },
+        body: "{",
+      }),
+    );
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ code: "VALIDATION_FAILED" });
+  });
 });

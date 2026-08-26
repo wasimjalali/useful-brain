@@ -181,7 +181,7 @@ No remote D1, R2, Vectorize, Queue, Workflow or Access resource has been created
 - [x] `@cloudflare/vitest-plugin@1.1.0` installed. Critical Worker tests run in workerd (`npm run test:workers`). Node tests remain for pure helpers.
 - [x] Redacted structured JSON operational logs. Staging observability `head_sampling_rate: 0.1`. Evidence: `src/lib/cf/operational-log.ts` and test.
 - [x] `npm audit --omit=dev --audit-level=high` exits 0 after overrides `postcss@8.5.26`, `nanoid@3.3.18`, `adm-zip@0.6.0`. rclone.js `extractEntryTo` still works. Full-tree (including dev) still reports `brace-expansion` and `js-yaml` highs; those are not in the production audit.
-- [ ] Independent review (`codex review --base main`) green, including the stale-key grace security verdict.
+- [ ] Independent review (`codex review --base main`) green after the follow-up fix. 2026-08-26 gpt-5.6-sol review (session `01a03f93-2b5c-7ca0-b232-4e2128b08b68`) did **not** flag the retained 3600s stale-key grace as P0/P1. It reported one P1 (loopback `workers_dev` default) and two P2s (malformed lock JSON → 500; missing `typecheck:workers` in CI). Those findings are fixed in source: `workers_dev`/`preview_urls` false on every environment including loopback, `WorkerValidationError` for malformed lock JSON, and CI `typecheck:workers`. Re-run review before merge.
 
 ### Helper-level items (not phase-complete evidence)
 

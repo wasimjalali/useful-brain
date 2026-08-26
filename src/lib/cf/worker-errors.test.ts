@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { AccessJwtError, AccessJwtUnavailable } from "../auth/access-jwt";
 import { IdentityConfigError } from "../auth/identity-mode";
-import { toPublicWorkerError, workerErrorResponse } from "./worker-errors";
+import { toPublicWorkerError, WorkerValidationError, workerErrorResponse } from "./worker-errors";
 
 describe("worker error contracts", () => {
   it("maps a bad token to AUTH_REQUIRED without leaking verifier detail", () => {
@@ -31,6 +31,15 @@ describe("worker error contracts", () => {
       message: "Identity verification is temporarily unavailable.",
       retryable: true,
       requestId: "req-2",
+    });
+  });
+
+  it("maps malformed JSON to VALIDATION_FAILED", () => {
+    expect(toPublicWorkerError(new WorkerValidationError(), "req-json")).toEqual({
+      code: "VALIDATION_FAILED",
+      message: "The request is invalid.",
+      retryable: false,
+      requestId: "req-json",
     });
   });
 

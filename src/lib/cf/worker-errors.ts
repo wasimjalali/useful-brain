@@ -6,6 +6,13 @@ import { BoundedIdError } from "./bounded-id";
 import { UnsignedPrincipalError } from "./service-binding-identity";
 import { StartupConfigError } from "./startup";
 
+export class WorkerValidationError extends Error {
+  constructor(message = "The request is invalid.") {
+    super(message);
+    this.name = "WorkerValidationError";
+  }
+}
+
 export type WorkerErrorCode =
   | "AUTH_REQUIRED"
   | "FORBIDDEN"
@@ -43,7 +50,11 @@ export function toPublicWorkerError(error: unknown, requestId: string): PublicWo
       requestId,
     };
   }
-  if (error instanceof BoundedIdError || error instanceof IngestQueueMessageError) {
+  if (
+    error instanceof BoundedIdError ||
+    error instanceof IngestQueueMessageError ||
+    error instanceof WorkerValidationError
+  ) {
     return {
       code: "VALIDATION_FAILED",
       message: "The request is invalid.",

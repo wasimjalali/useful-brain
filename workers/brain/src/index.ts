@@ -4,7 +4,7 @@ import { parseBoundedId } from "../../../src/lib/cf/bounded-id";
 import { writeOperationalLog } from "../../../src/lib/cf/operational-log";
 import { resolveRequestId, withRequestId } from "../../../src/lib/cf/request-id";
 import { assertWorkerStartup } from "../../../src/lib/cf/startup";
-import { toPublicWorkerError, workerErrorResponse } from "../../../src/lib/cf/worker-errors";
+import { toPublicWorkerError, WorkerValidationError, workerErrorResponse } from "../../../src/lib/cf/worker-errors";
 import {
   LOAD_PRINCIPAL_SQL,
   type PrincipalDirectoryRow,
@@ -135,7 +135,12 @@ const brainWorker = {
 
       if ((path === "/lock" || path === "/unlock") && request.method === "POST") {
         operation = path.slice(1);
-        const body = (await request.json()) as { conversationId?: string; runId?: string };
+        let body: { conversationId?: string; runId?: string };
+        try {
+          body = (await request.json()) as { conversationId?: string; runId?: string };
+        } catch {
+          throw new WorkerValidationError();
+        }
         const conversationId = parseBoundedId(body.conversationId, "conversation id");
         const runId = parseBoundedId(body.runId, "run id");
         const stub = env.CONVERSATION.getByName(conversationId);
