@@ -3,7 +3,10 @@
   "name": "useful-brain-brain",
   "main": "src/index.ts",
   "compatibility_date": "2026-08-26",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "dev": {
+    "ip": "127.0.0.1"
+  },
   "observability": {
     "enabled": false
   },
@@ -12,8 +15,7 @@
     "IDENTITY_MODE": "loopback",
     "RESOURCES_PROVISIONED": "false",
     "WRANGLER_ACCESS_DEV": "false",
-    "ACCESS_TEAM_DOMAIN": "",
-    "ACCESS_AUD": "",
+    "LOOPBACK_RUNTIME": "true",
     "LOOPBACK_SUBJECT": "dev@localhost"
   },
   "d1_databases": [
@@ -68,8 +70,7 @@
         "IDENTITY_MODE": "loopback",
         "RESOURCES_PROVISIONED": "false",
         "WRANGLER_ACCESS_DEV": "false",
-        "ACCESS_TEAM_DOMAIN": "",
-        "ACCESS_AUD": "",
+        "LOOPBACK_RUNTIME": "true",
         "LOOPBACK_SUBJECT": "dev@localhost"
       },
       "d1_databases": [
@@ -98,13 +99,19 @@
       }
     },
     "staging": {
+      "workers_dev": false,
+      "preview_urls": false,
+      "observability": {
+        "enabled": true,
+        "head_sampling_rate": 0.1
+      },
       "vars": {
         "RUNTIME_ENV": "staging",
         "IDENTITY_MODE": "access",
         "RESOURCES_PROVISIONED": "false",
         "WRANGLER_ACCESS_DEV": "false",
-        "ACCESS_TEAM_DOMAIN": "",
-        "ACCESS_AUD": ""
+        "LOOPBACK_RUNTIME": "false",
+        "LOOPBACK_SUBJECT": ""
       },
       "d1_databases": [
         {
@@ -130,13 +137,15 @@
       }
     },
     "production": {
+      "workers_dev": false,
+      "preview_urls": false,
       "vars": {
         "RUNTIME_ENV": "production",
         "IDENTITY_MODE": "access",
         "RESOURCES_PROVISIONED": "false",
         "WRANGLER_ACCESS_DEV": "false",
-        "ACCESS_TEAM_DOMAIN": "",
-        "ACCESS_AUD": ""
+        "LOOPBACK_RUNTIME": "false",
+        "LOOPBACK_SUBJECT": ""
       },
       "d1_databases": [
         {

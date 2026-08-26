@@ -1,6 +1,7 @@
 import type { AccessIdentity } from "./access-jwt";
 
 export type DirectoryRecord = {
+  id: string;
   subject: string;
   kind: "user" | "service_token";
   roles: string[];
@@ -21,6 +22,9 @@ export function resolvePrincipal(
   if (!record) {
     throw new PrincipalResolutionError("Verified subject is not in the operations directory");
   }
+  if (!record.id) {
+    throw new PrincipalResolutionError("Directory record is missing a principal id");
+  }
   if (record.subject !== identity.subject || record.kind !== identity.kind) {
     throw new PrincipalResolutionError("Directory record does not match the verified subject");
   }
@@ -31,6 +35,7 @@ export function resolvePrincipal(
     throw new PrincipalResolutionError("Service-token subjects must not occupy the email namespace");
   }
   return {
+    id: record.id,
     subject: record.subject,
     kind: record.kind,
     roles: [...record.roles],

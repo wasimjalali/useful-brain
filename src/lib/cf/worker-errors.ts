@@ -1,6 +1,8 @@
 import { AccessJwtError, AccessJwtUnavailable } from "../auth/access-jwt";
-import { IdentityConfigError, LoopbackIdentityError } from "../auth/identity-mode";
+import { IdentityConfigError } from "../auth/identity-mode";
 import { PrincipalResolutionError } from "../auth/principal";
+import { IngestQueueMessageError } from "../ingest/queue-message";
+import { BoundedIdError } from "./bounded-id";
 import { UnsignedPrincipalError } from "./service-binding-identity";
 import { StartupConfigError } from "./startup";
 
@@ -32,12 +34,19 @@ export function toPublicWorkerError(error: unknown, requestId: string): PublicWo
   if (
     error instanceof AccessJwtError ||
     error instanceof PrincipalResolutionError ||
-    error instanceof UnsignedPrincipalError ||
-    error instanceof LoopbackIdentityError
+    error instanceof UnsignedPrincipalError
   ) {
     return {
       code: "AUTH_REQUIRED",
       message: "Sign in to continue.",
+      retryable: false,
+      requestId,
+    };
+  }
+  if (error instanceof BoundedIdError || error instanceof IngestQueueMessageError) {
+    return {
+      code: "VALIDATION_FAILED",
+      message: "The request is invalid.",
       retryable: false,
       requestId,
     };

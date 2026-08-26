@@ -8,16 +8,17 @@ Useful Brain is a private company knowledge and action agent. It retrieves only 
 
 ## Execution gate
 
-The target architecture lives in `docs/useful-brain-master-plan.md`.
+The target architecture lives in `docs/useful-brain-master-plan.md`. Execute from `docs/useful-brain-execution-tracker.md`.
 
-The external review is complete, accepted findings are incorporated and the plan is approved. Execute from `docs/useful-brain-execution-tracker.md` one phase at a time.
+Phase 0 is merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10)). Phase 1 is open as [PR #11](https://github.com/wasimjalali/useful-brain/pull/11) on `phase-1-cloudflare-foundation`. Do not merge PR #11 or provision Cloudflare resources until the Phase 1 repair list in the tracker is complete, independent review is green, and GitHub checks pass.
 
-- Begin with the remaining Phase 0 feasibility work. Do not start Phase 1 until Phase 0 passes or Wasim explicitly approves a documented fallback.
-- Do not skip phase exit criteria or silently change the master plan.
-- Pause for the existing approval boundaries before installing packages, changing schemas or auth, provisioning paid resources or deleting Burooj.
-- Keep historical Nura documents as historical records unless they cause active instructions to become ambiguous.
+Wasim granted standing authorization on 2026-08-26 for Grok 4.6 xhigh to execute Phase 1 through Phase 6 and Phase 7A without ordinary phase-by-phase approval. That covers approved packages, master-plan D1 schema and auth changes, staging-only Cloudflare resources, synthetic Workers AI and model evaluations inside the safety limits, branches/commits/PRs, merging green PRs, continuing to the next phase, updating planning documents, evidence-based Cloudflare-hosted model selection, and using eligible Cloudflare credits for staging infrastructure and Workers AI. It does **not** cover real company data, production cutover, destructive retirement, uncovered external-provider spending, unlimited usage, Convex deletion, or Burooj deletion.
 
-The implementation model is Grok 4.6 xhigh. GPT-5.6 Sol xhigh owns architecture adjudication and final integration review. Neither model approves its own critical security work.
+Phase 7 is split: 7A (staging release candidate) is inside this authorization; 7B (production launch and retirement) requires one final explicit Wasim approval.
+
+Do not skip phase exit criteria or silently change the master plan. Keep historical Nura documents as historical records unless they cause active instructions to become ambiguous.
+
+The implementation model is Grok 4.6 xhigh. GPT-5.6 Sol xhigh owns architecture adjudication and final integration review. Neither model approves its own critical security work. `codex review --base main` is the independent review gate; a self-review is not independent.
 
 ## Current and target stacks
 
@@ -79,15 +80,30 @@ Do not introduce Convex into new target code. Do not propose or add Microsoft Fo
 - Keep a migration ledger that maps every retained behavior to its Useful Brain implementation and test.
 - Do not delete Burooj until Section 12 of the master plan passes and Wasim confirms deletion.
 
+## Approved packages
+
+Pre-approved for this implementation:
+
+- Root production: `@earendil-works/pi-agent-core@0.84.3`, `@earendil-works/pi-ai@0.84.3`, and `typebox@1.3.7` if imported directly. Use only the minimum `pi-ai` provider imports required by the selected Cloudflare-hosted models.
+- Root development: `@cloudflare/vitest-plugin@1.1.0`. Use `wrangler types`. Do not install `@cloudflare/workers-types` or `@cloudflare/vitest-pool-workers`.
+- Phase 6 only: `@modelcontextprotocol/sdk@1.30.0`.
+
+Compatible patched transitive overrides are authorized after full verification. Never run `npm audit fix --force`. Do not introduce LangChain, LangGraph, CrewAI, Cloudflare Agents SDK, another agent framework, broad Pi provider bundles, Pi coding-agent packages, or OAuth/SQLite Pi session backends.
+
+## Stop conditions
+
+Stop and batch remaining manual work only when: a change contradicts the fixed architecture; a confirmed high/critical risk has no safe in-plan solution; a required package is outside the approved list and no package-free path exists; a new paid subscription or add-on is required; confirmed credits do not cover a required paid operation; a gross usage safety limit would be exceeded; real company content or production credentials are required; production deployment or real traffic cutover is reached; Convex or Burooj deletion is reached; an irreversible destructive action is required; or a manual identity/domain/protected-secret bootstrap is unavoidable.
+
 ## Development workflow
 
 - Work on a branch, never directly on `main`.
 - Use npm unless the lockfile changes deliberately through an approved migration.
 - Prefer test-first work for custom behavior.
 - Keep changes surgical and update markdown made stale by the change.
-- Verify every completed change with `npx tsc --noEmit`, `npm run lint`, `npm test` and `npm run build`.
+- Verify every completed change with `npx tsc --noEmit`, `npm run lint`, `npm test`, `npm run build`, relevant workerd tests, Wrangler dry runs, the dependency audit and security tests.
 - For Next.js and Cloudflare changes, verify current official documentation rather than relying on memory.
-- Critical auth, database, connector, secret and tool-execution code must pass the required adversarial reviews before merge.
+- Run independent review with `codex review --base main`. Fix every confirmed P0/P1 and every confirmed high or critical security finding. Merge automatically only when GitHub checks and independent review are green. Then start the next phase from updated `main` without asking Wasim.
+- Do not merge PR #11 until Phase 1 repairs, workerd evidence and independent review are complete.
 
 ## Interface
 

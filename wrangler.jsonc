@@ -4,6 +4,9 @@
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-08-26",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "dev": {
+    "ip": "127.0.0.1"
+  },
   "observability": {
     "enabled": false
   },
@@ -11,7 +14,8 @@
     "RUNTIME_ENV": "development",
     "IDENTITY_MODE": "loopback",
     "RESOURCES_PROVISIONED": "false",
-    "WRANGLER_ACCESS_DEV": "false"
+    "WRANGLER_ACCESS_DEV": "false",
+    "LOOPBACK_RUNTIME": "true"
   },
   "assets": {
     "directory": ".open-next/assets",
@@ -33,7 +37,8 @@
         "RUNTIME_ENV": "development",
         "IDENTITY_MODE": "loopback",
         "RESOURCES_PROVISIONED": "false",
-        "WRANGLER_ACCESS_DEV": "false"
+        "WRANGLER_ACCESS_DEV": "false",
+        "LOOPBACK_RUNTIME": "true"
       },
       "assets": {
         "directory": ".open-next/assets",
@@ -51,11 +56,14 @@
       ]
     },
     "staging": {
+      "workers_dev": false,
+      "preview_urls": false,
       "vars": {
         "RUNTIME_ENV": "staging",
         "IDENTITY_MODE": "access",
         "RESOURCES_PROVISIONED": "false",
-        "WRANGLER_ACCESS_DEV": "false"
+        "WRANGLER_ACCESS_DEV": "false",
+        "LOOPBACK_RUNTIME": "false"
       },
       "assets": {
         "directory": ".open-next/assets",
@@ -73,11 +81,14 @@
       ]
     },
     "production": {
+      "workers_dev": false,
+      "preview_urls": false,
       "vars": {
         "RUNTIME_ENV": "production",
         "IDENTITY_MODE": "access",
         "RESOURCES_PROVISIONED": "false",
-        "WRANGLER_ACCESS_DEV": "false"
+        "WRANGLER_ACCESS_DEV": "false",
+        "LOOPBACK_RUNTIME": "false"
       },
       "assets": {
         "directory": ".open-next/assets",

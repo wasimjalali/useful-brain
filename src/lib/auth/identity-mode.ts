@@ -8,13 +8,6 @@ export class IdentityConfigError extends Error {
   }
 }
 
-export class LoopbackIdentityError extends Error {
-  constructor(message = "loopback identity is not available") {
-    super(message);
-    this.name = "LoopbackIdentityError";
-  }
-}
-
 export function parseIdentityMode(raw: string | undefined): IdentityMode {
   const value = raw?.trim();
   if (value === "access" || value === "loopback" || value === "disabled") {
@@ -35,6 +28,7 @@ export function assertIdentityConfiguration(config: {
   runtimeEnv: RuntimeEnv;
   identityMode: IdentityMode;
   wranglerAccessDevConfigured: boolean;
+  loopbackRuntimeConfigured: boolean;
 }): void {
   if (config.runtimeEnv === "staging" || config.runtimeEnv === "production") {
     if (config.identityMode !== "access") {
@@ -47,24 +41,25 @@ export function assertIdentityConfiguration(config: {
         `${config.runtimeEnv} must not configure Wrangler access.dev`,
       );
     }
+    if (config.loopbackRuntimeConfigured) {
+      throw new IdentityConfigError(
+        `${config.runtimeEnv} must not enable the loopback runtime signal`,
+      );
+    }
   }
 
   if (config.identityMode === "access" && config.wranglerAccessDevConfigured) {
     throw new IdentityConfigError("Access mode cannot combine with Wrangler access.dev");
   }
-}
 
-export function isLoopbackAddress(address: string | undefined): boolean {
-  return address === "127.0.0.1" || address === "::1" || address === "localhost";
-}
-
-export function assertedLoopbackAddress(address: string | undefined): string {
-  if (!address || address.includes(",")) {
-    throw new LoopbackIdentityError();
+  if (config.identityMode === "loopback") {
+    if (config.runtimeEnv !== "development") {
+      throw new IdentityConfigError("loopback identity is development-only");
+    }
+    if (!config.loopbackRuntimeConfigured) {
+      throw new IdentityConfigError(
+        "loopback identity requires the trusted local LOOPBACK_RUNTIME signal",
+      );
+    }
   }
-  const value = address.trim();
-  if (!isLoopbackAddress(value)) {
-    throw new LoopbackIdentityError();
-  }
-  return value;
 }

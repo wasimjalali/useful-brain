@@ -17,14 +17,15 @@ export function assertWorkerStartup(env: {
   IDENTITY_MODE?: string;
   RESOURCES_PROVISIONED?: string;
   WRANGLER_ACCESS_DEV?: string;
+  LOOPBACK_RUNTIME?: string;
 }): { runtimeEnv: RuntimeEnv; identityMode: ReturnType<typeof parseIdentityMode> } {
   const runtimeEnv = parseRuntimeEnv(env.RUNTIME_ENV);
   const identityMode = parseIdentityMode(env.IDENTITY_MODE);
-  const wranglerAccessDevConfigured = env.WRANGLER_ACCESS_DEV === "true";
   assertIdentityConfiguration({
     runtimeEnv,
     identityMode,
-    wranglerAccessDevConfigured,
+    wranglerAccessDevConfigured: env.WRANGLER_ACCESS_DEV === "true",
+    loopbackRuntimeConfigured: env.LOOPBACK_RUNTIME === "true",
   });
   if (
     (runtimeEnv === "staging" || runtimeEnv === "production") &&

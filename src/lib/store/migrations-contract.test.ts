@@ -14,6 +14,10 @@ describe("D1 migrations", () => {
     expect(corpusSql).not.toEqual(operationsSql);
     expect(corpusSql).toMatch(/corpus_generations/);
     expect(operationsSql).toMatch(/principals/);
+    expect(operationsSql).toMatch(/UNIQUE \(kind, subject\)/);
+    expect(operationsSql).toMatch(/principal_id/);
+    expect(operationsSql).not.toMatch(/user_id/);
+    expect(operationsSql).toMatch(/No remote D1 has applied this migration/);
 
     for (const directory of ["corpus", "operations"]) {
       for (const file of readdirSync(path.join(root, directory))) {

@@ -361,4 +361,127 @@ describe("Access JWT verification", () => {
       }),
     ).toThrow(AccessConfigError);
   });
+
+  it("rejects a hostile or port-bearing team domain", () => {
+    expect(() => normaliseTeamDomain("https://evil.example.com")).toThrow(/cloudflareaccess/);
+    expect(() => normaliseTeamDomain("https://karkoai.cloudflareaccess.com:8443")).toThrow(
+      AccessConfigError,
+    );
+    expect(() =>
+      normaliseTeamDomain("https://user:pass@karkoai.cloudflareaccess.com"),
+    ).toThrow(AccessConfigError);
+    expect(() => normaliseTeamDomain("https://karkoai.cloudflareaccess.com/cdn-cgi")).toThrow(
+      AccessConfigError,
+    );
+  });
+
+  it("applies the JWKS refetch floor after a cold-start fetch failure", async () => {
+    const signing = await generateSigning();
+    const certs = new Certs([signing.jwk]);
+    certs.fail = true;
+    const access = verifier(certs);
+    for (let index = 0; index < 20; index += 1) {
+      await expect(access.verify(await signToken(signing.privateKey, signing.kid))).rejects.toBeInstanceOf(
+        AccessJwtUnavailable,
+      );
+    }
+    expect(certs.calls).toBe(1);
+  });
+
+  it("joins an in-flight JWKS fetch instead of 503ing waiters on a slow first fetch", async () => {
+    const signing = await generateSigning();
+    const certs = new Certs([signing.jwk]);
+    certs.delayMs = 80;
+    const access = verifier(certs);
+    const token = await signToken(signing.privateKey, signing.kid);
+    const results = await Promise.all(
+      Array.from({ length: 8 }, () => access.verify(token)),
+    );
+    expect(results.every((identity) => identity.kind === "user")).toBe(true);
+    expect(certs.calls).toBe(1);
+  });
+
+  it("does not fetch once per sequential unknown-kid request", async () => {
+    const signing = await generateSigning();
+    const attacker = await generateSigning("kid-forged");
+    const certs = new Certs([signing.jwk]);
+    const access = verifier(certs);
+    await access.verify(await signToken(signing.privateKey, signing.kid));
+    expect(certs.calls).toBe(1);
+    for (let index = 0; index < 10; index += 1) {
+      await expect(
+        access.verify(await signToken(attacker.privateKey, `kid-forged-${index}`)),
+      ).rejects.toThrow(/unknown Access signing key/);
+    }
+    expect(certs.calls).toBe(1);
+  });
+
+  it("cancels a JWKS body once it exceeds 256 KiB", async () => {
+    const signing = await generateSigning();
+    let cancelled = false;
+    const chunk = new Uint8Array(65_536).fill(0x20);
+    const access = new AccessJwtVerifier({
+      teamDomain: TEAM,
+      audience: AUD,
+      fetchJwks: async () =>
+        new Response(
+          new ReadableStream({
+            pull(controller) {
+              controller.enqueue(chunk);
+            },
+            cancel() {
+              cancelled = true;
+            },
+          }),
+        ),
+    });
+    await expect(
+      access.verify(await signToken(signing.privateKey, signing.kid)),
+    ).rejects.toBeInstanceOf(AccessJwtUnavailable);
+    expect(cancelled).toBe(true);
+  });
+
+  it("picks up a rotated key after the refetch floor", async () => {
+    const signing = await generateSigning();
+    const rotated = await generateSigning("kid-2");
+    const certs = new Certs([signing.jwk]);
+    const access = verifier(certs, { minRefetchMs: 0, ttlMs: 0 });
+    await access.verify(await signToken(signing.privateKey, signing.kid));
+    certs.keys = [rotated.jwk];
+    const identity = await access.verify(await signToken(rotated.privateKey, "kid-2"));
+    expect(identity.kind).toBe("user");
+  });
+
+  it("still verifies a cached key through a JWKS outage within the stale grace", async () => {
+    const signing = await generateSigning();
+    const attacker = await generateSigning("kid-unknown");
+    const certs = new Certs([signing.jwk]);
+    const access = verifier(certs, { ttlMs: 0, minRefetchMs: 0 });
+    await access.verify(await signToken(signing.privateKey, signing.kid));
+    certs.fail = true;
+    await expect(access.verify(await signToken(signing.privateKey, signing.kid))).resolves.toMatchObject({
+      subject: "alice@karkoai.com",
+    });
+    await expect(
+      access.verify(await signToken(attacker.privateKey, "kid-unknown")),
+    ).rejects.toBeInstanceOf(AccessJwtUnavailable);
+  });
+
+  it("refuses cached keys once the stale grace has elapsed", async () => {
+    const signing = await generateSigning();
+    const certs = new Certs([signing.jwk]);
+    let elapsed = 1_000;
+    const access = verifier(certs, {
+      ttlMs: 0,
+      minRefetchMs: 0,
+      staleGraceMs: 0,
+      nowElapsedMs: () => elapsed,
+    });
+    await access.verify(await signToken(signing.privateKey, signing.kid));
+    certs.fail = true;
+    elapsed = 2_000;
+    await expect(access.verify(await signToken(signing.privateKey, signing.kid))).rejects.toThrow(
+      /stale/,
+    );
+  });
 });

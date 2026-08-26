@@ -4,11 +4,10 @@ import {
 } from "./access-jwt";
 import {
   IdentityConfigError,
-  assertedLoopbackAddress,
   type IdentityMode,
 } from "./identity-mode";
 import { resolvePrincipal, type DirectoryRecord } from "./principal";
-import { assertionForBrain } from "../cf/service-binding-identity";
+import { assertionForBrain, rejectSpoofedPrincipal } from "../cf/service-binding-identity";
 
 export type WorkerDirectoryLookup = (
   subject: string,
@@ -18,7 +17,6 @@ export type WorkerDirectoryLookup = (
 export type AuthenticateWorkerRequestInput = {
   identityMode: IdentityMode;
   headers: Headers;
-  clientAddress?: string;
   loopbackSubject?: string;
   requirePrincipal: boolean;
   verifyAccess?: (token: string) => Promise<AccessIdentity>;
@@ -32,8 +30,9 @@ export async function authenticateWorkerRequest(
     throw new IdentityConfigError("disabled identity cannot serve authenticated routes");
   }
 
+  rejectSpoofedPrincipal(input.headers);
+
   if (input.identityMode === "loopback") {
-    assertedLoopbackAddress(input.clientAddress);
     if (!input.requirePrincipal) {
       return null;
     }

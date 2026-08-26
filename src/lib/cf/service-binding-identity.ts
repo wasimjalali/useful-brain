@@ -36,3 +36,31 @@ export function assertionForBrain(headers: Headers): string {
   }
   return token;
 }
+
+export type BrainService = {
+  fetch(input: Request | string, init?: RequestInit): Promise<Response>;
+};
+
+export function createBrainBoundRequest(request: Request, path = "/whoami"): Request {
+  const headers = new Headers();
+  const assertion = readAccessAssertion(request.headers);
+  if (assertion) {
+    headers.set(ACCESS_ASSERTION_HEADER, assertion);
+  }
+  const requestId = request.headers.get("x-request-id");
+  if (requestId) {
+    headers.set("x-request-id", requestId);
+  }
+  return new Request(new URL(path, "https://brain.internal"), {
+    method: "GET",
+    headers,
+  });
+}
+
+export function forwardIdentityToBrain(
+  brain: BrainService,
+  request: Request,
+  path = "/whoami",
+): Promise<Response> {
+  return brain.fetch(createBrainBoundRequest(request, path));
+}

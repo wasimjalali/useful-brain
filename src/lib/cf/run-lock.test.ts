@@ -13,4 +13,8 @@ describe("conversation run lock", () => {
     expect(releaseRunLock("run-1", "run-2")).toEqual({ ok: false, status: 409 });
     expect(releaseRunLock("run-1", "run-1")).toEqual({ ok: true });
   });
+
+  it("rejects an unbounded run id before inspecting the lock", () => {
+    expect(() => acquireRunLock(undefined, "../run")).toThrow(/run id is invalid/);
+  });
 });

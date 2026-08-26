@@ -63,12 +63,23 @@ export function normaliseTeamDomain(raw: string): string {
   } catch {
     throw new AccessConfigError(`Access team domain does not form a usable URL: ${raw}`);
   }
-  if (parsed.username || parsed.password || parsed.search || parsed.hash || (parsed.pathname && parsed.pathname !== "/")) {
+  if (
+    parsed.protocol !== "https:" ||
+    parsed.username ||
+    parsed.password ||
+    parsed.port ||
+    parsed.search ||
+    parsed.hash ||
+    (parsed.pathname && parsed.pathname !== "/")
+  ) {
     throw new AccessConfigError(
-      "Access team domain must be a bare hostname, with no path, query, fragment or credentials",
+      "Access team domain must be a bare hostname, with no path, query, fragment, port or credentials",
     );
   }
-  return `${parsed.protocol}//${parsed.host}`;
+  if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.cloudflareaccess\.com$/i.test(parsed.hostname)) {
+    throw new AccessConfigError("Access team domain must be a *.cloudflareaccess.com hostname");
+  }
+  return `https://${parsed.hostname}`;
 }
 
 function safe(value: string, limit = 64): string {
@@ -108,6 +119,43 @@ function audienceValues(aud: unknown): string[] {
 
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+}
+
+async function readBoundedBody(response: Response, maxBytes: number, source: string): Promise<Uint8Array> {
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new AccessJwtUnavailable(`Access signing key set at ${source} had no body`);
+  }
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      if (!value) {
+        continue;
+      }
+      total += value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel();
+        throw new AccessJwtUnavailable(
+          `Access signing key set at ${source} exceeded ${maxBytes} bytes`,
+        );
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const buffer = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    buffer.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return buffer;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -308,7 +356,11 @@ export class AccessJwtVerifier {
     if (this.fetchInFlight) {
       return this.fetchInFlight;
     }
-    this.attemptedAt = this.nowElapsedMs();
+    const now = this.nowElapsedMs();
+    if (this.attemptedAt !== NEVER && now - this.attemptedAt < this.minRefetchMs) {
+      throw new AccessJwtUnavailable("Access signing keys could not be confirmed");
+    }
+    this.attemptedAt = now;
     this.fetchInFlight = this.fetchKeys()
       .then((keys) => {
         this.keys = keys;
@@ -334,12 +386,7 @@ export class AccessJwtVerifier {
     if (!response.ok) {
       throw new AccessJwtUnavailable(`could not fetch Access signing keys from ${this.certsUrl}`);
     }
-    const buffer = new Uint8Array(await response.arrayBuffer());
-    if (buffer.byteLength > MAX_JWKS_BYTES) {
-      throw new AccessJwtUnavailable(
-        `Access signing key set at ${this.certsUrl} exceeded ${MAX_JWKS_BYTES} bytes`,
-      );
-    }
+    const buffer = await readBoundedBody(response, MAX_JWKS_BYTES, this.certsUrl);
     let payload: unknown;
     try {
       payload = JSON.parse(new TextDecoder().decode(buffer)) as unknown;

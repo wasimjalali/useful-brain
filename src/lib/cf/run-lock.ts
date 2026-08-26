@@ -1,21 +1,24 @@
+import { parseBoundedId } from "./bounded-id";
+
+export type RunLockResult = { ok: true; runId: string } | { ok: false; status: 409 };
+
 export function acquireRunLock(
   currentRunId: string | undefined,
   requestedRunId: string,
-): { ok: true; runId: string } | { ok: false; status: 409 } {
-  if (!requestedRunId) {
+): RunLockResult {
+  const runId = parseBoundedId(requestedRunId, "run id");
+  if (currentRunId && currentRunId !== runId) {
     return { ok: false, status: 409 };
   }
-  if (currentRunId && currentRunId !== requestedRunId) {
-    return { ok: false, status: 409 };
-  }
-  return { ok: true, runId: requestedRunId };
+  return { ok: true, runId };
 }
 
 export function releaseRunLock(
   currentRunId: string | undefined,
   requestedRunId: string,
 ): { ok: true } | { ok: false; status: 409 } {
-  if (!currentRunId || currentRunId !== requestedRunId) {
+  const runId = parseBoundedId(requestedRunId, "run id");
+  if (!currentRunId || currentRunId !== runId) {
     return { ok: false, status: 409 };
   }
   return { ok: true };

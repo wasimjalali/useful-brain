@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { AccessJwtError, AccessJwtUnavailable } from "../auth/access-jwt";
-import { IdentityConfigError, LoopbackIdentityError } from "../auth/identity-mode";
+import { IdentityConfigError } from "../auth/identity-mode";
 import { toPublicWorkerError, workerErrorResponse } from "./worker-errors";
 
 describe("worker error contracts", () => {
@@ -31,15 +31,6 @@ describe("worker error contracts", () => {
       message: "Identity verification is temporarily unavailable.",
       retryable: true,
       requestId: "req-2",
-    });
-  });
-
-  it("maps a loopback client rejection to AUTH_REQUIRED", () => {
-    expect(toPublicWorkerError(new LoopbackIdentityError(), "req-lb")).toEqual({
-      code: "AUTH_REQUIRED",
-      message: "Sign in to continue.",
-      retryable: false,
-      requestId: "req-lb",
     });
   });
 

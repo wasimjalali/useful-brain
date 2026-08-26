@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import { AccessJwtError, AccessJwtUnavailable } from "./access-jwt";
-import { IdentityConfigError, LoopbackIdentityError } from "./identity-mode";
+import { IdentityConfigError } from "./identity-mode";
 import { PrincipalResolutionError } from "./principal";
 import { UnsignedPrincipalError } from "../cf/service-binding-identity";
 import { authenticateWorkerRequest } from "./worker-identity";
 
 const directory = {
+  id: "principal-dev",
   subject: "dev@localhost",
   kind: "user" as const,
   roles: ["operator"],
@@ -17,8 +18,10 @@ describe("worker inbound identity", () => {
   it("resolves loopback identity from the operations directory", async () => {
     const principal = await authenticateWorkerRequest({
       identityMode: "loopback",
-      headers: new Headers(),
-      clientAddress: "127.0.0.1",
+      headers: new Headers({
+        "x-forwarded-for": "203.0.113.8",
+        "cf-connecting-ip": "203.0.113.8",
+      }),
       loopbackSubject: "dev@localhost",
       requirePrincipal: true,
       loadDirectory: async () => directory,
@@ -26,17 +29,17 @@ describe("worker inbound identity", () => {
     expect(principal).toEqual(directory);
   });
 
-  it("does not treat a forwarded-for chain as loopback", async () => {
+  it("does not treat caller-controlled headers as Access identity", async () => {
     await expect(
       authenticateWorkerRequest({
-        identityMode: "loopback",
-        headers: new Headers(),
-        clientAddress: "127.0.0.1, 203.0.113.8",
-        loopbackSubject: "dev@localhost",
-        requirePrincipal: true,
-        loadDirectory: async () => directory,
+        identityMode: "access",
+        headers: new Headers({
+          "x-forwarded-for": "127.0.0.1",
+          "cf-connecting-ip": "127.0.0.1",
+        }),
+        requirePrincipal: false,
       }),
-    ).rejects.toBeInstanceOf(LoopbackIdentityError);
+    ).rejects.toBeInstanceOf(UnsignedPrincipalError);
   });
 
   it("fails closed when the loopback subject is missing from the directory", async () => {
@@ -44,7 +47,6 @@ describe("worker inbound identity", () => {
       authenticateWorkerRequest({
         identityMode: "loopback",
         headers: new Headers(),
-        clientAddress: "127.0.0.1",
         loopbackSubject: "dev@localhost",
         requirePrincipal: true,
         loadDirectory: async () => null,
@@ -111,7 +113,6 @@ describe("worker inbound identity", () => {
       authenticateWorkerRequest({
         identityMode: "loopback",
         headers: new Headers(),
-        clientAddress: "127.0.0.1",
         requirePrincipal: false,
       }),
     ).resolves.toBeNull();
