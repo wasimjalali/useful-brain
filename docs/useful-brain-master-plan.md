@@ -1,10 +1,10 @@
 # Useful Brain production master plan
 
-Status: finalized and approved for phased implementation, version 1.2
+Status: finalized and approved for phased implementation, version 1.3
 
 Date: 2026-08-26
 
-Implementation status: approved. Execution begins with the remaining Phase 0 feasibility gates and follows `docs/useful-brain-execution-tracker.md`.
+Implementation status: approved. Phase 0 technical spikes and the first-pilot planning profile are recorded. Execution follows `docs/useful-brain-execution-tracker.md`. Do not start Phase 1 until the Phase 0 PR is green.
 
 ## 1. Decision
 
@@ -30,7 +30,7 @@ The deployment boundary is one application and one isolated resource set per com
 - [Queues provide at-least-once delivery](https://developers.cloudflare.com/queues/reference/delivery-guarantees/). Cloudflare does not deduplicate deliveries for the application. Queue payloads carry identifiers only and consumers enforce idempotency.
 - [Workers have a 128 MB isolate memory limit](https://developers.cloudflare.com/workers/platform/limits/). File parsing and ingestion must stream, batch and reject oversized inputs.
 - Cloudflare currently recommends vinext for new Next.js projects, but it remains beta. The existing Next.js 16 application will use the supported [OpenNext adapter](https://developers.cloudflare.com/workers/framework-guides/web-apps/opennext/) first. A vinext migration can be reconsidered after compatibility and stability gates pass.
-- Pi declares Node.js 22.19 or newer for its install and build toolchain while its core and provider factories are designed to bundle without Node-only session dependencies. Direct Worker compatibility with `nodejs_compat` must be proved in Phase 0. Cloudflare Containers are generally available, but they are not an automatic fallback. Any Container-hosted agent requires a separate latency, cost, operations and residency decision.
+- Pi declares Node.js 22.19 or newer for its install and build toolchain while its core and provider factories are designed to bundle without Node-only session dependencies. Phase 0 proved unpaid `fauxProvider()` on Workers with `nodejs_compat`. Live AI Gateway and Workers AI remain unapproved. Cloudflare Containers are generally available, but they are not an automatic fallback. Any Container-hosted agent requires a separate latency, cost, operations and residency decision.
 
 ## 2. Product definition
 
@@ -405,7 +405,80 @@ Two quality ratchets are required: deterministic fake-provider CI floors and rea
 - Record baseline results from both current Nura and Burooj Sanad, including the exact Sanad commit and retrieval fingerprint.
 - Record the first company's residency, corpus-size, reindex-cadence, p95 latency, quality and monthly-cost budgets.
 
-Architecture approval is complete. Phase 0 exits when both spikes pass or an explicit fallback is approved and the baseline and workload decisions are recorded. No Phase 1 production foundation work starts before this exit.
+Architecture approval is complete. The unpaid Pi Worker spike, local OpenNext spike and first-pilot planning profile are recorded. No Phase 1 production foundation work starts before the Phase 0 PR is green. Do not provision Cloudflare resources or run paid inference yet.
+
+### First-pilot planning profile
+
+These are planning assumptions for the first isolated company deployment, not customer contractual promises. They were approved on 2026-08-26.
+
+#### Residency and retention
+
+- Target an EU-based first pilot.
+- The pilot requires GDPR-compatible processing with contractual transfer safeguards. It does not require strict EU-only processing.
+- Create D1 databases and R2 buckets with the `eu` jurisdiction.
+- Do not onboard a company requiring strict EU-only processing until Vectorize, Workers AI, AI Gateway, Worker execution and outbound model calls have a documented compliant path.
+- Source documents remain until deleted by the company. Purge deleted source objects and obsolete parser artifacts within 30 days.
+- Retain conversations and exact evidence snapshots for 90 days.
+- Retain operational logs for 30 days.
+- Retain approval, security and mutating-action audit records for 365 days.
+- Disable AI Gateway prompt and response payload storage. Retain metadata-only usage records.
+- Continue using synthetic data until a production data-handling review explicitly permits real company content.
+
+#### First-pilot workload envelope
+
+- Up to 10,000 documents
+- Up to 10 GB of source files
+- Maximum individual file size: 25 MB
+- Planning estimate: up to 100,000 chunks
+- Incremental connector synchronization: hourly
+- Full corpus rebuild: monthly and on retrieval configuration changes
+
+#### Users and concurrency
+
+- Up to 50 employees
+- Up to 10 concurrent chat or agent runs
+- Up to 5 service-token callers
+- One isolated application and Cloudflare resource set per company
+
+#### Initial product scope
+
+- Ship the Pi-based agent shell with the first release.
+- The first release is knowledge-first: retrieval, grounded answers, evaluations and read-only tools.
+- External mutating connector actions remain disabled until their policy, approval and idempotency phases pass.
+- If a production-only Pi problem appears later, knowledge-only RAG may ship while the agent runtime issue is resolved.
+
+#### Diagnostic visibility
+
+- Company administrators and designated operators may see complete retrieval diagnostics.
+- Ordinary employees may see citations and evidence they are authorized to read.
+- Ordinary employees may not see ACL calculations, hidden candidates, raw policy traces, model prompts or cross-user operational traces.
+
+#### Numeric release budgets
+
+Latency:
+
+- Retrieval p95: no more than 1.5 seconds
+- Time to first generated token p95: no more than 3 seconds
+- Complete grounded answer p95: no more than 15 seconds, excluding approval waits and external connector latency
+- Accepted document searchable p95: no more than 5 minutes for ordinary files
+
+Quality:
+
+- ACL leaks: exactly 0
+- Invalid citations: exactly 0
+- Unsupported answers for locked unanswerable cases: exactly 0
+- Full fake-provider evaluation floors: recall 0.907, MRR 0.821 and nDCG 0.831
+- Locked real-stack slices must meet or exceed the recorded BGE plus 0.05 results
+- Retrieval changes may not reduce either the fake or real locked baseline without an explicit reviewed decision
+
+Cost:
+
+- Idle deployment: existing $5 Workers Paid account minimum, with effectively $0 incremental idle Cloudflare cost
+- First-pilot Cloudflare platform budget: no more than $25 per month
+- External generation-model budget: no more than $75 per month
+- Initial combined operating budget: no more than $100 per company per month
+- Credits are excluded from cost justification until the billing dashboard confirms Developer Platform eligibility
+- Add budget alerts before any repeated live-stack evaluation or external model workload
 
 ### Phase 1: Cloudflare foundation
 
@@ -512,17 +585,17 @@ Grok works from `docs/useful-brain-execution-tracker.md` and the checked-in exec
 
 ### Must be validated before the dependent production phase
 
-- Pi's selective bundle and streaming behavior in the Workers runtime.
-- Whether a failed Pi Worker spike delays agent actions or justifies a separately approved Container deployment. There is no automatic fallback.
+- Pi's selective bundle and streaming behavior in the Workers runtime. Phase 0 unpaid `fauxProvider()` spike passed. Live AI Gateway and Workers AI remain unapproved.
+- Whether a production-only Pi problem should delay mutating actions or ship knowledge-only RAG. The first release ships the Pi agent shell as knowledge-first with read-only tools. There is no automatic Container fallback.
 - OpenNext compatibility with every current Next.js feature used by the app.
 - The exact reasoning model that clears the locked quality and tool-use gates.
 - D1 query plans and latency on the full Northwind corpus plus production-shaped scale data.
 - Upload parser memory behavior under the Worker limit.
 - Safe arbitrary-HTTP connector egress with pinned public addresses. Until proved, use explicit origin allowlists only.
-- Retention and regional requirements for the first real company deployment.
-- The first company's corpus size, reindex cadence, employee and service-token callers, trace visibility policy and numeric p95 latency, quality and cost budgets.
+- Retention and regional requirements for the first real company deployment. Recorded as the first-pilot planning profile: EU-based GDPR-compatible processing with contractual transfer safeguards, not strict EU-only processing; D1 and R2 `eu` jurisdiction; Vectorize, Workers AI, AI Gateway, Worker execution and outbound model calls still need a documented compliant path before a strict EU-only company is onboarded.
+- The first company's corpus size, reindex cadence, employee and service-token callers, trace visibility policy and numeric p95 latency, quality and cost budgets. Recorded as the first-pilot planning profile. Those ceilings are planning assumptions until they are measured on the selected production model.
 
-Most gates determine the safe implementation path inside Cloudflare. Residency can force a regional redesign. A failed Pi Worker spike can delay the agent milestone or reopen only the agent-hosting choice. Neither silently changes the rest of the Cloudflare-native RAG architecture.
+Most gates determine the safe implementation path inside Cloudflare. A company requiring strict EU-only processing would force a residency redesign. A production-only Pi failure can delay mutating actions or ship knowledge-only RAG while the agent runtime is resolved. Neither silently changes the rest of the Cloudflare-native RAG architecture.
 
 ## 15. Current Cloudflare cost envelope
 
@@ -546,7 +619,9 @@ With the application deployed but no users, files, queued work, vector queries o
 
 The 65-document Burooj migration corpus, 120-question evaluation set and ordinary CI builds fit comfortably inside the storage, vector and build allowances. Repeated full-stack model evals can still create Workers AI or external model charges, so staging receives daily spend limits and alerts before those evals run.
 
-The account's Cloudflare credits are useful runway only if their billing terms apply to the Developer Platform products used here. That eligibility must be confirmed in the billing dashboard before the plan treats the credit balance as a guarantee.
+First-pilot operating ceilings, excluding credits: no more than $25 per month Cloudflare platform, $75 per month external generation models, and $100 combined per company per month. Credits are excluded from cost justification until the billing dashboard confirms Developer Platform eligibility. Add budget alerts before any repeated live-stack evaluation or external model workload.
+
+The account's Cloudflare credits are useful runway only if their billing terms apply to the Developer Platform products used here. That eligibility is not yet confirmed.
 
 Current pricing references:
 

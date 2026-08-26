@@ -29,11 +29,18 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "install:spike:pi": "npm --prefix spikes/phase-0-pi-worker ci --legacy-peer-deps",
+    "typecheck:spike:pi": "npm --prefix spikes/phase-0-pi-worker run typecheck",
+    "test:spike:pi": "npm --prefix spikes/phase-0-pi-worker test",
+    "build:cf": "opennextjs-cloudflare build",
+    "preview:cf": "opennextjs-cloudflare build && opennextjs-cloudflare preview"
   },
   "dependencies": {
+    "@opennextjs/cloudflare": "1.20.3",
     "convex": "^1.42.1",
-    "next": "16.2.9",
+    "next": "16.3.3",
+    "rclone.js": "0.6.6",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "unpdf": "^1.6.2"
@@ -50,10 +57,11 @@
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6.0.3",
     "eslint": "^9",
-    "eslint-config-next": "16.2.9",
+    "eslint-config-next": "16.3.3",
     "jsdom": "^29.1.1",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.9",
+    "wrangler": "4.126.0"
   }
 }
