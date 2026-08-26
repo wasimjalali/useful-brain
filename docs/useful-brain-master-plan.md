@@ -4,7 +4,7 @@ Status: finalized and approved for phased implementation, version 1.3
 
 Date: 2026-08-26
 
-Implementation status: approved. Phase 0 technical spikes and the first-pilot planning profile are recorded. Execution follows `docs/useful-brain-execution-tracker.md`. Do not start Phase 1 until the Phase 0 PR is green.
+Implementation status: approved. Phase 0 is merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10)). Phase 1 local skeleton is in progress. Do not provision Cloudflare resources or run paid inference until Wasim approves.
 
 ## 1. Decision
 
@@ -405,7 +405,7 @@ Two quality ratchets are required: deterministic fake-provider CI floors and rea
 - Record baseline results from both current Nura and Burooj Sanad, including the exact Sanad commit and retrieval fingerprint.
 - Record the first company's residency, corpus-size, reindex-cadence, p95 latency, quality and monthly-cost budgets.
 
-Architecture approval is complete. The unpaid Pi Worker spike, local OpenNext spike and first-pilot planning profile are recorded. No Phase 1 production foundation work starts before the Phase 0 PR is green. Do not provision Cloudflare resources or run paid inference yet.
+Architecture approval is complete. Phase 0 is merged. Phase 1 adds the local Worker skeleton and identity contracts. Do not provision Cloudflare resources or run paid inference until Wasim approves.
 
 ### First-pilot planning profile
 

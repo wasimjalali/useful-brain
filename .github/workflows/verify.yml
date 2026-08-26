@@ -24,6 +24,8 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+      - run: npx wrangler deploy --dry-run --outdir /tmp/useful-brain-brain --config workers/brain/wrangler.jsonc --env development
+      - run: npx wrangler deploy --dry-run --outdir /tmp/useful-brain-ingestion --config workers/ingestion/wrangler.jsonc --env development
 
   pi-spike:
     name: Pi spike

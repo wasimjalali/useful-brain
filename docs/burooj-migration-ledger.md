@@ -1,12 +1,12 @@
 # Burooj migration ledger
 
-Status: initial Phase 0 recording. No TypeScript ports have started.
+Status: Phase 1 TypeScript ports have started. Access JWT is the first Burooj auth contract in Useful Brain.
 
 Sanad source commit: `630ba08dc7cad6aa71942d6842ce6d8d55a26873`  
 Sibling checkout: `/Users/wasimjalali/Desktop/Personal Project/Burooj`  
 Checkout note: HEAD matches the locked commit. The worktree is dirty with Tabari UI files only; Sanad sources used for this ledger were not modified.
 
-Target contract tests named below are planned Useful Brain files. They do not exist yet.
+Target contract tests named below are planned Useful Brain files unless Status is Ported.
 
 ## Named eval slices
 
@@ -49,7 +49,7 @@ The fake-provider CI ratchet is a **separate** fingerprint. The 2026-08-26 unpai
 | Hybrid fusion and local keyword rescoring | `sanad/src/sanad/retrieve/fusion.py`, `keyword_score.py` | `sanad/tests/test_fusion.py`, `test_pipeline.py` | Retrieval pipeline | `src/lib/retrieve/fusion.test.ts` | Not started |
 | Cross-encoder rerank and score floor | `sanad/src/sanad/retrieve/reranker.py` | `sanad/tests/test_reranker.py` | Workers AI reranker | `src/lib/retrieve/rerank.test.ts` | Not started |
 | Parent context off / conflict off | `sanad/src/sanad/retrieve/parent.py`, `conflict.py` | `test_parent_retrieval.py`, `test_conflict_detect.py` | Context assembly | `src/lib/retrieve/parent-off.test.ts` | Not started |
-| Access JWT verification | `sanad/src/sanad/auth/access_jwt.py` | `sanad/tests/test_auth_access_jwt.py` | Brain Access middleware | `src/lib/auth/access-jwt.test.ts` | Not started |
+| Access JWT verification | `sanad/src/sanad/auth/access_jwt.py` | `sanad/tests/test_auth_access_jwt.py` | Brain Access middleware | `src/lib/auth/access-jwt.test.ts` | Ported (Web Crypto; JWKS cache/concurrency suite still thinner than Burooj) |
 | Connector lifecycle and SSRF controls | `sanad/src/sanad/connectors/` | `test_connectors.py`, `test_live_http.py` | Ingestion connectors | `src/lib/connectors/ssrf.test.ts` | Not started |
 | 65-document Northwind corpus and 120 questions | `sanad/src/sanad/evals/corpus/` | `sanad/tests/test_evals.py`, `test_evals_loader.py` | TypeScript eval fixtures | `src/lib/eval/northwind.test.ts` | Not started |
 | Answer contract | `sanad/tests/test_brain_answer_contract.py` | same | RAG answer validation | `src/lib/answer/contract.test.ts` | Not started |
@@ -71,7 +71,7 @@ The fake-provider CI ratchet is a **separate** fingerprint. The 2026-08-26 unpai
 | GitHub truncated listings fail the sync | `connectors/` + `test_connectors.py` | Not started |
 | HTTP fetch pins validated public addresses or stays allowlist-only | `connectors/` + `test_live_http.py` | Not started |
 | Connector config recursively scrubbed; only named secret-binding references | `test_connector_instances.py` | Not started |
-| Access JWT: RS256, application token, fail closed; roles/departments from server directory | `auth/access_jwt.py` | Not started |
+| Access JWT: RS256, application token, fail closed; roles/departments from server directory | `auth/access_jwt.py` | Ported in `src/lib/auth/access-jwt.ts` and `src/lib/auth/principal.ts` |
 | Eval loader rejects duplicate keys; fake and real ratchets stay separate | `test_evals.py`, `test_evals_loader.py` | Not started |
 | Must-retrieve, current-turn evidence ledger, deterministic unavailable/insufficient_evidence, no transport leakage | `test_brain_grounding.py` | Not started |
 | Permission, keyword-oracle and window-eviction suites are release blockers | named tests above | Not started |

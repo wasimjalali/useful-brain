@@ -1,0 +1,181 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "useful-brain-ingestion",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-26",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": false
+  },
+  "vars": {
+    "RUNTIME_ENV": "development",
+    "IDENTITY_MODE": "loopback",
+    "RESOURCES_PROVISIONED": "false",
+    "WRANGLER_ACCESS_DEV": "false"
+  },
+  "d1_databases": [
+    {
+      "binding": "CORPUS_DB",
+      "database_name": "useful-brain-corpus-development",
+      "database_id": "00000000-0000-4000-8000-000000000001",
+      "migrations_dir": "../../migrations/corpus"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "SOURCES",
+      "bucket_name": "useful-brain-sources-development",
+      "jurisdiction": "eu"
+    }
+  ],
+  "vectorize": [
+    {
+      "binding": "VECTORIZE",
+      "index_name": "useful-brain-development"
+    }
+  ],
+  "ai": {
+    "binding": "AI"
+  },
+  "queues": {
+    "consumers": [
+      {
+        "queue": "useful-brain-ingest-development",
+        "max_retries": 5,
+        "dead_letter_queue": "useful-brain-ingest-dlq-development"
+      }
+    ]
+  },
+  "workflows": [
+    {
+      "name": "useful-brain-ingestion",
+      "binding": "INGESTION_WORKFLOW",
+      "class_name": "IngestionWorkflow"
+    }
+  ],
+  "env": {
+    "development": {
+      "vars": {
+        "RUNTIME_ENV": "development",
+        "IDENTITY_MODE": "loopback",
+        "RESOURCES_PROVISIONED": "false",
+        "WRANGLER_ACCESS_DEV": "false"
+      },
+      "d1_databases": [
+        {
+          "binding": "CORPUS_DB",
+          "database_name": "useful-brain-corpus-development",
+          "database_id": "00000000-0000-4000-8000-000000000001",
+          "migrations_dir": "../../migrations/corpus"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "SOURCES",
+          "bucket_name": "useful-brain-sources-development",
+          "jurisdiction": "eu"
+        }
+      ],
+      "vectorize": [{ "binding": "VECTORIZE", "index_name": "useful-brain-development" }],
+      "ai": { "binding": "AI" },
+      "queues": {
+        "consumers": [
+          {
+            "queue": "useful-brain-ingest-development",
+            "max_retries": 5,
+            "dead_letter_queue": "useful-brain-ingest-dlq-development"
+          }
+        ]
+      },
+      "workflows": [
+        {
+          "name": "useful-brain-ingestion-development",
+          "binding": "INGESTION_WORKFLOW",
+          "class_name": "IngestionWorkflow"
+        }
+      ]
+    },
+    "staging": {
+      "vars": {
+        "RUNTIME_ENV": "staging",
+        "IDENTITY_MODE": "access",
+        "RESOURCES_PROVISIONED": "false",
+        "WRANGLER_ACCESS_DEV": "false"
+      },
+      "d1_databases": [
+        {
+          "binding": "CORPUS_DB",
+          "database_name": "useful-brain-corpus-staging",
+          "database_id": "00000000-0000-4000-8000-000000000011",
+          "migrations_dir": "../../migrations/corpus"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "SOURCES",
+          "bucket_name": "useful-brain-sources-staging",
+          "jurisdiction": "eu"
+        }
+      ],
+      "vectorize": [{ "binding": "VECTORIZE", "index_name": "useful-brain-staging" }],
+      "ai": { "binding": "AI" },
+      "queues": {
+        "consumers": [
+          {
+            "queue": "useful-brain-ingest-staging",
+            "max_retries": 5,
+            "dead_letter_queue": "useful-brain-ingest-dlq-staging"
+          }
+        ]
+      },
+      "workflows": [
+        {
+          "name": "useful-brain-ingestion-staging",
+          "binding": "INGESTION_WORKFLOW",
+          "class_name": "IngestionWorkflow"
+        }
+      ]
+    },
+    "production": {
+      "vars": {
+        "RUNTIME_ENV": "production",
+        "IDENTITY_MODE": "access",
+        "RESOURCES_PROVISIONED": "false",
+        "WRANGLER_ACCESS_DEV": "false"
+      },
+      "d1_databases": [
+        {
+          "binding": "CORPUS_DB",
+          "database_name": "useful-brain-corpus-production",
+          "database_id": "00000000-0000-4000-8000-000000000021",
+          "migrations_dir": "../../migrations/corpus"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "SOURCES",
+          "bucket_name": "useful-brain-sources-production",
+          "jurisdiction": "eu"
+        }
+      ],
+      "vectorize": [{ "binding": "VECTORIZE", "index_name": "useful-brain-production" }],
+      "ai": { "binding": "AI" },
+      "queues": {
+        "consumers": [
+          {
+            "queue": "useful-brain-ingest-production",
+            "max_retries": 5,
+            "dead_letter_queue": "useful-brain-ingest-dlq-production"
+          }
+        ]
+      },
+      "workflows": [
+        {
+          "name": "useful-brain-ingestion-production",
+          "binding": "INGESTION_WORKFLOW",
+          "class_name": "IngestionWorkflow"
+        }
+      ]
+    }
+  }
+}

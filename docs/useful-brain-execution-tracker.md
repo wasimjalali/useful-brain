@@ -1,6 +1,6 @@
 # Useful Brain implementation execution tracker
 
-Status: Phase 0 PR on `phase-0-feasibility-baselines`. Do not start Phase 1.
+Status: Phase 1 on `phase-1-cloudflare-foundation`. Phase 0 is merged. Do not provision Cloudflare resources or run paid AI until Wasim approves.
 
 Architecture authority: `docs/useful-brain-master-plan.md`
 
@@ -70,8 +70,8 @@ Do not weaken or delete a failing test to make a gate pass. Record deviations an
 | Phase | Status | Exit evidence |
 | --- | --- | --- |
 | Plan review and product rename | Complete | Master plan v1.2 and renamed repository |
-| Phase 0: feasibility and baselines | PR opened, waiting for review | [phase-0 report](implementation-reports/phase-0-feasibility.md); spikes and first-pilot planning profile recorded |
-| Phase 1: Cloudflare foundation | Blocked by Phase 0 | Pending |
+| Phase 0: feasibility and baselines | Complete | [PR #10](https://github.com/wasimjalali/useful-brain/pull/10); [phase-0 report](implementation-reports/phase-0-feasibility.md) |
+| Phase 1: Cloudflare foundation | In progress | Local skeleton and identity contracts; staging deploy blocked on provisioning approval |
 | Phase 2: ingestion and generations | Blocked by Phase 1 | Pending |
 | Phase 3: ACL-safe retrieval | Blocked by Phase 2 | Pending |
 | Phase 4: grounded answers | Blocked by Phase 3 | Pending |
@@ -141,26 +141,27 @@ Recorded as the first-pilot planning profile. These are planning assumptions, no
 - [x] OpenNext spike passes or Wasim approves a documented fallback. Local build/preview passed. `node:fs` synthetic-doc path is recorded for R2 replacement; not a Node-server requirement.
 - [x] Both legacy baselines and the migration fingerprint are recorded.
 - [x] Product inputs and numeric budgets are recorded.
-- [ ] Phase 0 report and PR are green. This pull request is the Phase 0 PR. Do not start Phase 1, provision Cloudflare resources or run paid AI calls until it is reviewed and green.
+- [x] Phase 0 report and PR are green. [PR #10](https://github.com/wasimjalali/useful-brain/pull/10) merged 2026-08-26. Wasim accepted merge. GitHub Actions did not execute the new `verify` workflow until it landed on `main` (first workflow in the repo). Local root and Pi spike checks passed. Do not provision Cloudflare resources or run paid AI calls until Phase 1 approvals pass.
 
 ## 7. Phase 1: Cloudflare foundation
 
 Goal: deploy an authenticated, least-privilege skeleton with no production corpus migration.
 
-- [ ] Obtain package, schema, auth and resource-provisioning approvals before the relevant changes.
-- [ ] Add separate web, brain and ingestion Worker entrypoints with typed bindings.
-- [ ] Add development, staging and production Wrangler configuration without secrets or production coordinates in the repository.
-- [ ] Create independent corpus and operations D1 migration histories.
-- [ ] Add R2, Vectorize, Queue, Workflow, Durable Object, Workers AI, AI Gateway and Service Binding definitions.
-- [ ] Implement request IDs and safe cross-Worker error contracts.
-- [ ] Implement Brain-side Access application JWT verification with RS256, issuer, audience, time claims and `type=app` validation.
-- [ ] Resolve roles and departments only from the operations database.
-- [ ] Keep employee and service-token namespaces distinct.
-- [ ] Make Access, loopback asserted development identity and disabled identity mutually exclusive.
-- [ ] Fail startup in staging or production when a development identity escape hatch is enabled.
-- [ ] Prove Brain rejects an unsigned principal passed through a Service Binding.
-- [ ] Configure AI Gateway metadata logging with payload collection off.
-- [ ] Add a configuration test for `cf-aig-collect-log-payload: false` on production model requests.
+- [x] Obtain package, schema, auth and resource-provisioning approvals before the relevant changes. Evidence: no new npm packages. Access JWT uses Web Crypto (not `jose`). D1 SQL is local files only. Convex auth is unchanged. Staging/production stay unprovisioned (`RESOURCES_PROVISIONED=false`) until Wasim approves `wrangler d1 create --jurisdiction eu`, R2 `eu` buckets, Vectorize, Queues, Workflows, Access application and a staging deploy.
+- [x] Add separate web, brain and ingestion Worker entrypoints with typed bindings. Evidence: root `wrangler.jsonc` (OpenNext web), `workers/brain/`, `workers/ingestion/`.
+- [x] Add development, staging and production Wrangler configuration without secrets or production coordinates in the repository. Evidence: named envs use placeholder D1 IDs and empty Access audience/team domain. No `access.dev` block.
+- [x] Create independent corpus and operations D1 migration histories. Evidence: `migrations/corpus/0001_init.sql`, `migrations/operations/0001_init.sql`, `src/lib/store/migrations-contract.test.ts`.
+- [x] Add R2, Vectorize, Queue, Workflow, Durable Object, Workers AI, AI Gateway and Service Binding definitions. Evidence: ingestion R2 `eu`, Vectorize/AI/Queues/Workflows, brain Conversation DO, web `BRAIN` service binding. AI Gateway is header-enforced (`cf-aig-collect-log-payload: false`), not a Wrangler binding.
+- [x] Implement request IDs and safe cross-Worker error contracts. Evidence: `src/lib/cf/request-id.ts`, `src/lib/cf/worker-errors.ts`.
+- [x] Implement Brain-side Access application JWT verification with RS256, issuer, audience, time claims and `type=app` validation. Evidence: `src/lib/auth/access-jwt.ts` ported from Burooj `access_jwt.py` / `test_auth_access_jwt.py`.
+- [x] Resolve roles and departments only from the operations database. Evidence: `src/lib/auth/principal.ts`.
+- [x] Keep employee and service-token namespaces distinct. Evidence: Access JWT + principal tests.
+- [x] Make Access, loopback asserted development identity and disabled identity mutually exclusive. Evidence: `src/lib/auth/identity-mode.ts`.
+- [x] Fail startup in staging or production when a development identity escape hatch is enabled. Evidence: identity-mode and startup tests; `WRANGLER_ACCESS_DEV` must stay false.
+- [x] Prove Brain rejects an unsigned principal passed through a Service Binding. Evidence: `src/lib/cf/service-binding-identity.test.ts`.
+- [x] Configure AI Gateway metadata logging with payload collection off. Evidence: `src/lib/cf/ai-gateway.ts`.
+- [x] Add a configuration test for `cf-aig-collect-log-payload: false` on production model requests. Evidence: `src/lib/cf/ai-gateway.test.ts`.
+- [x] Local Wrangler dry-run of brain and ingestion (no account create). Evidence: wrangler 4.126.0 `--dry-run --env development`; brain gzip 6.48 KiB; ingestion gzip 6.00 KiB with R2 `eu`.
 - [ ] Deploy the empty skeleton to staging only after Wasim approves provisioning.
 
 ### Phase 1 exit
