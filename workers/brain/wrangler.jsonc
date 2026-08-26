@@ -1,0 +1,178 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "useful-brain-brain",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-26",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "dev": {
+    "ip": "127.0.0.1"
+  },
+  "observability": {
+    "enabled": false
+  },
+  "vars": {
+    "RUNTIME_ENV": "development",
+    "IDENTITY_MODE": "loopback",
+    "RESOURCES_PROVISIONED": "false",
+    "WRANGLER_ACCESS_DEV": "false",
+    "LOOPBACK_RUNTIME": "true",
+    "LOOPBACK_SUBJECT": "dev@localhost"
+  },
+  "d1_databases": [
+    {
+      "binding": "CORPUS_DB",
+      "database_name": "useful-brain-corpus-development",
+      "database_id": "00000000-0000-4000-8000-000000000001",
+      "migrations_dir": "../../migrations/corpus"
+    },
+    {
+      "binding": "OPERATIONS_DB",
+      "database_name": "useful-brain-operations-development",
+      "database_id": "00000000-0000-4000-8000-000000000002",
+      "migrations_dir": "../../migrations/operations"
+    }
+  ],
+  "vectorize": [
+    {
+      "binding": "VECTORIZE",
+      "index_name": "useful-brain-development"
+    }
+  ],
+  "ai": {
+    "binding": "AI"
+  },
+  "queues": {
+    "producers": [
+      {
+        "binding": "INGEST_QUEUE",
+        "queue": "useful-brain-ingest-development"
+      }
+    ]
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CONVERSATION",
+        "class_name": "ConversationRunLock"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["ConversationRunLock"]
+    }
+  ],
+  "env": {
+    "development": {
+      "workers_dev": false,
+      "preview_urls": false,
+      "vars": {
+        "RUNTIME_ENV": "development",
+        "IDENTITY_MODE": "loopback",
+        "RESOURCES_PROVISIONED": "false",
+        "WRANGLER_ACCESS_DEV": "false",
+        "LOOPBACK_RUNTIME": "true",
+        "LOOPBACK_SUBJECT": "dev@localhost"
+      },
+      "d1_databases": [
+        {
+          "binding": "CORPUS_DB",
+          "database_name": "useful-brain-corpus-development",
+          "database_id": "00000000-0000-4000-8000-000000000001",
+          "migrations_dir": "../../migrations/corpus"
+        },
+        {
+          "binding": "OPERATIONS_DB",
+          "database_name": "useful-brain-operations-development",
+          "database_id": "00000000-0000-4000-8000-000000000002",
+          "migrations_dir": "../../migrations/operations"
+        }
+      ],
+      "vectorize": [{ "binding": "VECTORIZE", "index_name": "useful-brain-development" }],
+      "ai": { "binding": "AI" },
+      "queues": {
+        "producers": [
+          { "binding": "INGEST_QUEUE", "queue": "useful-brain-ingest-development" }
+        ]
+      },
+      "durable_objects": {
+        "bindings": [{ "name": "CONVERSATION", "class_name": "ConversationRunLock" }]
+      }
+    },
+    "staging": {
+      "workers_dev": false,
+      "preview_urls": false,
+      "observability": {
+        "enabled": true,
+        "head_sampling_rate": 0.1
+      },
+      "vars": {
+        "RUNTIME_ENV": "staging",
+        "IDENTITY_MODE": "access",
+        "RESOURCES_PROVISIONED": "false",
+        "WRANGLER_ACCESS_DEV": "false",
+        "LOOPBACK_RUNTIME": "false",
+        "LOOPBACK_SUBJECT": ""
+      },
+      "d1_databases": [
+        {
+          "binding": "CORPUS_DB",
+          "database_name": "useful-brain-corpus-staging",
+          "database_id": "00000000-0000-4000-8000-000000000011",
+          "migrations_dir": "../../migrations/corpus"
+        },
+        {
+          "binding": "OPERATIONS_DB",
+          "database_name": "useful-brain-operations-staging",
+          "database_id": "00000000-0000-4000-8000-000000000012",
+          "migrations_dir": "../../migrations/operations"
+        }
+      ],
+      "vectorize": [{ "binding": "VECTORIZE", "index_name": "useful-brain-staging" }],
+      "ai": { "binding": "AI" },
+      "queues": {
+        "producers": [{ "binding": "INGEST_QUEUE", "queue": "useful-brain-ingest-staging" }]
+      },
+      "durable_objects": {
+        "bindings": [{ "name": "CONVERSATION", "class_name": "ConversationRunLock" }]
+      }
+    },
+    "production": {
+      "workers_dev": false,
+      "preview_urls": false,
+      "vars": {
+        "RUNTIME_ENV": "production",
+        "IDENTITY_MODE": "access",
+        "RESOURCES_PROVISIONED": "false",
+        "WRANGLER_ACCESS_DEV": "false",
+        "LOOPBACK_RUNTIME": "false",
+        "LOOPBACK_SUBJECT": ""
+      },
+      "d1_databases": [
+        {
+          "binding": "CORPUS_DB",
+          "database_name": "useful-brain-corpus-production",
+          "database_id": "00000000-0000-4000-8000-000000000021",
+          "migrations_dir": "../../migrations/corpus"
+        },
+        {
+          "binding": "OPERATIONS_DB",
+          "database_name": "useful-brain-operations-production",
+          "database_id": "00000000-0000-4000-8000-000000000022",
+          "migrations_dir": "../../migrations/operations"
+        }
+      ],
+      "vectorize": [{ "binding": "VECTORIZE", "index_name": "useful-brain-production" }],
+      "ai": { "binding": "AI" },
+      "queues": {
+        "producers": [{ "binding": "INGEST_QUEUE", "queue": "useful-brain-ingest-production" }]
+      },
+      "durable_objects": {
+        "bindings": [{ "name": "CONVERSATION", "class_name": "ConversationRunLock" }]
+      }
+    }
+  }
+}

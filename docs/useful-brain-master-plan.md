@@ -1,10 +1,10 @@
 # Useful Brain production master plan
 
-Status: finalized and approved for phased implementation, version 1.3
+Status: finalized and approved for phased implementation, version 1.4
 
 Date: 2026-08-26
 
-Implementation status: approved. Phase 0 technical spikes and the first-pilot planning profile are recorded. Execution follows `docs/useful-brain-execution-tracker.md`. Do not start Phase 1 until the Phase 0 PR is green.
+Implementation status: approved. Phase 0 is merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10)). Phase 1 is [PR #11](https://github.com/wasimjalali/useful-brain/pull/11) and must be repaired before merge. Standing authorization (2026-08-26) covers Phase 1 through Phase 6 and Phase 7A. Phase 7B remains closed. Do not provision Cloudflare resources until PR #11 is corrected, independently reviewed and merged.
 
 ## 1. Decision
 
@@ -108,6 +108,8 @@ The preservation target is behavior, not filenames. The TypeScript port must ret
 - GitHub truncated listings fail the sync. Arbitrary HTTP fetching must pin a validated public address through every redirect hop, including IPv4-mapped, NAT64 and Teredo forms, or remain disabled in favor of explicit origin allowlists.
 - Stored connector configuration is recursively scrubbed for secrets. It may reference only explicitly allowlisted connector-secret bindings.
 - Access verification pins RS256, requires an application token and fails closed on JWKS or directory failure. Roles and departments come from the server-owned directory, not token custom claims.
+- JWKS fetches are single-flight, streamed and cancelled above 256 KiB. The refetch floor advances on failed as well as successful attempts so a cold-start outage cannot produce one fetch per request. Team domains are a bare HTTPS `*.cloudflareaccess.com` hostname with no port, credentials, path, query or fragment.
+- Bounded stale-key grace (3600s) is retained from Burooj: a previously fetched key may be used through a brief JWKS blip, then fail closed. Serving never-fetched keys after a failed first fetch is forbidden. This grace is a retained Burooj contract and requires an independent security verdict before Phase 1 merge.
 - The eval loader rejects duplicate keys. The fake-provider CI ratchet and real-stack ratchet remain separate, including the locked and expanded multi-hop slices.
 - Host grounding enforces must-retrieve, current-turn evidence-ledger citations, deterministic unavailable and insufficient-evidence responses and no transport-detail leakage.
 - Permission, keyword-oracle and window-eviction suites remain release blockers.
@@ -321,10 +323,14 @@ If this fails, the agent milestone pauses. Knowledge-only RAG may ship first if 
 
 ## 8. Identity, authorization and security
 
-- Cloudflare Access protects every production route. The Web Worker uses `ctx.access` when Access directly invokes it and forwards the original `Cf-Access-Jwt-Assertion` to Brain. Brain independently validates the RS256 signature, key ID, issuer, audience, `iat`, `nbf`, expiry and `type=app` before any data access.
-- Service-token identity and employee identity occupy explicit, disjoint namespaces. An empty service-token `sub` is never treated as an employee.
+- Cloudflare Access protects every production route. The Web Worker uses `ctx.access` when Access directly invokes it and forwards the original `Cf-Access-Jwt-Assertion` to Brain. Brain independently validates the RS256 signature, key ID, issuer, audience, `iat`, `nbf`, expiry and `type=app` before any data access. Access context does not propagate automatically across a Service Binding.
+- Service-token identity and employee identity occupy explicit, disjoint namespaces. An empty service-token `sub` is never treated as an employee. Every principal has a stable principal ID; uniqueness is `(kind, subject)`; roles and departments attach to the principal ID; grants must not flow through a nullable user foreign key.
+- Loopback asserted development identity depends on a trusted local runtime signal and a loopback-only listener. Caller-controlled headers such as `x-forwarded-for` never prove loopback origin. Staging and production fail startup if loopback is enabled.
+- Brain and Ingestion staging and production set `workers_dev: false` and `preview_urls: false`, receive no public routes, and are reachable only through Service Bindings and approved platform triggers. `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` are protected secrets, never committed staging or production vars.
 - The verified Access subject maps to a principal in the operations database. Roles and departments are server-owned. Browser-supplied claims and trimmed token custom claims never authorize data.
 - The three identity modes are mutually exclusive: Access, loopback-only asserted development identity, or disabled. Production and staging fail at startup if asserted identity or Wrangler `access.dev` is configured.
+- Starting agent execution budgets: 8 model turns, 8 total tool calls, 4 `search_knowledge` calls, 32,000 input tokens, 4,000 output tokens, 90s interactive wall time, 60s model timeout, 10s read-tool timeout, 15-minute approval expiry, 32 KiB persisted redacted tool results, 1 MiB raw external response before parsing. Mutating tools are sequential. High-risk actions are denied. Budgets may be tightened from evidence and must not be loosened beyond the approved cost, security or latency envelope without stopping.
+- Cloudflare-hosted `@cf/...` models are the only eligible default production models. Selection is evidence-based: enumerate the live catalog, shortlist against hard requirements, benchmark the qualified set, and write `docs/model-selection-report.md`. Third-party models through AI Gateway are not the default unless every suitable Cloudflare-hosted candidate fails a hard gate and Wasim later approves an exception.
 - Document authorization supports public, department, role and private-owner scopes. The resulting ACL group is indexed in Vectorize and expressed independently in D1 SQL.
 - Denied chunks never enter candidate normalization, reranking, model context, logs or traces.
 - Worker secrets or AI Gateway stored keys hold initial provider and connector service credentials. No secret value is stored in repository files or ordinary D1 rows.
@@ -405,7 +411,9 @@ Two quality ratchets are required: deterministic fake-provider CI floors and rea
 - Record baseline results from both current Nura and Burooj Sanad, including the exact Sanad commit and retrieval fingerprint.
 - Record the first company's residency, corpus-size, reindex-cadence, p95 latency, quality and monthly-cost budgets.
 
-Architecture approval is complete. The unpaid Pi Worker spike, local OpenNext spike and first-pilot planning profile are recorded. No Phase 1 production foundation work starts before the Phase 0 PR is green. Do not provision Cloudflare resources or run paid inference yet.
+Architecture approval is complete. Phase 0 is merged. Phase 1 PR #11 repair is implemented on `phase-1-cloudflare-foundation` (WorkflowEntrypoint, Access JWT JWKS contracts, Service Binding identity, loopback, principal schema, SQLite Durable Object lock, workerd tests). Do not merge or provision staging until independent review, including the stale-key grace verdict, is green.
+
+Standing authorization (2026-08-26): Grok 4.6 xhigh may execute Phase 1 through Phase 6 and Phase 7A without ordinary phase-by-phase approval. That includes approved packages, master-plan schema and auth changes, staging-only resources after PR #11 merges, synthetic Workers AI/evals inside the safety limits, PRs, merging green PRs, continuing to the next phase, planning-document updates, evidence-based Cloudflare-hosted model selection, and eligible credits for staging infrastructure and Workers AI. It does not include real company data, production cutover, destructive retirement, uncovered external spend or unlimited usage.
 
 ### First-pilot planning profile
 
@@ -474,11 +482,15 @@ Quality:
 Cost:
 
 - Idle deployment: existing $5 Workers Paid account minimum, with effectively $0 incremental idle Cloudflare cost
-- First-pilot Cloudflare platform budget: no more than $25 per month
-- External generation-model budget: no more than $75 per month
-- Initial combined operating budget: no more than $100 per company per month
-- Credits are excluded from cost justification until the billing dashboard confirms Developer Platform eligibility
-- Add budget alerts before any repeated live-stack evaluation or external model workload
+- First-pilot Cloudflare platform **safety boundary**: no more than $25 gross per month
+- Workers AI inference **safety boundary**: no more than $75 gross per month
+- Combined **protection limit**: no more than $100 gross per company per month
+- These are not reserved budgets, prepaid commitments or expected monthly bills
+- Empty staging Workers, D1, R2, Vectorize, Queues, Workflows, Durable Objects and AI Gateway configuration do not imply $100 of monthly spending
+- Record gross metered cost before credits separately from uncovered cash cost
+- Do not describe credit-covered consumption as free inference
+- Use eligible Cloudflare credits for staging infrastructure and Workers AI; route eligible Workers AI through AI Gateway Unified Billing when that is the confirmed credit path
+- Stop before purchasing another subscription, using a service not covered by confirmed credits, creating a production resource set, exceeding a safety limit, or allowing an unbounded inference/Workflow/Queue/retry loop
 
 ### Phase 1: Cloudflare foundation
 
@@ -530,14 +542,28 @@ Exit: adversarial tool-policy tests pass and every run stores the model, prompt 
 
 Exit: one read connector and one approved write connector pass security, untrusted-result, failure and revocation tests. A broad marketplace is not required.
 
-### Phase 7: cutover and retirement
+### Phase 7A: staging release candidate
 
-- Run staging load, restore and incident drills.
-- Run Cloudflare in shadow, then canary, then primary mode.
-- Keep the Convex path read-only during the rollback window.
-- Remove legacy code only after data and behavior parity are proved.
+Authorized after Phase 6. Synthetic data only.
 
-Exit: production runs on Cloudflare, rollback has expired successfully and legacy resources are decommissioned deliberately.
+- Staging load, D1/R2 restore and incident drills.
+- Corpus rollback proof.
+- Synthetic shadow, canary and staging-primary modes.
+- Operational and rollback runbooks.
+- Budget and alert validation.
+- Burooj migration-ledger completion and a recoverable Burooj archive.
+
+Exit: staging is the release candidate. No real company data.
+
+### Phase 7B: production launch and retirement
+
+Requires one final explicit Wasim approval.
+
+- Real company data, production resource set and real production traffic.
+- Production-primary cutover and rollback-window expiry.
+- Convex deletion, Burooj deletion and destructive legacy-resource removal.
+
+Exit: only after Wasim explicitly approves real production cutover and retirement.
 
 ## 12. Burooj retirement gate
 
@@ -561,7 +587,7 @@ Implementation uses one bounded phase at a time with explicit acceptance evidenc
 - `GPT-5.6 Sol xhigh`: architecture changes, critic adjudication, security-boundary review and final integration review.
 - The enabled security and code-review checks remain independent merge gates for critical work.
 
-Grok works from `docs/useful-brain-execution-tracker.md` and the checked-in execution prompt. Every phase lands through a branch and PR. It must stop on architecture drift, a failed phase exit, an approval boundary or a newly discovered high-severity risk. Critical auth, database, connector, secret and tool-execution code receives the required security and code reviews before merge.
+Grok works from `docs/useful-brain-execution-tracker.md` and the checked-in execution prompt. Standing authorization covers Phase 1 through Phase 6 and Phase 7A. Every phase lands through a branch and PR. Independent review is `codex review --base main`; a self-review is not independent. Merge only when GitHub checks and independent review are green. Stop on architecture drift, a failed phase exit, a remaining stop condition in `AGENTS.md`, or a newly discovered high-severity risk with no in-plan fix. Phase 7B and destructive retirement remain closed.
 
 ## 14. Finalized choices and open validation gates
 

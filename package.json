@@ -28,7 +28,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run",
+    "test": "vitest run --config vitest.config.ts && npm run test:workers",
+    "test:workers": "npm run types:workers && vitest run --config workers/brain/vitest.config.mts && vitest run --config workers/ingestion/vitest.config.mts",
+    "types:workers": "wrangler types workers/brain/worker-configuration.d.ts -c workers/brain/wrangler.jsonc && wrangler types workers/ingestion/worker-configuration.d.ts -c workers/ingestion/wrangler.jsonc",
+    "typecheck:workers": "npm run types:workers && tsc --noEmit -p workers/brain/tsconfig.json && tsc --noEmit -p workers/ingestion/tsconfig.json",
     "test:watch": "vitest",
     "install:spike:pi": "npm --prefix spikes/phase-0-pi-worker ci --legacy-peer-deps",
     "typecheck:spike:pi": "npm --prefix spikes/phase-0-pi-worker run typecheck",
@@ -46,9 +49,12 @@
     "unpdf": "^1.6.2"
   },
   "overrides": {
-    "postcss": "8.5.16"
+    "postcss": "8.5.26",
+    "nanoid": "3.3.18",
+    "adm-zip": "0.6.0"
   },
   "devDependencies": {
+    "@cloudflare/vitest-plugin": "1.1.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",

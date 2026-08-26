@@ -4,6 +4,21 @@
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-08-26",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "dev": {
+    "ip": "127.0.0.1"
+  },
+  "observability": {
+    "enabled": false
+  },
+  "vars": {
+    "RUNTIME_ENV": "development",
+    "IDENTITY_MODE": "loopback",
+    "RESOURCES_PROVISIONED": "false",
+    "WRANGLER_ACCESS_DEV": "false",
+    "LOOPBACK_RUNTIME": "true"
+  },
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
@@ -12,9 +27,87 @@
     {
       "binding": "WORKER_SELF_REFERENCE",
       "service": "useful-brain"
+    },
+    {
+      "binding": "BRAIN",
+      "service": "useful-brain-brain"
     }
   ],
-  "observability": {
-    "enabled": false
+  "env": {
+    "development": {
+      "workers_dev": false,
+      "preview_urls": false,
+      "vars": {
+        "RUNTIME_ENV": "development",
+        "IDENTITY_MODE": "loopback",
+        "RESOURCES_PROVISIONED": "false",
+        "WRANGLER_ACCESS_DEV": "false",
+        "LOOPBACK_RUNTIME": "true"
+      },
+      "assets": {
+        "directory": ".open-next/assets",
+        "binding": "ASSETS"
+      },
+      "services": [
+        {
+          "binding": "WORKER_SELF_REFERENCE",
+          "service": "useful-brain-development"
+        },
+        {
+          "binding": "BRAIN",
+          "service": "useful-brain-brain-development"
+        }
+      ]
+    },
+    "staging": {
+      "workers_dev": false,
+      "preview_urls": false,
+      "vars": {
+        "RUNTIME_ENV": "staging",
+        "IDENTITY_MODE": "access",
+        "RESOURCES_PROVISIONED": "false",
+        "WRANGLER_ACCESS_DEV": "false",
+        "LOOPBACK_RUNTIME": "false"
+      },
+      "assets": {
+        "directory": ".open-next/assets",
+        "binding": "ASSETS"
+      },
+      "services": [
+        {
+          "binding": "WORKER_SELF_REFERENCE",
+          "service": "useful-brain-staging"
+        },
+        {
+          "binding": "BRAIN",
+          "service": "useful-brain-brain-staging"
+        }
+      ]
+    },
+    "production": {
+      "workers_dev": false,
+      "preview_urls": false,
+      "vars": {
+        "RUNTIME_ENV": "production",
+        "IDENTITY_MODE": "access",
+        "RESOURCES_PROVISIONED": "false",
+        "WRANGLER_ACCESS_DEV": "false",
+        "LOOPBACK_RUNTIME": "false"
+      },
+      "assets": {
+        "directory": ".open-next/assets",
+        "binding": "ASSETS"
+      },
+      "services": [
+        {
+          "binding": "WORKER_SELF_REFERENCE",
+          "service": "useful-brain-production"
+        },
+        {
+          "binding": "BRAIN",
+          "service": "useful-brain-brain-production"
+        }
+      ]
+    }
   }
 }

@@ -17,6 +17,6 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
-    exclude: ["**/node_modules/**", "**/dist/**", "spikes/**", ".open-next/**"],
+    exclude: ["**/node_modules/**", "**/dist/**", "spikes/**", ".open-next/**", "workers/**"],
   },
 });

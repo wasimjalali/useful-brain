@@ -1,0 +1,29 @@
+{
+  "name": "useful-brain-ingestion",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-26",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "vars": {
+    "RUNTIME_ENV": "development",
+    "IDENTITY_MODE": "loopback",
+    "RESOURCES_PROVISIONED": "false",
+    "WRANGLER_ACCESS_DEV": "false",
+    "LOOPBACK_RUNTIME": "true"
+  },
+  "workflows": [
+    {
+      "name": "useful-brain-ingestion-test",
+      "binding": "INGESTION_WORKFLOW",
+      "class_name": "IngestionWorkflow"
+    }
+  ],
+  "queues": {
+    "consumers": [
+      {
+        "queue": "useful-brain-ingest-development",
+        "max_retries": 5,
+        "dead_letter_queue": "useful-brain-ingest-dlq-development"
+      }
+    ]
+  }
+}

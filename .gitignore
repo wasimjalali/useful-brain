@@ -27,6 +27,7 @@ pnpm-debug.log*
 .open-next/
 .wrangler/
 .dev.vars
+workers/**/worker-configuration.d.ts
 worker-startup.cpuprofile
 **/worker-startup.cpuprofile
 spikes/**/node_modules/

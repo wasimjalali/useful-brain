@@ -1,10 +1,12 @@
 # Useful Brain implementation execution tracker
 
-Status: Phase 0 PR on `phase-0-feasibility-baselines`. Do not start Phase 1.
+Status: Phase 1 repair on `phase-1-cloudflare-foundation` ([PR #11](https://github.com/wasimjalali/useful-brain/pull/11)). Phase 0 is merged. Do not merge PR #11 or provision Cloudflare resources until Phase 1 repairs, workerd evidence and independent review are complete.
 
 Architecture authority: `docs/useful-brain-master-plan.md`
 
 Execution prompt: `docs/useful-brain-grok-execution-prompt.md`
+
+Standing authorization: 2026-08-26. Grok 4.6 xhigh may execute Phase 1 through Phase 6 and Phase 7A without ordinary phase-by-phase approval. Phase 7B stays closed.
 
 ## 1. Objective
 
@@ -33,18 +35,34 @@ Changing one of these decisions is an architecture change. Stop, write the evide
 
 ## 3. Approval boundaries
 
-Grok must stop and ask Wasim before:
+Wasim granted standing authorization on 2026-08-26 for Grok 4.6 xhigh to execute Phase 1 through Phase 6 and Phase 7A without requesting ordinary phase-by-phase approval. That covers:
 
-- installing or changing npm packages
-- applying a D1 schema migration outside a disposable local test database
-- changing authentication or authorization behavior
-- creating Cloudflare resources that may produce charges
-- choosing a paid model or paid product tier
+1. Installing the approved packages in `AGENTS.md`.
+2. Making D1 schema and authentication changes required by the approved master plan.
+3. Provisioning the approved staging-only Cloudflare resources **after PR #11 is corrected, independently reviewed and merged**.
+4. Running synthetic Workers AI and model evaluations within the approved usage boundaries.
+5. Creating branches, committing, pushing, opening PRs and merging green PRs.
+6. Continuing automatically from one completed phase to the next.
+7. Updating the master plan, tracker, execution prompt, migration ledger and implementation reports.
+8. Selecting Cloudflare-hosted models through the evidence-based process in the master plan.
+9. Using eligible Cloudflare credits for staging infrastructure and Workers AI inference.
+
+This authorization does **not** cover real company data, production cutover, destructive retirement, uncovered external-provider spending or unlimited resource usage.
+
+Grok must still stop and ask Wasim before:
+
+- installing a package outside the approved list when no package-free path exists
+- purchasing another subscription or paid add-on
+- creating a production resource set
+- exceeding a configured gross usage safety limit
+- using a service not covered by confirmed credits
+- changing a fixed architecture decision
 - deleting Convex code, data or resources
 - deleting or archiving the Burooj repository
-- changing a fixed architecture decision
+- Phase 7B production launch, real traffic cutover or destructive legacy-resource removal
+- a manual identity, domain or protected-secret bootstrap that cannot be done in code
 
-Repository inspection, local tests, throwaway source spikes, documentation, branch work and non-destructive read-only Cloudflare checks do not require a new approval.
+The $25 Cloudflare and $75 model figures are gross usage safety boundaries, not reserved budgets. Idle empty staging resources are expected to add approximately $0 above the existing $5 Workers Paid minimum. Record gross metered cost before credits separately from uncovered cash cost. Do not describe credit-covered consumption as free inference.
 
 ## 4. Execution protocol
 
@@ -54,30 +72,31 @@ For every phase:
 2. Inspect only the code and Burooj sources required for the current phase.
 3. Verify current Next.js, Cloudflare and Pi APIs from primary documentation.
 4. Create a phase branch from current `main`. Never work directly on `main`.
-5. Write or port contract tests before custom behavior where practical.
+5. Write or port contract tests before custom behavior where practical. Critical Worker behavior requires workerd tests, not Node-only mocks.
 6. Implement only the current phase and its prerequisites.
 7. Update this tracker and any stale project markdown.
-8. Run `npx tsc --noEmit`, `npm run lint`, `npm test` and `npm run build`.
-9. Run the phase-specific tests and required critical-code reviews.
-10. Commit conventionally, push, open a PR and wait for required checks.
+8. Run `npx tsc --noEmit`, `npm run lint`, `npm test`, `npm run build`, relevant workerd tests, Wrangler dry runs, phase-specific evals, `npm audit --omit=dev --audit-level=high` and security tests.
+9. Run independent review with `codex review --base main`. Fix every confirmed P0/P1 and every confirmed high or critical security finding. A self-review is not independent.
+10. Commit conventionally, push, open a PR and wait for GitHub checks.
 11. Add `docs/implementation-reports/phase-N-<name>.md` with the evidence template in Section 13.
-12. Continue only after the phase exit is satisfied.
+12. Merge only when checks and independent review are green, then start the next phase from updated `main`.
 
-Do not weaken or delete a failing test to make a gate pass. Record deviations and unresolved failures explicitly.
+Do not weaken or delete a failing test to make a gate pass. Record deviations and unresolved failures explicitly. A Wrangler dry-run that only bundles an exported symbol is not evidence that a Workflow, Durable Object or Service Binding path works.
 
 ## 5. Status board
 
 | Phase | Status | Exit evidence |
 | --- | --- | --- |
 | Plan review and product rename | Complete | Master plan v1.2 and renamed repository |
-| Phase 0: feasibility and baselines | PR opened, waiting for review | [phase-0 report](implementation-reports/phase-0-feasibility.md); spikes and first-pilot planning profile recorded |
-| Phase 1: Cloudflare foundation | Blocked by Phase 0 | Pending |
+| Phase 0: feasibility and baselines | Complete | [PR #10](https://github.com/wasimjalali/useful-brain/pull/10); [phase-0 report](implementation-reports/phase-0-feasibility.md) |
+| Phase 1: Cloudflare foundation | In progress — PR #11 must be repaired | Workerd Workflow, DO lock, Service Binding identity and staging auth remain incomplete |
 | Phase 2: ingestion and generations | Blocked by Phase 1 | Pending |
 | Phase 3: ACL-safe retrieval | Blocked by Phase 2 | Pending |
 | Phase 4: grounded answers | Blocked by Phase 3 | Pending |
 | Phase 5: Pi knowledge agent | Blocked by Phase 4 | Pending |
 | Phase 6: connectors, MCP and plugins | Blocked by Phase 5 | Pending |
-| Phase 7: cutover and retirement | Blocked by Phase 6 | Pending |
+| Phase 7A: staging release candidate | Blocked by Phase 6 | Authorized after Phase 6; synthetic only |
+| Phase 7B: production launch and retirement | Closed | Requires one final explicit Wasim approval |
 
 ## 6. Phase 0: feasibility and baselines
 
@@ -141,35 +160,47 @@ Recorded as the first-pilot planning profile. These are planning assumptions, no
 - [x] OpenNext spike passes or Wasim approves a documented fallback. Local build/preview passed. `node:fs` synthetic-doc path is recorded for R2 replacement; not a Node-server requirement.
 - [x] Both legacy baselines and the migration fingerprint are recorded.
 - [x] Product inputs and numeric budgets are recorded.
-- [ ] Phase 0 report and PR are green. This pull request is the Phase 0 PR. Do not start Phase 1, provision Cloudflare resources or run paid AI calls until it is reviewed and green.
+- [x] Phase 0 report and PR are green. [PR #10](https://github.com/wasimjalali/useful-brain/pull/10) merged 2026-08-26. Wasim accepted merge. GitHub Actions did not execute the new `verify` workflow until it landed on `main` (first workflow in the repo). Local root and Pi spike checks passed. Do not provision Cloudflare resources or run paid AI calls until Phase 1 approvals pass.
 
 ## 7. Phase 1: Cloudflare foundation
 
 Goal: deploy an authenticated, least-privilege skeleton with no production corpus migration.
 
-- [ ] Obtain package, schema, auth and resource-provisioning approvals before the relevant changes.
-- [ ] Add separate web, brain and ingestion Worker entrypoints with typed bindings.
-- [ ] Add development, staging and production Wrangler configuration without secrets or production coordinates in the repository.
-- [ ] Create independent corpus and operations D1 migration histories.
-- [ ] Add R2, Vectorize, Queue, Workflow, Durable Object, Workers AI, AI Gateway and Service Binding definitions.
-- [ ] Implement request IDs and safe cross-Worker error contracts.
-- [ ] Implement Brain-side Access application JWT verification with RS256, issuer, audience, time claims and `type=app` validation.
-- [ ] Resolve roles and departments only from the operations database.
-- [ ] Keep employee and service-token namespaces distinct.
-- [ ] Make Access, loopback asserted development identity and disabled identity mutually exclusive.
-- [ ] Fail startup in staging or production when a development identity escape hatch is enabled.
-- [ ] Prove Brain rejects an unsigned principal passed through a Service Binding.
-- [ ] Configure AI Gateway metadata logging with payload collection off.
-- [ ] Add a configuration test for `cf-aig-collect-log-payload: false` on production model requests.
-- [ ] Deploy the empty skeleton to staging only after Wasim approves provisioning.
+No remote D1, R2, Vectorize, Queue, Workflow or Access resource has been created. `RESOURCES_PROVISIONED` remains `false`. The operations `0001_init.sql` file has **not** been applied to any remote D1, so the principal/grant schema may still be corrected in that initial migration rather than adding a follow-on migration.
+
+### Repair list (PR #11 — do not merge until complete)
+
+- [x] Replace `IngestionWorkflow` with a Cloudflare `WorkflowEntrypoint` that runs at least one real, bounded, idempotent `step.do`. Evidence: `workers/ingestion/src/workflow.ts` extends `WorkflowEntrypoint` with official `run(event, step)` and `step.do("accept-ingestion-job")`. Confirmed against https://developers.cloudflare.com/workflows/build/workers-api/ (accessed 2026-08-26). Workerd: `workers/ingestion/test/workflow.test.ts`.
+- [x] Access JWT implementation: JWKS refetch floor after cold-start failure; join in-flight fetches; stream and cancel JWKS over 256 KiB; team domain restricted to bare HTTPS `*.cloudflareaccess.com`; never-fetched keys fail closed. Evidence: `src/lib/auth/access-jwt.ts`, Node `src/lib/auth/access-jwt.test.ts`, workerd `workers/brain/test/access-jwt.test.ts`. Bounded 3600s stale-key grace is retained from Burooj and reconciled in the master plan and ledger; **independent security verdict still required before merge**.
+- [x] Brain and Ingestion staging/production: `workers_dev: false`, `preview_urls: false`, no public routes, `global_fetch_strictly_public`. Evidence: `src/lib/cf/wrangler-config.test.ts` plus `wrangler deploy --dry-run --env staging` (Brain gzip 8.09 KiB, Ingestion gzip 7.13 KiB, R2 `eu`, `LOOPBACK_RUNTIME=false`). Live deployed config is not yet available because resources are not provisioned.
+- [x] Web-to-Brain identity forwarding in workerd: Web helper copies only `Cf-Access-Jwt-Assertion` and strips spoofed principal headers; Brain verifies independently and loads grants from operations D1. Evidence: `src/lib/cf/service-binding-identity.ts`, `src/app/api/brain/whoami/route.ts`, `workers/brain/test/identity.test.ts`. Miniflare cannot bind Brain as a second service to itself; a real staging Service Binding smoke test remains after provisioning.
+- [x] Loopback development identity: no `x-forwarded-for` / `cf-connecting-ip` origin proof. Trusted `LOOPBACK_RUNTIME` Wrangler var plus `dev.ip: 127.0.0.1`. Staging/production fail startup if loopback is enabled. Evidence: `src/lib/auth/identity-mode.ts`, `src/lib/cf/startup.test.ts`, workerd identity spoofing/startup tests.
+- [x] Operations principal schema: stable `principals.id`, unique `(kind, subject)`, roles/departments on `principal_id`, disjoint user/service-token namespaces, no nullable user FK. Corrected in `migrations/operations/0001_init.sql` because no remote D1 has applied it. Evidence: `src/lib/store/migrations-contract.test.ts`, `src/lib/auth/principal.test.ts`, `workers/brain/test/principal-schema.test.ts`.
+- [x] Conversation Durable Object: SQLite `new_sqlite_classes`, `transactionSync` lock, bounded IDs, one concurrent winner, owner-only release, eviction/restart. Evidence: `workers/brain/src/conversation-lock.ts`, `workers/brain/test/conversation-lock.test.ts`.
+- [x] `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` removed from committed staging/production vars. Tests inject Access fixtures through Miniflare bindings only.
+- [x] `@cloudflare/vitest-plugin@1.1.0` installed. Critical Worker tests run in workerd (`npm run test:workers`). Node tests remain for pure helpers.
+- [x] Redacted structured JSON operational logs. Staging observability `head_sampling_rate: 0.1`. Evidence: `src/lib/cf/operational-log.ts` and test.
+- [x] `npm audit --omit=dev --audit-level=high` exits 0 after overrides `postcss@8.5.26`, `nanoid@3.3.18`, `adm-zip@0.6.0`. rclone.js `extractEntryTo` still works. Full-tree (including dev) still reports `brace-expansion` and `js-yaml` highs; those are not in the production audit.
+- [ ] Independent review (`codex review --base main`) green after the follow-up fix. 2026-08-26 gpt-5.6-sol review (session `01a03f93-2b5c-7ca0-b232-4e2128b08b68`) did **not** flag the retained 3600s stale-key grace as P0/P1. It reported one P1 (loopback `workers_dev` default) and two P2s (malformed lock JSON → 500; missing `typecheck:workers` in CI). Those findings are fixed in source: `workers_dev`/`preview_urls` false on every environment including loopback, `WorkerValidationError` for malformed lock JSON, and CI `typecheck:workers`. Re-run review before merge.
+
+### Helper-level items (not phase-complete evidence)
+
+- [x] Separate web, brain and ingestion Worker entrypoints exist. Evidence: root `wrangler.jsonc`, `workers/brain/`, `workers/ingestion/`. **Not** staging-auth evidence.
+- [x] Independent corpus and operations D1 migration files exist. Evidence: `migrations/corpus/0001_init.sql`, `migrations/operations/0001_init.sql`. Principal schema repaired in `0001_init.sql` (no remote apply).
+- [x] Request IDs and safe error-contract helpers exist. Evidence: `src/lib/cf/request-id.ts`, `src/lib/cf/worker-errors.ts`.
+- [x] Access JWT Node unit tests exist, including JWKS floor, in-flight join, 256 KiB stream cancel, hostile-domain, rotation and stale-grace. Evidence: `src/lib/auth/access-jwt.test.ts`. Not a substitute for the independent stale-grace verdict.
+- [x] AI Gateway payload-off helper test. Evidence: `src/lib/cf/ai-gateway.test.ts`.
+- [x] Local Wrangler dry-run of brain and ingestion. Evidence: wrangler 4.126.0 `--dry-run --env development` and `--env staging`.
+- [ ] Deploy the empty skeleton to staging only after PR #11 is merged and the approved staging resources exist.
 
 ### Phase 1 exit
 
 - [ ] Staging skeleton authenticates through Access.
-- [ ] Least-privilege bindings are verified.
-- [ ] No unauthenticated mutation route is reachable.
-- [ ] AI Gateway payload-off test passes.
-- [ ] Full project checks, critical reviews, phase report and PR are green.
+- [ ] Least-privilege bindings are verified on a live staging deployment (`workers_dev`/`preview_urls` off for Brain and Ingestion). Source and dry-run evidence is recorded above.
+- [x] No unauthenticated mutation route is reachable in the skeleton. Evidence: GET `/health` is the only public Worker route; `/whoami` fails closed without a valid assertion.
+- [x] AI Gateway payload-off test passes.
+- [x] Workerd tests pass for Workflow, Durable Object concurrency, identity forwarding, Access JWT, queue consumer and loopback startup. A live Service Binding smoke test is still required after staging exists.
+- [ ] Full project checks, independent review, phase report and PR are green.
 
 ## 8. Phase 2: ingestion and corpus generations
 
@@ -289,33 +320,55 @@ Goal: introduce Pi without weakening the host’s grounding, policy or durable r
 - [ ] Every mutating side effect crosses the policy gateway sequentially.
 - [ ] Full project checks, critical reviews, phase report and PR are green.
 
-## 12. Phase 6 and Phase 7
+## 12. Phase 6, Phase 7A and Phase 7B
 
 ### Phase 6: connectors, MCP and plugins
 
+Synthetic proofs only. Do not wait for third-party production credentials.
+
 - [ ] Create a connector registry with capability, authentication, rate-limit, data-classification and health metadata.
 - [ ] Add per-connector scopes and revocation.
-- [ ] Add one read connector through the policy gateway.
-- [ ] Add remote MCP tools through the same policy gateway.
+- [ ] Add one allowlisted GitHub or HTTP read connector through the policy gateway.
+- [ ] Add one self-hosted staging MCP test server, one MCP read tool and one synthetic approval-required MCP write tool.
+- [ ] Add one staging action-sink connector proving preview, exact normalized arguments, approval binding, idempotency, audit, revocation, retry safety, untrusted-result handling and duplicate-delivery protection.
 - [ ] Treat every connector, MCP and plugin result as untrusted data.
-- [ ] Add one approved write connector with preview, approval, idempotency and audit.
-- [ ] Prove revocation, failure, untrusted-result and retry behavior.
+- [ ] Do not claim the synthetic action sink is a production vendor integration.
 
 Exit: one read connector and one approved write connector pass all policy and security gates. A marketplace is not required.
 
-### Phase 7: cutover and retirement
+### Phase 7A: staging release candidate
 
-- [ ] Run staging load, restore and incident drills.
-- [ ] Prove restore for both D1 databases and R2 exports.
-- [ ] Prove corpus rollback uses the generation pointer, not Time Travel.
-- [ ] Run Cloudflare in shadow, canary and primary modes.
-- [ ] Keep Convex read-only through the rollback window.
-- [ ] Complete the Burooj migration ledger and all Section 12 retirement gates in the master plan.
-- [ ] Create a recoverable Burooj archive.
-- [ ] Ask Wasim for explicit Burooj deletion approval.
-- [ ] Remove legacy code and resources only after parity, rollback expiry and approval.
+Authorized for continuous execution after Phase 6. Synthetic data only.
 
-Exit: Cloudflare is primary, the rollback window expires successfully and retirement is deliberate and recoverable.
+- [ ] Staging load tests
+- [ ] D1 and R2 restore drills
+- [ ] Incident drills
+- [ ] Corpus rollback proof (generation pointer, not Time Travel)
+- [ ] Synthetic shadow mode
+- [ ] Synthetic canary mode
+- [ ] Staging-primary mode
+- [ ] Operational runbooks
+- [ ] Rollback runbooks
+- [ ] Budget and alert validation
+- [ ] Burooj migration-ledger completion
+- [ ] Recoverable Burooj archive creation
+
+Exit: staging is the release candidate with restore, incident and budget evidence. No real company data.
+
+### Phase 7B: production launch and retirement
+
+Requires one final explicit Wasim approval. Do not start.
+
+- [ ] Real company data
+- [ ] Production resource set
+- [ ] Real production traffic
+- [ ] Production-primary cutover
+- [ ] Rollback-window expiry
+- [ ] Convex deletion
+- [ ] Burooj deletion
+- [ ] Destructive legacy-resource removal
+
+Exit: only after Wasim explicitly approves real production cutover and retirement.
 
 ## 13. Required phase report
 
