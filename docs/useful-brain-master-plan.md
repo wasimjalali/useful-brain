@@ -1,10 +1,10 @@
 # Useful Brain production master plan
 
-Status: external architecture review incorporated, version 1.1
+Status: finalized and approved for phased implementation, version 1.2
 
 Date: 2026-08-26
 
-Implementation status: blocked until Wasim approves this revised plan. No migration or product implementation starts before that approval.
+Implementation status: approved. Execution begins with the remaining Phase 0 feasibility gates and follows `docs/useful-brain-execution-tracker.md`.
 
 ## 1. Decision
 
@@ -397,7 +397,7 @@ Two quality ratchets are required: deterministic fake-provider CI floors and rea
 
 ### Phase 0: review, rebrand and feasibility
 
-- Complete the Useful Brain product rename in user-facing code and active documentation.
+- Complete the Useful Brain product, repository and local-directory rename.
 - Keep historical Nura design documents as historical records.
 - Run the external critical review prompt in `docs/useful-brain-critical-review-prompt.md`.
 - Incorporate accepted gaps into this plan.
@@ -405,7 +405,7 @@ Two quality ratchets are required: deterministic fake-provider CI floors and rea
 - Record baseline results from both current Nura and Burooj Sanad, including the exact Sanad commit and retrieval fingerprint.
 - Record the first company's residency, corpus-size, reindex-cadence, p95 latency, quality and monthly-cost budgets.
 
-Exit: revised plan approved, both spikes pass or an explicit fallback is approved. No production migration starts before this exit.
+Architecture approval is complete. Phase 0 exits when both spikes pass or an explicit fallback is approved and the baseline and workload decisions are recorded. No Phase 1 production foundation work starts before this exit.
 
 ### Phase 1: Cloudflare foundation
 
@@ -480,15 +480,15 @@ Do not delete Burooj until all of the following are true:
 - a recoverable repository archive exists
 - Wasim confirms deletion after reviewing the migration ledger
 
-## 13. Implementation coordination after plan approval
+## 13. Implementation coordination
 
-Implementation will use bounded workstreams with explicit file ownership. The primary agent remains responsible for architecture, integration, verification and final decisions.
+Implementation uses one bounded phase at a time with explicit acceptance evidence.
 
-- `gpt-5.6-sol`: architecture changes, security boundaries, retrieval design, non-trivial debugging and final integration review.
-- `gpt-5.6-terra`: day-to-day TypeScript implementation, tests, D1 migrations and UI integration.
-- `gpt-5.6-luna`: file discovery, mechanical renames and focused lookup work.
+- `Grok 4.6 xhigh`: primary implementation, tests, documentation and phase reports.
+- `GPT-5.6 Sol xhigh`: architecture changes, critic adjudication, security-boundary review and final integration review.
+- The enabled security and code-review checks remain independent merge gates for critical work.
 
-No worker changes the same files concurrently. Every phase lands through a branch and PR. Critical auth, database, connector, secret and tool-execution code receives the required security and code reviews before merge.
+Grok works from `docs/useful-brain-execution-tracker.md` and the checked-in execution prompt. Every phase lands through a branch and PR. It must stop on architecture drift, a failed phase exit, an approval boundary or a newly discovered high-severity risk. Critical auth, database, connector, secret and tool-execution code receives the required security and code reviews before merge.
 
 ## 14. Finalized choices and open validation gates
 
@@ -510,7 +510,7 @@ No worker changes the same files concurrently. Every phase lands through a branc
 - Development and build toolchain: Node.js 22.19 or newer before Pi is installed. This is not a claim about the Workers runtime.
 - Connector and action policy: one shared tool gateway for native tools, MCP and plugins.
 
-### Must be validated before implementation commits
+### Must be validated before the dependent production phase
 
 - Pi's selective bundle and streaming behavior in the Workers runtime.
 - Whether a failed Pi Worker spike delays agent actions or justifies a separately approved Container deployment. There is no automatic fallback.
@@ -523,3 +523,40 @@ No worker changes the same files concurrently. Every phase lands through a branc
 - The first company's corpus size, reindex cadence, employee and service-token callers, trace visibility policy and numeric p95 latency, quality and cost budgets.
 
 Most gates determine the safe implementation path inside Cloudflare. Residency can force a regional redesign. A failed Pi Worker spike can delay the agent milestone or reopen only the agent-hosting choice. Neither silently changes the rest of the Cloudflare-native RAG architecture.
+
+## 15. Current Cloudflare cost envelope
+
+The target stack fits the existing Workers Paid account for development, staging and an idle production deployment. Cloudflare bills the account, not each Worker, so separate web, brain and ingestion Workers do not create separate base subscriptions.
+
+| Product | Current included use relevant to Useful Brain |
+| --- | --- |
+| Workers Paid | $5 monthly minimum, 10 million requests and 30 million CPU milliseconds per month |
+| Workers Builds | 6,000 build minutes per month, then $0.005 per minute |
+| D1 | 25 billion rows read, 50 million rows written and 5 GB storage per month |
+| R2 Standard | 10 GB-month, 1 million Class A operations, 10 million Class B operations and free egress per month |
+| Vectorize | 50 million queried dimensions and 10 million stored dimensions included on Workers Paid |
+| Queues | 1 million operations per month |
+| Workflows | 500,000 steps and 1 GB stored state per month, with request and CPU use sharing the Workers allowances |
+| Durable Objects | 1 million requests and 400,000 GB-seconds per month, plus the included SQLite storage allowance |
+| Workers AI | 10,000 Neurons per day, then $0.011 per 1,000 Neurons |
+| AI Gateway | Core analytics, caching and rate limiting are free. Workers Paid includes 10 million persistent logs per gateway |
+| Cloudflare Access | Free for up to 50 users, without the paid-plan SLA and longer log retention |
+
+With the application deployed but no users, files, queued work, vector queries or model calls, the expected Cloudflare total is the existing $5 monthly Workers Paid minimum. The incremental idle cost of Useful Brain is effectively $0. Domains, external model inference, optional paid Zero Trust seats and any product overage are separate.
+
+The 65-document Burooj migration corpus, 120-question evaluation set and ordinary CI builds fit comfortably inside the storage, vector and build allowances. Repeated full-stack model evals can still create Workers AI or external model charges, so staging receives daily spend limits and alerts before those evals run.
+
+The account's Cloudflare credits are useful runway only if their billing terms apply to the Developer Platform products used here. That eligibility must be confirmed in the billing dashboard before the plan treats the credit balance as a guarantee.
+
+Current pricing references:
+
+- [Workers and platform storage pricing](https://developers.cloudflare.com/workers/platform/pricing/)
+- [Workers Builds limits and pricing](https://developers.cloudflare.com/workers/ci-cd/builds/limits-and-pricing/)
+- [R2 pricing](https://developers.cloudflare.com/r2/pricing/)
+- [Vectorize pricing](https://developers.cloudflare.com/vectorize/platform/pricing/)
+- [Queues pricing](https://developers.cloudflare.com/queues/platform/pricing/)
+- [Workflows pricing](https://developers.cloudflare.com/workflows/reference/pricing/)
+- [Durable Objects pricing](https://developers.cloudflare.com/durable-objects/platform/pricing/)
+- [Workers AI pricing](https://developers.cloudflare.com/workers-ai/platform/pricing/)
+- [AI Gateway pricing](https://developers.cloudflare.com/ai-gateway/reference/pricing/)
+- [Cloudflare Zero Trust plans](https://www.cloudflare.com/plans/zero-trust-services/)

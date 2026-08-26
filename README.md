@@ -2,13 +2,13 @@
 
 Useful Brain is a private company knowledge and action agent. It answers from approved company sources, shows the evidence behind every factual claim and will take actions only through explicit tool policy and approval boundaries.
 
-The product was previously named Nura RAG Copilot. The product name, package name and active UI copy now use Useful Brain. The GitHub repository URL and local directory keep their legacy coordinates until the reviewed Cloudflare migration plan is accepted.
+The product was previously named Nura RAG Copilot. The product name, package name, GitHub repository, local directory and active UI copy now use Useful Brain.
 
 ## Planning status
 
-The production architecture is defined in the [Useful Brain production master plan](./docs/useful-brain-master-plan.md). Functional migration work is blocked until an independent model reviews that plan and the accepted findings are incorporated.
+The production architecture is finalized in the [Useful Brain production master plan](./docs/useful-brain-master-plan.md). The independent review is complete and accepted findings are incorporated. Implementation starts with the remaining Phase 0 feasibility gates.
 
-Use the [external critical-review prompt](./docs/useful-brain-critical-review-prompt.md) for that review.
+Grok 4.6 xhigh will execute from the [phased execution tracker](./docs/useful-brain-execution-tracker.md) using the [execution prompt](./docs/useful-brain-grok-execution-prompt.md). Each phase must clear its exit gate before the next phase begins.
 
 ## Target product
 

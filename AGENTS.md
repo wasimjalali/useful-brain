@@ -6,17 +6,18 @@ Guidance for coding agents and contributors working in this repository.
 
 Useful Brain is a private company knowledge and action agent. It retrieves only evidence the current principal may read, cites every factual answer, refuses unsupported claims and performs actions only through a typed tool policy and approval boundary.
 
-## Planning gate
+## Execution gate
 
 The target architecture lives in `docs/useful-brain-master-plan.md`.
 
-Do not start the Cloudflare migration, install migration packages or add action tools until:
+The external review is complete, accepted findings are incorporated and the plan is approved. Execute from `docs/useful-brain-execution-tracker.md` one phase at a time.
 
-1. The external critical review has been run with `docs/useful-brain-critical-review-prompt.md`.
-2. Accepted high-severity findings have been incorporated into the master plan.
-3. The revised plan is approved for implementation.
+- Begin with the remaining Phase 0 feasibility work. Do not start Phase 1 until Phase 0 passes or Wasim explicitly approves a documented fallback.
+- Do not skip phase exit criteria or silently change the master plan.
+- Pause for the existing approval boundaries before installing packages, changing schemas or auth, provisioning paid resources or deleting Burooj.
+- Keep historical Nura documents as historical records unless they cause active instructions to become ambiguous.
 
-Product rebrand changes and plan corrections are allowed before that gate. Keep historical Nura documents as historical records unless they cause active instructions to become ambiguous.
+The implementation model is Grok 4.6 xhigh. GPT-5.6 Sol xhigh owns architecture adjudication and final integration review. Neither model approves its own critical security work.
 
 ## Current and target stacks
 
@@ -27,7 +28,7 @@ The finalized target is:
 - Frontend: Next.js App Router with TypeScript, deployed to Cloudflare Workers through OpenNext initially.
 - Styling: Tailwind CSS v4 with role-named design tokens.
 - Runtime: Cloudflare Workers split into web, brain and ingestion responsibilities.
-- Database and keyword search: D1 and FTS5, one database per company deployment.
+- Database and keyword search: separate corpus and operations D1 databases per company deployment, with FTS5 in the corpus database.
 - Object storage: R2.
 - Vector search: Vectorize as a rebuildable projection.
 - Durable work: Workflows and Queues.

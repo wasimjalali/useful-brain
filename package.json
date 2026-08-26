@@ -7,9 +7,9 @@
   "author": "Wasim Jalali",
   "repository": {
     "type": "git",
-    "url": "https://github.com/wasimjalali/nura-rag-copilot.git"
+    "url": "https://github.com/wasimjalali/useful-brain.git"
   },
-  "homepage": "https://github.com/wasimjalali/nura-rag-copilot#readme",
+  "homepage": "https://github.com/wasimjalali/useful-brain#readme",
   "keywords": [
     "rag",
     "retrieval-augmented-generation",

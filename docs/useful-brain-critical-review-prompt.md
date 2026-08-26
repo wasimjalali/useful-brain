@@ -14,8 +14,8 @@ The proposed architecture is Cloudflare-native: Workers, D1, R2, Vectorize, Work
 </context>
 
 <inputs>
-1. Read the complete plan at `nura-rag-copilot/docs/useful-brain-master-plan.md`.
-2. Inspect the current `nura-rag-copilot` code only where needed to verify the plan's claims.
+1. Read the complete plan at `useful-brain/docs/useful-brain-master-plan.md`.
+2. Inspect the current `useful-brain` code only where needed to verify the plan's claims.
 3. Inspect the useful RAG, ACL, connector, Cloudflare and evaluation code under `Burooj/sanad` and the Brain grounding integration under `Burooj/tabari`.
 4. Verify changeable Cloudflare and Pi facts against current primary sources. Prefer official Cloudflare docs, the official Pi repository and package metadata.
 </inputs>
