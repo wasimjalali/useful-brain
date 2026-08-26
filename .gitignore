@@ -24,5 +24,17 @@ pnpm-debug.log*
 /audit-*.png
 /verify-*.png
 
+.open-next/
+.wrangler/
+.dev.vars
+worker-startup.cpuprofile
+**/worker-startup.cpuprofile
+spikes/**/node_modules/
+spikes/**/.wrangler/
+spikes/**/dist/
+# Local convenience only. Spike installs use --legacy-peer-deps via
+# `npm run install:spike:pi`. Never add a root .npmrc with this flag.
+spikes/**/.npmrc
+
 # Personal AI-tooling config (not needed by users)
 .codex/

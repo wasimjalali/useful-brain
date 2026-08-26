@@ -1,6 +1,6 @@
 # Useful Brain implementation execution tracker
 
-Status: ready for Grok 4.6 xhigh
+Status: Phase 0 PR on `phase-0-feasibility-baselines`. Do not start Phase 1.
 
 Architecture authority: `docs/useful-brain-master-plan.md`
 
@@ -70,7 +70,7 @@ Do not weaken or delete a failing test to make a gate pass. Record deviations an
 | Phase | Status | Exit evidence |
 | --- | --- | --- |
 | Plan review and product rename | Complete | Master plan v1.2 and renamed repository |
-| Phase 0: feasibility and baselines | Not started | Pending |
+| Phase 0: feasibility and baselines | PR opened, waiting for review | [phase-0 report](implementation-reports/phase-0-feasibility.md); spikes and first-pilot planning profile recorded |
 | Phase 1: Cloudflare foundation | Blocked by Phase 0 | Pending |
 | Phase 2: ingestion and generations | Blocked by Phase 1 | Pending |
 | Phase 3: ACL-safe retrieval | Blocked by Phase 2 | Pending |
@@ -85,55 +85,63 @@ Goal: prove the chosen runtime path and lock the migration baseline before produ
 
 ### Repository and toolchain
 
-- [ ] Confirm the repository is `wasimjalali/useful-brain` and the local directory is `useful-brain`.
-- [ ] Record the current Useful Brain commit, Node.js version, npm version and lockfile state.
-- [ ] Record the Burooj Sanad source commit `630ba08dc7cad6aa71942d6842ce6d8d55a26873` or document why the available checkout differs.
-- [ ] Inventory current runtime dependencies without installing anything.
-- [ ] Propose the minimum package changes needed for OpenNext, Wrangler, Pi and Worker tests, then pause for package approval.
+- [x] Confirm the repository is `wasimjalali/useful-brain` and the local directory is `useful-brain`. Evidence: remote `https://github.com/wasimjalali/useful-brain.git`, directory `/Users/wasimjalali/Desktop/Personal Project/useful-brain`.
+- [x] Record the current Useful Brain commit, Node.js version, npm version and lockfile state. Evidence: [phase-0 report](implementation-reports/phase-0-feasibility.md) section 1. HEAD `057b24d0a810490af673b06c1e0cea875b400a2c`, Node `v22.23.1`, npm `10.9.8`, lockfile SHA-256 `16e75991af5848b4a554ed89c2ce4915313987fd7a25329f9a6c29d1c6509c74`.
+- [x] Record the Burooj Sanad source commit `630ba08dc7cad6aa71942d6842ce6d8d55a26873` or document why the available checkout differs. Evidence: sibling HEAD matches. Worktree is dirty with Tabari UI files only; Sanad evals used `SANAD_STORE=memory`.
+- [x] Inventory current runtime dependencies without installing anything. Evidence: [phase-0 report](implementation-reports/phase-0-feasibility.md) section 2.
+- [x] Propose the minimum package changes needed for OpenNext, Wrangler, Pi and Worker tests, then pause for package approval. Evidence: [phase-0 report](implementation-reports/phase-0-feasibility.md) section 3. Wasim approved the list on 2026-08-26 with two corrections: `@cloudflare/vitest-plugin@1.1.0` instead of `@cloudflare/vitest-pool-workers`, and generated types via `wrangler types` instead of installing `@cloudflare/workers-types`. Wrangler still lists `@cloudflare/workers-types` as an optional peer in the lockfiles; it is not a direct dependency and `npm ls @cloudflare/workers-types` is empty.
 
 ### Pi Worker spike
 
-- [ ] Build a disposable Worker entrypoint that imports only `@earendil-works/pi-agent-core` and the minimum `pi-ai` provider factory.
-- [ ] Verify `nodejs_compat`, bundle size, startup time and absence of Node-only session, OAuth or SQLite dependencies.
-- [ ] Prove text streaming and typed tool events.
-- [ ] Prove sequential mutating-tool configuration.
-- [ ] Prove cancellation through `AbortController` or Pi’s supported abort path.
-- [ ] Prove a fresh agent can reconstruct durable state without an in-memory session.
-- [ ] Record measured results and the exact package versions.
+Unpaid `fauxProvider()` proof in `spikes/phase-0-pi-worker/`. Root `tsc`/`eslint`/`vitest` exclude `spikes/**`; spike has its own passing checks via `npm run typecheck:spike:pi` and `npm run test:spike:pi`.
+
+- [x] Build a disposable Worker entrypoint that imports only `@earendil-works/pi-agent-core` and the minimum `pi-ai` provider factory. Evidence: `spikes/phase-0-pi-worker/src/index.ts` and `src/pi-run.ts` import `Agent` from `@earendil-works/pi-agent-core` and `fauxProvider` from `@earendil-works/pi-ai/providers/faux`.
+- [x] Verify `nodejs_compat`, bundle size, startup time and absence of Node-only session, OAuth or SQLite dependencies. Evidence: wrangler 4.126.0 `check startup` and `deploy --dry-run --outdir dist` (local only): **656.90 KiB / gzip 114.68 KiB**; local startup window 35.6 ms, active 16.0 ms. `npm run check:bundle` found no sqlite, OAuth, or Node session backends. `@cloudflare/vitest-pool-workers` is not installed. `@cloudflare/workers-types` is not a direct dependency; types come from `wrangler types` → `worker-configuration.d.ts`. Wrangler names it as an optional peer in the lockfile.
+- [x] Prove text streaming and typed tool events. Evidence: `spikes/phase-0-pi-worker/test/pi-spike.test.ts` — 5 passed, including `text_delta` and `tool_execution_start`/`end`.
+- [x] Prove sequential mutating-tool configuration. Evidence: same suite; `increment_counter` end timestamp ≤ `record_value` start; counter=1.
+- [x] Prove cancellation through `AbortController` or Pi’s supported abort path. Evidence: `Agent.abort()` after first `text_delta`; `aborted` true; last event `agent_end`.
+- [x] Prove a fresh agent can reconstruct durable state without an in-memory session. Evidence: `reconstructAgent(snapshotState(...))` is a different instance with equal cloned messages and can `prompt` further.
+- [x] Record measured results and the exact package versions. Evidence: [phase-0 report](implementation-reports/phase-0-feasibility.md) section 4. Versions: `pi-agent-core` 0.84.3, `pi-ai` 0.84.3, `wrangler` 4.126.0, `@cloudflare/vitest-plugin` 1.1.0, `vitest` 4.1.9, `typescript` 5.9.3, `@types/node` 22.20.1. Spike `npm install` required `--legacy-peer-deps` after npm 10.9.8 arborist `edgesOut` crash. That flag is confined to disposable Pi spike installs (`npm run install:spike:pi`) and must not become a root or production installation policy. There is no root `.npmrc`.
+
+Live AI Gateway / Workers AI remain **unapproved** and were not run.
 
 ### OpenNext spike
 
-- [ ] Run the supported OpenNext compatibility check against the current Next.js application.
-- [ ] Verify App Router server actions, streaming, static assets, route handlers and current PDF behavior.
-- [ ] Record bundle size, startup time and unsupported APIs.
-- [ ] Confirm that no current feature requires a Node server outside Workers.
+Local `opennextjs-cloudflare build` and `preview` only. No `migrate`, `deploy`, `upload`, remote cache population, or Cloudflare resource creation.
+
+- [x] Run the supported OpenNext compatibility check against the current Next.js application. Evidence: OpenNext has no `check` command. `opennextjs-cloudflare build` 1.20.3 against Next 16.3.3 completed; preview populated dummy cache only (“Incremental cache does not need populating”).
+- [x] Verify App Router server actions, streaming, static assets, route handlers and current PDF behavior. Evidence: local preview `http://127.0.0.1:8790` — `GET /` 200 `text/html` with `x-opennext: 1` (chunked); Chat / Knowledge / Evaluations rendered; `POST /` 200 (237 ms) for the grounded-question server action; `/icon.svg` 200; `public/file.svg` 200; `/_next/static` CSS `Cache-Control: public,max-age=31536000,immutable`; unknown path 404. No route handlers in the app. `node:fs` synthetic-doc inventory returned 0 documents on Workers (`loadSyntheticDocuments` catch). `unpdf` remains covered by the Node unit suite; Worker upload-to-disk was not exercised because it uses `node:fs`.
+- [x] Record bundle size, startup time and unsupported APIs. Evidence: wrangler dry-run / `check startup` (local): **7500.89 KiB / gzip 1599.31 KiB**; startup window 145.8 ms, active 43.6 ms. Unsupported for cutover: `node:fs` writes/reads under `content/synthetic-docs`. No `export const runtime = "edge"`.
+- [x] Confirm that no current feature requires a Node server outside Workers. Evidence: Chat, Convex HTTP, and Evaluations UI run on the OpenNext Worker. Local document inventory and add-document persistence need an R2 replacement before cutover; they do not require keeping a Node server if that path is replaced.
 
 ### Baselines
 
-- [ ] Run the current Useful Brain TypeScript, lint, test and production-build suite.
-- [ ] Record current Nura retrieval, citation, refusal and operation-record results.
-- [ ] Run Burooj’s locked fake-provider and real-stack baselines without writing to a live corpus.
-- [ ] Record the exact retrieval fingerprint: 300/30 chunking, 0.70/0.30 fusion, six keyword candidates, 20 rerank candidates, BGE reranker and 0.05 starting floor.
-- [ ] Preserve q086-q090 and q116-q120 as separate named slices.
-- [ ] Create the initial Burooj migration ledger with source behavior, target contract test and implementation status.
+- [x] Run the current Useful Brain TypeScript, lint, test and production-build suite. Evidence: `npx tsc --noEmit`, `npm run lint`, `npm test` (25 files, 154 tests), `npm run build` all exit 0 on 2026-08-26.
+- [x] Record current Nura retrieval, citation, refusal and operation-record results. Evidence: [phase-0 report](implementation-reports/phase-0-feasibility.md) section 5. Unit suite only; live Foundry evals were not run.
+- [x] Run Burooj’s locked fake-provider and real-stack baselines without writing to a live corpus. Evidence: fake-provider `tests/test_evals.py` 34 passed; `_run_evals --local` memory fingerprint in the phase report. Real-stack numbers copied from Burooj docs at the locked commit; live D1/Vectorize was not queried or written.
+- [x] Record the exact retrieval fingerprint: 300/30 chunking, 0.70/0.30 fusion, six keyword candidates, 20 rerank candidates, BGE reranker and 0.05 starting floor. Evidence: [migration ledger](burooj-migration-ledger.md).
+- [x] Preserve q086-q090 and q116-q120 as separate named slices. Evidence: ledger named-slice table; local fake-provider slice metrics recorded.
+- [x] Create the initial Burooj migration ledger with source behavior, target contract test and implementation status. Evidence: [burooj-migration-ledger.md](burooj-migration-ledger.md).
 
 ### Product inputs
 
-- [ ] Record company 1 residency and retention requirements.
-- [ ] Record expected corpus size, file-size range and reindex cadence.
-- [ ] Record expected employees, concurrent chats and service-token callers.
-- [ ] Decide whether agent actions must ship with v1 or knowledge-only RAG may ship first if Pi cannot run safely on Workers.
-- [ ] Decide who may see operator retrieval diagnostics.
-- [ ] Set numeric p95 latency, retrieval quality and monthly-cost budgets.
-- [ ] Confirm whether the Cloudflare credit applies to the Developer Platform invoice.
+Recorded as the first-pilot planning profile. These are planning assumptions, not customer contractual promises. Source of truth: [master plan](useful-brain-master-plan.md) Phase 0 first-pilot planning profile and [phase-0 report](implementation-reports/phase-0-feasibility.md) section 6.
+
+- [x] Record company 1 residency and retention requirements. Evidence: EU-based first pilot; GDPR-compatible processing with contractual transfer safeguards, not strict EU-only; D1 and R2 `eu` jurisdiction; 30/90/30/365 day retention classes; AI Gateway payload storage disabled; synthetic data until a production data-handling review.
+- [x] Record expected corpus size, file-size range and reindex cadence. Evidence: up to 10,000 documents, 10 GB sources, 25 MB max file, ~100,000 chunks; hourly incremental sync; monthly full rebuild and on retrieval-config changes.
+- [x] Record expected employees, concurrent chats and service-token callers. Evidence: up to 50 employees, 10 concurrent chat or agent runs, 5 service-token callers; one isolated application and Cloudflare resource set per company.
+- [x] Decide whether agent actions must ship with v1 or knowledge-only RAG may ship first if Pi cannot run safely on Workers. Evidence: ship the Pi agent shell; first release is knowledge-first (retrieval, grounded answers, evaluations, read-only tools); external mutating connector actions stay disabled until later phases; knowledge-only RAG is the fallback only if a production-only Pi problem appears later.
+- [x] Decide who may see operator retrieval diagnostics. Evidence: company administrators and designated operators see complete retrieval diagnostics; ordinary employees see authorized citations and evidence only.
+- [x] Set numeric p95 latency, retrieval quality and monthly-cost budgets. Evidence: retrieval 1.5 s, first token 3 s, complete answer 15 s, searchable 5 min; ACL/invalid-citation/unanswerable zeros; fake-provider floors 0.907 / 0.821 / 0.831; real-stack slices at or above BGE+0.05; Cloudflare ≤ $25/month, external generation ≤ $75/month, combined ≤ $100/company/month; idle is the existing $5 Workers Paid minimum.
+- [x] Confirm whether the Cloudflare credit applies to the Developer Platform invoice. Evidence: eligibility is **not** confirmed. Credits are excluded from cost justification until the billing dashboard confirms Developer Platform eligibility.
 
 ### Phase 0 exit
 
-- [ ] Pi Worker spike passes or Wasim approves a documented fallback.
-- [ ] OpenNext spike passes or Wasim approves a documented fallback.
-- [ ] Both legacy baselines and the migration fingerprint are recorded.
-- [ ] Product inputs and numeric budgets are recorded.
-- [ ] Phase 0 report and PR are green.
+- [x] Pi Worker spike passes or Wasim approves a documented fallback. Unpaid `fauxProvider()` proof passed. Live AI Gateway / Workers AI remain unapproved.
+- [x] OpenNext spike passes or Wasim approves a documented fallback. Local build/preview passed. `node:fs` synthetic-doc path is recorded for R2 replacement; not a Node-server requirement.
+- [x] Both legacy baselines and the migration fingerprint are recorded.
+- [x] Product inputs and numeric budgets are recorded.
+- [ ] Phase 0 report and PR are green. This pull request is the Phase 0 PR. Do not start Phase 1, provision Cloudflare resources or run paid AI calls until it is reviewed and green.
 
 ## 7. Phase 1: Cloudflare foundation
 
