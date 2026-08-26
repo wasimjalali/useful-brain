@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 
 import { ArrowRightIcon, LayersIcon, NewChatIcon } from "@/components/icons";
-import { NuraMark } from "@/components/nura-logo";
-import { DEFAULT_NURA_CONFIG } from "@/lib/nura-config";
+import { UsefulBrainMark } from "@/components/useful-brain-logo";
+import { DEFAULT_USEFUL_BRAIN_CONFIG } from "@/lib/useful-brain-config";
 import type { GroundedAnswerResponse } from "@/lib/rag/grounded-answer";
 import type { ChatTurn } from "@/lib/rag/chat-history";
 import { formatRetrievalScore } from "@/lib/rag/retrieval";
@@ -148,13 +148,13 @@ function ChatWelcome({ onRunQuestion }: { onRunQuestion: (value: string) => void
   return (
     <div className="rise flex flex-col items-center pt-8 text-center sm:pt-16">
       <span className="grid size-14 place-items-center rounded-2xl bg-brand shadow-sm">
-        <NuraMark className="size-9" tone="dark" />
+        <UsefulBrainMark className="size-9" tone="dark" />
       </span>
       <h2 className="mt-5 text-2xl font-semibold tracking-[-0.01em] text-ink">
         Ask a grounded question
       </h2>
       <p className="mt-2 max-w-md text-[15px] leading-6 text-ink-muted">
-        {DEFAULT_NURA_CONFIG.productName} answers only from retrieved support documents
+        {DEFAULT_USEFUL_BRAIN_CONFIG.productName} answers only from retrieved company documents
         and cites every source. If evidence is missing, it says so.
       </p>
 
@@ -189,7 +189,7 @@ function ThinkingIndicator() {
   return (
     <div className="msg-in flex gap-3" role="status">
       <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-brand shadow-sm">
-        <NuraMark className="size-5" tone="dark" />
+        <UsefulBrainMark className="size-5" tone="dark" />
       </span>
       <div className="flex items-center gap-2.5 pt-1.5">
         <span
@@ -212,7 +212,7 @@ function SetupNotice() {
         Store and embed chunks before answer generation.
       </h2>
       <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-muted">
-        The corpus has not been embedded yet. Open {DEFAULT_NURA_CONFIG.knowledgeLabel}
+        The corpus has not been embedded yet. Open {DEFAULT_USEFUL_BRAIN_CONFIG.knowledgeLabel}
         {" "}and run the embed step, then return to ask questions.
       </p>
     </div>
@@ -229,7 +229,7 @@ function ErrorMessage({
   return (
     <div className="msg-in flex gap-3">
       <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-brand shadow-sm">
-        <NuraMark className="size-5" tone="dark" />
+        <UsefulBrainMark className="size-5" tone="dark" />
       </span>
       <div className="flex-1 rounded-2xl border border-danger/25 bg-danger-soft px-4 py-3" role="alert">
         <p className="text-sm font-medium text-danger">{message}</p>

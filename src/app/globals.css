@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* ------------------------------------------------------------------ *
- * Nura design tokens (light theme). Named by role, not by hue, so a
+ * Useful Brain design tokens (light theme). Named by role, not by hue, so a
  * dark theme can be derived later without renaming. Neutrals carry a
  * slight cool bias toward the royal-blue accent so they read chosen.
  * ------------------------------------------------------------------ */

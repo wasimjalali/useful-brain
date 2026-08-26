@@ -10,8 +10,8 @@ import {
   type ReactNode,
 } from "react";
 
-import { NuraLogo } from "@/components/nura-logo";
-import { DEFAULT_NURA_CONFIG } from "@/lib/nura-config";
+import { UsefulBrainLogo } from "@/components/useful-brain-logo";
+import { DEFAULT_USEFUL_BRAIN_CONFIG } from "@/lib/useful-brain-config";
 
 export type WorkspaceView = "chat" | "knowledge" | "evaluations";
 
@@ -95,9 +95,9 @@ function MobileTopBar({ onOpenNav }: { onOpenNav: () => void }) {
       >
         <MenuGlyph />
       </button>
-      <NuraLogo compact />
+      <UsefulBrainLogo compact />
       <span className="text-sm font-semibold text-ink">
-        {DEFAULT_NURA_CONFIG.productName}
+        {DEFAULT_USEFUL_BRAIN_CONFIG.productName}
       </span>
     </header>
   );

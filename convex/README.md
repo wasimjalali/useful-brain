@@ -1,6 +1,8 @@
 # Convex Backend
 
-This directory holds Nura's Convex backend: identity guards, durable conversations, corpus versioning, vector retrieval, persisted evaluations and safe operation records.
+This directory holds Useful Brain's legacy Convex backend: identity guards, durable conversations, corpus versioning, vector retrieval, persisted evaluations and safe operation records.
+
+It remains the working migration source and rollback path until the Cloudflare cutover gates in `../docs/useful-brain-master-plan.md` pass. Do not add new target architecture here.
 
 ## Schema
 

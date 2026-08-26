@@ -18,9 +18,9 @@ const jetBrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Nura RAG Copilot",
+  title: "Useful Brain",
   description:
-    "A grounded support copilot that answers only from retrieved evidence and cites every source.",
+    "Company knowledge and actions grounded in evidence your team can inspect.",
 };
 
 export default function RootLayout({

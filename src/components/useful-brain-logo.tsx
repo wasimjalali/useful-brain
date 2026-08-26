@@ -5,7 +5,7 @@ type MarkTone = "dark" | "light";
  * the literal shape of vector search. "dark" renders for a navy tile,
  * "light" renders navy-on-white for inline use.
  */
-export function NuraMark({
+export function UsefulBrainMark({
   tone = "dark",
   className,
 }: {
@@ -40,19 +40,19 @@ export function NuraMark({
 }
 
 /** Mark on a navy tile plus the wordmark. Used in the sidebar and header. */
-export function NuraLogo({ compact = false }: { compact?: boolean }) {
+export function UsefulBrainLogo({ compact = false }: { compact?: boolean }) {
   return (
     <div className="flex items-center gap-3">
       <span className="grid size-9 shrink-0 place-items-center rounded-[11px] bg-brand shadow-sm">
-        <NuraMark tone="dark" className="size-6" />
+        <UsefulBrainMark tone="dark" className="size-6" />
       </span>
       {!compact ? (
         <span className="flex min-w-0 flex-col leading-none">
           <span className="text-[15px] font-semibold tracking-[-0.01em] text-ink">
-            Nura
+            Useful Brain
           </span>
           <span className="mt-1 text-[11px] font-medium uppercase tracking-[0.14em] text-ink-faint">
-            RAG Copilot
+            Company knowledge
           </span>
         </span>
       ) : null}

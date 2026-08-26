@@ -1,8 +1,8 @@
 {
-  "name": "nura-rag-copilot",
+  "name": "useful-brain",
   "version": "0.1.0",
   "private": true,
-  "description": "A grounded RAG support copilot: retrieval-augmented answers with visible sources, inline citations and honest refusals, built directly on Next.js and Convex without RAG frameworks.",
+  "description": "A company knowledge and action agent with source-grounded answers, visible evidence and controlled tool use.",
   "license": "MIT",
   "author": "Wasim Jalali",
   "repository": {
@@ -14,7 +14,7 @@
     "rag",
     "retrieval-augmented-generation",
     "nextjs",
-    "convex",
+    "cloudflare",
     "vector-search",
     "embeddings",
     "llm",
