@@ -1,0 +1,11 @@
+{
+  "name": "Useful Brain",
+  "install": "bash .cursor/install.sh",
+  "terminals": [
+    {
+      "name": "web",
+      "command": "bash .cursor/dev.sh"
+    }
+  ],
+  "ports": [3000]
+}
