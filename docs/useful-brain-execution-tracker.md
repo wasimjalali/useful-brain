@@ -1,6 +1,6 @@
 # Useful Brain implementation execution tracker
 
-Status: Phase 2 complete on `phase-1-through-7a-staging`. Phase 0 and Phase 1 code are merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10), [PR #11](https://github.com/wasimjalali/useful-brain/pull/11)). Staging resources are live. Product boundary (Wasim 2026-08-27): local portfolio agent — no billing, public signup or required Cloudflare Access. Independent review waits for the single consolidated PR after Phase 7A.
+Status: Phase 4 complete on `phase-1-through-7a-staging`. Phase 0 and Phase 1 code are merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10), [PR #11](https://github.com/wasimjalali/useful-brain/pull/11)). Staging resources are live. Product boundary (Wasim 2026-08-27): local portfolio agent — no billing, public signup or required Cloudflare Access. Independent review waits for the single consolidated PR after Phase 7A.
 
 Architecture authority: `docs/useful-brain-master-plan.md`
 
@@ -92,8 +92,8 @@ Do not weaken or delete a failing test to make a gate pass. Record deviations an
 | Phase 1: Cloudflare foundation | Remainder complete — Access not required | [phase-1 report](implementation-reports/phase-1-cloudflare-foundation.md); staging workers.dev smoke; Access is optional ported code |
 | Phase 2: ingestion and generations | Complete | [phase-2 report](implementation-reports/phase-2-ingestion.md); workerd promote/rollback and workflow/queue tests |
 | Phase 3: ACL-safe retrieval | Complete | [phase-3 report](implementation-reports/phase-3-retrieval.md); fake-provider and fake-rerank CI ratchets; FTS5 workerd |
-| Phase 4: grounded answers | Blocked by Phase 3 | Pending |
-| Phase 5: Pi knowledge agent | Blocked by Phase 4 | Pending |
+| Phase 4: grounded answers | Complete | [phase-4 report](implementation-reports/phase-4-grounded-answers.md); citation/refusal/replay/shadow; Convex stays live UI |
+| Phase 5: Pi knowledge agent | Pending | Entry open after Phase 4 |
 | Phase 6: connectors, MCP and plugins | Blocked by Phase 5 | Pending |
 | Phase 7A: staging release candidate | Blocked by Phase 6 | Authorized after Phase 6; synthetic only |
 | Phase 7B: production launch and retirement | Closed | Requires one final explicit Wasim approval |
@@ -270,25 +270,25 @@ Goal: meet or beat Burooj’s locked retrieval behavior without allowing denied 
 
 Goal: reproduce citations, refusals, replay and server-owned history before adding the agent loop.
 
-- [ ] Port the structured answer contract and deterministic `insufficient_evidence` result.
-- [ ] Validate every citation against the current-run evidence snapshot.
-- [ ] Store immutable evidence snapshots and prompt, model, retrieval and corpus versions.
-- [ ] Migrate server-owned conversations and bounded history behavior.
-- [ ] Port the Tabari must-retrieve host finalizer.
-- [ ] Build the evidence ledger only from successful current-turn retrieval tool results.
-- [ ] Replace unavailable retrieval with one deterministic response that leaks no transport detail.
-- [ ] Treat retrieved text and every tool result as untrusted data.
-- [ ] Add Durable Object one-run locks, hibernating WebSocket fan-out and cancellation only.
-- [ ] Persist durable state in the operations database before releasing the run lock.
-- [ ] Shadow Convex answers without changing user-visible behavior.
+- [x] Port the structured answer contract and deterministic `insufficient_evidence` result. Evidence: `src/lib/answer/contract.ts`, `contract.test.ts`.
+- [x] Validate every citation against the current-run evidence snapshot. Evidence: `parseStructuredGroundedAnswer`; workerd `conversations-d1.test.ts`.
+- [x] Store immutable evidence snapshots and prompt, model, retrieval and corpus versions. Evidence: `migrations/operations/0002_conversations.sql`, `src/lib/store/conversations.ts`.
+- [x] Migrate server-owned conversations and bounded history behavior. Evidence: `createPendingTurn`, `trimStoredHistory` (6 turns / 6000 chars).
+- [x] Port the Tabari must-retrieve host finalizer. Evidence: `src/lib/agent/host-grounding.ts`.
+- [x] Build the evidence ledger only from successful current-turn retrieval tool results. Evidence: `buildTurnLedger` requires `search_knowledge`.
+- [x] Replace unavailable retrieval with one deterministic response that leaks no transport detail. Evidence: `BRAIN_KNOWLEDGE_UNAVAILABLE`; `conversation-events.test.ts`.
+- [x] Treat retrieved text and every tool result as untrusted data. Evidence: grounded-answer system prompt.
+- [x] Add Durable Object one-run locks, hibernating WebSocket fan-out and cancellation only. Evidence: `workers/brain/src/conversation-lock.ts`, `conversation-stream.test.ts`.
+- [x] Persist durable state in the operations database before releasing the run lock. Evidence: `persistThenRelease`.
+- [x] Shadow Convex answers without changing user-visible behavior. Evidence: `src/lib/answer/convex-shadow.test.ts`; Convex UI unchanged.
 
 ### Phase 4 exit
 
-- [ ] Zero invalid citation IDs.
-- [ ] Zero unsupported answers in the locked unanswerable set.
-- [ ] Replay reconstructs the stored answer and evidence.
-- [ ] Shadow parity and host-grounding suites pass.
-- [ ] Full project checks, critical reviews, phase report and PR are green.
+- [x] Zero invalid citation IDs.
+- [x] Zero unsupported answers in the locked unanswerable set.
+- [x] Replay reconstructs the stored answer and evidence.
+- [x] Shadow parity and host-grounding suites pass.
+- [x] Full project checks and phase report are green. Independent review and the single PR wait until Phase 7A. GitHub Actions quota is exhausted.
 
 ## 11. Phase 5: Pi knowledge agent
 

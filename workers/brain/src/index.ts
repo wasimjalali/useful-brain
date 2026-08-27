@@ -24,8 +24,13 @@ export type BrainEnv = {
   LOOPBACK_SUBJECT?: string;
   OPERATIONS_DB: {
     prepare(query: string): {
-      bind(...values: string[]): { first<T>(): Promise<T | null> };
+      bind(...values: unknown[]): {
+        first<T>(): Promise<T | null>;
+        run(): Promise<{ meta?: { changes?: number } }>;
+        all<T>(): Promise<{ results: T[] }>;
+      };
     };
+    batch(statements: unknown[]): Promise<unknown>;
   };
   CONVERSATION: {
     idFromName(name: string): unknown;
@@ -133,7 +138,19 @@ const brainWorker = {
         );
       }
 
-      if ((path === "/lock" || path === "/unlock") && request.method === "POST") {
+      if (path === "/stream") {
+        operation = "stream";
+        if (request.headers.get("Upgrade") !== "websocket") {
+          throw new WorkerValidationError();
+        }
+        const conversationId = parseBoundedId(
+          new URL(request.url).searchParams.get("conversationId"),
+          "conversation id",
+        );
+        return env.CONVERSATION.getByName(conversationId).fetch(request);
+      }
+
+      if ((path === "/lock" || path === "/unlock" || path === "/cancel") && request.method === "POST") {
         operation = path.slice(1);
         let body: { conversationId?: string; runId?: string };
         try {
@@ -144,7 +161,11 @@ const brainWorker = {
         const conversationId = parseBoundedId(body.conversationId, "conversation id");
         const runId = parseBoundedId(body.runId, "run id");
         const stub = env.CONVERSATION.getByName(conversationId);
-        const result = await (path === "/lock" ? stub.acquire(runId) : stub.release(runId));
+        const result = await (path === "/lock"
+          ? stub.acquire(runId)
+          : path === "/cancel"
+            ? stub.cancel(runId)
+            : stub.release(runId));
         writeOperationalLog({
           requestId,
           principalKind: principal.kind,

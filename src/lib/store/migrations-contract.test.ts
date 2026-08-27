@@ -11,6 +11,7 @@ describe("D1 migrations", () => {
     expect(corpusFiles).toContain("0002_lifecycle.sql");
     expect(corpusFiles).toContain("0003_fts5.sql");
     expect(operationsFiles).toContain("0001_init.sql");
+    expect(operationsFiles).toContain("0002_conversations.sql");
     const corpusSql = readFileSync(path.join(root, "corpus", "0001_init.sql"), "utf8");
     const operationsSql = readFileSync(path.join(root, "operations", "0001_init.sql"), "utf8");
     expect(corpusSql).not.toEqual(operationsSql);
@@ -20,6 +21,9 @@ describe("D1 migrations", () => {
     expect(operationsSql).toMatch(/principal_id/);
     expect(operationsSql).not.toMatch(/user_id/);
     expect(operationsSql).toMatch(/No remote D1 has applied this migration/);
+    const conversationsSql = readFileSync(path.join(root, "operations", "0002_conversations.sql"), "utf8");
+    expect(conversationsSql).toMatch(/CREATE TABLE conversations/);
+    expect(conversationsSql).toMatch(/evidence_snapshots/);
 
     for (const directory of ["corpus", "operations"]) {
       for (const file of readdirSync(path.join(root, directory))) {

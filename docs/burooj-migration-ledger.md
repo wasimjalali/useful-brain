@@ -1,6 +1,6 @@
 # Burooj migration ledger
 
-Status: Phase 3 TypeScript retrieval, Northwind 65/120, FTS5 and dual fake-provider ratchets are in place. Grounded answers remain Phase 4.
+Status: Phase 4 grounded answers, host finalizer, evidence snapshots and server-owned conversations are in place. Pi agent loop remains Phase 5.
 
 Sanad source commit: `630ba08dc7cad6aa71942d6842ce6d8d55a26873`  
 Sibling checkout: `/Users/wasimjalali/Desktop/Personal Project/Burooj`  
@@ -54,9 +54,9 @@ The fake-provider CI ratchet is a **separate** fingerprint. The 2026-08-26 unpai
 | ACL grouping and pre-score filtering | `sanad/src/sanad/permissions/acl.py` | `sanad/tests/test_acl_filter.py`, `test_permissions.py` | Authorization and retrieval policy | `src/lib/acl/acl-group.test.ts`, `acl-filter.test.ts` | Ported: length-prefixed injective SHA-256 `[:32]`; non-string private owner denies; store-side filter equivalence |
 | Access JWT verification | `sanad/src/sanad/auth/access_jwt.py` | `sanad/tests/test_auth_access_jwt.py` | Brain Access middleware | `src/lib/auth/access-jwt.test.ts`, `workers/brain/test/access-jwt.test.ts` | Ported as optional capability. Not a launch gate (Wasim 2026-08-27 local portfolio product). |
 | Connector lifecycle and SSRF controls | `sanad/src/sanad/connectors/` | `test_connectors.py`, `test_live_http.py` | Ingestion connectors | `src/lib/connectors/http-allowlist.test.ts`, `src/lib/connectors/github-tree.test.ts`, `src/lib/connectors/config-scrub.test.ts` | Ported: GitHub truncated listings fail; stale delete only after complete list+ingest; HTTP allowlist-only with redirects refused; recursive secret scrub; named `CONNECTOR_*` bindings |
-| Answer contract | `sanad/tests/test_brain_answer_contract.py` | same | RAG answer validation | `src/lib/answer/contract.test.ts` | Not started |
-| Host grounding finalizer | `tabari/tests/agent/test_brain_grounding.py` | same | Brain host finalizer | `src/lib/agent/host-grounding.test.ts` | Not started |
-| Current Nura citation/refusal/ops records | Useful Brain `convex/groundedAnswer.ts`, `convex/operations.ts` | `convex/groundedAnswer.test.ts`, `convex/operations.test.ts`, `src/lib/eval/run-eval.test.ts` | Keep through Phase 4 shadow | Existing tests (154 passing 2026-08-26) | Recorded, still Convex |
+| Answer contract | `sanad/tests/test_brain_answer_contract.py` | same | RAG answer validation | `src/lib/answer/contract.test.ts` | Ported: structured `grounded` / `insufficient_evidence`, current-run citation labels only, empty retrieval abstains |
+| Host grounding finalizer | `tabari/tests/agent/test_brain_grounding.py` | same | Brain host finalizer | `src/lib/agent/host-grounding.test.ts` | Ported: must-retrieve, current-turn `search_knowledge` ledger, invalid citation refuse, deterministic unavailable without transport leakage. Tabari session-DB/finalize_turn and deferred-tool cache are not ported |
+| Current Nura citation/refusal/ops records | Useful Brain `convex/groundedAnswer.ts`, `convex/operations.ts` | `convex/groundedAnswer.test.ts`, `convex/operations.test.ts`, `src/lib/eval/run-eval.test.ts` | Keep through Phase 4 shadow | `src/lib/answer/convex-shadow.test.ts` plus existing Convex tests | Shadow parity; Convex remains the live UI |
 
 ## Invariants that must survive the TypeScript rewrite
 
@@ -73,7 +73,7 @@ The fake-provider CI ratchet is a **separate** fingerprint. The 2026-08-26 unpai
 | Connector config recursively scrubbed; only named secret-binding references | `test_connector_instances.py` | Ported (`secret_binding` / `CONNECTOR_*`) |
 | Access JWT: RS256, application token, fail closed; roles/departments from server directory | `auth/access_jwt.py` | Ported as optional capability. Not a launch gate |
 | Eval loader rejects duplicate keys; fake and real ratchets stay separate | `test_evals.py`, `test_evals_loader.py` | Ported |
-| Must-retrieve, current-turn evidence ledger, deterministic unavailable/insufficient_evidence, no transport leakage | `test_brain_grounding.py` | Phase 4 |
+| Must-retrieve, current-turn evidence ledger, deterministic unavailable/insufficient_evidence, no transport leakage | `test_brain_grounding.py` | Ported |
 | Permission, keyword-oracle and window-eviction suites are release blockers | named tests above | Ported |
 
 Do not port the Python/FastAPI shell, Tabari desktop, Tabari’s unrelated agent framework, or REST clients that Workers bindings replace.
