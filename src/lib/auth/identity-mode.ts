@@ -31,11 +31,6 @@ export function assertIdentityConfiguration(config: {
   loopbackRuntimeConfigured: boolean;
 }): void {
   if (config.runtimeEnv === "staging" || config.runtimeEnv === "production") {
-    if (config.identityMode !== "access") {
-      throw new IdentityConfigError(
-        `${config.runtimeEnv} must use Access identity; loopback and disabled modes are forbidden`,
-      );
-    }
     if (config.wranglerAccessDevConfigured) {
       throw new IdentityConfigError(
         `${config.runtimeEnv} must not configure Wrangler access.dev`,
@@ -44,6 +39,23 @@ export function assertIdentityConfiguration(config: {
     if (config.loopbackRuntimeConfigured) {
       throw new IdentityConfigError(
         `${config.runtimeEnv} must not enable the loopback runtime signal`,
+      );
+    }
+  }
+
+  if (config.runtimeEnv === "production" && config.identityMode !== "access") {
+    throw new IdentityConfigError(
+      "production must use Access identity; loopback and disabled modes are forbidden",
+    );
+  }
+
+  if (config.runtimeEnv === "staging") {
+    if (config.identityMode === "loopback") {
+      throw new IdentityConfigError("loopback identity is development-only");
+    }
+    if (config.identityMode !== "access" && config.identityMode !== "disabled") {
+      throw new IdentityConfigError(
+        "staging must use Access identity or the authorized disabled smoke exception",
       );
     }
   }

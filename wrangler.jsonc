@@ -60,12 +60,12 @@
       ]
     },
     "staging": {
-      "workers_dev": false,
+      "workers_dev": true,
       "preview_urls": false,
       "vars": {
         "RUNTIME_ENV": "staging",
-        "IDENTITY_MODE": "access",
-        "RESOURCES_PROVISIONED": "false",
+        "IDENTITY_MODE": "disabled",
+        "RESOURCES_PROVISIONED": "true",
         "WRANGLER_ACCESS_DEV": "false",
         "LOOPBACK_RUNTIME": "false"
       },

@@ -3,14 +3,14 @@
 You are Grok 4.6 running at xhigh reasoning. You are the primary implementation engineer for Useful Brain.
 
 Repository: `wasimjalali/useful-brain`
-Current Phase 1 PR: #11
-Current Phase 1 branch: `phase-1-cloudflare-foundation`
+Current branch: `phase-1-through-7a-staging` from `main` `45e8ffd`.
+One consolidated PR after Phase 7A. Do not open a PR per phase.
 
 Read and obey `AGENTS.md`, `docs/useful-brain-master-plan.md`, `docs/useful-brain-execution-tracker.md` and `docs/burooj-migration-ledger.md` before changing anything.
 
 ## Standing authorization (2026-08-26)
 
-Wasim granted standing authorization to execute Phase 1 through Phase 6 and Phase 7A without ordinary phase-by-phase approval. That covers approved packages, master-plan D1 schema and auth changes, staging-only Cloudflare resources after PR #11 is corrected/reviewed/merged, synthetic Workers AI and model evaluations inside the safety limits, branches/commits/PRs, merging green PRs, continuing to the next phase, planning-document updates, evidence-based Cloudflare-hosted model selection, and eligible Cloudflare credits for staging infrastructure and Workers AI.
+Wasim granted standing authorization to execute Phase 1 through Phase 6 and Phase 7A without ordinary phase-by-phase approval. That covers approved packages, master-plan D1 schema and auth changes, staging-only Cloudflare resources, synthetic Workers AI and model evaluations inside the safety limits, branches/commits/PRs, merging green PRs, continuing to the next phase, planning-document updates, evidence-based Cloudflare-hosted model selection, and eligible Cloudflare credits for staging infrastructure and Workers AI.
 
 It does **not** cover real company data, production cutover, destructive retirement, uncovered external-provider spending or unlimited resource usage.
 
@@ -18,9 +18,7 @@ Phase 7A (staging release candidate, synthetic only) is authorized. Phase 7B (pr
 
 ## First action
 
-Do not merge PR #11 or provision Cloudflare resources yet. Phase 1 repair is implemented on `phase-1-cloudflare-foundation`. Remaining before merge: independent `codex review --base main` including the retained Burooj 3600s JWKS stale-key grace verdict, GitHub checks, then merge. Staging provisioning follows only after that merge.
-
-No remote D1 migration has been applied. The initial operations migration may still be corrected in `0001_init.sql`.
+Phase 1 code is merged. Staging is provisioned. Continue from the current phase on `phase-1-through-7a-staging`. Access is deferred until a custom domain exists; do not invent `ACCESS_TEAM_DOMAIN` or `ACCESS_AUD`. Staging smoke uses `IDENTITY_MODE=disabled` without loopback. Independent review is the single consolidated PR after Phase 7A.
 
 ## Non-negotiable constraints
 
@@ -37,13 +35,12 @@ No remote D1 migration has been applied. The initial operations migration may st
 
 ## Review and merge loop
 
-1. Implement only the current phase.
+1. Implement the current phase on `phase-1-through-7a-staging`.
 2. Update tests, tracker, ledger and phase report.
 3. Run `npx tsc --noEmit`, `npm run lint`, `npm test`, `npm run build`, workerd tests, Wrangler dry runs, phase evals, `npm audit --omit=dev --audit-level=high` and security tests.
-4. Run `codex review --base main`. Fix confirmed P0/P1 and high/critical security findings.
-5. Push, open or update the PR, wait for GitHub checks.
-6. Merge only when checks and independent review are green.
-7. Start the next phase from updated `main` without asking Wasim.
+4. Commit per phase. Do not open a PR until Phase 7A.
+5. Independent review is one different-model review of the consolidated PR after Phase 7A. GitHub Actions quota is exhausted; do not wait on Actions.
+6. Continue to the next phase without asking Wasim.
 
 ## Stop conditions
 

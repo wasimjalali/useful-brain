@@ -10,7 +10,7 @@ Useful Brain is a private company knowledge and action agent. It retrieves only 
 
 The target architecture lives in `docs/useful-brain-master-plan.md`. Execute from `docs/useful-brain-execution-tracker.md`.
 
-Phase 0 is merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10)). Phase 1 is open as [PR #11](https://github.com/wasimjalali/useful-brain/pull/11) on `phase-1-cloudflare-foundation`. Do not merge PR #11 or provision Cloudflare resources until the Phase 1 repair list in the tracker is complete, independent review is green, and GitHub checks pass.
+Phase 0 is merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10)). Phase 1 code is merged ([PR #11](https://github.com/wasimjalali/useful-brain/pull/11), follow-up `40f89d7`). Staging resources are provisioned. Access is deferred until a custom domain exists. Independent review is a single consolidated PR after Phase 7A, not a per-phase gate.
 
 Wasim granted standing authorization on 2026-08-26 for Grok 4.6 xhigh to execute Phase 1 through Phase 6 and Phase 7A without ordinary phase-by-phase approval. That covers approved packages, master-plan D1 schema and auth changes, staging-only Cloudflare resources, synthetic Workers AI and model evaluations inside the safety limits, branches/commits/PRs, merging green PRs, continuing to the next phase, updating planning documents, evidence-based Cloudflare-hosted model selection, and using eligible Cloudflare credits for staging infrastructure and Workers AI. It does **not** cover real company data, production cutover, destructive retirement, uncovered external-provider spending, unlimited usage, Convex deletion, or Burooj deletion.
 
@@ -103,7 +103,7 @@ Stop and batch remaining manual work only when: a change contradicts the fixed a
 - Verify every completed change with `npx tsc --noEmit`, `npm run lint`, `npm test`, `npm run build`, relevant workerd tests, Wrangler dry runs, the dependency audit and security tests.
 - For Next.js and Cloudflare changes, verify current official documentation rather than relying on memory.
 - Run independent review with `codex review --base main`. Fix every confirmed P0/P1 and every confirmed high or critical security finding. Merge automatically only when GitHub checks and independent review are green. Then start the next phase from updated `main` without asking Wasim.
-- Do not merge PR #11 until Phase 1 repairs, workerd evidence and independent review are complete.
+- Do not open a PR per phase. One consolidated PR lands after Phase 7A. GitHub Actions quota is exhausted; local proof is `npx tsc --noEmit`, `npm run lint`, `npm test`, `npm run test:workers`, `npm run build`, Wrangler dry-runs, `npm audit --omit=dev --audit-level=high`, and the phase reports.
 
 ## Interface
 

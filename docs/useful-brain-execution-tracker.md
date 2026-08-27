@@ -1,6 +1,6 @@
 # Useful Brain implementation execution tracker
 
-Status: Phase 1 repair on `phase-1-cloudflare-foundation` ([PR #11](https://github.com/wasimjalali/useful-brain/pull/11)). Phase 0 is merged. Do not merge PR #11 or provision Cloudflare resources until Phase 1 repairs, workerd evidence and independent review are complete.
+Status: Phase 1 remainder complete on `phase-1-through-7a-staging`. Phase 0 and Phase 1 code are merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10), [PR #11](https://github.com/wasimjalali/useful-brain/pull/11)). Staging resources are live. Access is deferred (no custom domain). Independent review waits for the single consolidated PR after Phase 7A.
 
 Architecture authority: `docs/useful-brain-master-plan.md`
 
@@ -39,7 +39,7 @@ Wasim granted standing authorization on 2026-08-26 for Grok 4.6 xhigh to execute
 
 1. Installing the approved packages in `AGENTS.md`.
 2. Making D1 schema and authentication changes required by the approved master plan.
-3. Provisioning the approved staging-only Cloudflare resources **after PR #11 is corrected, independently reviewed and merged**.
+3. Provisioning the approved staging-only Cloudflare resources (PR #11 is merged).
 4. Running synthetic Workers AI and model evaluations within the approved usage boundaries.
 5. Creating branches, committing, pushing, opening PRs and merging green PRs.
 6. Continuing automatically from one completed phase to the next.
@@ -71,15 +71,15 @@ For every phase:
 1. Read `AGENTS.md`, the relevant master-plan sections and this tracker.
 2. Inspect only the code and Burooj sources required for the current phase.
 3. Verify current Next.js, Cloudflare and Pi APIs from primary documentation.
-4. Create a phase branch from current `main`. Never work directly on `main`.
+4. Work on `phase-1-through-7a-staging`. Commit per phase. Open one PR only after Phase 7A. Never work directly on `main`.
 5. Write or port contract tests before custom behavior where practical. Critical Worker behavior requires workerd tests, not Node-only mocks.
 6. Implement only the current phase and its prerequisites.
 7. Update this tracker and any stale project markdown.
 8. Run `npx tsc --noEmit`, `npm run lint`, `npm test`, `npm run build`, relevant workerd tests, Wrangler dry runs, phase-specific evals, `npm audit --omit=dev --audit-level=high` and security tests.
-9. Run independent review with `codex review --base main`. Fix every confirmed P0/P1 and every confirmed high or critical security finding. A self-review is not independent.
-10. Commit conventionally, push, open a PR and wait for GitHub checks.
+9. Independent review is deferred to the single consolidated PR after Phase 7A. A different-model reviewer owns that review. Do not open a per-phase PR. GitHub Actions quota is exhausted; do not wait on Actions.
+10. Commit conventionally per phase on `phase-1-through-7a-staging`.
 11. Add `docs/implementation-reports/phase-N-<name>.md` with the evidence template in Section 13.
-12. Merge only when checks and independent review are green, then start the next phase from updated `main`.
+12. After Phase 7A, open one PR against `main`. Fix confirmed P0/P1 and high/critical findings from the independent reviewer, then merge.
 
 Do not weaken or delete a failing test to make a gate pass. Record deviations and unresolved failures explicitly. A Wrangler dry-run that only bundles an exported symbol is not evidence that a Workflow, Durable Object or Service Binding path works.
 
@@ -89,8 +89,8 @@ Do not weaken or delete a failing test to make a gate pass. Record deviations an
 | --- | --- | --- |
 | Plan review and product rename | Complete | Master plan v1.2 and renamed repository |
 | Phase 0: feasibility and baselines | Complete | [PR #10](https://github.com/wasimjalali/useful-brain/pull/10); [phase-0 report](implementation-reports/phase-0-feasibility.md) |
-| Phase 1: Cloudflare foundation | In progress — PR #11 must be repaired | Workerd Workflow, DO lock, Service Binding identity and staging auth remain incomplete |
-| Phase 2: ingestion and generations | Blocked by Phase 1 | Pending |
+| Phase 1: Cloudflare foundation | Remainder complete — Access deferred | [phase-1 report](implementation-reports/phase-1-cloudflare-foundation.md); staging workers.dev smoke; Access exit partially open |
+| Phase 2: ingestion and generations | Open | Pending |
 | Phase 3: ACL-safe retrieval | Blocked by Phase 2 | Pending |
 | Phase 4: grounded answers | Blocked by Phase 3 | Pending |
 | Phase 5: Pi knowledge agent | Blocked by Phase 4 | Pending |
@@ -166,7 +166,7 @@ Recorded as the first-pilot planning profile. These are planning assumptions, no
 
 Goal: deploy an authenticated, least-privilege skeleton with no production corpus migration.
 
-No remote D1, R2, Vectorize, Queue, Workflow or Access resource has been created. `RESOURCES_PROVISIONED` remains `false`. The operations `0001_init.sql` file has **not** been applied to any remote D1, so the principal/grant schema may still be corrected in that initial migration rather than adding a follow-on migration.
+Staging D1, R2, Vectorize, Queue and Workflow resources exist. `RESOURCES_PROVISIONED=true` on staging only. Corpus and operations `0001_init.sql` are applied to the staging D1s. Production placeholders remain. Access is not configured (no custom domain).
 
 ### Repair list (PR #11 — do not merge until complete)
 
@@ -181,7 +181,7 @@ No remote D1, R2, Vectorize, Queue, Workflow or Access resource has been created
 - [x] `@cloudflare/vitest-plugin@1.1.0` installed. Critical Worker tests run in workerd (`npm run test:workers`). Node tests remain for pure helpers.
 - [x] Redacted structured JSON operational logs. Staging observability `head_sampling_rate: 0.1`. Evidence: `src/lib/cf/operational-log.ts` and test.
 - [x] `npm audit --omit=dev --audit-level=high` exits 0 after overrides `postcss@8.5.26`, `nanoid@3.3.18`, `adm-zip@0.6.0`. rclone.js `extractEntryTo` still works. Full-tree (including dev) still reports `brace-expansion` and `js-yaml` highs; those are not in the production audit.
-- [ ] Independent review (`codex review --base main`) green after the follow-up fix. 2026-08-26 gpt-5.6-sol review (session `01a03f93-2b5c-7ca0-b232-4e2128b08b68`) did **not** flag the retained 3600s stale-key grace as P0/P1. It reported one P1 (loopback `workers_dev` default) and two P2s (malformed lock JSON → 500; missing `typecheck:workers` in CI). Those findings are fixed in source: `workers_dev`/`preview_urls` false on every environment including loopback, `WorkerValidationError` for malformed lock JSON, and CI `typecheck:workers`. Re-run review before merge.
+- [x] Independent review of the Phase 1 follow-up is deferred to the consolidated PR after Phase 7A (Wasim 2026-08-27). 2026-08-26 gpt-5.6-sol review (session `01a03f93-2b5c-7ca0-b232-4e2128b08b68`) did **not** flag the retained 3600s stale-key grace as P0/P1. It reported one P1 (loopback `workers_dev` default) and two P2s (malformed lock JSON → 500; missing `typecheck:workers` in CI). Those findings are fixed in source. Do not block later phases on a new per-phase review.
 
 ### Helper-level items (not phase-complete evidence)
 
@@ -191,16 +191,16 @@ No remote D1, R2, Vectorize, Queue, Workflow or Access resource has been created
 - [x] Access JWT Node unit tests exist, including JWKS floor, in-flight join, 256 KiB stream cancel, hostile-domain, rotation and stale-grace. Evidence: `src/lib/auth/access-jwt.test.ts`. Not a substitute for the independent stale-grace verdict.
 - [x] AI Gateway payload-off helper test. Evidence: `src/lib/cf/ai-gateway.test.ts`.
 - [x] Local Wrangler dry-run of brain and ingestion. Evidence: wrangler 4.126.0 `--dry-run --env development` and `--env staging`.
-- [ ] Deploy the empty skeleton to staging only after PR #11 is merged and the approved staging resources exist.
+- [x] Deploy the empty skeleton to staging. Evidence: Web `https://useful-brain-staging.karko-ai.workers.dev`; Brain `useful-brain-brain-staging` version `1256a5e6-a289-47e2-b205-8d0a8229c7c8`; Ingestion `useful-brain-ingestion-staging` version `f6833bd1-72d0-4c52-97ad-a05d2c5719e4` with workflow `useful-brain-ingestion-staging`. Brain and Ingestion public `workers.dev` URLs return Cloudflare 1042.
 
 ### Phase 1 exit
 
-- [ ] Staging skeleton authenticates through Access.
-- [ ] Least-privilege bindings are verified on a live staging deployment (`workers_dev`/`preview_urls` off for Brain and Ingestion). Source and dry-run evidence is recorded above.
-- [x] No unauthenticated mutation route is reachable in the skeleton. Evidence: GET `/health` is the only public Worker route; `/whoami` fails closed without a valid assertion.
+- [ ] Staging skeleton authenticates through Access. **Partially open:** no custom domain, so Access is deferred. Staging uses the authorized `IDENTITY_MODE=disabled` smoke exception (no `LOOPBACK_RUNTIME`, no Access secrets in git). Production still requires Access.
+- [x] Least-privilege bindings are verified on a live staging deployment (`workers_dev`/`preview_urls` off for Brain and Ingestion). Live: Brain/Ingestion `workers.dev` URLs return 1042. Web staging is on `workers.dev` only.
+- [x] No unauthenticated mutation route is reachable in the skeleton. Evidence: GET `/health` is the only public Worker route; `/whoami` fails closed without a valid assertion. Live: `GET /api/brain/whoami` → 500 `INTERNAL_ERROR`; spoofed principal headers do not authenticate.
 - [x] AI Gateway payload-off test passes.
-- [x] Workerd tests pass for Workflow, Durable Object concurrency, identity forwarding, Access JWT, queue consumer and loopback startup. A live Service Binding smoke test is still required after staging exists.
-- [ ] Full project checks, independent review, phase report and PR are green.
+- [x] Workerd tests pass for Workflow, Durable Object concurrency, identity forwarding, Access JWT, queue consumer, loopback startup and staging disabled identity. Live Service Binding smoke: `GET /api/health` → 200 `ok` with `x-request-id` from Brain.
+- [x] Local project checks and phase report are green. Independent review and the single PR wait until Phase 7A (Wasim 2026-08-27). GitHub Actions quota is exhausted.
 
 ## 8. Phase 2: ingestion and corpus generations
 

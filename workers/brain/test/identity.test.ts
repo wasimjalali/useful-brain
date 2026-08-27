@@ -131,6 +131,29 @@ describe("Web-to-Brain identity", () => {
     expect(await response.json()).toMatchObject({ id: "principal-dev", kind: "user" });
   });
 
+  it("serves health and fails closed on whoami in staging disabled identity", async () => {
+    const disabledStaging = {
+      ...env,
+      RUNTIME_ENV: "staging",
+      IDENTITY_MODE: "disabled",
+      RESOURCES_PROVISIONED: "true",
+      LOOPBACK_RUNTIME: "false",
+      LOOPBACK_SUBJECT: "",
+    };
+    const health = await fetchWorker(
+      new IncomingRequest("https://brain.internal/health"),
+      disabledStaging,
+    );
+    const whoami = await fetchWorker(
+      new IncomingRequest("https://brain.internal/whoami"),
+      disabledStaging,
+    );
+    expect(health.status).toBe(200);
+    expect(await health.text()).toBe("ok");
+    expect(whoami.status).toBe(500);
+    expect(await whoami.json()).toMatchObject({ code: "INTERNAL_ERROR" });
+  });
+
   it("fails startup when loopback is enabled without the trusted runtime signal", async () => {
     const response = await fetchWorker(
       new IncomingRequest("https://brain.internal/whoami"),

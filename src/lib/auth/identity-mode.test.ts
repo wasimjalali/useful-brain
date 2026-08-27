@@ -38,7 +38,42 @@ describe("identity modes", () => {
         wranglerAccessDevConfigured: false,
         loopbackRuntimeConfigured: true,
       }),
-    ).toThrow(/staging must use Access/);
+    ).toThrow(/loopback runtime/);
+    expect(() =>
+      assertIdentityConfiguration({
+        runtimeEnv: "staging",
+        identityMode: "loopback",
+        wranglerAccessDevConfigured: false,
+        loopbackRuntimeConfigured: false,
+      }),
+    ).toThrow(/loopback identity is development-only/);
+  });
+
+  it("allows staging disabled identity without loopback or Access secrets", () => {
+    expect(() =>
+      assertIdentityConfiguration({
+        runtimeEnv: "staging",
+        identityMode: "disabled",
+        wranglerAccessDevConfigured: false,
+        loopbackRuntimeConfigured: false,
+      }),
+    ).not.toThrow();
+    expect(() =>
+      assertIdentityConfiguration({
+        runtimeEnv: "staging",
+        identityMode: "disabled",
+        wranglerAccessDevConfigured: false,
+        loopbackRuntimeConfigured: true,
+      }),
+    ).toThrow(/loopback runtime/);
+    expect(() =>
+      assertIdentityConfiguration({
+        runtimeEnv: "production",
+        identityMode: "disabled",
+        wranglerAccessDevConfigured: false,
+        loopbackRuntimeConfigured: false,
+      }),
+    ).toThrow(/production must use Access/);
   });
 
   it("fails staging and production when Wrangler access.dev or loopback runtime is configured", () => {

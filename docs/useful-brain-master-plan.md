@@ -4,7 +4,7 @@ Status: finalized and approved for phased implementation, version 1.4
 
 Date: 2026-08-26
 
-Implementation status: approved. Phase 0 is merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10)). Phase 1 is [PR #11](https://github.com/wasimjalali/useful-brain/pull/11) and must be repaired before merge. Standing authorization (2026-08-26) covers Phase 1 through Phase 6 and Phase 7A. Phase 7B remains closed. Do not provision Cloudflare resources until PR #11 is corrected, independently reviewed and merged.
+Implementation status: approved. Phase 0 is merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10)). Phase 1 code is merged ([PR #11](https://github.com/wasimjalali/useful-brain/pull/11)). Staging resources are provisioned. Access is deferred until a custom domain exists. Standing authorization (2026-08-26) covers Phase 1 through Phase 6 and Phase 7A. Phase 7B remains closed.
 
 ## 1. Decision
 
@@ -411,9 +411,9 @@ Two quality ratchets are required: deterministic fake-provider CI floors and rea
 - Record baseline results from both current Nura and Burooj Sanad, including the exact Sanad commit and retrieval fingerprint.
 - Record the first company's residency, corpus-size, reindex-cadence, p95 latency, quality and monthly-cost budgets.
 
-Architecture approval is complete. Phase 0 is merged. Phase 1 PR #11 repair is implemented on `phase-1-cloudflare-foundation` (WorkflowEntrypoint, Access JWT JWKS contracts, Service Binding identity, loopback, principal schema, SQLite Durable Object lock, workerd tests). Do not merge or provision staging until independent review, including the stale-key grace verdict, is green.
+Architecture approval is complete. Phase 0 is merged. Phase 1 code is merged ([PR #11](https://github.com/wasimjalali/useful-brain/pull/11)). Staging resources are provisioned. Access is deferred until a custom domain exists. Independent review is the single consolidated PR after Phase 7A.
 
-Standing authorization (2026-08-26): Grok 4.6 xhigh may execute Phase 1 through Phase 6 and Phase 7A without ordinary phase-by-phase approval. That includes approved packages, master-plan schema and auth changes, staging-only resources after PR #11 merges, synthetic Workers AI/evals inside the safety limits, PRs, merging green PRs, continuing to the next phase, planning-document updates, evidence-based Cloudflare-hosted model selection, and eligible credits for staging infrastructure and Workers AI. It does not include real company data, production cutover, destructive retirement, uncovered external spend or unlimited usage.
+Standing authorization (2026-08-26): Grok 4.6 xhigh may execute Phase 1 through Phase 6 and Phase 7A without ordinary phase-by-phase approval. That includes approved packages, master-plan schema and auth changes, staging-only resources, synthetic Workers AI/evals inside the safety limits, PRs, merging green PRs, continuing to the next phase, planning-document updates, evidence-based Cloudflare-hosted model selection, and eligible credits for staging infrastructure and Workers AI. It does not include real company data, production cutover, destructive retirement, uncovered external spend or unlimited usage.
 
 ### First-pilot planning profile
 
