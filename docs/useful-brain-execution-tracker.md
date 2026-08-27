@@ -1,6 +1,6 @@
 # Useful Brain implementation execution tracker
 
-Status: Phase 7A complete on `phase-1-through-7a-staging`. Phase 0 and Phase 1 code are merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10), [PR #11](https://github.com/wasimjalali/useful-brain/pull/11)). Staging resources are live. Product boundary (Wasim 2026-08-27): local portfolio agent — no billing, public signup or required Cloudflare Access. Independent review is the single consolidated PR after Phase 7A. Phase 7B stays closed.
+Status: Phase 7A complete on `phase-1-through-7a-staging`. Consolidated PR: [#13](https://github.com/wasimjalali/useful-brain/pull/13). Phase 0 and Phase 1 code are merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10), [PR #11](https://github.com/wasimjalali/useful-brain/pull/11)). Staging resources are live. Product boundary (Wasim 2026-08-27): local portfolio agent — no billing, public signup or required Cloudflare Access. Independent review is PR #13. Phase 7B stays closed.
 
 Architecture authority: `docs/useful-brain-master-plan.md`
 
@@ -95,7 +95,7 @@ Do not weaken or delete a failing test to make a gate pass. Record deviations an
 | Phase 4: grounded answers | Complete | [phase-4 report](implementation-reports/phase-4-grounded-answers.md); citation/refusal/replay/shadow; Convex stays live UI |
 | Phase 5: Pi knowledge agent | Complete | [phase-5 report](implementation-reports/phase-5-pi-agent.md); policy gateway, Workflow approval, durable run records |
 | Phase 6: connectors, MCP and plugins | Complete | [phase-6 report](implementation-reports/phase-6-connectors-mcp.md); synthetic HTTP/MCP/action-sink through the policy gateway |
-| Phase 7A: staging release candidate | Complete | [phase-7a report](implementation-reports/phase-7a-staging-rc.md); synthetic staging RC; no billing/signup/required Access |
+| Phase 7A: staging release candidate | Complete | [phase-7a report](implementation-reports/phase-7a-staging-rc.md); [PR #13](https://github.com/wasimjalali/useful-brain/pull/13); synthetic staging RC; no billing/signup/required Access |
 | Phase 7B: production launch and retirement | Closed | Requires one final explicit Wasim approval |
 
 ## 6. Phase 0: feasibility and baselines
