@@ -36,22 +36,23 @@ export function assertIdentityConfiguration(config: {
         `${config.runtimeEnv} must not configure Wrangler access.dev`,
       );
     }
-    if (config.loopbackRuntimeConfigured) {
-      throw new IdentityConfigError(
-        `${config.runtimeEnv} must not enable the loopback runtime signal`,
-      );
-    }
   }
 
-  if (config.runtimeEnv === "production" && config.identityMode !== "access") {
+  if (config.runtimeEnv === "staging" && config.loopbackRuntimeConfigured) {
     throw new IdentityConfigError(
-      "production must use Access identity; loopback and disabled modes are forbidden",
+      "staging must not enable the loopback runtime signal",
+    );
+  }
+
+  if (config.runtimeEnv === "production" && config.identityMode === "disabled") {
+    throw new IdentityConfigError(
+      "production cannot use disabled identity; use loopback on 127.0.0.1 or Access",
     );
   }
 
   if (config.runtimeEnv === "staging") {
     if (config.identityMode === "loopback") {
-      throw new IdentityConfigError("loopback identity is development-only");
+      throw new IdentityConfigError("loopback identity is not allowed on staging workers.dev");
     }
     if (config.identityMode !== "access" && config.identityMode !== "disabled") {
       throw new IdentityConfigError(
@@ -63,10 +64,13 @@ export function assertIdentityConfiguration(config: {
   if (config.identityMode === "access" && config.wranglerAccessDevConfigured) {
     throw new IdentityConfigError("Access mode cannot combine with Wrangler access.dev");
   }
+  if (config.identityMode === "access" && config.loopbackRuntimeConfigured) {
+    throw new IdentityConfigError("Access mode cannot combine with the loopback runtime signal");
+  }
 
   if (config.identityMode === "loopback") {
-    if (config.runtimeEnv !== "development") {
-      throw new IdentityConfigError("loopback identity is development-only");
+    if (config.runtimeEnv === "staging") {
+      throw new IdentityConfigError("loopback identity is not allowed on staging workers.dev");
     }
     if (!config.loopbackRuntimeConfigured) {
       throw new IdentityConfigError(

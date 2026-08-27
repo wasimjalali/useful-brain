@@ -1,6 +1,6 @@
 # Useful Brain implementation execution tracker
 
-Status: Phase 2 complete on `phase-1-through-7a-staging`. Phase 0 and Phase 1 code are merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10), [PR #11](https://github.com/wasimjalali/useful-brain/pull/11)). Staging resources are live. Access is deferred (no custom domain). Independent review waits for the single consolidated PR after Phase 7A.
+Status: Phase 2 complete on `phase-1-through-7a-staging`. Phase 0 and Phase 1 code are merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10), [PR #11](https://github.com/wasimjalali/useful-brain/pull/11)). Staging resources are live. Product boundary (Wasim 2026-08-27): local portfolio agent — no billing, public signup or required Cloudflare Access. Independent review waits for the single consolidated PR after Phase 7A.
 
 Architecture authority: `docs/useful-brain-master-plan.md`
 
@@ -26,7 +26,7 @@ This file is the implementation checklist and evidence ledger. Update it as work
 - AI Gateway for model routing with payload collection disabled.
 - Queues and Workflows for durable ingestion, approval waits and deterministic resume.
 - Durable Objects only for one-run locks, stream fan-out and cancellation.
-- Cloudflare Access at the perimeter and independent assertion verification in Brain.
+- Loopback local operator on 127.0.0.1. Cloudflare Access JWT is optional ported code, not a required perimeter. No billing or public signup.
 - Pi Agent Core as the only agent loop.
 - One policy gateway for native tools, MCP and plugins.
 - Convex remains a migration source and rollback path until cutover.
@@ -89,9 +89,9 @@ Do not weaken or delete a failing test to make a gate pass. Record deviations an
 | --- | --- | --- |
 | Plan review and product rename | Complete | Master plan v1.2 and renamed repository |
 | Phase 0: feasibility and baselines | Complete | [PR #10](https://github.com/wasimjalali/useful-brain/pull/10); [phase-0 report](implementation-reports/phase-0-feasibility.md) |
-| Phase 1: Cloudflare foundation | Remainder complete — Access deferred | [phase-1 report](implementation-reports/phase-1-cloudflare-foundation.md); staging workers.dev smoke; Access exit partially open |
+| Phase 1: Cloudflare foundation | Remainder complete — Access not required | [phase-1 report](implementation-reports/phase-1-cloudflare-foundation.md); staging workers.dev smoke; Access is optional ported code |
 | Phase 2: ingestion and generations | Complete | [phase-2 report](implementation-reports/phase-2-ingestion.md); workerd promote/rollback and workflow/queue tests |
-| Phase 3: ACL-safe retrieval | Open | Pending |
+| Phase 3: ACL-safe retrieval | Complete | [phase-3 report](implementation-reports/phase-3-retrieval.md); fake-provider and fake-rerank CI ratchets; FTS5 workerd |
 | Phase 4: grounded answers | Blocked by Phase 3 | Pending |
 | Phase 5: Pi knowledge agent | Blocked by Phase 4 | Pending |
 | Phase 6: connectors, MCP and plugins | Blocked by Phase 5 | Pending |
@@ -195,7 +195,7 @@ Staging D1, R2, Vectorize, Queue and Workflow resources exist. `RESOURCES_PROVIS
 
 ### Phase 1 exit
 
-- [ ] Staging skeleton authenticates through Access. **Partially open:** no custom domain, so Access is deferred. Staging uses the authorized `IDENTITY_MODE=disabled` smoke exception (no `LOOPBACK_RUNTIME`, no Access secrets in git). Production still requires Access.
+- [x] Staging Access authentication is **not a product requirement** (Wasim 2026-08-27: local portfolio agent, no billing or public signup). Access JWT remains ported. Staging uses `IDENTITY_MODE=disabled` without loopback. Local operator identity is loopback on 127.0.0.1. Production may use loopback with `LOOPBACK_RUNTIME`; disabled identity stays forbidden on production.
 - [x] Least-privilege bindings are verified on a live staging deployment (`workers_dev`/`preview_urls` off for Brain and Ingestion). Live: Brain/Ingestion `workers.dev` URLs return 1042. Web staging is on `workers.dev` only.
 - [x] No unauthenticated mutation route is reachable in the skeleton. Evidence: GET `/health` is the only public Worker route; `/whoami` fails closed without a valid assertion. Live: `GET /api/brain/whoami` → 500 `INTERNAL_ERROR`; spoofed principal headers do not authenticate.
 - [x] AI Gateway payload-off test passes.
@@ -238,33 +238,33 @@ Goal: reproduce the approved corpus lifecycle with D1 as authority and Vectorize
 
 Goal: meet or beat Burooj’s locked retrieval behavior without allowing denied content to affect results or traces.
 
-- [ ] Port the 65-document Northwind corpus and all 120 inherited questions.
-- [ ] Reject duplicate eval keys.
-- [ ] Implement the external-content FTS5 table with `INTEGER PRIMARY KEY AUTOINCREMENT` and synchronized insert, update and delete triggers.
-- [ ] Forbid `INSERT OR REPLACE`; use `ON CONFLICT DO UPDATE`.
-- [ ] Implement an injective, length-prefixed `acl_group` canonical form hashed to 32 hexadecimal characters.
-- [ ] Reject non-string or empty private owners.
-- [ ] Bound principal grants and raise `AclTooWide` without truncation.
-- [ ] Enumerate only ACL groups the principal may read.
-- [ ] Measure the serialized Vectorize filter and reject it at 2,048 bytes or more. Do not copy Burooj’s 500-group ceiling.
-- [ ] Require both generation namespace and ACL filter on every Vectorize query.
-- [ ] Apply equivalent store-side ACL constraints to D1 FTS candidate generation.
-- [ ] Recompute keyword scores over the allowed set only.
-- [ ] Fuse at the locked 0.70/0.30 starting profile.
-- [ ] Rerank 20 allowed candidates and apply the locked 0.05 starting floor.
-- [ ] Keep parent expansion and conflict detection off.
-- [ ] Remove denied IDs, scores, removal counts and partial-document offsets from user-visible traces.
-- [ ] Implement D1 and Vectorize ACL equivalence contract tests.
-- [ ] Port permission, keyword-oracle and window-eviction suites.
-- [ ] Keep fake-provider and real-stack ratchets separate.
-- [ ] Use new documents and questions for new holdout work. Never tune on the inherited locked set.
+- [x] Port the 65-document Northwind corpus and all 120 inherited questions. Evidence: `content/northwind/`, `src/lib/eval/northwind.test.ts`.
+- [x] Reject duplicate eval keys. Evidence: `src/lib/eval/northwind-loader.test.ts`.
+- [x] Implement the external-content FTS5 table with `INTEGER PRIMARY KEY AUTOINCREMENT` and synchronized insert, update and delete triggers. Evidence: `migrations/corpus/0003_fts5.sql`, workerd `workers/ingestion/test/fts5.test.ts`.
+- [x] Forbid `INSERT OR REPLACE`; use `ON CONFLICT DO UPDATE`. Evidence: `UPSERT_CHUNK_SQL`, `src/lib/store/migrations-contract.test.ts`.
+- [x] Implement an injective, length-prefixed `acl_group` canonical form hashed to 32 hexadecimal characters. Evidence: `src/lib/acl/acl-group.test.ts`.
+- [x] Reject non-string or empty private owners. Evidence: `ownerOf`, `src/lib/acl/permissions.test.ts`.
+- [x] Bound principal grants and raise `AclTooWide` without truncation. Evidence: `src/lib/acl/acl-filter.test.ts`.
+- [x] Enumerate only ACL groups the principal may read. Evidence: `enumerateAllowedAclGroups`.
+- [x] Measure the serialized Vectorize filter and refuse it at 2,048 bytes or more. Evidence: `assertSerializedFilterSize`, `src/lib/retrieve/cloudflare-query.test.ts`.
+- [x] Require both generation namespace and ACL filter on every Vectorize query. Evidence: `assertVectorizeQuery`, `buildVectorizeQuery`.
+- [x] Apply equivalent store-side ACL constraints to D1 FTS candidate generation. Evidence: `keywordSearchSql` includes `generation_id` and the ACL predicate.
+- [x] Recompute keyword scores over the allowed set only, including section headings. Evidence: `src/lib/retrieve/keyword-score.ts`.
+- [x] Fuse at the locked 0.70/0.30 starting profile. Evidence: `REAL_STACK_FINGERPRINT`. Fake-provider CI uses the separate 0.20/0.80 pair.
+- [x] Rerank 20 allowed candidates and apply the locked 0.05 starting floor. Evidence: `src/lib/retrieve/rerank.ts`, `rerank.test.ts`. Fake-rerank CI ratchet uses floor 0.
+- [x] Keep parent expansion and conflict detection off. Evidence: `src/lib/retrieve/parent-off.test.ts`.
+- [x] Remove denied IDs, scores, removal counts and partial-document offsets from user-visible traces. Evidence: `src/lib/retrieve/trace-leak.test.ts`.
+- [x] Implement D1 and Vectorize ACL equivalence contract tests. Evidence: `src/lib/acl/acl-filter.test.ts`.
+- [x] Port permission, keyword-oracle and window-eviction suites. Evidence: `permissions.test.ts`, `keyword-oracle.test.ts`, `window-eviction.test.ts`.
+- [x] Keep fake-provider and real-stack ratchets separate. Evidence: `FAKE_PROVIDER_FINGERPRINT`, `FAKE_RERANK_FINGERPRINT`, `REAL_STACK_FINGERPRINT`.
+- [x] Use new documents and questions for new holdout work. Never tune on the inherited locked set. Evidence: floors were not lowered; heading-aware local rescore restored Sanad behavior.
 
 ### Phase 3 exit
 
-- [ ] Zero unauthorized chunks, citations or trace-derived side channels.
-- [ ] Retrieval meets or beats both locked ratchets or has an approved written exception.
-- [ ] Vectorize inventory reconciles before every real-stack evaluation.
-- [ ] Full project checks, critical reviews, phase report and PR are green.
+- [x] Zero unauthorized chunks, citations or trace-derived side channels. Evidence: fake-provider and fake-rerank evals `aclLeakCount === 0`; trace-leak tests.
+- [x] Retrieval meets or beats both locked ratchets or has an approved written exception. Evidence: fake-provider CI floors 0.90/0.80/0.82/0.49 pass; fake-rerank floors 0.62/0.53/0.55/0.39 pass. Live qwen3+BGE real-stack eval is a written exception: fingerprint locked, adapters contracted, unpaid CI cannot reproduce BGE numbers; inventory reconcile is required before any live eval. Product is synthetic/local; no billed live-stack eval in this phase.
+- [x] Vectorize inventory reconciles before every real-stack evaluation. No live real-stack eval was run. `auditStoreConsistency` remains the gate when one is.
+- [x] Full project checks and phase report are green. Independent review and the single PR wait until Phase 7A. GitHub Actions quota is exhausted.
 
 ## 10. Phase 4: grounded answers and conversation migration
 

@@ -4,13 +4,13 @@ Guidance for coding agents and contributors working in this repository.
 
 ## Purpose
 
-Useful Brain is a private company knowledge and action agent. It retrieves only evidence the current principal may read, cites every factual answer, refuses unsupported claims and performs actions only through a typed tool policy and approval boundary.
+Useful Brain is a local, single-operator knowledge and action agent for Wasim’s portfolio. It retrieves only evidence the current principal may read, cites every factual answer, refuses unsupported claims and performs actions only through a typed tool policy and approval boundary. It is not a billed product, not a public SaaS, and not a multi-company platform.
 
 ## Execution gate
 
 The target architecture lives in `docs/useful-brain-master-plan.md`. Execute from `docs/useful-brain-execution-tracker.md`.
 
-Phase 0 is merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10)). Phase 1 code is merged ([PR #11](https://github.com/wasimjalali/useful-brain/pull/11), follow-up `40f89d7`). Staging resources are provisioned. Access is deferred until a custom domain exists. Independent review is a single consolidated PR after Phase 7A, not a per-phase gate.
+Phase 0 is merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10)). Phase 1 code is merged ([PR #11](https://github.com/wasimjalali/useful-brain/pull/11), follow-up `40f89d7`). Staging resources are provisioned. Operator identity is loopback on 127.0.0.1. Cloudflare Access is optional ported code, not a launch requirement. Independent review is a single consolidated PR after Phase 7A, not a per-phase gate.
 
 Wasim granted standing authorization on 2026-08-26 for Grok 4.6 xhigh to execute Phase 1 through Phase 6 and Phase 7A without ordinary phase-by-phase approval. That covers approved packages, master-plan D1 schema and auth changes, staging-only Cloudflare resources, synthetic Workers AI and model evaluations inside the safety limits, branches/commits/PRs, merging green PRs, continuing to the next phase, updating planning documents, evidence-based Cloudflare-hosted model selection, and using eligible Cloudflare credits for staging infrastructure and Workers AI. It does **not** cover real company data, production cutover, destructive retirement, uncovered external-provider spending, unlimited usage, Convex deletion, or Burooj deletion.
 
@@ -34,7 +34,7 @@ The finalized target is:
 - Vector search: Vectorize as a rebuildable projection.
 - Durable work: Workflows and Queues.
 - Real-time coordination: Durable Objects and hibernating WebSockets.
-- Identity perimeter: Cloudflare Access.
+- Identity: loopback local operator on 127.0.0.1. Cloudflare Access JWT verification is retained as a ported capability, not a launch requirement. No billing, public signup or tenant switching.
 - Embeddings and reranking: Workers AI.
 - Model routing: AI Gateway.
 - Agent framework: `@earendil-works/pi-agent-core` with the minimum `pi-ai` provider imports.
@@ -111,7 +111,8 @@ Useful Brain is an internal operational product. Keep the existing left-aligned 
 
 ## Deployment model
 
-- Deploy one application and one Cloudflare resource set per company.
+- One application and one Cloudflare resource set for this local/staging portfolio deployment.
 - Keep company terminology in `src/lib/useful-brain-config.ts`.
-- Do not add public signup, billing or tenant switching to the shared foundation.
-- The legacy `NURA_ALLOW_ANONYMOUS_DEV` flag remains only until the Convex path is retired. The Cloudflare replacement must be loopback-only and fail production startup when enabled.
+- Do not add public signup, billing, SSO onboarding or tenant switching.
+- Operator identity is loopback on 127.0.0.1 with `LOOPBACK_RUNTIME`. Never enable loopback on a public `workers.dev` URL. Staging may use `IDENTITY_MODE=disabled` for skeleton smoke. Cloudflare Access is optional demonstration code, not a required production perimeter.
+- The legacy `NURA_ALLOW_ANONYMOUS_DEV` flag remains only until the Convex path is retired.

@@ -18,7 +18,7 @@ Phase 7A (staging release candidate, synthetic only) is authorized. Phase 7B (pr
 
 ## First action
 
-Phase 1 code is merged. Staging is provisioned. Continue from the current phase on `phase-1-through-7a-staging`. Access is deferred until a custom domain exists; do not invent `ACCESS_TEAM_DOMAIN` or `ACCESS_AUD`. Staging smoke uses `IDENTITY_MODE=disabled` without loopback. Independent review is the single consolidated PR after Phase 7A.
+Phase 1 code is merged. Staging is provisioned. Continue from the current phase on `phase-1-through-7a-staging`. This is a local portfolio product: no billing, public signup or required Cloudflare Access. Do not invent `ACCESS_TEAM_DOMAIN` or `ACCESS_AUD`. Staging smoke uses `IDENTITY_MODE=disabled` without loopback. Local operator identity is loopback on 127.0.0.1. Independent review is the single consolidated PR after Phase 7A.
 
 ## Non-negotiable constraints
 

@@ -86,20 +86,25 @@ export function canMarkReady(input: {
 
 export const UPSERT_CHUNK_SQL = `INSERT INTO chunks (
   chunk_id, document_id, document_version_id, generation_id, heading, chunk_index,
-  text, start_offset, end_offset, content_digest, vector_id, acl_group, created_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  content, start_offset, end_offset, content_digest, vector_id, acl_group,
+  access_scope, allowed_roles, allowed_departments, metadata, created_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(chunk_id) DO UPDATE SET
   document_id = excluded.document_id,
   document_version_id = excluded.document_version_id,
   generation_id = excluded.generation_id,
   heading = excluded.heading,
   chunk_index = excluded.chunk_index,
-  text = excluded.text,
+  content = excluded.content,
   start_offset = excluded.start_offset,
   end_offset = excluded.end_offset,
   content_digest = excluded.content_digest,
   vector_id = excluded.vector_id,
-  acl_group = excluded.acl_group`;
+  acl_group = excluded.acl_group,
+  access_scope = excluded.access_scope,
+  allowed_roles = excluded.allowed_roles,
+  allowed_departments = excluded.allowed_departments,
+  metadata = excluded.metadata`;
 
 export const PROMOTE_SQL = `UPDATE corpus_state
 SET active_generation_id = ?

@@ -60,6 +60,7 @@ describe("corpus generations", () => {
 
   it("upserts chunks with ON CONFLICT DO UPDATE and never INSERT OR REPLACE", () => {
     expect(UPSERT_CHUNK_SQL).toMatch(/ON CONFLICT\(chunk_id\) DO UPDATE/);
+    expect(UPSERT_CHUNK_SQL).toMatch(/\bcontent\b/);
     expect(UPSERT_CHUNK_SQL).not.toMatch(/INSERT\s+OR\s+REPLACE/i);
     expect(PROMOTE_SQL).toMatch(/state = 'ready'/);
   });
