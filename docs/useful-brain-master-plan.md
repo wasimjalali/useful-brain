@@ -8,7 +8,7 @@ Implementation status: approved. Phase 0 is merged ([PR #10](https://github.com/
 
 ## 1. Decision
 
-Useful Brain will be a Cloudflare-native company knowledge and action system. Convex and Microsoft Foundry are legacy implementation details and are not part of the target architecture.
+Useful Brain will be a Cloudflare-native local portfolio knowledge and action system. Convex and Microsoft Foundry are legacy implementation details and are not part of the target architecture.
 
 Cloudflare will own the application runtime, relational data, object storage, vector search, durable jobs, queues, real-time coordination, optional identity verification, AI routing and operational telemetry. Model inference remains replaceable behind Cloudflare AI Gateway. Workers AI is the default for embeddings and reranking. The main agent model may be Cloudflare-hosted or reached through AI Gateway, but it must clear the same quality, tool-use, latency and cost gates.
 
@@ -17,14 +17,14 @@ The deployment boundary is one application and one isolated resource set for thi
 ### Why Cloudflare is the right choice
 
 - The Burooj Sanad implementation already proves the important D1, FTS5, Vectorize, Workers AI and Cloudflare Access path.
-- Useful Brain is read-heavy. D1 is suitable when each company has isolated databases, queries are indexed and historical event data is archived before either database reaches the 10 GB ceiling.
+- Useful Brain is read-heavy. D1 is suitable when this operator deployment has isolated databases, queries are indexed and historical event data is archived before either database reaches the 10 GB ceiling.
 - R2, Vectorize, Queues, Workflows and Durable Objects cover the distinct storage and execution shapes instead of forcing them into one database.
 - Document ACL (public, department, role, private-owner) stays in D1. That is retrieval authorization for the Northwind security demo, not a commercial identity product. Cloudflare Access JWT verification is retained as optional ported code. The operator path is loopback on 127.0.0.1. There is no billing, SSO onboarding, public signup or tenant switching.
 - The Cloudflare credit balance improves runway, but credits are not the architectural reason. The system still needs service boundaries, cost caps and portability seams.
 
 ### Important constraints
 
-- [D1 databases are single-threaded and limited to 10 GB each](https://developers.cloudflare.com/d1/platform/limits/). The answer is two databases per company, short indexed transactions, the Sessions API for replicated reads and R2 archival, not one global D1 database.
+- [D1 databases are single-threaded and limited to 10 GB each](https://developers.cloudflare.com/d1/platform/limits/). The answer is two databases per deployment, short indexed transactions, the Sessions API for replicated reads and R2 archival, not one global D1 database.
 - [Vectorize mutations are asynchronous](https://developers.cloudflare.com/vectorize/reference/client-api/). D1 is authoritative. Vectorize is a rebuildable search projection with a reconciliation ledger.
 - [Vectorize metadata filtering runs before topK selection](https://developers.cloudflare.com/vectorize/reference/metadata-filtering/). ACL metadata indexes must exist before vectors are written.
 - [Queues provide at-least-once delivery](https://developers.cloudflare.com/queues/reference/delivery-guarantees/). Cloudflare does not deduplicate deliveries for the application. Queue payloads carry identifiers only and consumers enforce idempotency.
@@ -210,7 +210,7 @@ Every Vectorize query requires both the active-generation namespace and an `acl_
 
 ### Capacity plan
 
-- One corpus D1 database, one operations D1 database, one R2 prefix and one Vectorize index per company deployment.
+- One corpus D1 database, one operations D1 database, one R2 prefix and one Vectorize index for this operator deployment.
 - Keep active operational rows in the operations database. Archive old run events, evidence bodies and full parser artifacts to R2 on a retention schedule.
 - Use short, indexed D1 queries. Never scan large tables from the request path.
 - Enable D1 read replication only with the Sessions API. Writes still go to the primary.
@@ -350,7 +350,7 @@ The restricted operator view must expose:
 - model, prompt, embedding, chunking and corpus versions
 - queue age, workflow state, retry count, dead-letter count and reconciliation drift
 - tool-call risk class, approval latency, execution outcome and idempotency status
-- latency percentiles and usage per company, user, model, connector and operation class
+- latency percentiles and usage per operator, model, connector and operation class
 
 Use Workers Logs for structured operational logs, Analytics Engine for high-cardinality product metrics and AI Gateway for model latency, token and error telemetry. Configure CPU and subrequest caps in Wrangler, upload limits, model budgets, connector rate limits and daily usage alerts. Do not enable response caching for private RAG or agent requests by default.
 
@@ -442,10 +442,10 @@ These are planning assumptions for the first isolated company deployment, not cu
 
 #### Users and concurrency
 
-- Up to 50 employees
+- Northwind-demo planning envelope: up to 50 principals
 - Up to 10 concurrent chat or agent runs
 - Up to 5 service-token callers
-- One isolated application and Cloudflare resource set per company
+- One isolated application and Cloudflare resource set for this operator. This is not a billed multi-company platform.
 
 #### Initial product scope
 
@@ -483,7 +483,7 @@ Cost:
 - Idle deployment: existing $5 Workers Paid account minimum, with effectively $0 incremental idle Cloudflare cost
 - First-pilot Cloudflare platform **safety boundary**: no more than $25 gross per month
 - Workers AI inference **safety boundary**: no more than $75 gross per month
-- Combined **protection limit**: no more than $100 gross per company per month
+- Combined **protection limit**: no more than $100 gross per month
 - These are not reserved budgets, prepaid commitments or expected monthly bills
 - Empty staging Workers, D1, R2, Vectorize, Queues, Workflows, Durable Objects and AI Gateway configuration do not imply $100 of monthly spending
 - Record gross metered cost before credits separately from uncovered cash cost
@@ -498,7 +498,7 @@ Cost:
 - Add Brain-side Access JWT verification, independent corpus and operations D1 migrations, R2, Vectorize, Queues, Workflows, Durable Objects and Service Bindings.
 - Add structured logs, request IDs and safe error contracts.
 
-Exit: authenticated skeleton deploys to staging with least-privilege bindings and smoke tests.
+Exit: operator-identity skeleton deploys to staging with least-privilege bindings and smoke tests. Loopback on 127.0.0.1; staging `workers.dev` may use disabled identity. Cloudflare Access is optional ported code, not this exit.
 
 ### Phase 2: ingestion and corpus generations
 
@@ -556,7 +556,7 @@ Exit: staging is the release candidate. No real company data.
 
 ### Phase 7B: production launch and retirement
 
-Requires one final explicit Wasim approval.
+Requires one final explicit Wasim approval. Do not start. This is not a commercial launch and must not add billing, public signup, SSO onboarding, tenant switching or required Cloudflare Access.
 
 - Real company data, production resource set and real production traffic.
 - Production-primary cutover and rollback-window expiry.
@@ -644,7 +644,7 @@ With the application deployed but no users, files, queued work, vector queries o
 
 The 65-document Burooj migration corpus, 120-question evaluation set and ordinary CI builds fit comfortably inside the storage, vector and build allowances. Repeated full-stack model evals can still create Workers AI or external model charges, so staging receives daily spend limits and alerts before those evals run.
 
-First-pilot operating ceilings, excluding credits: no more than $25 per month Cloudflare platform, $75 per month external generation models, and $100 combined per company per month. Credits are excluded from cost justification until the billing dashboard confirms Developer Platform eligibility. Add budget alerts before any repeated live-stack evaluation or external model workload.
+First-pilot operating ceilings, excluding credits: no more than $25 per month Cloudflare platform, $75 per month external generation models, and $100 combined per month. These are infrastructure safety limits, not a customer billing product. Credits are excluded from cost justification until the Cloudflare billing dashboard confirms Developer Platform eligibility. Add budget alerts before any repeated live-stack evaluation or external model workload.
 
 The account's Cloudflare credits are useful runway only if their billing terms apply to the Developer Platform products used here. That eligibility is not yet confirmed.
 

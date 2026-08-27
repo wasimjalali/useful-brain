@@ -1,6 +1,6 @@
 # Phase 1 Cloudflare foundation
 
-1. Phase: 1. Code merged in [PR #11](https://github.com/wasimjalali/useful-brain/pull/11). Remainder (provision/deploy/smoke) is on `phase-1-through-7a-staging` from `main` `45e8ffd`. Access exit is partially open. See remainder section below.
+1. Phase: 1. Code merged in [PR #11](https://github.com/wasimjalali/useful-brain/pull/11). Remainder (provision/deploy/smoke) is on `phase-1-through-7a-staging` from `main` `45e8ffd`. Access is optional ported code, not a launch gate. See remainder section below.
 2. Objective: authenticated, least-privilege Worker skeleton with independent D1 histories, Access JWT verification, Service Binding identity forwarding, a valid Workflow entrypoint, an atomic SQLite conversation lock, workerd tests and a clean production-tree audit. No production corpus migration. No Cloudflare resource creation.
 3. Files and systems changed: `src/lib/auth/*`, `src/lib/cf/*`, `src/lib/store/*`, `src/lib/ingest/*`, `src/app/api/brain/whoami/route.ts`, `migrations/{corpus,operations}/0001_init.sql`, `workers/brain/`, `workers/ingestion/`, root and Worker Wrangler configs, `@cloudflare/vitest-plugin@1.1.0`, patched `postcss`/`nanoid`/`adm-zip` overrides, tracker, ledger, this report. Convex auth is unchanged.
 4. Architecture decisions or deviations: Access JWT uses Web Crypto instead of `jose`. AI Gateway payload collection is enforced as `cf-aig-collect-log-payload: false` in application headers, not a Wrangler binding. Staging and production keep `RESOURCES_PROVISIONED=false` so those environments fail startup until resources exist. Bounded 3600s JWKS stale-key grace is retained from Burooj and needs an independent security verdict. Workerd cannot bind Brain as a second service to itself; identity tests call `createBrainBoundRequest` then the Brain Worker fetch handler. `adm-zip@0.6.0` is a verified override for rclone.js/OpenNext (build-time zip extract only).
@@ -30,9 +30,9 @@ Full `npm audit` (including `devDependencies`) still reports high `brace-expansi
 ## Remainder: provision, deploy, smoke (2026-08-27)
 
 1. Phase: 1 remainder. Branch: `phase-1-through-7a-staging` from `main` `45e8ffd` (PR #12 on merged Phase 1). Commit range starts after that merge.
-2. Objective: provision staging-only EU resources, apply `0001_init.sql`, deploy the empty web/brain/ingestion skeleton, smoke health and fail-closed whoami over the Service Binding, record Access as partially open.
+2. Objective: provision staging-only EU resources, apply `0001_init.sql`, deploy the empty web/brain/ingestion skeleton, smoke health and fail-closed whoami over the Service Binding. Access is not a product requirement.
 3. Files and systems changed: `src/lib/auth/identity-mode.ts` and tests, `src/lib/cf/startup.test.ts`, `src/lib/cf/wrangler-config.test.ts`, `src/app/api/health/route.ts`, `workers/brain/test/identity.test.ts`, root and Worker Wrangler staging vars/IDs, tracker, AGENTS.md, master-plan status lines, this report.
-4. Architecture decisions or deviations: Wasim 2026-08-27 authorized a **staging-only** `IDENTITY_MODE=disabled` exception because Cloudflare Access needs a custom domain that does not exist yet. Loopback remains development / `127.0.0.1` only. Staging forbids `LOOPBACK_RUNTIME=true` and Wrangler `access.dev`. Production still requires Access. Web staging `workers_dev: true`; Brain and Ingestion stay `workers_dev: false`, `preview_urls: false`. This is not a silent architecture change. Independent review is deferred to the single consolidated PR after Phase 7A.
+4. Architecture decisions or deviations: Wasim 2026-08-27 authorized a **staging-only** `IDENTITY_MODE=disabled` exception on public `workers.dev`. Loopback remains development / `127.0.0.1` only. Staging forbids `LOOPBACK_RUNTIME=true` and Wrangler `access.dev`. Product boundary (same day, restated): this is a local portfolio agent. Production may use loopback with `LOOPBACK_RUNTIME`; it must not use disabled identity. Cloudflare Access is optional ported code, not a launch requirement. Web staging `workers_dev: true`; Brain and Ingestion stay `workers_dev: false`, `preview_urls: false`. Independent review is deferred to the single consolidated PR after Phase 7A.
 5. Tests run with exact results (2026-08-27, Node `v22.22.2`): `npx tsc --noEmit` exit 0; `npm run lint` exit 0; Node Vitest 41 files, 239 passed; Brain workerd 4 files / 13 tests passed; Ingestion workerd 2 files / 3 tests passed; `npm run build` Next 16.3.3 exit 0; `npm run build:cf` OpenNext 1.20.3; wrangler 4.126.0 `--dry-run --env staging` Brain gzip 8.21 KiB, Ingestion gzip 7.22 KiB, Web gzip 1608.06 KiB; `npm audit --omit=dev --audit-level=high` 0 vulnerabilities.
 6. Security: live `GET /api/health` 200 `ok` with Brain `x-request-id`; live `GET /api/brain/whoami` 500 `INTERNAL_ERROR` (disabled identity cannot serve authenticated routes); spoofed principal headers do not authenticate; Brain/Ingestion `*.workers.dev` return Cloudflare 1042; no Access AUD or team domain committed; `LOOPBACK_RUNTIME=false` on staging.
 7. Cloudflare resources created (staging only, account `3d757afb0bb862e97e04c9eddc8db6d0`, Karko AI). Did not touch `usefulapply-*` or `sanad-*`.
@@ -53,7 +53,7 @@ Full `npm audit` (including `devDependencies`) still reports high `brace-expansi
 Gross metered cost: empty staging D1/R2/Vectorize/Queues plus three Workers. Idle is expected at approximately the existing $5 Workers Paid minimum. Uncovered cash cost: $0. Gross model cost: $0. No production resources.
 
 8. Data migrations: `migrations/corpus/0001_init.sql` and `migrations/operations/0001_init.sql` applied remotely to the staging D1s (`d1_migrations` recorded both). Tables present: `corpus_generations`, `corpus_state`, `principals`, `roles`, `departments`. Rollback: leave the generation pointer unset; do not use D1 Time Travel for corpus rollback. Convex remains the live application backend.
-9. Remaining risks: Access exit is partially open until a custom domain exists; `PRAGMA foreign_keys = ON` still required on mutating operations D1 sessions; independent review waits for the consolidated PR; GitHub Actions quota exhausted so CI did not run.
+9. Remaining risks: Access JWT unused on the operator path (optional demonstration code); `PRAGMA foreign_keys = ON` still required on mutating operations D1 sessions; independent review waits for the consolidated PR; GitHub Actions quota exhausted so CI did not run.
 10. Recommended next phase: Phase 2. Entry gate is open.
 
 ## Provisioning list (executed 2026-08-27)
@@ -64,6 +64,6 @@ Gross metered cost: empty staging D1/R2/Vectorize/Queues plus three Workers. Idl
 - [x] Vectorize `useful-brain-staging` (1024, cosine)
 - [x] Queues `useful-brain-ingest-staging` and `useful-brain-ingest-dlq-staging`
 - [x] Ingestion Workflow `useful-brain-ingestion-staging`
-- [ ] Cloudflare Access application — deferred, no custom domain. Do not invent `ACCESS_TEAM_DOMAIN` / `ACCESS_AUD`.
+- [ ] Cloudflare Access application — not required for this local portfolio product. Do not invent `ACCESS_TEAM_DOMAIN` / `ACCESS_AUD`.
 - [x] Staging deploy of web, brain, and ingestion Workers
 - [x] `RESOURCES_PROVISIONED=true` on staging after IDs were recorded. Production remains `false`.

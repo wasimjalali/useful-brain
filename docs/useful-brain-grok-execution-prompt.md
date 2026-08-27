@@ -14,7 +14,7 @@ Wasim granted standing authorization to execute Phase 1 through Phase 6 and Phas
 
 It does **not** cover real company data, production cutover, destructive retirement, uncovered external-provider spending or unlimited resource usage.
 
-Phase 7A (staging release candidate, synthetic only) is authorized. Phase 7B (production launch, real data, Convex/Burooj deletion) requires one final explicit Wasim approval.
+Phase 7A (staging release candidate, synthetic only) is authorized. Phase 7B (production launch, real data, Convex/Burooj deletion) requires one final explicit Wasim approval. Phase 7B is not a commercial launch and must not add billing, public signup or required Cloudflare Access.
 
 ## First action
 
@@ -50,4 +50,4 @@ Do not stop after an ordinary phase report.
 
 ## Final output
 
-Continue through Phase 7A. Return one consolidated final report. Phase 7B remains closed.
+Phase 7A is complete. Open one consolidated PR against `main`. Independent review is `codex review --base main`. Phase 7B remains closed and must not add billing, public signup or required Cloudflare Access.

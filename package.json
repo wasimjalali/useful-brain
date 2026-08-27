@@ -2,7 +2,7 @@
   "name": "useful-brain",
   "version": "0.1.0",
   "private": true,
-  "description": "A company knowledge and action agent with source-grounded answers, visible evidence and controlled tool use.",
+  "description": "A local portfolio knowledge and action agent with source-grounded answers, visible evidence and controlled tool use.",
   "license": "MIT",
   "author": "Wasim Jalali",
   "repository": {

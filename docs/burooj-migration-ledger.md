@@ -1,6 +1,6 @@
 # Burooj migration ledger
 
-Status: Phase 6 synthetic connectors, MCP and action-sink are in place through the shared policy gateway. Phase 7A is the staging release candidate.
+Status: complete for Phase 7A. Named Sanad contracts are ported with TypeScript tests. The recoverable Burooj archive is local-only (gitignored `.archives/burooj-630ba08dc7cad6aa71942d6842ce6d8d55a26873.bundle`, SHA-256 `2e8733d7884f963ab02e5633646515131c33af870f75e9ffa332679f587dcaf8`). Do not delete Burooj. Phase 7B stays closed.
 
 Sanad source commit: `630ba08dc7cad6aa71942d6842ce6d8d55a26873`  
 Sibling checkout: `/Users/wasimjalali/Desktop/Personal Project/Burooj`  

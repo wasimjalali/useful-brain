@@ -1,6 +1,6 @@
 # Useful Brain implementation execution tracker
 
-Status: Phase 6 complete on `phase-1-through-7a-staging`. Phase 0 and Phase 1 code are merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10), [PR #11](https://github.com/wasimjalali/useful-brain/pull/11)). Staging resources are live. Product boundary (Wasim 2026-08-27): local portfolio agent — no billing, public signup or required Cloudflare Access. Independent review waits for the single consolidated PR after Phase 7A.
+Status: Phase 7A complete on `phase-1-through-7a-staging`. Phase 0 and Phase 1 code are merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10), [PR #11](https://github.com/wasimjalali/useful-brain/pull/11)). Staging resources are live. Product boundary (Wasim 2026-08-27): local portfolio agent — no billing, public signup or required Cloudflare Access. Independent review is the single consolidated PR after Phase 7A. Phase 7B stays closed.
 
 Architecture authority: `docs/useful-brain-master-plan.md`
 
@@ -16,7 +16,7 @@ This file is the implementation checklist and evidence ledger. Update it as work
 
 ## 2. Fixed architecture
 
-- One isolated application and Cloudflare resource set per company.
+- One isolated application and Cloudflare resource set for this operator. No billing, public signup or tenant switching.
 - Next.js on Cloudflare Workers through OpenNext initially.
 - Separate web, brain and ingestion Worker responsibilities.
 - Separate corpus and operations D1 databases.
@@ -95,7 +95,7 @@ Do not weaken or delete a failing test to make a gate pass. Record deviations an
 | Phase 4: grounded answers | Complete | [phase-4 report](implementation-reports/phase-4-grounded-answers.md); citation/refusal/replay/shadow; Convex stays live UI |
 | Phase 5: Pi knowledge agent | Complete | [phase-5 report](implementation-reports/phase-5-pi-agent.md); policy gateway, Workflow approval, durable run records |
 | Phase 6: connectors, MCP and plugins | Complete | [phase-6 report](implementation-reports/phase-6-connectors-mcp.md); synthetic HTTP/MCP/action-sink through the policy gateway |
-| Phase 7A: staging release candidate | Pending | Entry open after Phase 6; synthetic only |
+| Phase 7A: staging release candidate | Complete | [phase-7a report](implementation-reports/phase-7a-staging-rc.md); synthetic staging RC; no billing/signup/required Access |
 | Phase 7B: production launch and retirement | Closed | Requires one final explicit Wasim approval |
 
 ## 6. Phase 0: feasibility and baselines
@@ -148,10 +148,10 @@ Recorded as the first-pilot planning profile. These are planning assumptions, no
 
 - [x] Record company 1 residency and retention requirements. Evidence: EU-based first pilot; GDPR-compatible processing with contractual transfer safeguards, not strict EU-only; D1 and R2 `eu` jurisdiction; 30/90/30/365 day retention classes; AI Gateway payload storage disabled; synthetic data until a production data-handling review.
 - [x] Record expected corpus size, file-size range and reindex cadence. Evidence: up to 10,000 documents, 10 GB sources, 25 MB max file, ~100,000 chunks; hourly incremental sync; monthly full rebuild and on retrieval-config changes.
-- [x] Record expected employees, concurrent chats and service-token callers. Evidence: up to 50 employees, 10 concurrent chat or agent runs, 5 service-token callers; one isolated application and Cloudflare resource set per company.
+- [x] Record expected employees, concurrent chats and service-token callers. Evidence: Northwind-demo envelope of up to 50 principals, 10 concurrent chat or agent runs, 5 service-token callers; one isolated application and Cloudflare resource set for this operator. Not a billed multi-company product.
 - [x] Decide whether agent actions must ship with v1 or knowledge-only RAG may ship first if Pi cannot run safely on Workers. Evidence: ship the Pi agent shell; first release is knowledge-first (retrieval, grounded answers, evaluations, read-only tools); external mutating connector actions stay disabled until later phases; knowledge-only RAG is the fallback only if a production-only Pi problem appears later.
 - [x] Decide who may see operator retrieval diagnostics. Evidence: company administrators and designated operators see complete retrieval diagnostics; ordinary employees see authorized citations and evidence only.
-- [x] Set numeric p95 latency, retrieval quality and monthly-cost budgets. Evidence: retrieval 1.5 s, first token 3 s, complete answer 15 s, searchable 5 min; ACL/invalid-citation/unanswerable zeros; fake-provider floors 0.907 / 0.821 / 0.831; real-stack slices at or above BGE+0.05; Cloudflare ≤ $25/month, external generation ≤ $75/month, combined ≤ $100/company/month; idle is the existing $5 Workers Paid minimum.
+- [x] Set numeric p95 latency, retrieval quality and monthly-cost budgets. Evidence: retrieval 1.5 s, first token 3 s, complete answer 15 s, searchable 5 min; ACL/invalid-citation/unanswerable zeros; fake-provider floors 0.907 / 0.821 / 0.831; real-stack slices at or above BGE+0.05; Cloudflare ≤ $25/month, external generation ≤ $75/month, combined ≤ $100/month infrastructure safety limits (not a customer billing product); idle is the existing $5 Workers Paid minimum.
 - [x] Confirm whether the Cloudflare credit applies to the Developer Platform invoice. Evidence: eligibility is **not** confirmed. Credits are excluded from cost justification until the billing dashboard confirms Developer Platform eligibility.
 
 ### Phase 0 exit
@@ -340,24 +340,24 @@ Exit: one read connector and one approved write connector pass all policy and se
 
 Authorized for continuous execution after Phase 6. Synthetic data only.
 
-- [ ] Staging load tests
-- [ ] D1 and R2 restore drills
-- [ ] Incident drills
-- [ ] Corpus rollback proof (generation pointer, not Time Travel)
-- [ ] Synthetic shadow mode
-- [ ] Synthetic canary mode
-- [ ] Staging-primary mode
-- [ ] Operational runbooks
-- [ ] Rollback runbooks
-- [ ] Budget and alert validation
-- [ ] Burooj migration-ledger completion
-- [ ] Recoverable Burooj archive creation
+- [x] Staging load tests. Evidence: eight live `GET /api/health` requests to `https://useful-brain-staging.karko-ai.workers.dev/api/health` returned 200 `ok`; `src/lib/release/modes.test.ts` measures the same synthetic load.
+- [x] D1 and R2 restore drills. Evidence: remote `sqlite_master` on both staging D1s; `corpus_state` empty; R2 `useful-brain-sources-staging` `--jurisdiction eu` is 0 objects / 0 B EEUR. Restore of the empty bucket is re-upload from the local synthetic corpus. Do not use D1 Time Travel.
+- [x] Incident drills. Evidence: `FAIL_CLOSED_INCIDENTS` in `src/lib/release/modes.ts` and [operations runbook](runbooks/operations.md).
+- [x] Corpus rollback proof (generation pointer, not Time Travel). Evidence: `src/lib/store/generations.test.ts`, `workers/ingestion/test/generations.test.ts`, `src/lib/release/modes.test.ts`, [rollback runbook](runbooks/rollback.md).
+- [x] Synthetic shadow mode. Evidence: `planRelease("shadow")` keeps Convex live, `canaryPercent` 0.
+- [x] Synthetic canary mode. Evidence: `planRelease("canary")` keeps Convex live, `canaryPercent` 10.
+- [x] Staging-primary mode. Evidence: `planRelease("staging_primary")` uses Cloudflare staging, still `syntheticOnly: true`.
+- [x] Operational runbooks. Evidence: [docs/runbooks/operations.md](runbooks/operations.md).
+- [x] Rollback runbooks. Evidence: [docs/runbooks/rollback.md](runbooks/rollback.md).
+- [x] Budget and alert validation. Evidence: `GROSS_USAGE_CEILINGS_USD` $25 / $75 / $100 as infrastructure safety limits, not a customer billing product. Gross model cost $0. Idle approximately the existing $5 Workers Paid minimum.
+- [x] Burooj migration-ledger completion. Evidence: [docs/burooj-migration-ledger.md](burooj-migration-ledger.md) complete for 7A. Phase 7B deletion stays closed.
+- [x] Recoverable Burooj archive creation. Evidence: local gitignored `.archives/burooj-630ba08dc7cad6aa71942d6842ce6d8d55a26873.bundle` (~97 MB), SHA-256 `2e8733d7884f963ab02e5633646515131c33af870f75e9ffa332679f587dcaf8`, `git bundle verify` ok, `HEAD` / `refs/heads/main` `630ba08dc7cad6aa71942d6842ce6d8d55a26873`. Not committed. Do not push Burooj.
 
-Exit: staging is the release candidate with restore, incident and budget evidence. No real company data.
+Exit: staging is the release candidate with restore, incident and budget evidence. No real company data. No billing, public signup or required Cloudflare Access.
 
 ### Phase 7B: production launch and retirement
 
-Requires one final explicit Wasim approval. Do not start.
+Requires one final explicit Wasim approval. Do not start. This is not a commercial launch and must not add billing, public signup or required Cloudflare Access.
 
 - [ ] Real company data
 - [ ] Production resource set

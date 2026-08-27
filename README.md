@@ -1,23 +1,23 @@
 # Useful Brain
 
-Useful Brain is a private company knowledge and action agent. It answers from approved company sources, shows the evidence behind every factual claim and will take actions only through explicit tool policy and approval boundaries.
+Useful Brain is a local portfolio knowledge and action agent. It answers from approved sources, shows the evidence behind every factual claim and takes actions only through explicit tool policy and approval boundaries. It is not a billed product and not a public SaaS.
 
 The product was previously named Nura RAG Copilot. The product name, package name, GitHub repository, local directory and active UI copy now use Useful Brain.
 
 ## Planning status
 
-The production architecture is finalized in the [Useful Brain production master plan](./docs/useful-brain-master-plan.md). The independent review is complete and accepted findings are incorporated. Implementation starts with the remaining Phase 0 feasibility gates.
+The architecture is finalized in the [Useful Brain production master plan](./docs/useful-brain-master-plan.md). This is a local portfolio product for hiring-manager demonstration: no billing, public signup or required Cloudflare Access.
 
-Grok 4.6 xhigh will execute from the [phased execution tracker](./docs/useful-brain-execution-tracker.md) using the [execution prompt](./docs/useful-brain-grok-execution-prompt.md). Each phase must clear its exit gate before the next phase begins.
+Phases 0–7A live on `phase-1-through-7a-staging`. Convex remains the live application UI until Phase 7B, which stays closed.
 
 ## Target product
 
-- A central knowledge base for company documents and connected sources.
+- A central knowledge base for approved documents and connected sources.
 - Source-grounded answers with visible citations and honest refusals.
 - ACL-safe hybrid retrieval, reranking and immutable evidence snapshots.
 - A Pi Agent Core runtime for read tools and controlled actions.
 - Native tools, MCP servers and plugins behind one policy and approval gateway.
-- One isolated deployment and resource set per company.
+- One isolated local/staging deployment. No billing, public signup or tenant switching.
 
 ## Finalized target stack
 
@@ -31,7 +31,7 @@ Grok 4.6 xhigh will execute from the [phased execution tracker](./docs/useful-br
 | Vector search | Cloudflare Vectorize |
 | Durable ingestion | Cloudflare Workflows and Queues |
 | Conversation coordination | Durable Objects and hibernating WebSockets |
-| Identity perimeter | Cloudflare Access |
+| Operator identity | Loopback on 127.0.0.1. Cloudflare Access JWT is optional demonstration code, not required |
 | Embeddings and reranking | Cloudflare Workers AI |
 | Model routing and telemetry | Cloudflare AI Gateway |
 | Tests | Vitest and Testing Library |

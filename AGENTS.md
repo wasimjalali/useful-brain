@@ -29,7 +29,7 @@ The finalized target is:
 - Frontend: Next.js App Router with TypeScript, deployed to Cloudflare Workers through OpenNext initially.
 - Styling: Tailwind CSS v4 with role-named design tokens.
 - Runtime: Cloudflare Workers split into web, brain and ingestion responsibilities.
-- Database and keyword search: separate corpus and operations D1 databases per company deployment, with FTS5 in the corpus database.
+- Database and keyword search: separate corpus and operations D1 databases for this operator deployment, with FTS5 in the corpus database.
 - Object storage: R2.
 - Vector search: Vectorize as a rebuildable projection.
 - Durable work: Workflows and Queues.
@@ -107,7 +107,7 @@ Stop and batch remaining manual work only when: a change contradicts the fixed a
 
 ## Interface
 
-Useful Brain is an internal operational product. Keep the existing left-aligned workspace, visible evidence inspector and role-named tokens in `src/app/globals.css`. Follow the `design-craft` discipline for all UI changes. Do not add helper copy that restates headings or labels.
+Useful Brain is a local portfolio product. Keep the existing left-aligned workspace, visible evidence inspector and role-named tokens in `src/app/globals.css`. Follow the `design-craft` discipline for all UI changes. Do not add helper copy that restates headings or labels.
 
 ## Deployment model
 
