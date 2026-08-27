@@ -1,6 +1,6 @@
 # Burooj migration ledger
 
-Status: Phase 1 TypeScript ports have started. Access JWT is the first Burooj auth contract in Useful Brain.
+Status: Phase 2 TypeScript ingestion ports are in place. FTS5, Northwind evals and hybrid retrieval remain Phase 3.
 
 Sanad source commit: `630ba08dc7cad6aa71942d6842ce6d8d55a26873`  
 Sibling checkout: `/Users/wasimjalali/Desktop/Personal Project/Burooj`  
@@ -41,16 +41,16 @@ The fake-provider CI ratchet is a **separate** fingerprint. The 2026-08-26 unpai
 
 | Capability | Burooj source | Burooj tests | Useful Brain destination | Target contract test | Status |
 | --- | --- | --- | --- | --- | --- |
-| 300/30 chunking and character anchors | `sanad/src/sanad/ingest/chunker.py`, `sanad/env.example` | `sanad/tests/test_chunker.py`, `test_passage_anchors.py` | Ingestion Worker | `src/lib/ingest/chunker.test.ts` | Not started |
-| Query/document embedding instructions | `sanad/src/sanad/ingest/embeddings.py` | `sanad/tests/test_embeddings_factory.py` | Workers AI embedding adapter | `src/lib/embeddings/instructions.test.ts` | Not started |
-| D1 FTS5 and Vectorize projection | `sanad/src/sanad/store/cloudflare.py` | `sanad/tests/test_store_cloudflare.py` | Corpus D1 + Vectorize repositories | `src/lib/store/cloudflare-fts.test.ts` | Not started |
-| Exact D1/Vectorize inventory audit | `sanad/src/sanad/store/audit.py` | `sanad/tests/test_store_audit.py` | Reconciliation workflow | `src/lib/store/inventory-audit.test.ts` | Not started |
-| ACL grouping and pre-score filtering | `sanad/src/sanad/permissions/acl.py` | `sanad/tests/test_acl_filter.py`, `test_permissions.py` | Authorization and retrieval policy | `src/lib/acl/acl-group.test.ts` | Not started |
+| 300/30 chunking and character anchors | `sanad/src/sanad/ingest/chunker.py`, `sanad/env.example` | `sanad/tests/test_chunker.py`, `test_passage_anchors.py` | Ingestion Worker | `src/lib/ingest/chunker.test.ts` | Ported: 300/30, headings, sentence cuts, pretokens, decimal `.` not a sentence end, oversized pretoken hard-split, character anchors |
+| Query/document embedding instructions | `sanad/src/sanad/ingest/embeddings.py` | `sanad/tests/test_embeddings_factory.py` | Workers AI embedding adapter | `src/lib/embeddings/instructions.test.ts` | Ported: query instruction vs document payload; `@cf/qwen/qwen3-embedding-0.6b` 1024 cosine |
+| D1 FTS5 and Vectorize projection | `sanad/src/sanad/store/cloudflare.py` | `sanad/tests/test_store_cloudflare.py` | Corpus D1 + Vectorize repositories | `src/lib/store/cloudflare-fts.test.ts` | Phase 2: Vectorize mutation wait, metadata index, 2048-byte filter cap, generation namespace. FTS5 external-content remains Phase 3 |
+| Exact D1/Vectorize inventory audit | `sanad/src/sanad/store/audit.py` | `sanad/tests/test_store_audit.py` | Reconciliation workflow | `src/lib/store/inventory-audit.test.ts` | Ported: exact mutation equality, paginated IDs, moving audit is partial and blocks promotion |
+| ACL grouping and pre-score filtering | `sanad/src/sanad/permissions/acl.py` | `sanad/tests/test_acl_filter.py`, `test_permissions.py` | Authorization and retrieval policy | `src/lib/acl/acl-group.test.ts` | Phase 2: length-prefixed injective SHA-256 `[:32]`; non-string private owner is empty (deny). Store-side filter equivalence remains Phase 3 |
 | Hybrid fusion and local keyword rescoring | `sanad/src/sanad/retrieve/fusion.py`, `keyword_score.py` | `sanad/tests/test_fusion.py`, `test_pipeline.py` | Retrieval pipeline | `src/lib/retrieve/fusion.test.ts` | Not started |
 | Cross-encoder rerank and score floor | `sanad/src/sanad/retrieve/reranker.py` | `sanad/tests/test_reranker.py` | Workers AI reranker | `src/lib/retrieve/rerank.test.ts` | Not started |
 | Parent context off / conflict off | `sanad/src/sanad/retrieve/parent.py`, `conflict.py` | `test_parent_retrieval.py`, `test_conflict_detect.py` | Context assembly | `src/lib/retrieve/parent-off.test.ts` | Not started |
 | Access JWT verification | `sanad/src/sanad/auth/access_jwt.py` | `sanad/tests/test_auth_access_jwt.py` | Brain Access middleware | `src/lib/auth/access-jwt.test.ts`, `workers/brain/test/access-jwt.test.ts` | Ported: RS256, application token, JWKS floor after cold-start failure, single-flight join, streamed 256 KiB cancel, bare HTTPS `*.cloudflareaccess.com` only, never-fetched keys fail closed. Bounded 3600s stale-key grace retained from Burooj (`JWKS_STALE_GRACE_MS`); independent security verdict still required before Phase 1 merge. |
-| Connector lifecycle and SSRF controls | `sanad/src/sanad/connectors/` | `test_connectors.py`, `test_live_http.py` | Ingestion connectors | `src/lib/connectors/ssrf.test.ts` | Not started |
+| Connector lifecycle and SSRF controls | `sanad/src/sanad/connectors/` | `test_connectors.py`, `test_live_http.py` | Ingestion connectors | `src/lib/connectors/http-allowlist.test.ts`, `src/lib/connectors/github-tree.test.ts`, `src/lib/connectors/config-scrub.test.ts` | Ported: GitHub truncated listings fail; stale delete only after complete list+ingest; HTTP allowlist-only with redirects refused; recursive secret scrub; named `CONNECTOR_*` bindings |
 | 65-document Northwind corpus and 120 questions | `sanad/src/sanad/evals/corpus/` | `sanad/tests/test_evals.py`, `test_evals_loader.py` | TypeScript eval fixtures | `src/lib/eval/northwind.test.ts` | Not started |
 | Answer contract | `sanad/tests/test_brain_answer_contract.py` | same | RAG answer validation | `src/lib/answer/contract.test.ts` | Not started |
 | Host grounding finalizer | `tabari/tests/agent/test_brain_grounding.py` | same | Brain host finalizer | `src/lib/agent/host-grounding.test.ts` | Not started |
@@ -62,15 +62,15 @@ The fake-provider CI ratchet is a **separate** fingerprint. The 2026-08-26 unpai
 
 | Invariant | Burooj proof | Useful Brain status |
 | --- | --- | --- |
-| ACL candidate generation over allowed content only; `acl_group` is length-prefixed injective SHA-256 truncated to 32 hex | `permissions/acl.py`, `test_acl_filter.py` | Not started |
-| Over-wide principals raise `AclTooWide`; grants are never truncated | `test_acl_filter.py` | Not started |
-| Private owners are non-empty strings; D1 owner extraction fails closed | `store/cloudflare.py` | Not started |
-| Query and document embedding instructions remain distinct; Vectorize cosine only | `ingest/embeddings.py` | Not started |
-| External-content FTS5 uses `INTEGER PRIMARY KEY AUTOINCREMENT`, insert/update/delete triggers, `ON CONFLICT DO UPDATE`; `INSERT OR REPLACE` forbidden | `test_store_cloudflare.py` | Not started |
-| Vectorize mutation IDs are opaque; wait for exact equality; paginated ID inventory; moving audit is partial | `store/audit.py` | Not started |
-| GitHub truncated listings fail the sync | `connectors/` + `test_connectors.py` | Not started |
-| HTTP fetch pins validated public addresses or stays allowlist-only | `connectors/` + `test_live_http.py` | Not started |
-| Connector config recursively scrubbed; only named secret-binding references | `test_connector_instances.py` | Not started |
+| ACL candidate generation over allowed content only; `acl_group` is length-prefixed injective SHA-256 truncated to 32 hex | `permissions/acl.py`, `test_acl_filter.py` | Group key ported. Enumeration/filter equivalence is Phase 3 |
+| Over-wide principals raise `AclTooWide`; grants are never truncated | `test_acl_filter.py` | Phase 3 |
+| Private owners are non-empty strings; D1 owner extraction fails closed | `store/cloudflare.py` | Ported in `ownerOf` |
+| Query and document embedding instructions remain distinct; Vectorize cosine only | `ingest/embeddings.py` | Ported |
+| External-content FTS5 uses `INTEGER PRIMARY KEY AUTOINCREMENT`, insert/update/delete triggers, `ON CONFLICT DO UPDATE`; `INSERT OR REPLACE` forbidden | `test_store_cloudflare.py` | `INSERT OR REPLACE` forbidden in migrations. FTS5 table is Phase 3 |
+| Vectorize mutation IDs are opaque; wait for exact equality; paginated ID inventory; moving audit is partial | `store/audit.py` | Ported |
+| GitHub truncated listings fail the sync | `connectors/` + `test_connectors.py` | Ported |
+| HTTP fetch pins validated public addresses or stays allowlist-only | `connectors/` + `test_live_http.py` | Allowlist-only; redirects not followed |
+| Connector config recursively scrubbed; only named secret-binding references | `test_connector_instances.py` | Ported (`secret_binding` / `CONNECTOR_*`) |
 | Access JWT: RS256, application token, fail closed; roles/departments from server directory | `auth/access_jwt.py` | Ported in `src/lib/auth/access-jwt.ts` and `src/lib/auth/principal.ts`. Grants attach to `principals.id`. Stale-key grace retained; independent security verdict pending. |
 | Eval loader rejects duplicate keys; fake and real ratchets stay separate | `test_evals.py`, `test_evals_loader.py` | Not started |
 | Must-retrieve, current-turn evidence ledger, deterministic unavailable/insufficient_evidence, no transport leakage | `test_brain_grounding.py` | Not started |

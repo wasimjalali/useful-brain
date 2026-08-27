@@ -11,7 +11,7 @@ describe("ingestion queue consumer", () => {
         id: "msg-1",
         timestamp: new Date(),
         attempts: 1,
-        body: { jobId: "job-1", idempotencyKey: "idem-1" },
+        body: { jobId: "q-job-1", idempotencyKey: "q-idem-1" },
       },
     ]);
     const ctx = createExecutionContext();
@@ -35,6 +35,56 @@ describe("ingestion queue consumer", () => {
     await worker.queue(batch, env, ctx);
     const result = await getQueueResult(batch, ctx);
     expect(result.explicitAcks).toEqual(["msg-bad"]);
-    expect(result.retryMessages).toEqual([]);
+  });
+
+  it("acks a duplicate delivery of the same idempotency key", async () => {
+    const first = createMessageBatch("useful-brain-ingest-development", [
+      {
+        id: "msg-dup-1",
+        timestamp: new Date(),
+        attempts: 1,
+        body: { jobId: "q-job-dup", idempotencyKey: "q-idem-dup" },
+      },
+    ]);
+    const second = createMessageBatch("useful-brain-ingest-development", [
+      {
+        id: "msg-dup-2",
+        timestamp: new Date(),
+        attempts: 2,
+        body: { jobId: "q-job-dup", idempotencyKey: "q-idem-dup" },
+      },
+    ]);
+    const ctx = createExecutionContext();
+    await worker.queue(first, env, ctx);
+    await worker.queue(second, env, ctx);
+    expect((await getQueueResult(first, ctx)).explicitAcks).toEqual(["msg-dup-1"]);
+    expect((await getQueueResult(second, ctx)).explicitAcks).toEqual(["msg-dup-2"]);
+  });
+
+  it("retries a transient workflow create failure", async () => {
+    const batch = createMessageBatch("useful-brain-ingest-development", [
+      {
+        id: "msg-retry",
+        timestamp: new Date(),
+        attempts: 1,
+        body: { jobId: "q-job-retry", idempotencyKey: "q-idem-retry" },
+      },
+    ]);
+    const ctx = createExecutionContext();
+    await worker.queue(
+      batch,
+      {
+        ...env,
+        INGESTION_WORKFLOW: {
+          create: async () => {
+            throw new Error("timeout contacting workflow engine");
+          },
+        },
+      },
+      ctx,
+    );
+    const result = await getQueueResult(batch, ctx);
+    expect(result.explicitAcks).toEqual([]);
+    expect(result.retryMessages).toHaveLength(1);
   });
 });

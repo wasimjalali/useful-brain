@@ -6,9 +6,9 @@ import { assertWorkerStartup } from "../../../src/lib/cf/startup";
 import { workerErrorResponse } from "../../../src/lib/cf/worker-errors";
 import {
   IngestQueueMessageError,
-  acknowledgeIngestJob,
   parseIngestQueueMessage,
 } from "../../../src/lib/ingest/queue-message";
+import { isWorkflowAlreadyExists, workflowInstanceId } from "../../../src/lib/ingest/workflow-id";
 import { IngestionWorkflow } from "./workflow";
 
 export { IngestionWorkflow };
@@ -25,6 +25,15 @@ export type IngestionEnv = {
     create(options: { id?: string; params: { jobId: string; idempotencyKey: string } }): Promise<{
       id: string;
     }>;
+  };
+  CORPUS_DB?: {
+    prepare(query: string): {
+      bind(...values: Array<string | number | null>): {
+        run(): Promise<unknown>;
+        first<T>(): Promise<T | null>;
+      };
+      run(): Promise<unknown>;
+    };
   };
 };
 
@@ -89,7 +98,19 @@ const ingestionWorker = {
     for (const message of batch.messages) {
       try {
         const parsed = parseIngestQueueMessage(message.body);
-        acknowledgeIngestJob(parsed);
+        if (!env.INGESTION_WORKFLOW) {
+          throw new Error("INGESTION_WORKFLOW is not bound");
+        }
+        try {
+          await env.INGESTION_WORKFLOW.create({
+            id: workflowInstanceId(parsed.idempotencyKey),
+            params: parsed,
+          });
+        } catch (error) {
+          if (!isWorkflowAlreadyExists(error)) {
+            throw error;
+          }
+        }
         message.ack();
       } catch (error) {
         if (error instanceof IngestQueueMessageError) {

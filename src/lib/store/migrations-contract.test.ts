@@ -8,6 +8,7 @@ describe("D1 migrations", () => {
     const corpusFiles = readdirSync(path.join(root, "corpus"));
     const operationsFiles = readdirSync(path.join(root, "operations"));
     expect(corpusFiles).toContain("0001_init.sql");
+    expect(corpusFiles).toContain("0002_lifecycle.sql");
     expect(operationsFiles).toContain("0001_init.sql");
     const corpusSql = readFileSync(path.join(root, "corpus", "0001_init.sql"), "utf8");
     const operationsSql = readFileSync(path.join(root, "operations", "0001_init.sql"), "utf8");

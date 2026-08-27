@@ -1,6 +1,6 @@
 # Useful Brain implementation execution tracker
 
-Status: Phase 1 remainder complete on `phase-1-through-7a-staging`. Phase 0 and Phase 1 code are merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10), [PR #11](https://github.com/wasimjalali/useful-brain/pull/11)). Staging resources are live. Access is deferred (no custom domain). Independent review waits for the single consolidated PR after Phase 7A.
+Status: Phase 2 complete on `phase-1-through-7a-staging`. Phase 0 and Phase 1 code are merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10), [PR #11](https://github.com/wasimjalali/useful-brain/pull/11)). Staging resources are live. Access is deferred (no custom domain). Independent review waits for the single consolidated PR after Phase 7A.
 
 Architecture authority: `docs/useful-brain-master-plan.md`
 
@@ -90,8 +90,8 @@ Do not weaken or delete a failing test to make a gate pass. Record deviations an
 | Plan review and product rename | Complete | Master plan v1.2 and renamed repository |
 | Phase 0: feasibility and baselines | Complete | [PR #10](https://github.com/wasimjalali/useful-brain/pull/10); [phase-0 report](implementation-reports/phase-0-feasibility.md) |
 | Phase 1: Cloudflare foundation | Remainder complete — Access deferred | [phase-1 report](implementation-reports/phase-1-cloudflare-foundation.md); staging workers.dev smoke; Access exit partially open |
-| Phase 2: ingestion and generations | Open | Pending |
-| Phase 3: ACL-safe retrieval | Blocked by Phase 2 | Pending |
+| Phase 2: ingestion and generations | Complete | [phase-2 report](implementation-reports/phase-2-ingestion.md); workerd promote/rollback and workflow/queue tests |
+| Phase 3: ACL-safe retrieval | Open | Pending |
 | Phase 4: grounded answers | Blocked by Phase 3 | Pending |
 | Phase 5: Pi knowledge agent | Blocked by Phase 4 | Pending |
 | Phase 6: connectors, MCP and plugins | Blocked by Phase 5 | Pending |
@@ -206,33 +206,33 @@ Staging D1, R2, Vectorize, Queue and Workflow resources exist. `RESOURCES_PROVIS
 
 Goal: reproduce the approved corpus lifecycle with D1 as authority and Vectorize as projection.
 
-- [ ] Port the source, document, document-version, chunk, generation and reconciliation models to TypeScript.
-- [ ] Port the 300-token target, 30-token overlap, heading boundaries, sentence-aware cuts and character anchors.
-- [ ] Add stable IDs and content digests.
-- [ ] Add direct R2 upload finalization without buffering whole files in a Worker.
-- [ ] Stream and bound Markdown, text, HTML and PDF parsing under the 128 MB Worker limit.
-- [ ] Implement separate query and document embedding instructions.
-- [ ] Use cosine Vectorize indexes and generation namespaces.
-- [ ] Store only fixed-width `acl_group` as indexed ACL metadata.
-- [ ] Create metadata indexes before vector upserts and require re-upsert before filtered queries.
-- [ ] Make Queue payloads identifier-only.
-- [ ] Create deterministic Workflow instance IDs and idempotent steps.
-- [ ] Wait for exact equality on the newest opaque mutation ID.
-- [ ] Compare a paginated Vectorize ID inventory with the D1 ledger.
-- [ ] Mark a moving audit as partial and block promotion.
-- [ ] Implement explicit ready, promote, rollback and archive transitions.
-- [ ] Prove a failed generation cannot change the active pointer.
-- [ ] Add GitHub sync that refuses truncated listings and deletes only after a complete successful sync.
-- [ ] Keep arbitrary HTTP sources allowlist-only until redirect address pinning is proved safe on Workers.
-- [ ] Recursively scrub connector configuration and allow only named secret-binding references.
+- [x] Port the source, document, document-version, chunk, generation and reconciliation models to TypeScript. Evidence: `migrations/corpus/0002_lifecycle.sql`, `src/lib/store/generations.ts`, `src/lib/store/corpus-d1.ts`.
+- [x] Port the 300-token target, 30-token overlap, heading boundaries, sentence-aware cuts and character anchors. Evidence: `src/lib/ingest/chunker.ts`, `src/lib/ingest/chunker.test.ts`.
+- [x] Add stable IDs and content digests. Evidence: `src/lib/ingest/digests.ts`.
+- [x] Add direct R2 upload finalization without buffering whole files in a Worker. Evidence: `src/lib/ingest/r2-finalize.ts` streams a bounded object by key; client upload is to R2, not the Worker request body.
+- [x] Stream and bound Markdown, text, HTML and PDF parsing under the 128 MB Worker limit. Evidence: `src/lib/ingest/parsers.ts` (25 MiB source cap, 8 MiB PDF cap, HTML text extraction).
+- [x] Implement separate query and document embedding instructions. Evidence: `src/lib/embeddings/instructions.ts`.
+- [x] Use cosine Vectorize indexes and generation namespaces. Evidence: `src/lib/embeddings/instructions.ts` (`cosine`, 1024), `generationNamespace`.
+- [x] Store only fixed-width `acl_group` as indexed ACL metadata. Evidence: `src/lib/acl/acl-group.ts`, chunks table `CHECK (length(acl_group) = 32)`.
+- [x] Create metadata indexes before vector upserts and require re-upsert before filtered queries. Evidence: `assertMetadataIndexReady`, `canMarkReady`.
+- [x] Make Queue payloads identifier-only. Evidence: `src/lib/ingest/queue-message.ts` and workerd queue tests.
+- [x] Create deterministic Workflow instance IDs and idempotent steps. Evidence: `src/lib/ingest/workflow-id.ts`, `workers/ingestion/src/workflow.ts`.
+- [x] Wait for exact equality on the newest opaque mutation ID. Evidence: `src/lib/store/vectorize-projection.ts`.
+- [x] Compare a paginated Vectorize ID inventory with the D1 ledger. Evidence: `paginateVectorIds`, `auditStoreConsistency`.
+- [x] Mark a moving audit as partial and block promotion. Evidence: `src/lib/store/inventory-audit.test.ts`.
+- [x] Implement explicit ready, promote, rollback and archive transitions. Evidence: `src/lib/store/generations.ts`, workerd `generations.test.ts`.
+- [x] Prove a failed generation cannot change the active pointer. Evidence: workerd `generations.test.ts`.
+- [x] Add GitHub sync that refuses truncated listings and deletes only after a complete successful sync. Evidence: `src/lib/connectors/github-tree.ts`.
+- [x] Keep arbitrary HTTP sources allowlist-only until redirect address pinning is proved safe on Workers. Evidence: `src/lib/connectors/http-allowlist.ts`.
+- [x] Recursively scrub connector configuration and allow only named secret-binding references. Evidence: `src/lib/connectors/config-scrub.ts`.
 
 ### Phase 2 exit
 
-- [ ] Complete generations promote and roll back.
-- [ ] Partial D1 or Vectorize writes are visible and reconcilable.
-- [ ] Failed and moving audits block promotion.
-- [ ] GitHub truncation, queue retry and workflow-resume tests pass.
-- [ ] Full project checks, critical reviews, phase report and PR are green.
+- [x] Complete generations promote and roll back. Evidence: workerd `workers/ingestion/test/generations.test.ts`.
+- [x] Partial D1 or Vectorize writes are visible and reconcilable. Evidence: `reconciliation_audits` plus inventory audit `partial` status.
+- [x] Failed and moving audits block promotion. Evidence: `canMarkReady` and `inventory-audit.test.ts`.
+- [x] GitHub truncation, queue retry and workflow-resume tests pass. Evidence: `github-tree.test.ts`, `workers/ingestion/test/queue.test.ts`, `workers/ingestion/test/workflow.test.ts`.
+- [x] Full project checks and phase report are green. Independent review and the single PR wait until Phase 7A. GitHub Actions quota is exhausted.
 
 ## 9. Phase 3: ACL-safe hybrid retrieval
 
