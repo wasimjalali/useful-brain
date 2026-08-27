@@ -5,13 +5,18 @@ import { writeOperationalLog } from "../../../src/lib/cf/operational-log";
 import { resolveRequestId, withRequestId } from "../../../src/lib/cf/request-id";
 import { assertWorkerStartup } from "../../../src/lib/cf/startup";
 import { toPublicWorkerError, WorkerValidationError, workerErrorResponse } from "../../../src/lib/cf/worker-errors";
+import { isWorkflowAlreadyExists, workflowInstanceId } from "../../../src/lib/ingest/workflow-id";
+import { upsertApproval } from "../../../src/lib/store/agent-runs";
+import type { OperationsDatabase } from "../../../src/lib/store/conversations";
 import {
   LOAD_PRINCIPAL_SQL,
   type PrincipalDirectoryRow,
 } from "../../../src/lib/store/principal-directory";
+import type { ApprovalBinding } from "../../../src/lib/agent/policy";
 import { ConversationRunLock } from "./conversation-lock";
+import { ApprovalWorkflow } from "./approval-workflow";
 
-export { ConversationRunLock };
+export { ConversationRunLock, ApprovalWorkflow };
 
 export type BrainEnv = {
   RUNTIME_ENV?: string;
@@ -36,6 +41,12 @@ export type BrainEnv = {
     idFromName(name: string): unknown;
     get(id: unknown): ConversationRunLock;
     getByName(name: string): ConversationRunLock;
+  };
+  APPROVAL_WORKFLOW?: {
+    create(options: { id?: string; params: { binding: ApprovalBinding } }): Promise<{ id: string }>;
+    get(id: string): Promise<{
+      sendEvent(event: { type: string; payload: unknown }): Promise<void>;
+    }>;
   };
 };
 
@@ -148,6 +159,78 @@ const brainWorker = {
           "conversation id",
         );
         return env.CONVERSATION.getByName(conversationId).fetch(request);
+      }
+
+      if (path === "/approvals/start" && request.method === "POST") {
+        operation = "approval-start";
+        if (!env.APPROVAL_WORKFLOW) {
+          throw new WorkerValidationError();
+        }
+        let body: { binding?: ApprovalBinding };
+        try {
+          body = (await request.json()) as { binding?: ApprovalBinding };
+        } catch {
+          throw new WorkerValidationError();
+        }
+        const binding = body.binding;
+        if (!binding || binding.principalId !== principal.id) {
+          throw new WorkerValidationError();
+        }
+        parseBoundedId(binding.idempotencyKey, "idempotency key");
+        await upsertApproval(env.OPERATIONS_DB as OperationsDatabase, binding, "pending", Date.now());
+        const workflowId = workflowInstanceId(binding.idempotencyKey);
+        try {
+          await env.APPROVAL_WORKFLOW.create({
+            id: workflowId,
+            params: { binding },
+          });
+        } catch (error) {
+          if (!isWorkflowAlreadyExists(error)) {
+            throw error;
+          }
+        }
+        writeOperationalLog({
+          requestId,
+          principalKind: principal.kind,
+          operation,
+          status: "ok",
+          durationMs: Date.now() - started,
+        });
+        return json({ pendingApproval: true, workflowId }, requestId, 202);
+      }
+
+      if (path === "/approvals/event" && request.method === "POST") {
+        operation = "approval-event";
+        if (!env.APPROVAL_WORKFLOW) {
+          throw new WorkerValidationError();
+        }
+        let body: { workflowId?: string; decision?: string; binding?: ApprovalBinding };
+        try {
+          body = (await request.json()) as {
+            workflowId?: string;
+            decision?: string;
+            binding?: ApprovalBinding;
+          };
+        } catch {
+          throw new WorkerValidationError();
+        }
+        const workflowId = parseBoundedId(body.workflowId, "workflow id");
+        if ((body.decision !== "approve" && body.decision !== "reject") || !body.binding) {
+          throw new WorkerValidationError();
+        }
+        const instance = await env.APPROVAL_WORKFLOW.get(workflowId);
+        await instance.sendEvent({
+          type: "approval",
+          payload: { decision: body.decision, binding: body.binding },
+        });
+        writeOperationalLog({
+          requestId,
+          principalKind: principal.kind,
+          operation,
+          status: "ok",
+          durationMs: Date.now() - started,
+        });
+        return json({ ok: true, workflowId }, requestId);
       }
 
       if ((path === "/lock" || path === "/unlock" || path === "/cancel") && request.method === "POST") {

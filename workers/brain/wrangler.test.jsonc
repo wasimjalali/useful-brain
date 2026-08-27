@@ -32,5 +32,12 @@
       "tag": "v1",
       "new_sqlite_classes": ["ConversationRunLock"]
     }
+  ],
+  "workflows": [
+    {
+      "name": "useful-brain-approval-test",
+      "binding": "APPROVAL_WORKFLOW",
+      "class_name": "ApprovalWorkflow"
+    }
   ]
 }

@@ -1,6 +1,6 @@
 # Useful Brain implementation execution tracker
 
-Status: Phase 4 complete on `phase-1-through-7a-staging`. Phase 0 and Phase 1 code are merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10), [PR #11](https://github.com/wasimjalali/useful-brain/pull/11)). Staging resources are live. Product boundary (Wasim 2026-08-27): local portfolio agent — no billing, public signup or required Cloudflare Access. Independent review waits for the single consolidated PR after Phase 7A.
+Status: Phase 5 complete on `phase-1-through-7a-staging`. Phase 0 and Phase 1 code are merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10), [PR #11](https://github.com/wasimjalali/useful-brain/pull/11)). Staging resources are live. Product boundary (Wasim 2026-08-27): local portfolio agent — no billing, public signup or required Cloudflare Access. Independent review waits for the single consolidated PR after Phase 7A.
 
 Architecture authority: `docs/useful-brain-master-plan.md`
 
@@ -93,8 +93,8 @@ Do not weaken or delete a failing test to make a gate pass. Record deviations an
 | Phase 2: ingestion and generations | Complete | [phase-2 report](implementation-reports/phase-2-ingestion.md); workerd promote/rollback and workflow/queue tests |
 | Phase 3: ACL-safe retrieval | Complete | [phase-3 report](implementation-reports/phase-3-retrieval.md); fake-provider and fake-rerank CI ratchets; FTS5 workerd |
 | Phase 4: grounded answers | Complete | [phase-4 report](implementation-reports/phase-4-grounded-answers.md); citation/refusal/replay/shadow; Convex stays live UI |
-| Phase 5: Pi knowledge agent | Pending | Entry open after Phase 4 |
-| Phase 6: connectors, MCP and plugins | Blocked by Phase 5 | Pending |
+| Phase 5: Pi knowledge agent | Complete | [phase-5 report](implementation-reports/phase-5-pi-agent.md); policy gateway, Workflow approval, durable run records |
+| Phase 6: connectors, MCP and plugins | Pending | Entry open after Phase 5 |
 | Phase 7A: staging release candidate | Blocked by Phase 6 | Authorized after Phase 6; synthetic only |
 | Phase 7B: production launch and retirement | Closed | Requires one final explicit Wasim approval |
 
@@ -294,31 +294,31 @@ Goal: reproduce citations, refusals, replay and server-owned history before addi
 
 Goal: introduce Pi without weakening the host’s grounding, policy or durable replay contracts.
 
-- [ ] Install only approved Pi packages and only the provider factories required by the selected model.
-- [ ] Construct a fresh Pi Agent for each run from operations D1 state.
-- [ ] Expose `search_knowledge` as the first read-only tool.
-- [ ] Preserve the Phase 4 host finalizer after every Pi knowledge turn.
-- [ ] Add turn, token, tool-call and wall-time budgets.
-- [ ] Propagate cancellation through Brain and Pi.
-- [ ] Add typed event streaming and durable run state.
-- [ ] Build one central policy gateway used inside every tool `execute()` path.
-- [ ] Treat `beforeToolCall` and `afterToolCall` as additional guards, not the control plane.
-- [ ] Declare every mutating tool sequential.
-- [ ] Bind approval to principal, conversation, tool, normalized arguments, expiry and idempotency key.
-- [ ] End a Brain run at `pending_approval`; never keep Pi or a Durable Object waiter alive.
-- [ ] Wait through Workflow `waitForEvent`, then enqueue one deterministic resume.
-- [ ] Reconstruct state and recheck policy before the side effect.
-- [ ] Deny high-risk actions in the first release.
-- [ ] Store the model, prompt version, corpus generation, evidence snapshot, tool inputs, redacted tool results and approval record for replay.
+- [x] Install only approved Pi packages and only the provider factories required by the selected model.
+- [x] Construct a fresh Pi Agent for each run from operations D1 state.
+- [x] Expose `search_knowledge` as the first read-only tool.
+- [x] Preserve the Phase 4 host finalizer after every Pi knowledge turn.
+- [x] Add turn, token, tool-call and wall-time budgets.
+- [x] Propagate cancellation through Brain and Pi.
+- [x] Add typed event streaming and durable run state.
+- [x] Build one central policy gateway used inside every tool `execute()` path.
+- [x] Treat `beforeToolCall` and `afterToolCall` as additional guards, not the control plane.
+- [x] Declare every mutating tool sequential.
+- [x] Bind approval to principal, conversation, tool, normalized arguments, expiry and idempotency key.
+- [x] End a Brain run at `pending_approval`; never keep Pi or a Durable Object waiter alive.
+- [x] Wait through Workflow `waitForEvent`, then enqueue one deterministic resume.
+- [x] Reconstruct state and recheck policy before the side effect.
+- [x] Deny high-risk actions in the first release.
+- [x] Store the model, prompt version, corpus generation, evidence snapshot, tool inputs, redacted tool results and approval record for replay.
 
 ### Phase 5 exit
 
-- [ ] Must-retrieve and current-turn citation-ledger tests pass.
-- [ ] Cancellation, turn-limit and tool-error tests pass.
-- [ ] Argument tampering invalidates approval.
-- [ ] Duplicate delivery cannot repeat a side effect.
-- [ ] Every mutating side effect crosses the policy gateway sequentially.
-- [ ] Full project checks, critical reviews, phase report and PR are green.
+- [x] Must-retrieve and current-turn citation-ledger tests pass.
+- [x] Cancellation, turn-limit and tool-error tests pass.
+- [x] Argument tampering invalidates approval.
+- [x] Duplicate delivery cannot repeat a side effect.
+- [x] Every mutating side effect crosses the policy gateway sequentially.
+- [x] Full project checks and phase report are green. Independent review and the single PR wait until Phase 7A. GitHub Actions quota is exhausted.
 
 ## 12. Phase 6, Phase 7A and Phase 7B
 

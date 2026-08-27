@@ -1,6 +1,6 @@
 # Burooj migration ledger
 
-Status: Phase 4 grounded answers, host finalizer, evidence snapshots and server-owned conversations are in place. Pi agent loop remains Phase 5.
+Status: Phase 5 Pi knowledge agent, policy gateway and Workflow approval are in place. Synthetic connectors/MCP remain Phase 6.
 
 Sanad source commit: `630ba08dc7cad6aa71942d6842ce6d8d55a26873`  
 Sibling checkout: `/Users/wasimjalali/Desktop/Personal Project/Burooj`  
@@ -57,6 +57,7 @@ The fake-provider CI ratchet is a **separate** fingerprint. The 2026-08-26 unpai
 | Answer contract | `sanad/tests/test_brain_answer_contract.py` | same | RAG answer validation | `src/lib/answer/contract.test.ts` | Ported: structured `grounded` / `insufficient_evidence`, current-run citation labels only, empty retrieval abstains |
 | Host grounding finalizer | `tabari/tests/agent/test_brain_grounding.py` | same | Brain host finalizer | `src/lib/agent/host-grounding.test.ts` | Ported: must-retrieve, current-turn `search_knowledge` ledger, invalid citation refuse, deterministic unavailable without transport leakage. Tabari session-DB/finalize_turn and deferred-tool cache are not ported |
 | Current Nura citation/refusal/ops records | Useful Brain `convex/groundedAnswer.ts`, `convex/operations.ts` | `convex/groundedAnswer.test.ts`, `convex/operations.test.ts`, `src/lib/eval/run-eval.test.ts` | Keep through Phase 4 shadow | `src/lib/answer/convex-shadow.test.ts` plus existing Convex tests | Shadow parity; Convex remains the live UI |
+| Pi knowledge agent, policy gateway, sequential mutating tools, Workflow approval | Tabari host finalizer + Sanad tool policy contracts | `test_brain_grounding.py` plus Useful Brain Phase 5 tests | Brain Pi loop | `src/lib/agent/agent-loop.test.ts`, `workers/brain/test/approval-workflow.test.ts`, `workers/brain/test/agent-runs.test.ts` | Ported: `search_knowledge` + host finalizer; `beforeToolCall` extra guard; policy inside `execute()`; high-risk denied; `waitForEvent` 15 minutes; D1 run/tool/approval replay. Tabari session SQLite is not ported |
 
 ## Invariants that must survive the TypeScript rewrite
 

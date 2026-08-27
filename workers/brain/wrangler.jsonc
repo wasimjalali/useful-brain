@@ -65,6 +65,13 @@
       "new_sqlite_classes": ["ConversationRunLock"]
     }
   ],
+  "workflows": [
+    {
+      "name": "useful-brain-approval",
+      "binding": "APPROVAL_WORKFLOW",
+      "class_name": "ApprovalWorkflow"
+    }
+  ],
   "env": {
     "development": {
       "workers_dev": false,
@@ -100,7 +107,14 @@
       },
       "durable_objects": {
         "bindings": [{ "name": "CONVERSATION", "class_name": "ConversationRunLock" }]
-      }
+      },
+      "workflows": [
+        {
+          "name": "useful-brain-approval-development",
+          "binding": "APPROVAL_WORKFLOW",
+          "class_name": "ApprovalWorkflow"
+        }
+      ]
     },
     "staging": {
       "workers_dev": false,
@@ -138,7 +152,14 @@
       },
       "durable_objects": {
         "bindings": [{ "name": "CONVERSATION", "class_name": "ConversationRunLock" }]
-      }
+      },
+      "workflows": [
+        {
+          "name": "useful-brain-approval-staging",
+          "binding": "APPROVAL_WORKFLOW",
+          "class_name": "ApprovalWorkflow"
+        }
+      ]
     },
     "production": {
       "workers_dev": false,
@@ -172,7 +193,14 @@
       },
       "durable_objects": {
         "bindings": [{ "name": "CONVERSATION", "class_name": "ConversationRunLock" }]
-      }
+      },
+      "workflows": [
+        {
+          "name": "useful-brain-approval-production",
+          "binding": "APPROVAL_WORKFLOW",
+          "class_name": "ApprovalWorkflow"
+        }
+      ]
     }
   }
 }
