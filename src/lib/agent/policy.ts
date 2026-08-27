@@ -33,6 +33,11 @@ export class PolicyError extends Error {
 
 const REGISTRY: Record<string, ToolPolicy> = {
   search_knowledge: { name: "search_knowledge", risk: "read", executionMode: "parallel" },
+  fetch_allowlisted_http: { name: "fetch_allowlisted_http", risk: "read", executionMode: "parallel" },
+  mcp_lookup: { name: "mcp_lookup", risk: "read", executionMode: "parallel" },
+  mcp_create_ticket: { name: "mcp_create_ticket", risk: "external_write", executionMode: "sequential" },
+  action_sink_write: { name: "action_sink_write", risk: "external_write", executionMode: "sequential" },
+  plugin_echo: { name: "plugin_echo", risk: "read", executionMode: "parallel" },
   create_draft: { name: "create_draft", risk: "reversible_write", executionMode: "sequential" },
   send_email: { name: "send_email", risk: "external_write", executionMode: "sequential" },
   delete_records: { name: "delete_records", risk: "high_risk", executionMode: "sequential" },

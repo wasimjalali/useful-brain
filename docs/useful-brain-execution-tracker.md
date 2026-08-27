@@ -1,6 +1,6 @@
 # Useful Brain implementation execution tracker
 
-Status: Phase 5 complete on `phase-1-through-7a-staging`. Phase 0 and Phase 1 code are merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10), [PR #11](https://github.com/wasimjalali/useful-brain/pull/11)). Staging resources are live. Product boundary (Wasim 2026-08-27): local portfolio agent — no billing, public signup or required Cloudflare Access. Independent review waits for the single consolidated PR after Phase 7A.
+Status: Phase 6 complete on `phase-1-through-7a-staging`. Phase 0 and Phase 1 code are merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10), [PR #11](https://github.com/wasimjalali/useful-brain/pull/11)). Staging resources are live. Product boundary (Wasim 2026-08-27): local portfolio agent — no billing, public signup or required Cloudflare Access. Independent review waits for the single consolidated PR after Phase 7A.
 
 Architecture authority: `docs/useful-brain-master-plan.md`
 
@@ -94,8 +94,8 @@ Do not weaken or delete a failing test to make a gate pass. Record deviations an
 | Phase 3: ACL-safe retrieval | Complete | [phase-3 report](implementation-reports/phase-3-retrieval.md); fake-provider and fake-rerank CI ratchets; FTS5 workerd |
 | Phase 4: grounded answers | Complete | [phase-4 report](implementation-reports/phase-4-grounded-answers.md); citation/refusal/replay/shadow; Convex stays live UI |
 | Phase 5: Pi knowledge agent | Complete | [phase-5 report](implementation-reports/phase-5-pi-agent.md); policy gateway, Workflow approval, durable run records |
-| Phase 6: connectors, MCP and plugins | Pending | Entry open after Phase 5 |
-| Phase 7A: staging release candidate | Blocked by Phase 6 | Authorized after Phase 6; synthetic only |
+| Phase 6: connectors, MCP and plugins | Complete | [phase-6 report](implementation-reports/phase-6-connectors-mcp.md); synthetic HTTP/MCP/action-sink through the policy gateway |
+| Phase 7A: staging release candidate | Pending | Entry open after Phase 6; synthetic only |
 | Phase 7B: production launch and retirement | Closed | Requires one final explicit Wasim approval |
 
 ## 6. Phase 0: feasibility and baselines
@@ -326,13 +326,13 @@ Goal: introduce Pi without weakening the host’s grounding, policy or durable r
 
 Synthetic proofs only. Do not wait for third-party production credentials.
 
-- [ ] Create a connector registry with capability, authentication, rate-limit, data-classification and health metadata.
-- [ ] Add per-connector scopes and revocation.
-- [ ] Add one allowlisted GitHub or HTTP read connector through the policy gateway.
-- [ ] Add one self-hosted staging MCP test server, one MCP read tool and one synthetic approval-required MCP write tool.
-- [ ] Add one staging action-sink connector proving preview, exact normalized arguments, approval binding, idempotency, audit, revocation, retry safety, untrusted-result handling and duplicate-delivery protection.
-- [ ] Treat every connector, MCP and plugin result as untrusted data.
-- [ ] Do not claim the synthetic action sink is a production vendor integration.
+- [x] Create a connector registry with capability, authentication, rate-limit, data-classification and health metadata.
+- [x] Add per-connector scopes and revocation.
+- [x] Add one allowlisted GitHub or HTTP read connector through the policy gateway.
+- [x] Add one self-hosted staging MCP test server, one MCP read tool and one synthetic approval-required MCP write tool.
+- [x] Add one staging action-sink connector proving preview, exact normalized arguments, approval binding, idempotency, audit, revocation, retry safety, untrusted-result handling and duplicate-delivery protection.
+- [x] Treat every connector, MCP and plugin result as untrusted data.
+- [x] Do not claim the synthetic action sink is a production vendor integration.
 
 Exit: one read connector and one approved write connector pass all policy and security gates. A marketplace is not required.
 
