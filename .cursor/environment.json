@@ -1,0 +1,14 @@
+{
+  "name": "Useful Brain",
+  "install": "bash .cursor/install.sh",
+  "terminals": [
+    {
+      "name": "web",
+      "command": "bash .cursor/dev.sh",
+      "description": "Next.js dev server for the current Convex-backed app on http://localhost:3000"
+    }
+  ],
+  "ports": [
+    { "name": "web", "port": 3000 }
+  ]
+}
