@@ -8,14 +8,20 @@ import {
   fauxToolCall,
 } from "@earendil-works/pi-ai/providers/faux";
 
-import { BudgetExceededError, BudgetTracker } from "./budgets";
+import { AGENT_BUDGETS, BudgetExceededError, BudgetTracker } from "./budgets";
 import { approvalsMatch, argumentFingerprint, policyGateway, toolPolicy } from "./policy";
 import { IdempotentExecutor, MemoryIdempotencyStore, approvalFromAttempt, mutatingIdempotencyKey, resumeAfterApproval } from "./approvals";
 import { createDeleteRecordsTool, createDraftTool } from "./mutating-tools";
 import { FakeEmbeddingProvider } from "../retrieve/fake-embed";
 import { MemoryChunkStore } from "../retrieve/memory-store";
 import { KnowledgePipeline } from "../retrieve/pipeline";
-import { runKnowledgeAgent, snapshotAgentMessages, toolCallsFromMessages } from "./run";
+import {
+  currentRunAssistantTokens,
+  runKnowledgeAgent,
+  snapshotAgentMessages,
+  toolCallsFromMessages,
+} from "./run";
+import { redactToolResultForStorage } from "./redact-tool-result";
 import { BRAIN_KNOWLEDGE_UNAVAILABLE, BRAIN_MUST_RETRIEVE, SEARCH_KNOWLEDGE_TOOL } from "./host-grounding";
 
 const principal = { userId: "support", roles: ["standard"], departments: ["support"] };
@@ -192,11 +198,72 @@ describe("policy gateway", () => {
 describe("budgets", () => {
   it("stops after the turn limit", () => {
     const budgets = new BudgetTracker();
-    expect(() => {
-      for (let i = 0; i < 9; i += 1) {
-        budgets.noteTurn();
-      }
-    }).toThrow(BudgetExceededError);
+    for (let i = 0; i < AGENT_BUDGETS.maxTurns - 1; i += 1) {
+      budgets.noteTurn();
+    }
+    expect(budgets.turns).toBe(AGENT_BUDGETS.maxTurns - 1);
+    expect(() => budgets.noteTurn()).toThrow(BudgetExceededError);
+    expect(budgets.turns).toBe(AGENT_BUDGETS.maxTurns);
+  });
+
+  it("stops when cumulative token totals exceed the budget before the next turn", () => {
+    const budgets = new BudgetTracker();
+    budgets.assertTokenTotals(AGENT_BUDGETS.maxInputTokens, 1);
+    expect(() => budgets.assertTokenTotals(AGENT_BUDGETS.maxInputTokens + 1, 1)).toThrow(
+      /token budget exhausted/,
+    );
+  });
+
+  it("does not count prior-run assistant usage against the current execution budget", () => {
+    const prior = fauxAssistantMessage("prior answer");
+    prior.usage = {
+      ...prior.usage,
+      input: AGENT_BUDGETS.maxInputTokens,
+      output: AGENT_BUDGETS.maxOutputTokens,
+      totalTokens: AGENT_BUDGETS.maxInputTokens + AGENT_BUDGETS.maxOutputTokens,
+    };
+    const current = fauxAssistantMessage("current answer");
+    current.usage = { ...current.usage, input: 12, output: 4, totalTokens: 16 };
+    expect(currentRunAssistantTokens([prior, current], 1)).toEqual({ input: 12, output: 4 });
+  });
+
+  it("counts every native HTTP MCP plugin mutating and search tool once", () => {
+    const budgets = new BudgetTracker();
+    const names = [
+      "search_knowledge",
+      "fetch_allowlisted_http",
+      "mcp_lookup",
+      "plugin_echo",
+      "mcp_create_ticket",
+      "action_sink_write",
+      "search_knowledge",
+      "create_draft",
+    ];
+    for (const name of names) {
+      budgets.noteToolCall(name);
+    }
+    expect(budgets.toolCalls).toBe(8);
+    expect(budgets.searchKnowledgeCalls).toBe(2);
+    expect(() => budgets.noteToolCall("plugin_echo")).toThrow(/tool-call budget exhausted/);
+  });
+
+  it("keeps the four-call search_knowledge limit beside the total cap", () => {
+    const budgets = new BudgetTracker();
+    for (let index = 0; index < 4; index += 1) {
+      budgets.noteToolCall("search_knowledge");
+    }
+    expect(budgets.toolCalls).toBe(4);
+    expect(budgets.searchKnowledgeCalls).toBe(4);
+    expect(() => budgets.noteToolCall("search_knowledge")).toThrow(/search_knowledge budget exhausted/);
+  });
+
+  it("stops when interactive wall time is exhausted", () => {
+    const budgets = new BudgetTracker();
+    expect(budgets.remainingWallTimeMs(budgets.startedAt + 89_000)).toBe(1_000);
+    expect(budgets.remainingWallTimeMs(budgets.startedAt + AGENT_BUDGETS.wallTimeMs + 1)).toBe(0);
+    expect(() => budgets.assertWithinWallTime(budgets.startedAt + AGENT_BUDGETS.wallTimeMs + 1)).toThrow(
+      /wall time budget exhausted/,
+    );
   });
 });
 
@@ -264,6 +331,57 @@ describe("Pi knowledge agent", () => {
     ]);
     const reconstructed = snapshotAgentMessages(result.messages);
     expect(reconstructed).toEqual(result.messages);
+  }, 20_000);
+
+  it("does not abort a follow-up run because prior assistant usage filled the token budget", async () => {
+    const pipeline = await tinyPipeline();
+    const prior = [fauxAssistantMessage("Employees accrued leave in a previous run.[1]")];
+    prior[0].usage = {
+      ...prior[0].usage,
+      input: AGENT_BUDGETS.maxInputTokens,
+      output: AGENT_BUDGETS.maxOutputTokens,
+      totalTokens: AGENT_BUDGETS.maxInputTokens + AGENT_BUDGETS.maxOutputTokens,
+    };
+    const result = await runKnowledgeAgent({
+      question: "how much leave per month",
+      pipeline,
+      principal,
+      policyPrincipal,
+      conversationId: "c-1",
+      priorMessages: prior,
+    });
+    expect(result.aborted).toBe(false);
+    expect(result.finalResponse).not.toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
+    expect(result.finalResponse).toContain("[1]");
+  }, 20_000);
+
+  it("persists byte-bounded redacted tool results instead of raw secrets", async () => {
+    const pipeline = await tinyPipeline();
+    const secret = "Bearer supersecret.token-value";
+    const result = await runKnowledgeAgent({
+      question: "echo a connector payload",
+      searchQuery: "echo",
+      pipeline,
+      principal,
+      policyPrincipal,
+      conversationId: "c-1",
+      tools: [
+        {
+          name: "plugin_echo",
+          label: "Echo",
+          description: "Returns a secret-bearing payload.",
+          parameters: Type.Object({ query: Type.String() }),
+          execute: async () => ({
+            content: [{ type: "text" as const, text: `UNTRUSTED_CONNECTOR_RESULT\n${secret}` }],
+            details: { raw: secret },
+          }),
+        },
+      ],
+    });
+    const calls = toolCallsFromMessages(result.messages);
+    expect(calls[0]?.redactedResult).toBe(redactToolResultForStorage(`UNTRUSTED_CONNECTOR_RESULT\n${secret}`));
+    expect(calls[0]?.redactedResult).not.toContain("supersecret.token-value");
+    expect(calls[0]?.redactedResult).toContain("Bearer [REDACTED]");
   }, 20_000);
 
   it("cancels an in-flight run", async () => {
@@ -354,4 +472,66 @@ describe("Pi knowledge agent", () => {
       text: "high-risk actions are denied in the first release",
     });
   });
+
+  it("blocks the ninth mixed tool call in the central beforeToolCall barrier", async () => {
+    const budgets = new BudgetTracker();
+    const executed: string[] = [];
+    const names = [
+      "search_knowledge",
+      "fetch_allowlisted_http",
+      "mcp_lookup",
+      "plugin_echo",
+      "mcp_create_ticket",
+      "action_sink_write",
+      "search_knowledge",
+      "create_draft",
+      "plugin_echo",
+    ];
+    const tools = [...new Set(names)].map((name) => ({
+      name,
+      label: name,
+      description: "budget probe",
+      parameters: Type.Object({ query: Type.String() }),
+      execute: async () => {
+        executed.push(name);
+        return { content: [{ type: "text" as const, text: "ok" }], details: {} };
+      },
+    }));
+    const faux = fauxProvider({ provider: "useful-brain-budget-barrier" });
+    faux.setResponses([
+      ...names.map((name, index) =>
+        fauxAssistantMessage([fauxText(`call-${index}`), fauxToolCall(name, { query: String(index) })], {
+          stopReason: "toolUse",
+        }),
+      ),
+      fauxAssistantMessage([fauxText("done")], { stopReason: "stop" }),
+    ]);
+    const agent = new Agent({
+      initialState: {
+        systemPrompt: "Call tools.",
+        model: faux.getModel(),
+        tools,
+        messages: [],
+      },
+      streamFn: (nextModel, context, streamOptions) =>
+        faux.provider.streamSimple(nextModel, context, streamOptions),
+      toolExecution: "sequential",
+      beforeToolCall: async (context) => {
+        try {
+          budgets.noteToolCall(context.toolCall.name);
+          return undefined;
+        } catch (error) {
+          if (error instanceof BudgetExceededError) {
+            return { block: true, reason: error.message, terminate: true };
+          }
+          throw error;
+        }
+      },
+    });
+    await agent.prompt("go");
+    await agent.waitForIdle();
+    expect(executed).toEqual(names.slice(0, 8));
+    expect(budgets.toolCalls).toBe(9);
+    expect(budgets.searchKnowledgeCalls).toBe(2);
+  }, 20_000);
 });

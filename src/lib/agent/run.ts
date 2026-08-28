@@ -19,9 +19,12 @@ import {
   type ApprovalBinding,
 } from "./policy";
 import { AGENT_BUDGETS, BudgetExceededError, BudgetTracker } from "./budgets";
+import { toolDeadlineSignal } from "./deadlines";
+import { redactToolResultForStorage } from "./redact-tool-result";
 import {
   BRAIN_KNOWLEDGE_UNAVAILABLE,
   BRAIN_MUST_RETRIEVE,
+  createLedger,
   enforceBrainGrounding,
   SEARCH_KNOWLEDGE_TOOL,
   type TranscriptMessage,
@@ -103,11 +106,30 @@ export function toolCallsFromMessages(messages: AgentMessage[]): RecordedToolCal
       tool: message.toolName,
       argumentFingerprint: argumentFingerprint(argsByCallId.get(message.toolCallId) ?? {}),
       normalizedArguments: normalizeToolArguments(argsByCallId.get(message.toolCallId) ?? {}),
-      redactedResult: text.replace(/^UNTRUSTED_EVIDENCE\n/, "").slice(0, AGENT_BUDGETS.maxRedactedToolResultBytes),
+      redactedResult: redactToolResultForStorage(text),
       status: pending ? "pending_approval" : message.isError ? "error" : denied ? "denied" : "ok",
     });
   }
   return recorded;
+}
+
+export function assistantTokenTotals(messages: AgentMessage[]): { input: number; output: number } {
+  let input = 0;
+  let output = 0;
+  for (const message of messages) {
+    if (message.role === "assistant") {
+      input += message.usage.input;
+      output += message.usage.output;
+    }
+  }
+  return { input, output };
+}
+
+export function currentRunAssistantTokens(
+  messages: AgentMessage[],
+  priorMessageCount: number,
+): { input: number; output: number } {
+  return assistantTokenTotals(messages.slice(Math.max(0, priorMessageCount)));
 }
 
 export async function runKnowledgeAgent(input: {
@@ -124,6 +146,7 @@ export async function runKnowledgeAgent(input: {
   now?: number;
 }): Promise<KnowledgeRunResult> {
   const budgets = new BudgetTracker();
+  const evidenceLedger = createLedger();
   let pendingApprovalBinding: ApprovalBinding | undefined;
   const tools: AgentTool[] =
     input.tools ??
@@ -134,6 +157,7 @@ export async function runKnowledgeAgent(input: {
         policyPrincipal: input.policyPrincipal,
         conversationId: input.conversationId,
         budgets,
+        ledger: evidenceLedger,
       }),
     ];
   const faux = fauxProvider({ provider: "useful-brain-phase5-faux" });
@@ -147,6 +171,7 @@ export async function runKnowledgeAgent(input: {
       stopReason: "stop",
     }),
   ]);
+  const priorMessageCount = input.priorMessages?.length ?? 0;
   const allowed = new Set(tools.map((tool) => tool.name));
   const agent = new Agent({
     initialState: {
@@ -160,11 +185,25 @@ export async function runKnowledgeAgent(input: {
       messages: input.priorMessages ?? [],
     },
     streamFn: (nextModel, context, streamOptions) =>
-      faux.provider.streamSimple(nextModel, context, streamOptions),
+      faux.provider.streamSimple(nextModel, context, {
+        ...streamOptions,
+        signal: toolDeadlineSignal(
+          Math.min(AGENT_BUDGETS.modelTimeoutMs, budgets.remainingWallTimeMs()),
+          streamOptions?.signal,
+        ),
+      }),
     toolExecution: "sequential",
     beforeToolCall: async (context, signal) => {
       signal?.throwIfAborted();
       budgets.assertWithinWallTime();
+      try {
+        budgets.noteToolCall(context.toolCall.name);
+      } catch (error) {
+        if (error instanceof BudgetExceededError) {
+          return { block: true, reason: error.message, terminate: true };
+        }
+        throw error;
+      }
       if (!allowed.has(context.toolCall.name)) {
         return { block: true, reason: "tool is not enabled for this run", terminate: true };
       }
@@ -202,9 +241,12 @@ export async function runKnowledgeAgent(input: {
         throw error;
       }
     },
-    shouldStopAfterTurn: async () => {
+    shouldStopAfterTurn: async (context) => {
       try {
+        budgets.assertWithinWallTime();
         budgets.noteTurn();
+        const tokens = assistantTokenTotals(context.newMessages);
+        budgets.assertTokenTotals(tokens.input, tokens.output);
         return false;
       } catch (error) {
         if (error instanceof BudgetExceededError) {
@@ -215,10 +257,15 @@ export async function runKnowledgeAgent(input: {
     },
     afterToolCall: async (context, signal) => {
       signal?.throwIfAborted();
-      const redacted = JSON.stringify(context.result.details ?? {}).slice(
-        0,
-        AGENT_BUDGETS.maxRedactedToolResultBytes,
-      );
+      try {
+        budgets.assertWithinWallTime();
+      } catch (error) {
+        if (error instanceof BudgetExceededError) {
+          return { terminate: true };
+        }
+        throw error;
+      }
+      const redacted = redactToolResultForStorage(JSON.stringify(context.result.details ?? {}));
       return {
         details: { ...context.result.details, redacted },
       };
@@ -226,8 +273,10 @@ export async function runKnowledgeAgent(input: {
   });
 
   const pending = agent.prompt(input.question);
+  const abortNow = () => agent.abort();
+  const wall = AbortSignal.timeout(AGENT_BUDGETS.wallTimeMs);
+  wall.addEventListener("abort", abortNow, { once: true });
   if (input.abort) {
-    const abortNow = () => agent.abort();
     if (input.abort.signal.aborted) {
       abortNow();
     } else {
@@ -239,11 +288,17 @@ export async function runKnowledgeAgent(input: {
 
   let budgetErrorMessage: string | undefined;
   try {
-    for (const message of agent.state.messages) {
-      if (message.role === "assistant") {
-        budgets.noteTokens(message.usage.input, message.usage.output);
-      }
+    budgets.assertWithinWallTime();
+  } catch (error) {
+    if (error instanceof BudgetExceededError) {
+      budgetErrorMessage = error.message;
+    } else {
+      throw error;
     }
+  }
+  try {
+    const tokens = currentRunAssistantTokens(agent.state.messages, priorMessageCount);
+    budgets.assertTokenTotals(tokens.input, tokens.output);
   } catch (error) {
     if (error instanceof BudgetExceededError) {
       budgetErrorMessage = error.message;
@@ -259,7 +314,7 @@ export async function runKnowledgeAgent(input: {
     {
       finalResponse: typeof lastAssistant?.content === "string" ? lastAssistant.content : BRAIN_MUST_RETRIEVE,
       messages: transcript,
-      interrupted: Boolean(input.abort?.signal.aborted),
+      interrupted: Boolean(input.abort?.signal.aborted) || wall.aborted,
       failed: Boolean(agent.state.errorMessage),
     },
   );
@@ -274,7 +329,8 @@ export async function runKnowledgeAgent(input: {
     aborted:
       Boolean(agent.state.errorMessage) ||
       Boolean(budgetErrorMessage) ||
-      input.abort?.signal.aborted === true,
+      input.abort?.signal.aborted === true ||
+      wall.aborted,
     pendingApproval,
     pendingApprovalBinding,
     model: agent.state.model.id,

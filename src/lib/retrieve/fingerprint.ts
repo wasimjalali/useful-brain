@@ -11,6 +11,7 @@ export const REAL_STACK_FINGERPRINT = {
   relevanceFloor: 0.05,
   parentExpansion: "off",
   conflictDetection: "off",
+  ftsMatchStrategy: "stopword-or-v1",
 } as const;
 
 export const FAKE_PROVIDER_FINGERPRINT = {
@@ -26,6 +27,7 @@ export const FAKE_PROVIDER_FINGERPRINT = {
   relevanceFloor: 0,
   parentExpansion: "off",
   conflictDetection: "off",
+  ftsMatchStrategy: "stopword-or-v1",
 } as const;
 
 export const FAKE_RERANK_FINGERPRINT = {
@@ -41,6 +43,7 @@ export const FAKE_RERANK_FINGERPRINT = {
   relevanceFloor: 0,
   parentExpansion: "off",
   conflictDetection: "off",
+  ftsMatchStrategy: "stopword-or-v1",
 } as const;
 
 export type RetrievalFingerprint = {
@@ -58,6 +61,7 @@ export type RetrievalFingerprint = {
   relevanceFloor: number;
   parentExpansion: "off";
   conflictDetection: "off";
+  ftsMatchStrategy: "stopword-or-v1";
 };
 
 export function fingerprintId(fingerprint: RetrievalFingerprint): string {
@@ -70,5 +74,6 @@ export function fingerprintId(fingerprint: RetrievalFingerprint): string {
     `rr${fingerprint.rerankCandidates}`,
     fingerprint.reranker,
     `floor${fingerprint.relevanceFloor}`,
+    `fts-${fingerprint.ftsMatchStrategy}`,
   ].join("|");
 }

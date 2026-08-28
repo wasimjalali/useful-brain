@@ -18,6 +18,7 @@ export function hitsToEvidence(hits: SearchHit[]): CitedRetrievalResult[] {
     section: hit.citation.sectionHeading,
     text: hit.content,
     tokenEstimate: tokenEstimate(hit.content),
+    documentId: hit.citation.documentId,
   }));
   return addCitationLabels(results);
 }

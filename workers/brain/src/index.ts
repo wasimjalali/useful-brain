@@ -1,12 +1,17 @@
 import { AccessJwtUnavailable, AccessJwtVerifier } from "../../../src/lib/auth/access-jwt";
 import { authenticateWorkerRequest } from "../../../src/lib/auth/worker-identity";
-import { parseBoundedId, parseMutatingIdempotencyKey } from "../../../src/lib/cf/bounded-id";
+import { parseBoundedId } from "../../../src/lib/cf/bounded-id";
 import { writeOperationalLog } from "../../../src/lib/cf/operational-log";
 import { resolveRequestId, withRequestId } from "../../../src/lib/cf/request-id";
 import { assertWorkerStartup } from "../../../src/lib/cf/startup";
 import { toPublicWorkerError, WorkerForbiddenError, WorkerValidationError, workerErrorResponse } from "../../../src/lib/cf/worker-errors";
 import { isWorkflowAlreadyExists, workflowInstanceId } from "../../../src/lib/ingest/workflow-id";
-import { upsertApproval } from "../../../src/lib/store/agent-runs";
+import {
+  clientApprovalMatchesServer,
+  loadAgentReplay,
+  serverOwnedApprovalBinding,
+  upsertApproval,
+} from "../../../src/lib/store/agent-runs";
 import { assertConversationOwner, ConversationStoreError, type OperationsDatabase } from "../../../src/lib/store/conversations";
 import {
   LOAD_PRINCIPAL_SQL,
@@ -16,6 +21,7 @@ import type { ApprovalBinding } from "../../../src/lib/agent/policy";
 import { ConversationRunLock } from "./conversation-lock";
 import { ApprovalWorkflow } from "./approval-workflow";
 import {
+  enqueueRecoverableApprovalResumes,
   parseApprovalResumeMessage,
   resumeApprovedAgentRun,
 } from "./approval-resume";
@@ -200,25 +206,39 @@ const brainWorker = {
         } catch {
           throw new WorkerValidationError();
         }
-        const binding = body.binding;
-        if (!binding || binding.principalId !== principal.id) {
+        const runId = parseBoundedId(body.runId, "run id");
+        const run = await loadAgentReplay(env.OPERATIONS_DB as OperationsDatabase, runId);
+        if (!run || run.principalId !== principal.id) {
+          throw new WorkerForbiddenError();
+        }
+        await requireConversationOwner(env, run.conversationId, principal.id);
+        const now = Date.now();
+        let proposedBinding: ApprovalBinding;
+        try {
+          proposedBinding = await serverOwnedApprovalBinding(run, now);
+        } catch {
           throw new WorkerValidationError();
         }
-        const runId = parseBoundedId(body.runId, "run id");
-        await requireConversationOwner(env, binding.conversationId, principal.id);
-        parseMutatingIdempotencyKey(binding.idempotencyKey);
-        await upsertApproval(
-          env.OPERATIONS_DB as OperationsDatabase,
-          runId,
-          binding,
-          "pending",
-          Date.now(),
-        );
-        const workflowId = workflowInstanceId(binding.idempotencyKey);
+        if (!clientApprovalMatchesServer(body.binding, proposedBinding)) {
+          throw new WorkerValidationError();
+        }
+        let serverBinding: ApprovalBinding;
+        try {
+          serverBinding = await upsertApproval(
+            env.OPERATIONS_DB as OperationsDatabase,
+            runId,
+            proposedBinding,
+            "pending",
+            now,
+          );
+        } catch {
+          throw new WorkerValidationError();
+        }
+        const workflowId = workflowInstanceId(serverBinding.idempotencyKey);
         try {
           await env.APPROVAL_WORKFLOW.create({
             id: workflowId,
-            params: { runId, binding },
+            params: { runId, binding: serverBinding },
           });
         } catch (error) {
           if (!isWorkflowAlreadyExists(error)) {
@@ -232,7 +252,7 @@ const brainWorker = {
           status: "ok",
           durationMs: Date.now() - started,
         });
-        return json({ pendingApproval: true, workflowId }, requestId, 202);
+        return json({ pendingApproval: true, workflowId, binding: serverBinding }, requestId, 202);
       }
 
       if (path === "/approvals/event" && request.method === "POST") {
@@ -337,6 +357,16 @@ const brainWorker = {
         message.retry();
       }
     }
+  },
+  async scheduled(_controller: unknown, env: BrainEnv): Promise<void> {
+    assertWorkerStartup(env);
+    if (!env.APPROVAL_RESUME_QUEUE) {
+      return;
+    }
+    await enqueueRecoverableApprovalResumes(
+      env.OPERATIONS_DB as OperationsDatabase,
+      env.APPROVAL_RESUME_QUEUE,
+    );
   },
 };
 

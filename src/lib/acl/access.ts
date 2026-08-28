@@ -1,5 +1,5 @@
 import { aclGroupKey, ownerOf, type AccessScope, type AclShape } from "./acl-group";
-import type { ChunkRecord } from "../retrieve/types";
+import { MAX_CANDIDATE_LIMIT, type ChunkRecord } from "../retrieve/types";
 import { VECTORIZE_FILTER_MAX_BYTES } from "../store/vectorize-projection";
 
 export const MAX_FILTER_TERMS = 40;
@@ -193,16 +193,96 @@ export function aclSqlAndParams(acl: AclFilter): { sql: string; params: string[]
   return { sql: `(${branches.join(" OR ")})`, params };
 }
 
+export const FTS_MATCH_STRATEGY = "stopword-or-v1" as const;
+export const FTS_CANDIDATE_OVERFETCH = 4;
+
+const FTS_STOPWORDS = new Set([
+  "a",
+  "an",
+  "and",
+  "are",
+  "as",
+  "at",
+  "be",
+  "but",
+  "by",
+  "can",
+  "could",
+  "did",
+  "do",
+  "does",
+  "for",
+  "from",
+  "had",
+  "has",
+  "have",
+  "how",
+  "i",
+  "if",
+  "in",
+  "into",
+  "is",
+  "it",
+  "its",
+  "of",
+  "on",
+  "or",
+  "should",
+  "that",
+  "the",
+  "their",
+  "then",
+  "there",
+  "these",
+  "this",
+  "those",
+  "to",
+  "was",
+  "were",
+  "what",
+  "when",
+  "where",
+  "which",
+  "who",
+  "whom",
+  "why",
+  "will",
+  "with",
+  "would",
+]);
+
+export function ftsCandidateFetchLimit(candidateLimit: number): number {
+  const requested = Math.max(1, candidateLimit);
+  return Math.min(requested * FTS_CANDIDATE_OVERFETCH, MAX_CANDIDATE_LIMIT);
+}
+
 export function keywordSearchSql(aclSql: string): string {
-  return `SELECT c.chunk_id AS chunk_id, 0.0 AS rank FROM chunks_fts JOIN chunks c ON c.id = chunks_fts.rowid WHERE chunks_fts MATCH ? AND c.generation_id = ? AND ${aclSql} ORDER BY c.chunk_id LIMIT ?`;
+  return `SELECT c.chunk_id AS chunk_id, 0.0 AS rank FROM chunks_fts JOIN chunks c ON c.id = chunks_fts.rowid WHERE chunks_fts MATCH ? AND c.generation_id = ? AND ${aclSql} ORDER BY bm25(chunks_fts), c.chunk_id LIMIT ?`;
+}
+
+function quoteFtsTerm(term: string): string {
+  return `"${term.replaceAll('"', '""')}"`;
 }
 
 export function fts5MatchQuery(raw: string): string {
-  const terms = raw.match(/[\p{L}\p{N}_]+/gu) ?? [];
-  if (terms.length === 0) {
-    throw new Error("FTS query contains no searchable terms");
+  const identifiers: string[] = [];
+  let remaining = raw;
+  for (const token of raw.match(/[A-Za-z0-9]+(?:-[A-Za-z0-9]+)+/g) ?? []) {
+    if (/[0-9]/.test(token) && /[A-Za-z]/.test(token)) {
+      identifiers.push(token);
+      remaining = remaining.replaceAll(token, " ");
+    }
   }
-  return terms.map((term) => `"${term.replaceAll('"', '""')}"`).join(" AND ");
+  const words = remaining.match(/[\p{L}\p{N}_]+/gu) ?? [];
+  const content = words.filter((word) => !FTS_STOPWORDS.has(word.toLowerCase()));
+  const terms = [...identifiers, ...content];
+  if (terms.length === 0) {
+    if (words.length === 0) {
+      throw new Error("FTS query contains no searchable terms");
+    }
+    return words.map(quoteFtsTerm).join(" OR ");
+  }
+  return terms.map(quoteFtsTerm).join(" OR ");
 }
 
 export function principalHasFullDocumentAccess(principal: Principal, chunks: ChunkRecord[]): boolean {

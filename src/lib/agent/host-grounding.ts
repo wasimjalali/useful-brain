@@ -53,18 +53,22 @@ export type EvidenceIdentity = {
 export type TurnEvidenceLedger = {
   identities: EvidenceIdentity[];
   byChunkId: Map<string, EvidenceIdentity>;
+  byLabel: Map<number, EvidenceIdentity>;
   successfulSearchCount: number;
   emptyOrInsufficient: boolean;
   searchError: boolean;
+  labelConflict: boolean;
 };
 
 export function createLedger(): TurnEvidenceLedger {
   return {
     identities: [],
     byChunkId: new Map(),
+    byLabel: new Map(),
     successfulSearchCount: 0,
     emptyOrInsufficient: false,
     searchError: false,
+    labelConflict: false,
   };
 }
 
@@ -98,22 +102,35 @@ export function markersValidForLedger(text: string, ledger: TurnEvidenceLedger):
   if (!text) {
     return true;
   }
-  const size = ledger.identities.length;
+  if (ledger.labelConflict) {
+    return false;
+  }
   return text
     .split(/\n\s*\n/u)
     .map((paragraph) => paragraph.trim())
     .filter(Boolean)
     .every((paragraph) => {
       const markers = citedMarkerIndexes(paragraph);
-      if (markers.length === 0 || !markers.every((n) => n >= 1 && n <= size)) {
+      if (markers.length === 0) {
         return false;
       }
-      const cited = [...new Set(markers)].map((marker) => ledger.identities[marker - 1]);
+      const cited = [...new Set(markers)].map((marker) => ledger.byLabel.get(marker));
+      if (cited.some((item) => !item)) {
+        return false;
+      }
       return textSupportedByPassages(
         paragraph.replace(MARKER_RE, "").trim(),
-        cited.flatMap((item) => [item.section, item.text]),
+        cited.flatMap((item) => [item?.section ?? "", item?.text ?? ""]),
       );
     });
+}
+
+export function appendSearchHit(ledger: TurnEvidenceLedger, identity: EvidenceIdentity): string {
+  const label = addIdentity(ledger, identity);
+  if (label === null) {
+    throw new Error("evidence identity was not recorded");
+  }
+  return `[${label}]`;
 }
 
 export function ingestSearchPayload(ledger: TurnEvidenceLedger, payload: unknown): void {
@@ -135,13 +152,13 @@ export function ingestSearchPayload(ledger: TurnEvidenceLedger, payload: unknown
   for (const hit of hits) {
     const identity = identityFromHit(hit);
     if (identity) {
-      addIdentity(ledger, identity);
+      addIdentity(ledger, identity, hitLabel(hit));
     }
   }
   for (const citation of citations) {
     const identity = identityFromCitation(citation);
     if (identity) {
-      addIdentity(ledger, identity);
+      addIdentity(ledger, identity, hitLabel(citation));
     }
   }
 
@@ -251,20 +268,83 @@ export function enforceBrainGrounding(
   return grounded;
 }
 
-function addIdentity(ledger: TurnEvidenceLedger, identity: EvidenceIdentity): void {
-  if (!identity.chunkId) {
-    return;
+function parseCitationLabel(value: unknown): number | null {
+  if (typeof value !== "string") {
+    return null;
   }
+  const match = value.trim().match(/^\[(\d{1,2})\]$/);
+  if (!match) {
+    return null;
+  }
+  const n = Number.parseInt(match[1], 10);
+  return Number.isInteger(n) && n >= 1 ? n : null;
+}
+
+function hitLabel(value: unknown): unknown {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  if (typeof value.label === "string") {
+    return value.label;
+  }
+  return isRecord(value.citation) ? value.citation.label : undefined;
+}
+
+function labelForChunk(ledger: TurnEvidenceLedger, chunkId: string): number | null {
+  for (const [label, identity] of ledger.byLabel) {
+    if (identity.chunkId === chunkId) {
+      return label;
+    }
+  }
+  return null;
+}
+
+function nextSequentialLabel(ledger: TurnEvidenceLedger): number {
+  if (ledger.byLabel.size === 0) {
+    return 1;
+  }
+  return Math.max(...ledger.byLabel.keys()) + 1;
+}
+
+function addIdentity(
+  ledger: TurnEvidenceLedger,
+  identity: EvidenceIdentity,
+  label?: unknown,
+): number | null {
+  if (!identity.chunkId) {
+    return null;
+  }
+  const requested = parseCitationLabel(label);
   const existing = ledger.byChunkId.get(identity.chunkId);
   if (existing) {
     if (!existing.text && identity.text) {
       existing.text = identity.text;
       existing.section = identity.section;
     }
-    return;
+    const current = labelForChunk(ledger, identity.chunkId);
+    if (requested !== null) {
+      const occupant = ledger.byLabel.get(requested);
+      if (occupant && occupant.chunkId !== identity.chunkId) {
+        ledger.labelConflict = true;
+      }
+      if (current !== null && current !== requested) {
+        ledger.labelConflict = true;
+      }
+    }
+    return current;
   }
+  if (requested !== null) {
+    const occupant = ledger.byLabel.get(requested);
+    if (occupant && occupant.chunkId !== identity.chunkId) {
+      ledger.labelConflict = true;
+      return null;
+    }
+  }
+  const assigned = requested ?? nextSequentialLabel(ledger);
   ledger.byChunkId.set(identity.chunkId, identity);
   ledger.identities.push(identity);
+  ledger.byLabel.set(assigned, identity);
+  return assigned;
 }
 
 function identityFromHit(hit: unknown): EvidenceIdentity | null {

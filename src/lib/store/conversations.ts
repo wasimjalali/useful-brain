@@ -13,6 +13,57 @@ export const MAX_HISTORY_CHARS = 6000;
 
 export type StoredHistoryTurn = { question: string; answer: string };
 
+export type HistoryMessageRow = {
+  id: string;
+  role: string;
+  content: string;
+  status: string;
+  parent_user_message_id: string | null;
+};
+
+export function pairCompletedHistoryTurns(rows: HistoryMessageRow[]): StoredHistoryTurn[] {
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  const reservedParentIds = new Set(
+    rows
+      .filter((row) => row.role === "assistant" && row.parent_user_message_id)
+      .map((row) => row.parent_user_message_id as string),
+  );
+  const usedUserIds = new Set<string>();
+  const pendingUsers: HistoryMessageRow[] = [];
+  const turns: StoredHistoryTurn[] = [];
+  for (const row of rows) {
+    if (row.role === "user") {
+      pendingUsers.push(row);
+      continue;
+    }
+    if (row.role !== "assistant" || row.status !== "completed") {
+      continue;
+    }
+    if (row.parent_user_message_id) {
+      const parent = byId.get(row.parent_user_message_id);
+      if (!parent || parent.role !== "user" || usedUserIds.has(parent.id)) {
+        continue;
+      }
+      usedUserIds.add(parent.id);
+      turns.push({ question: parent.content, answer: row.content });
+      continue;
+    }
+    while (
+      pendingUsers.length > 0 &&
+      (usedUserIds.has(pendingUsers[0].id) || reservedParentIds.has(pendingUsers[0].id))
+    ) {
+      pendingUsers.shift();
+    }
+    const user = pendingUsers.shift();
+    if (!user) {
+      continue;
+    }
+    usedUserIds.add(user.id);
+    turns.push({ question: user.content, answer: row.content });
+  }
+  return turns;
+}
+
 export type OperationsStatement = {
   bind(...values: unknown[]): OperationsStatement;
   run(): Promise<{ meta?: { changes?: number } }>;
@@ -106,6 +157,7 @@ type MessageRow = {
   id: string;
   conversation_id: string;
   request_id: string | null;
+  parent_user_message_id: string | null;
   role: "user" | "assistant";
   content: string;
   status: "pending" | "completed" | "failed";
@@ -129,7 +181,142 @@ type EvidenceRow = {
   text: string;
   token_estimate: number;
   citation_label: string;
+  document_id: string | null;
 };
+
+function isUniqueConstraintError(error: unknown): boolean {
+  const text = error instanceof Error ? error.message : String(error);
+  return /UNIQUE constraint failed/i.test(text);
+}
+
+type RequestIdClaim = {
+  request_id: string;
+  conversation_id: string;
+  user_message_id: string;
+  assistant_message_id: string;
+  owner_principal_id: string;
+  payload_digest: string | null;
+};
+
+async function requestPayloadDigest(question: string): Promise<string> {
+  return sha256Hex(question);
+}
+
+async function loadRequestIdClaim(
+  db: OperationsDatabase,
+  requestId: string,
+): Promise<RequestIdClaim | null> {
+  return db
+    .prepare(
+      `SELECT request_id, conversation_id, user_message_id, assistant_message_id,
+              owner_principal_id, payload_digest
+       FROM request_id_claims WHERE request_id = ?`,
+    )
+    .bind(requestId)
+    .first<RequestIdClaim>();
+}
+
+async function resolveStoredPayloadDigest(
+  db: OperationsDatabase,
+  claim: RequestIdClaim | null,
+  assistantMessageId: string,
+): Promise<string | null> {
+  if (claim?.payload_digest) {
+    return claim.payload_digest;
+  }
+  const userId =
+    claim?.user_message_id ??
+    (
+      await db
+        .prepare(`SELECT parent_user_message_id FROM messages WHERE id = ?`)
+        .bind(assistantMessageId)
+        .first<{ parent_user_message_id: string | null }>()
+    )?.parent_user_message_id;
+  if (!userId) {
+    return null;
+  }
+  const user = await db
+    .prepare(`SELECT content FROM messages WHERE id = ? AND role = 'user'`)
+    .bind(userId)
+    .first<{ content: string }>();
+  if (!user) {
+    return null;
+  }
+  return requestPayloadDigest(user.content);
+}
+
+async function assertReplayPayload(
+  db: OperationsDatabase,
+  input: {
+    ownerPrincipalId: string;
+    payloadDigest: string;
+    conversationId?: string;
+    claim: RequestIdClaim | null;
+    assistantMessageId: string;
+    replayConversationId: string;
+  },
+): Promise<void> {
+  if (input.claim && input.claim.owner_principal_id !== input.ownerPrincipalId) {
+    throw new ConversationStoreError("FORBIDDEN");
+  }
+  if (input.conversationId && input.conversationId !== input.replayConversationId) {
+    throw new ConversationStoreError("request payload does not match the claimed request id");
+  }
+  const expectedDigest = await resolveStoredPayloadDigest(
+    db,
+    input.claim,
+    input.assistantMessageId,
+  );
+  if (!expectedDigest || expectedDigest !== input.payloadDigest) {
+    throw new ConversationStoreError("request payload does not match the claimed request id");
+  }
+}
+
+async function materializeClaimedTurn(
+  db: OperationsDatabase,
+  claim: RequestIdClaim,
+  input: { question: string; now: number },
+): Promise<void> {
+  await db.batch([
+    db
+      .prepare(
+        `INSERT INTO conversations (id, owner_principal_id, title, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO NOTHING`,
+      )
+      .bind(
+        claim.conversation_id,
+        claim.owner_principal_id,
+        deriveServerConversationTitle(input.question),
+        input.now,
+        input.now,
+      ),
+    db
+      .prepare(
+        `INSERT INTO messages (id, conversation_id, request_id, parent_user_message_id, role, content, status, created_at, updated_at)
+         VALUES (?, ?, NULL, NULL, 'user', ?, 'completed', ?, ?)
+         ON CONFLICT(id) DO NOTHING`,
+      )
+      .bind(claim.user_message_id, claim.conversation_id, input.question, input.now, input.now),
+    db
+      .prepare(
+        `INSERT INTO messages (id, conversation_id, request_id, parent_user_message_id, role, content, status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'assistant', '', 'pending', ?, ?)
+         ON CONFLICT(id) DO NOTHING`,
+      )
+      .bind(
+        claim.assistant_message_id,
+        claim.conversation_id,
+        claim.request_id,
+        claim.user_message_id,
+        input.now + 1,
+        input.now + 1,
+      ),
+    db
+      .prepare(`UPDATE conversations SET updated_at = ? WHERE id = ?`)
+      .bind(input.now, claim.conversation_id),
+  ]);
+}
 
 export async function createPendingTurn(
   db: OperationsDatabase,
@@ -143,17 +330,52 @@ export async function createPendingTurn(
 ): Promise<{ conversationId: string; assistantMessageId: string; duplicate: boolean }> {
   const ownerPrincipalId = parseBoundedId(input.ownerPrincipalId, "principal id");
   const requestId = parseBoundedId(input.requestId, "request id");
+  const payloadDigest = await requestPayloadDigest(input.question);
   const duplicate = await db
     .prepare(
-      `SELECT id, conversation_id, status FROM messages WHERE request_id = ?`,
+      `SELECT id, conversation_id, status FROM messages WHERE request_id = ? AND role = 'assistant'`,
     )
     .bind(requestId)
     .first<{ id: string; conversation_id: string; status: string }>();
   if (duplicate) {
+    const claim = await loadRequestIdClaim(db, requestId);
+    await assertReplayPayload(db, {
+      ownerPrincipalId,
+      payloadDigest,
+      conversationId: input.conversationId,
+      claim,
+      assistantMessageId: duplicate.id,
+      replayConversationId: duplicate.conversation_id,
+    });
     await assertConversationOwner(db, duplicate.conversation_id, ownerPrincipalId);
     return {
       conversationId: duplicate.conversation_id,
       assistantMessageId: duplicate.id,
+      duplicate: true,
+    };
+  }
+
+  const existingClaim = await loadRequestIdClaim(db, requestId);
+  if (existingClaim) {
+    await assertReplayPayload(db, {
+      ownerPrincipalId,
+      payloadDigest,
+      conversationId: input.conversationId,
+      claim: existingClaim,
+      assistantMessageId: existingClaim.assistant_message_id,
+      replayConversationId: existingClaim.conversation_id,
+    });
+    try {
+      await materializeClaimedTurn(db, existingClaim, input);
+    } catch (error) {
+      if (!isUniqueConstraintError(error)) {
+        throw error;
+      }
+    }
+    await assertConversationOwner(db, existingClaim.conversation_id, ownerPrincipalId);
+    return {
+      conversationId: existingClaim.conversation_id,
+      assistantMessageId: existingClaim.assistant_message_id,
       duplicate: true,
     };
   }
@@ -164,41 +386,64 @@ export async function createPendingTurn(
     await assertConversationOwner(db, conversationId, ownerPrincipalId);
   } else {
     conversationId = newBoundedId("c");
-    await db
-      .prepare(
-        `INSERT INTO conversations (id, owner_principal_id, title, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        conversationId,
-        ownerPrincipalId,
-        deriveServerConversationTitle(input.question),
-        input.now,
-        input.now,
-      )
-      .run();
   }
-
   const userId = newBoundedId("m");
   const assistantMessageId = newBoundedId("m");
-  await db.batch([
-    db
-      .prepare(
-        `INSERT INTO messages (id, conversation_id, request_id, role, content, status, created_at, updated_at)
-         VALUES (?, ?, NULL, 'user', ?, 'completed', ?, ?)`,
-      )
-      .bind(userId, conversationId, input.question, input.now, input.now),
-    db
-      .prepare(
-        `INSERT INTO messages (id, conversation_id, request_id, role, content, status, created_at, updated_at)
-         VALUES (?, ?, ?, 'assistant', '', 'pending', ?, ?)`,
-      )
-      .bind(assistantMessageId, conversationId, requestId, input.now + 1, input.now + 1),
-    db
-      .prepare(`UPDATE conversations SET updated_at = ? WHERE id = ?`)
-      .bind(input.now, conversationId),
-  ]);
-  return { conversationId, assistantMessageId, duplicate: false };
+  await db
+    .prepare(
+      `INSERT INTO request_id_claims (
+         request_id, conversation_id, user_message_id, assistant_message_id,
+         owner_principal_id, created_at, payload_digest
+       ) VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(request_id) DO NOTHING`,
+    )
+    .bind(
+      requestId,
+      conversationId,
+      userId,
+      assistantMessageId,
+      ownerPrincipalId,
+      input.now,
+      payloadDigest,
+    )
+    .run();
+  const winner = await loadRequestIdClaim(db, requestId);
+  if (!winner) {
+    throw new ConversationStoreError("request id claim is missing");
+  }
+  await assertReplayPayload(db, {
+    ownerPrincipalId,
+    payloadDigest,
+    conversationId: input.conversationId,
+    claim: winner,
+    assistantMessageId: winner.assistant_message_id,
+    replayConversationId: winner.conversation_id,
+  });
+  try {
+    await materializeClaimedTurn(db, winner, input);
+  } catch (error) {
+    if (!isUniqueConstraintError(error)) {
+      throw error;
+    }
+  }
+  const materialized = await db
+    .prepare(`SELECT id, conversation_id FROM messages WHERE request_id = ? AND role = 'assistant'`)
+    .bind(requestId)
+    .first<{ id: string; conversation_id: string }>();
+  if (materialized) {
+    await assertConversationOwner(db, materialized.conversation_id, ownerPrincipalId);
+    return {
+      conversationId: materialized.conversation_id,
+      assistantMessageId: materialized.id,
+      duplicate: materialized.id !== assistantMessageId,
+    };
+  }
+  await assertConversationOwner(db, winner.conversation_id, ownerPrincipalId);
+  return {
+    conversationId: winner.conversation_id,
+    assistantMessageId: winner.assistant_message_id,
+    duplicate: winner.assistant_message_id !== assistantMessageId,
+  };
 }
 
 export async function completeTurn(
@@ -339,7 +584,7 @@ export async function completeTurn(
           item.text,
           item.tokenEstimate,
           item.citationLabel,
-          null,
+          item.documentId ?? null,
           input.corpusGenerationId,
           assistantMessageId,
           completionToken,
@@ -395,7 +640,7 @@ export async function loadReplay(
 ): Promise<ReplayedTurn | null> {
   const message = await db
     .prepare(
-      `SELECT m.id, m.conversation_id, m.request_id, m.role, m.content, m.status, m.answer_type,
+      `SELECT m.id, m.conversation_id, m.request_id, m.parent_user_message_id, m.role, m.content, m.status, m.answer_type,
               m.answer_model, m.embedding_model, m.embedding_dimensions, m.structured_paragraphs_json,
               m.prompt_version, m.retrieval_config_version, m.corpus_generation_id, m.created_at
        FROM messages m
@@ -411,21 +656,29 @@ export async function loadReplay(
     return null;
   }
 
-  const prior = await db
-    .prepare(
-      `SELECT role, content FROM messages
-       WHERE conversation_id = ? AND created_at < ?
-       ORDER BY created_at DESC LIMIT 1`,
-    )
-    .bind(message.conversation_id, message.created_at)
-    .first<{ role: string; content: string }>();
+  const prior = message.parent_user_message_id
+    ? await db
+        .prepare(
+          `SELECT role, content FROM messages
+           WHERE id = ? AND conversation_id = ? AND role = 'user'`,
+        )
+        .bind(message.parent_user_message_id, message.conversation_id)
+        .first<{ role: string; content: string }>()
+    : await db
+        .prepare(
+          `SELECT role, content FROM messages
+           WHERE conversation_id = ? AND created_at < ?
+           ORDER BY created_at DESC, id DESC LIMIT 1`,
+        )
+        .bind(message.conversation_id, message.created_at)
+        .first<{ role: string; content: string }>();
   if (!prior || prior.role !== "user") {
     throw new ConversationStoreError("assistant turn is missing its question");
   }
 
   const evidence = await db
     .prepare(
-      `SELECT rank, score, chunk_id, source, section, text, token_estimate, citation_label
+      `SELECT rank, score, chunk_id, source, section, text, token_estimate, citation_label, document_id
        FROM evidence_snapshots WHERE message_id = ? ORDER BY rank ASC`,
     )
     .bind(message.id)
@@ -469,6 +722,7 @@ export async function loadReplay(
         text: item.text,
         tokenEstimate: item.token_estimate,
         citationLabel: item.citation_label,
+        documentId: item.document_id,
       })),
     },
     promptVersion: message.prompt_version,
@@ -489,24 +743,12 @@ export async function loadBoundedHistory(
   );
   const rows = await db
     .prepare(
-      `SELECT role, content, status FROM messages
-       WHERE conversation_id = ? ORDER BY created_at ASC`,
+      `SELECT id, role, content, status, parent_user_message_id FROM messages
+       WHERE conversation_id = ? ORDER BY created_at ASC, id ASC`,
     )
     .bind(conversationId)
-    .all<{ role: string; content: string; status: string }>();
-  const turns: StoredHistoryTurn[] = [];
-  for (let index = 0; index < rows.results.length - 1; index += 1) {
-    const user = rows.results[index];
-    const assistant = rows.results[index + 1];
-    if (user.role !== "user" || assistant.role !== "assistant") {
-      continue;
-    }
-    if (assistant.status === "completed") {
-      turns.push({ question: user.content, answer: assistant.content });
-    }
-    index += 1;
-  }
-  return trimStoredHistory(turns);
+    .all<HistoryMessageRow>();
+  return trimStoredHistory(pairCompletedHistoryTurns(rows.results));
 }
 
 export async function persistThenRelease<T>(input: {

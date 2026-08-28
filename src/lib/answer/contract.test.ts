@@ -44,6 +44,7 @@ describe("grounded answer contract", () => {
     const evidence = formatEvidenceForPrompt(addCitationLabels(retrievalResults));
     expect(evidence).toContain("[1] return_policy.md > Standard Return Window");
     expect(evidence).toContain("Chunk ID: return_policy__chunk_002");
+    expect(evidence).not.toContain("Document ID:");
     expect(evidence).toContain("Opened products may be returned within 30 days");
   });
 
