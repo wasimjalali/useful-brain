@@ -3,7 +3,12 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 
 import type { Principal } from "../acl/access";
 import type { KnowledgePipeline } from "../retrieve/pipeline";
-import { SEARCH_KNOWLEDGE_TOOL } from "./host-grounding";
+import {
+  SEARCH_KNOWLEDGE_TOOL,
+  appendSearchHit,
+  createLedger,
+  type TurnEvidenceLedger,
+} from "./host-grounding";
 import { BudgetTracker } from "./budgets";
 import { policyGateway, type PolicyPrincipal } from "./policy";
 
@@ -17,6 +22,7 @@ export function createSearchKnowledgeTool(input: {
   policyPrincipal: PolicyPrincipal;
   conversationId: string;
   budgets: BudgetTracker;
+  ledger?: TurnEvidenceLedger;
 }): AgentTool<typeof SearchParams, { hitCount: number }> {
   return {
     name: SEARCH_KNOWLEDGE_TOOL,
@@ -26,7 +32,6 @@ export function createSearchKnowledgeTool(input: {
     execute: async (_toolCallId, params: Static<typeof SearchParams>, signal) => {
       signal?.throwIfAborted();
       input.budgets.assertWithinWallTime();
-      input.budgets.noteToolCall(SEARCH_KNOWLEDGE_TOOL);
       const decision = policyGateway({
         tool: SEARCH_KNOWLEDGE_TOOL,
         principal: input.policyPrincipal,
@@ -48,22 +53,36 @@ export function createSearchKnowledgeTool(input: {
           topK: 3,
           candidateLimit: 24,
         });
-        const payload = {
-          hits: response.hits.map((hit) => ({
+        const ledger = input.ledger ?? createLedger();
+        const hits = response.hits.map((hit) => {
+          const label = appendSearchHit(ledger, {
+            chunkId: hit.chunkId,
+            documentId: hit.citation.documentId,
+            version: null,
+            section: hit.citation.sectionHeading,
+            text: hit.content,
+          });
+          return {
             chunk_id: hit.chunkId,
             content: hit.content,
             score: hit.score,
+            label,
             citation: {
               chunk_id: hit.chunkId,
               document_id: hit.citation.documentId,
               source_name: hit.citation.sourceName,
               section_heading: hit.citation.sectionHeading,
               source_path: hit.citation.sourcePath,
+              label,
             },
-          })),
-          citations: response.hits.map((hit) => ({
-            chunk_id: hit.chunkId,
-            document_id: hit.citation.documentId,
+          };
+        });
+        const payload = {
+          hits,
+          citations: hits.map((hit) => ({
+            chunk_id: hit.chunk_id,
+            document_id: hit.citation.document_id,
+            label: hit.label,
           })),
           not_enough_evidence: response.hits.length === 0,
         };

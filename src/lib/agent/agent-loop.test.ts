@@ -198,6 +198,36 @@ describe("budgets", () => {
       }
     }).toThrow(BudgetExceededError);
   });
+
+  it("counts every native HTTP MCP plugin mutating and search tool once", () => {
+    const budgets = new BudgetTracker();
+    const names = [
+      "search_knowledge",
+      "fetch_allowlisted_http",
+      "mcp_lookup",
+      "plugin_echo",
+      "mcp_create_ticket",
+      "action_sink_write",
+      "search_knowledge",
+      "create_draft",
+    ];
+    for (const name of names) {
+      budgets.noteToolCall(name);
+    }
+    expect(budgets.toolCalls).toBe(8);
+    expect(budgets.searchKnowledgeCalls).toBe(2);
+    expect(() => budgets.noteToolCall("plugin_echo")).toThrow(/tool-call budget exhausted/);
+  });
+
+  it("keeps the four-call search_knowledge limit beside the total cap", () => {
+    const budgets = new BudgetTracker();
+    for (let index = 0; index < 4; index += 1) {
+      budgets.noteToolCall("search_knowledge");
+    }
+    expect(budgets.toolCalls).toBe(4);
+    expect(budgets.searchKnowledgeCalls).toBe(4);
+    expect(() => budgets.noteToolCall("search_knowledge")).toThrow(/search_knowledge budget exhausted/);
+  });
 });
 
 describe("Pi knowledge agent", () => {
@@ -354,4 +384,66 @@ describe("Pi knowledge agent", () => {
       text: "high-risk actions are denied in the first release",
     });
   });
+
+  it("blocks the ninth mixed tool call in the central beforeToolCall barrier", async () => {
+    const budgets = new BudgetTracker();
+    const executed: string[] = [];
+    const names = [
+      "search_knowledge",
+      "fetch_allowlisted_http",
+      "mcp_lookup",
+      "plugin_echo",
+      "mcp_create_ticket",
+      "action_sink_write",
+      "search_knowledge",
+      "create_draft",
+      "plugin_echo",
+    ];
+    const tools = [...new Set(names)].map((name) => ({
+      name,
+      label: name,
+      description: "budget probe",
+      parameters: Type.Object({ query: Type.String() }),
+      execute: async () => {
+        executed.push(name);
+        return { content: [{ type: "text" as const, text: "ok" }], details: {} };
+      },
+    }));
+    const faux = fauxProvider({ provider: "useful-brain-budget-barrier" });
+    faux.setResponses([
+      ...names.map((name, index) =>
+        fauxAssistantMessage([fauxText(`call-${index}`), fauxToolCall(name, { query: String(index) })], {
+          stopReason: "toolUse",
+        }),
+      ),
+      fauxAssistantMessage([fauxText("done")], { stopReason: "stop" }),
+    ]);
+    const agent = new Agent({
+      initialState: {
+        systemPrompt: "Call tools.",
+        model: faux.getModel(),
+        tools,
+        messages: [],
+      },
+      streamFn: (nextModel, context, streamOptions) =>
+        faux.provider.streamSimple(nextModel, context, streamOptions),
+      toolExecution: "sequential",
+      beforeToolCall: async (context) => {
+        try {
+          budgets.noteToolCall(context.toolCall.name);
+          return undefined;
+        } catch (error) {
+          if (error instanceof BudgetExceededError) {
+            return { block: true, reason: error.message, terminate: true };
+          }
+          throw error;
+        }
+      },
+    });
+    await agent.prompt("go");
+    await agent.waitForIdle();
+    expect(executed).toEqual(names.slice(0, 8));
+    expect(budgets.toolCalls).toBe(9);
+    expect(budgets.searchKnowledgeCalls).toBe(2);
+  }, 20_000);
 });

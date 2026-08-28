@@ -22,6 +22,7 @@ import { AGENT_BUDGETS, BudgetExceededError, BudgetTracker } from "./budgets";
 import {
   BRAIN_KNOWLEDGE_UNAVAILABLE,
   BRAIN_MUST_RETRIEVE,
+  createLedger,
   enforceBrainGrounding,
   SEARCH_KNOWLEDGE_TOOL,
   type TranscriptMessage,
@@ -124,6 +125,7 @@ export async function runKnowledgeAgent(input: {
   now?: number;
 }): Promise<KnowledgeRunResult> {
   const budgets = new BudgetTracker();
+  const evidenceLedger = createLedger();
   let pendingApprovalBinding: ApprovalBinding | undefined;
   const tools: AgentTool[] =
     input.tools ??
@@ -134,6 +136,7 @@ export async function runKnowledgeAgent(input: {
         policyPrincipal: input.policyPrincipal,
         conversationId: input.conversationId,
         budgets,
+        ledger: evidenceLedger,
       }),
     ];
   const faux = fauxProvider({ provider: "useful-brain-phase5-faux" });
@@ -165,6 +168,14 @@ export async function runKnowledgeAgent(input: {
     beforeToolCall: async (context, signal) => {
       signal?.throwIfAborted();
       budgets.assertWithinWallTime();
+      try {
+        budgets.noteToolCall(context.toolCall.name);
+      } catch (error) {
+        if (error instanceof BudgetExceededError) {
+          return { block: true, reason: error.message, terminate: true };
+        }
+        throw error;
+      }
       if (!allowed.has(context.toolCall.name)) {
         return { block: true, reason: "tool is not enabled for this run", terminate: true };
       }
