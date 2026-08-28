@@ -33,6 +33,9 @@ describe("persisted tool-result redaction", () => {
         '{"Authorization":"ApiKey top-secret","nested":{"password":"correct horse battery"}}',
       ),
     ).toBe('{"Authorization":"[REDACTED]","nested":{"password":"[REDACTED]"}}');
+    expect(
+      redactToolResultForStorage('{"message":"Authorization: Bearer supersecret.token"}'),
+    ).toBe('{"message":"Authorization: Bearer [REDACTED]"}');
   });
 
   it("bounds storage by UTF-8 bytes rather than JS string length", () => {

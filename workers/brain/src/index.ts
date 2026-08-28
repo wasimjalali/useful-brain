@@ -213,22 +213,27 @@ const brainWorker = {
         }
         await requireConversationOwner(env, run.conversationId, principal.id);
         const now = Date.now();
-        let serverBinding: ApprovalBinding;
+        let proposedBinding: ApprovalBinding;
         try {
-          serverBinding = await serverOwnedApprovalBinding(run, now);
+          proposedBinding = await serverOwnedApprovalBinding(run, now);
         } catch {
           throw new WorkerValidationError();
         }
-        if (!clientApprovalMatchesServer(body.binding, serverBinding)) {
+        if (!clientApprovalMatchesServer(body.binding, proposedBinding)) {
           throw new WorkerValidationError();
         }
-        await upsertApproval(
-          env.OPERATIONS_DB as OperationsDatabase,
-          runId,
-          serverBinding,
-          "pending",
-          now,
-        );
+        let serverBinding: ApprovalBinding;
+        try {
+          serverBinding = await upsertApproval(
+            env.OPERATIONS_DB as OperationsDatabase,
+            runId,
+            proposedBinding,
+            "pending",
+            now,
+          );
+        } catch {
+          throw new WorkerValidationError();
+        }
         const workflowId = workflowInstanceId(serverBinding.idempotencyKey);
         try {
           await env.APPROVAL_WORKFLOW.create({

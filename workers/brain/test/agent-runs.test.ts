@@ -167,6 +167,67 @@ describe("agent run replay records", () => {
     ).rejects.toThrow(/binding/);
   });
 
+  it("returns the persisted winner when concurrent upserts disagree on expiry", async () => {
+    await seedPrincipals();
+    const pending = await createPendingTurn(env.OPERATIONS_DB, {
+      ownerPrincipalId: "principal-alice",
+      requestId: "req-approval-race",
+      question: "Create alpha",
+      now: 200,
+    });
+    await createAgentRun(env.OPERATIONS_DB, {
+      runId: "run-approval-race",
+      conversationId: pending.conversationId,
+      principalId: "principal-alice",
+      model: "phase5-faux",
+      promptVersion: PROMPT_VERSION,
+      corpusGenerationId: "gen-1",
+      now: 201,
+    });
+    await completeAgentRun(env.OPERATIONS_DB, {
+      runId: "run-approval-race",
+      status: "pending_approval",
+      toolCalls: [{
+        tool: "create_draft",
+        argumentFingerprint: argumentFingerprint({ title: "alpha" }),
+        normalizedArguments: { title: "alpha" },
+        redactedResult: "pending_approval",
+        status: "pending_approval",
+      }],
+      now: 202,
+    });
+    const base = {
+      principalId: "principal-alice",
+      conversationId: pending.conversationId,
+      tool: "create_draft",
+      argumentFingerprint: argumentFingerprint({ title: "alpha" }),
+      idempotencyKey: "draft-race",
+    };
+    const [first, second] = await Promise.all([
+      upsertApproval(
+        env.OPERATIONS_DB,
+        "run-approval-race",
+        { ...base, expiresAt: 50_000 },
+        "pending",
+        100,
+      ),
+      upsertApproval(
+        env.OPERATIONS_DB,
+        "run-approval-race",
+        { ...base, expiresAt: 50_001 },
+        "pending",
+        101,
+      ),
+    ]);
+    expect(first).toEqual(second);
+    const rows = await env.OPERATIONS_DB.prepare(
+      "SELECT COUNT(*) AS count FROM approvals WHERE run_id = ?",
+    )
+      .bind("run-approval-race")
+      .first<{ count: number }>();
+    expect(rows?.count).toBe(1);
+  });
+
   it("records tool calls once when completion is delivered concurrently", async () => {
     await seedPrincipals();
     const pending = await createPendingTurn(env.OPERATIONS_DB, {

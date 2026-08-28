@@ -151,4 +151,41 @@ describe("approval start binding", () => {
       .first<{ count: number }>();
     expect(stored?.count).toBe(0);
   });
+
+  it("returns one persisted binding for concurrent starts of the same run", async () => {
+    const token = await signToken(signing.privateKey, signing.kid);
+    const { runId } = await pendingRun("concurrent");
+    const start = () =>
+      fetchWorker(
+        new IncomingRequest("https://brain.internal/approvals/start", {
+          method: "POST",
+          headers: {
+            "cf-access-jwt-assertion": token,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ runId }),
+        }),
+      );
+    const responses = await Promise.all([start(), start()]);
+    expect(responses.map((response) => response.status)).toEqual([202, 202]);
+    const bodies = await Promise.all(
+      responses.map(
+        (response) =>
+          response.json() as Promise<{
+            workflowId: string;
+            binding: { idempotencyKey: string; expiresAt: number };
+          }>,
+      ),
+    );
+    expect(bodies[0].binding.idempotencyKey).toBe(bodies[1].binding.idempotencyKey);
+    expect(bodies[0].binding.expiresAt).toBe(bodies[1].binding.expiresAt);
+    expect(bodies[0].workflowId).toBe(bodies[1].workflowId);
+    const stored = await env.OPERATIONS_DB.prepare(
+      "SELECT COUNT(*) AS count, MIN(expires_at) AS expires_at FROM approvals WHERE run_id = ?",
+    )
+      .bind(runId)
+      .first<{ count: number; expires_at: number }>();
+    expect(stored?.count).toBe(1);
+    expect(stored?.expires_at).toBe(bodies[0].binding.expiresAt);
+  });
 });

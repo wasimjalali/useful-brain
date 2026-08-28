@@ -15,7 +15,12 @@ import { createDeleteRecordsTool, createDraftTool } from "./mutating-tools";
 import { FakeEmbeddingProvider } from "../retrieve/fake-embed";
 import { MemoryChunkStore } from "../retrieve/memory-store";
 import { KnowledgePipeline } from "../retrieve/pipeline";
-import { runKnowledgeAgent, snapshotAgentMessages, toolCallsFromMessages } from "./run";
+import {
+  currentRunAssistantTokens,
+  runKnowledgeAgent,
+  snapshotAgentMessages,
+  toolCallsFromMessages,
+} from "./run";
 import { redactToolResultForStorage } from "./redact-tool-result";
 import { BRAIN_KNOWLEDGE_UNAVAILABLE, BRAIN_MUST_RETRIEVE, SEARCH_KNOWLEDGE_TOOL } from "./host-grounding";
 
@@ -209,6 +214,19 @@ describe("budgets", () => {
     );
   });
 
+  it("does not count prior-run assistant usage against the current execution budget", () => {
+    const prior = fauxAssistantMessage("prior answer");
+    prior.usage = {
+      ...prior.usage,
+      input: AGENT_BUDGETS.maxInputTokens,
+      output: AGENT_BUDGETS.maxOutputTokens,
+      totalTokens: AGENT_BUDGETS.maxInputTokens + AGENT_BUDGETS.maxOutputTokens,
+    };
+    const current = fauxAssistantMessage("current answer");
+    current.usage = { ...current.usage, input: 12, output: 4, totalTokens: 16 };
+    expect(currentRunAssistantTokens([prior, current], 1)).toEqual({ input: 12, output: 4 });
+  });
+
   it("counts every native HTTP MCP plugin mutating and search tool once", () => {
     const budgets = new BudgetTracker();
     const names = [
@@ -313,6 +331,28 @@ describe("Pi knowledge agent", () => {
     ]);
     const reconstructed = snapshotAgentMessages(result.messages);
     expect(reconstructed).toEqual(result.messages);
+  }, 20_000);
+
+  it("does not abort a follow-up run because prior assistant usage filled the token budget", async () => {
+    const pipeline = await tinyPipeline();
+    const prior = [fauxAssistantMessage("Employees accrued leave in a previous run.[1]")];
+    prior[0].usage = {
+      ...prior[0].usage,
+      input: AGENT_BUDGETS.maxInputTokens,
+      output: AGENT_BUDGETS.maxOutputTokens,
+      totalTokens: AGENT_BUDGETS.maxInputTokens + AGENT_BUDGETS.maxOutputTokens,
+    };
+    const result = await runKnowledgeAgent({
+      question: "how much leave per month",
+      pipeline,
+      principal,
+      policyPrincipal,
+      conversationId: "c-1",
+      priorMessages: prior,
+    });
+    expect(result.aborted).toBe(false);
+    expect(result.finalResponse).not.toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
+    expect(result.finalResponse).toContain("[1]");
   }, 20_000);
 
   it("persists byte-bounded redacted tool results instead of raw secrets", async () => {

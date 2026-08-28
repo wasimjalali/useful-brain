@@ -329,6 +329,66 @@ describe("operations conversation snapshots", () => {
     expect(users?.content).toBe("What is the refund window?");
   });
 
+  it("rejects a reused request id when the claim digest is missing and the question differs", async () => {
+    await seedPrincipals();
+    const first = await createPendingTurn(env.OPERATIONS_DB, {
+      ownerPrincipalId: "principal-alice",
+      requestId: "req-null-digest-1",
+      question: "What is the refund window?",
+      now: 87,
+    });
+    await env.OPERATIONS_DB.prepare(
+      `UPDATE request_id_claims SET payload_digest = NULL WHERE request_id = ?`,
+    )
+      .bind("req-null-digest-1")
+      .run();
+    await expect(
+      createPendingTurn(env.OPERATIONS_DB, {
+        ownerPrincipalId: "principal-alice",
+        requestId: "req-null-digest-1",
+        question: "What is the discount policy?",
+        now: 88,
+      }),
+    ).rejects.toThrow(/request payload does not match the claimed request id/);
+    const replay = await createPendingTurn(env.OPERATIONS_DB, {
+      ownerPrincipalId: "principal-alice",
+      requestId: "req-null-digest-1",
+      question: "What is the refund window?",
+      now: 89,
+    });
+    expect(replay.duplicate).toBe(true);
+    expect(replay.conversationId).toBe(first.conversationId);
+  });
+
+  it("rejects a reused request id when no claim exists and the stored question differs", async () => {
+    await seedPrincipals();
+    const first = await createPendingTurn(env.OPERATIONS_DB, {
+      ownerPrincipalId: "principal-alice",
+      requestId: "req-orphan-msg-1",
+      question: "What is the refund window?",
+      now: 90,
+    });
+    await env.OPERATIONS_DB.prepare(`DELETE FROM request_id_claims WHERE request_id = ?`)
+      .bind("req-orphan-msg-1")
+      .run();
+    await expect(
+      createPendingTurn(env.OPERATIONS_DB, {
+        ownerPrincipalId: "principal-alice",
+        requestId: "req-orphan-msg-1",
+        question: "What is the discount policy?",
+        now: 91,
+      }),
+    ).rejects.toThrow(/request payload does not match the claimed request id/);
+    const replay = await createPendingTurn(env.OPERATIONS_DB, {
+      ownerPrincipalId: "principal-alice",
+      requestId: "req-orphan-msg-1",
+      question: "What is the refund window?",
+      now: 92,
+    });
+    expect(replay.duplicate).toBe(true);
+    expect(replay.conversationId).toBe(first.conversationId);
+  });
+
   it("replays and bounds history by parent user message when timestamps collide", async () => {
     await seedPrincipals();
     const seed = await createPendingTurn(env.OPERATIONS_DB, {

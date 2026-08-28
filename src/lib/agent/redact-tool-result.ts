@@ -44,6 +44,9 @@ export function boundUtf8Bytes(text: string, maxBytes: number): string {
 }
 
 export function redactJsonSecrets(value: unknown): unknown {
+  if (typeof value === "string") {
+    return redactPlainTextSecrets(value);
+  }
   if (Array.isArray(value)) {
     return value.map(redactJsonSecrets);
   }

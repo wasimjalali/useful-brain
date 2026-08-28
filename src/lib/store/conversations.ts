@@ -25,10 +25,7 @@ export function pairCompletedHistoryTurns(rows: HistoryMessageRow[]): StoredHist
   const byId = new Map(rows.map((row) => [row.id, row]));
   const reservedParentIds = new Set(
     rows
-      .filter(
-        (row) =>
-          row.role === "assistant" && row.status === "completed" && row.parent_user_message_id,
-      )
+      .filter((row) => row.role === "assistant" && row.parent_user_message_id)
       .map((row) => row.parent_user_message_id as string),
   );
   const usedUserIds = new Set<string>();
@@ -219,17 +216,58 @@ async function loadRequestIdClaim(
     .first<RequestIdClaim>();
 }
 
-function assertClaimCompatible(
-  claim: RequestIdClaim,
-  input: { ownerPrincipalId: string; payloadDigest: string; conversationId?: string },
-): void {
-  if (claim.owner_principal_id !== input.ownerPrincipalId) {
+async function resolveStoredPayloadDigest(
+  db: OperationsDatabase,
+  claim: RequestIdClaim | null,
+  assistantMessageId: string,
+): Promise<string | null> {
+  if (claim?.payload_digest) {
+    return claim.payload_digest;
+  }
+  const userId =
+    claim?.user_message_id ??
+    (
+      await db
+        .prepare(`SELECT parent_user_message_id FROM messages WHERE id = ?`)
+        .bind(assistantMessageId)
+        .first<{ parent_user_message_id: string | null }>()
+    )?.parent_user_message_id;
+  if (!userId) {
+    return null;
+  }
+  const user = await db
+    .prepare(`SELECT content FROM messages WHERE id = ? AND role = 'user'`)
+    .bind(userId)
+    .first<{ content: string }>();
+  if (!user) {
+    return null;
+  }
+  return requestPayloadDigest(user.content);
+}
+
+async function assertReplayPayload(
+  db: OperationsDatabase,
+  input: {
+    ownerPrincipalId: string;
+    payloadDigest: string;
+    conversationId?: string;
+    claim: RequestIdClaim | null;
+    assistantMessageId: string;
+    replayConversationId: string;
+  },
+): Promise<void> {
+  if (input.claim && input.claim.owner_principal_id !== input.ownerPrincipalId) {
     throw new ConversationStoreError("FORBIDDEN");
   }
-  if (claim.payload_digest && claim.payload_digest !== input.payloadDigest) {
+  if (input.conversationId && input.conversationId !== input.replayConversationId) {
     throw new ConversationStoreError("request payload does not match the claimed request id");
   }
-  if (input.conversationId && input.conversationId !== claim.conversation_id) {
+  const expectedDigest = await resolveStoredPayloadDigest(
+    db,
+    input.claim,
+    input.assistantMessageId,
+  );
+  if (!expectedDigest || expectedDigest !== input.payloadDigest) {
     throw new ConversationStoreError("request payload does not match the claimed request id");
   }
 }
@@ -300,15 +338,16 @@ export async function createPendingTurn(
     .bind(requestId)
     .first<{ id: string; conversation_id: string; status: string }>();
   if (duplicate) {
-    await assertConversationOwner(db, duplicate.conversation_id, ownerPrincipalId);
     const claim = await loadRequestIdClaim(db, requestId);
-    if (claim) {
-      assertClaimCompatible(claim, {
-        ownerPrincipalId,
-        payloadDigest,
-        conversationId: input.conversationId,
-      });
-    }
+    await assertReplayPayload(db, {
+      ownerPrincipalId,
+      payloadDigest,
+      conversationId: input.conversationId,
+      claim,
+      assistantMessageId: duplicate.id,
+      replayConversationId: duplicate.conversation_id,
+    });
+    await assertConversationOwner(db, duplicate.conversation_id, ownerPrincipalId);
     return {
       conversationId: duplicate.conversation_id,
       assistantMessageId: duplicate.id,
@@ -318,10 +357,13 @@ export async function createPendingTurn(
 
   const existingClaim = await loadRequestIdClaim(db, requestId);
   if (existingClaim) {
-    assertClaimCompatible(existingClaim, {
+    await assertReplayPayload(db, {
       ownerPrincipalId,
       payloadDigest,
       conversationId: input.conversationId,
+      claim: existingClaim,
+      assistantMessageId: existingClaim.assistant_message_id,
+      replayConversationId: existingClaim.conversation_id,
     });
     try {
       await materializeClaimedTurn(db, existingClaim, input);
@@ -369,10 +411,13 @@ export async function createPendingTurn(
   if (!winner) {
     throw new ConversationStoreError("request id claim is missing");
   }
-  assertClaimCompatible(winner, {
+  await assertReplayPayload(db, {
     ownerPrincipalId,
     payloadDigest,
     conversationId: input.conversationId,
+    claim: winner,
+    assistantMessageId: winner.assistant_message_id,
+    replayConversationId: winner.conversation_id,
   });
   try {
     await materializeClaimedTurn(db, winner, input);

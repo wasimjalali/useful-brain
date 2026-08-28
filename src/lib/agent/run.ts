@@ -113,7 +113,7 @@ export function toolCallsFromMessages(messages: AgentMessage[]): RecordedToolCal
   return recorded;
 }
 
-function assistantTokenTotals(messages: AgentMessage[]): { input: number; output: number } {
+export function assistantTokenTotals(messages: AgentMessage[]): { input: number; output: number } {
   let input = 0;
   let output = 0;
   for (const message of messages) {
@@ -123,6 +123,13 @@ function assistantTokenTotals(messages: AgentMessage[]): { input: number; output
     }
   }
   return { input, output };
+}
+
+export function currentRunAssistantTokens(
+  messages: AgentMessage[],
+  priorMessageCount: number,
+): { input: number; output: number } {
+  return assistantTokenTotals(messages.slice(Math.max(0, priorMessageCount)));
 }
 
 export async function runKnowledgeAgent(input: {
@@ -164,8 +171,8 @@ export async function runKnowledgeAgent(input: {
       stopReason: "stop",
     }),
   ]);
+  const priorMessageCount = input.priorMessages?.length ?? 0;
   const allowed = new Set(tools.map((tool) => tool.name));
-  const agentRef: { current?: Agent } = {};
   const agent = new Agent({
     initialState: {
       systemPrompt: [
@@ -234,11 +241,11 @@ export async function runKnowledgeAgent(input: {
         throw error;
       }
     },
-    shouldStopAfterTurn: async () => {
+    shouldStopAfterTurn: async (context) => {
       try {
         budgets.assertWithinWallTime();
         budgets.noteTurn();
-        const tokens = assistantTokenTotals(agentRef.current?.state.messages ?? []);
+        const tokens = assistantTokenTotals(context.newMessages);
         budgets.assertTokenTotals(tokens.input, tokens.output);
         return false;
       } catch (error) {
@@ -264,7 +271,6 @@ export async function runKnowledgeAgent(input: {
       };
     },
   });
-  agentRef.current = agent;
 
   const pending = agent.prompt(input.question);
   const abortNow = () => agent.abort();
@@ -291,7 +297,7 @@ export async function runKnowledgeAgent(input: {
     }
   }
   try {
-    const tokens = assistantTokenTotals(agent.state.messages);
+    const tokens = currentRunAssistantTokens(agent.state.messages, priorMessageCount);
     budgets.assertTokenTotals(tokens.input, tokens.output);
   } catch (error) {
     if (error instanceof BudgetExceededError) {

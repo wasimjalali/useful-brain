@@ -130,7 +130,7 @@ export async function upsertApproval(
   binding: ApprovalBinding,
   status: "pending" | "approved" | "rejected" | "expired",
   now: number,
-): Promise<void> {
+): Promise<ApprovalBinding> {
   const runId = parseBoundedId(runIdInput, "run id");
   const key = parseMutatingIdempotencyKey(binding.idempotencyKey);
   const principalId = parseBoundedId(binding.principalId, "principal id");
@@ -138,96 +138,131 @@ export async function upsertApproval(
   if (binding.expiresAt <= now || binding.expiresAt > now + AGENT_BUDGETS.approvalExpiryMs) {
     throw new Error("approval expiry is outside the allowed window");
   }
-  const existing = await db
-    .prepare(
-      `SELECT run_id, principal_id, conversation_id, tool, argument_fingerprint, expires_at
-       FROM approvals WHERE idempotency_key = ?`,
-    )
-    .bind(key)
-    .first<{
-      run_id: string | null;
-      principal_id: string;
-      conversation_id: string;
-      tool: string;
-      argument_fingerprint: string;
-      expires_at: number;
-    }>();
-  if (existing) {
+  if (status === "pending") {
+    const run = await db
+      .prepare(
+        `SELECT principal_id, conversation_id, status
+         FROM agent_runs WHERE id = ?`,
+      )
+      .bind(runId)
+      .first<{ principal_id: string; conversation_id: string; status: AgentRunStatus }>();
     if (
-      existing.run_id !== runId ||
-      existing.principal_id !== principalId ||
-      existing.conversation_id !== conversationId ||
-      existing.tool !== binding.tool ||
-      existing.argument_fingerprint !== binding.argumentFingerprint ||
-      existing.expires_at !== binding.expiresAt
+      !run ||
+      run.status !== "pending_approval" ||
+      run.principal_id !== principalId ||
+      run.conversation_id !== conversationId
     ) {
-      throw new Error("approval binding mismatch for idempotency key");
+      throw new Error("approval does not match a pending agent run");
     }
-    if (status !== "pending") {
-      throw new Error("approval records can only be upserted as pending");
+    const calls = await db
+      .prepare(
+        `SELECT tool, argument_fingerprint, normalized_arguments_json
+         FROM tool_calls WHERE run_id = ? AND status = 'pending_approval'`,
+      )
+      .bind(runId)
+      .all<{
+        tool: string;
+        argument_fingerprint: string;
+        normalized_arguments_json: string;
+      }>();
+    if (calls.results.length !== 1) {
+      throw new Error("agent run must have exactly one pending approval tool");
     }
-    return;
+    const call = calls.results[0];
+    const normalizedArguments = JSON.parse(call.normalized_arguments_json) as unknown;
+    if (
+      call.tool !== binding.tool ||
+      call.argument_fingerprint !== binding.argumentFingerprint ||
+      argumentFingerprint(normalizedArguments) !== binding.argumentFingerprint
+    ) {
+      throw new Error("approval binding does not match the pending tool call");
+    }
+    await db
+      .prepare(
+        `INSERT INTO approvals (
+           idempotency_key, principal_id, conversation_id, tool, argument_fingerprint,
+           expires_at, status, created_at, run_id
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT DO NOTHING`,
+      )
+      .bind(
+        key,
+        principalId,
+        conversationId,
+        binding.tool,
+        binding.argumentFingerprint,
+        binding.expiresAt,
+        status,
+        now,
+        runId,
+      )
+      .run();
+  }
+  const stored =
+    (await db
+      .prepare(
+        `SELECT run_id, principal_id, conversation_id, tool, argument_fingerprint,
+                expires_at, status, idempotency_key
+         FROM approvals WHERE run_id = ?`,
+      )
+      .bind(runId)
+      .first<{
+        run_id: string | null;
+        principal_id: string;
+        conversation_id: string;
+        tool: string;
+        argument_fingerprint: string;
+        expires_at: number;
+        status: "pending" | "approved" | "rejected" | "expired";
+        idempotency_key: string;
+      }>()) ??
+    (await db
+      .prepare(
+        `SELECT run_id, principal_id, conversation_id, tool, argument_fingerprint,
+                expires_at, status, idempotency_key
+         FROM approvals WHERE idempotency_key = ?`,
+      )
+      .bind(key)
+      .first<{
+        run_id: string | null;
+        principal_id: string;
+        conversation_id: string;
+        tool: string;
+        argument_fingerprint: string;
+        expires_at: number;
+        status: "pending" | "approved" | "rejected" | "expired";
+        idempotency_key: string;
+      }>());
+  if (!stored) {
+    throw new Error(
+      status === "pending"
+        ? "approval record is missing after upsert"
+        : "new approval records must start pending",
+    );
+  }
+  if (
+    stored.run_id !== runId ||
+    stored.principal_id !== principalId ||
+    stored.conversation_id !== conversationId ||
+    stored.tool !== binding.tool ||
+    stored.argument_fingerprint !== binding.argumentFingerprint
+  ) {
+    throw new Error("approval binding mismatch for idempotency key");
   }
   if (status !== "pending") {
-    throw new Error("new approval records must start pending");
+    throw new Error("approval records can only be upserted as pending");
   }
-  const run = await db
-    .prepare(
-      `SELECT principal_id, conversation_id, status
-       FROM agent_runs WHERE id = ?`,
-    )
-    .bind(runId)
-    .first<{ principal_id: string; conversation_id: string; status: AgentRunStatus }>();
-  if (
-    !run ||
-    run.status !== "pending_approval" ||
-    run.principal_id !== principalId ||
-    run.conversation_id !== conversationId
-  ) {
-    throw new Error("approval does not match a pending agent run");
+  if (stored.status !== "pending" && stored.status !== "approved") {
+    throw new Error("approval is no longer pending");
   }
-  const calls = await db
-    .prepare(
-      `SELECT tool, argument_fingerprint, normalized_arguments_json
-       FROM tool_calls WHERE run_id = ? AND status = 'pending_approval'`,
-    )
-    .bind(runId)
-    .all<{
-      tool: string;
-      argument_fingerprint: string;
-      normalized_arguments_json: string;
-    }>();
-  if (calls.results.length !== 1) {
-    throw new Error("agent run must have exactly one pending approval tool");
-  }
-  const call = calls.results[0];
-  const normalizedArguments = JSON.parse(call.normalized_arguments_json) as unknown;
-  if (
-    call.tool !== binding.tool ||
-    call.argument_fingerprint !== binding.argumentFingerprint ||
-    argumentFingerprint(normalizedArguments) !== binding.argumentFingerprint
-  ) {
-    throw new Error("approval binding does not match the pending tool call");
-  }
-  await db
-    .prepare(
-      `INSERT INTO approvals (
-         idempotency_key, principal_id, conversation_id, tool, argument_fingerprint,
-         expires_at, status, created_at, run_id
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .bind(
-      key,
-      principalId,
-      conversationId,
-      binding.tool,
-      binding.argumentFingerprint,
-      binding.expiresAt,
-      status,
-      now,
-      runId,
-    )
-    .run();
+  return {
+    principalId: stored.principal_id,
+    conversationId: stored.conversation_id,
+    tool: stored.tool,
+    argumentFingerprint: stored.argument_fingerprint,
+    idempotencyKey: stored.idempotency_key,
+    expiresAt: stored.expires_at,
+  };
 }
 
 export async function decideApproval(
