@@ -2,7 +2,7 @@
 
 Status: repaired on `grok/phase-7a-p2-repairs`. Owner: Grok 4.6 xhigh. Sources: GPT-5.6 Sol independent review sessions `01a0483e-2a9f-73a0-8e7e-dde20c61bdc6` and `01a048de-592c-7113-b1b1-db1290f9732e` on 2026-08-28.
 
-These findings were real correctness or durability bugs, but none was a confirmed P0/P1 or high/critical security blocker for the synthetic Phase 7A release candidate. Historical findings below are preserved. Each item now records its regression, fix and verification. Phase 7B stays closed.
+These findings were real correctness or durability bugs, but none was a confirmed P0/P1 or high/critical security blocker for the synthetic Phase 7A release candidate. Historical findings below are preserved. Each item now records its regression, fix and verification. Remaining independent reviews use Gemini 3.7 Flash high. Do not use GPT-5.6 Sol. Phase 7B stays closed.
 
 Local proof for this repair (2026-08-28, Node `v22.22.2`): `npx tsc --noEmit` exit 0; `npm run typecheck:workers` exit 0; `npm run lint` exit 0; Node Vitest 80 files / 400 tests passed; Brain workerd 10 files / 45 tests passed; Ingestion workerd 4 files / 11 tests passed; `npm run build` Next 16.3.3 exit 0; `npm run build:cf` OpenNext 1.20.3 exit 0; wrangler 4.126.0 `--dry-run --env staging` web gzip 1608.06 KiB (`IDENTITY_MODE=disabled`, `LOOPBACK_RUNTIME=false`), brain gzip 15.19 KiB, ingestion gzip 9.68 KiB; `npm audit --omit=dev --audit-level=high` 0 vulnerabilities.
 
@@ -296,5 +296,5 @@ For each follow-up repair:
 2. Run the focused regression.
 3. Run `npx tsc --noEmit`, `npm run typecheck:workers`, `npm run lint`, `npm test` and `npm run build` with Node `22.22.2`.
 4. Run staging dry-runs for web, Brain and ingestion plus `npm audit --omit=dev --audit-level=high`.
-5. Independent review is `codex review --base origin/main`. If Codex CLI is out of credits, GPT-5.6 Sol xhigh via a fresh independent process is the substitute designated reviewer. Fix confirmed P0/P1 or high/critical findings.
+5. Independent review is `codex review --base origin/main`. Codex CLI is out of workspace credits. Remaining independent reviews use Gemini 3.7 Flash high via a fresh independent process. Do not use GPT-5.6 Sol. Fix confirmed P0/P1 or high/critical findings.
 6. Use a new branch and PR. Do not start Phase 7B, apply real company data, create production resources, delete Convex or delete Burooj.
