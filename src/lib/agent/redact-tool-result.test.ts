@@ -97,4 +97,39 @@ describe("persisted tool-result redaction", () => {
     );
     expect(boundedCjk.startsWith("你")).toBe(true);
   });
+
+  it("redacts camelCase keys, header pairs, and multiline authorization leaves", () => {
+    const secrets = [
+      "abc123opaque",
+      "YWJjOmRlZg==",
+      "keep-secret",
+      "still-secret",
+    ];
+    const payloads = [
+      '{"openaiApiKey":"abc123opaque"}',
+      '{"authToken":"abc123opaque"}',
+      '{"idToken":"abc123opaque"}',
+      '{"sessionToken":"abc123opaque"}',
+      '{"secretAccessKey":"abc123opaque"}',
+      '{"headers":[["Authorization","Basic YWJjOmRlZg=="]]}',
+      JSON.stringify({ message: "Authorization: Bearer keep-secret\nstill-secret" }),
+    ];
+    for (const payload of payloads) {
+      const redacted = redactToolResultForStorage(payload);
+      for (const secret of secrets) {
+        expect(redacted).not.toContain(secret);
+      }
+    }
+    expect(redactToolResultForStorage('{"openaiApiKey":"abc123opaque"}')).toBe(
+      '{"openaiApiKey":"[REDACTED]"}',
+    );
+    expect(
+      redactToolResultForStorage('{"headers":[["Authorization","Basic YWJjOmRlZg=="]]}'),
+    ).toBe('{"headers":[["Authorization","[REDACTED]"]]}');
+    expect(
+      redactToolResultForStorage(
+        JSON.stringify({ message: "Authorization: Bearer keep-secret\nstill-secret" }),
+      ),
+    ).toBe('{"message":"Authorization: [REDACTED]"}');
+  });
 });

@@ -1,17 +1,11 @@
 import { AGENT_BUDGETS } from "./budgets";
 
 const UNTRUSTED_PREFIXES = ["UNTRUSTED_EVIDENCE\n", "UNTRUSTED_CONNECTOR_RESULT\n"];
-const AUTHORIZATION_HEADER_RE = /\b((?:Proxy-)?Authorization):[ \t]*[^\r\n]*/gi;
-const BEARER_RE = /\bBearer\s+[^\s\r\n]+/gi;
-const COOKIE_HEADER_RE = /\b((?:Set-)?Cookie):[ \t]*[^\r\n]*/gi;
 const JSON_AUTH_RE = /(["'](?:proxy-)?authorization["']\s*:\s*["'])([^"']+)(["'])/gi;
 const JSON_COOKIE_RE = /(["'](?:set-cookie|cookie)["']\s*:\s*["'])([^"']+)(["'])/gi;
-const SECRET_ASSIGNMENT_RE =
-  /\b(api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|private[_-]?key|password|secret|token)\b["']?\s*[:=]\s*["']?[^\r\n]+/gi;
-const AUTHORIZATION_EQUALS_RE = /\b(?:proxy-)?authorization\b["']?\s*=\s*["']?[^\r\n]+/gi;
-const SECRET_JSON_HEADER_KEY_RE = /^(?:x-)?(?:proxy-)?(?:authorization|cookie|set-cookie)$/i;
+const SECRET_JSON_HEADER_KEY_RE = /^(?:x-)?(?:proxy-)?(?:authorization|cookie|set-cookie)$/;
 const SECRET_JSON_SUFFIX_KEY_RE =
-  /(?:^|[_-])(?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|private[_-]?key|password|secret|token)$/i;
+  /(?:^|-)(?:api-key|access-key|access-token|refresh-token|client-secret|private-key|password|secret|token)$/;
 
 function utf8TrailingSequenceLength(startByte: number): number {
   if (startByte < 0x80) {
@@ -45,9 +39,16 @@ export function boundUtf8Bytes(text: string, maxBytes: number): string {
 
 export function redactJsonSecrets(value: unknown): unknown {
   if (typeof value === "string") {
-    return redactPlainTextSecrets(value);
+    return redactPlainTextSecrets(value, true);
   }
   if (Array.isArray(value)) {
+    if (
+      value.length === 2 &&
+      typeof value[0] === "string" &&
+      isSecretJsonKey(value[0])
+    ) {
+      return [value[0], "[REDACTED]"];
+    }
     return value.map(redactJsonSecrets);
   }
   if (value && typeof value === "object") {
@@ -61,24 +62,46 @@ export function redactJsonSecrets(value: unknown): unknown {
   return value;
 }
 
-function isSecretJsonKey(key: string): boolean {
-  return SECRET_JSON_HEADER_KEY_RE.test(key) || SECRET_JSON_SUFFIX_KEY_RE.test(key);
+function normalizeCredentialKey(key: string): string {
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1-$2")
+    .replace(/[/_]/g, "-")
+    .toLowerCase();
 }
 
-function redactPlainTextSecrets(text: string): string {
+function isSecretJsonKey(key: string): boolean {
+  const normalized = normalizeCredentialKey(key);
+  return SECRET_JSON_HEADER_KEY_RE.test(normalized) || SECRET_JSON_SUFFIX_KEY_RE.test(normalized);
+}
+
+function redactPlainTextSecrets(text: string, throughEnd = false): string {
+  const valuePattern = throughEnd ? "[\\s\\S]*" : "[^\\r\\n]*";
+  const tokenPattern = throughEnd ? "[\\s\\S]+" : "[^\\s\\r\\n]+";
   return text
-    .replace(AUTHORIZATION_HEADER_RE, (_, name: string) => `${name}: [REDACTED]`)
-    .replace(BEARER_RE, "Bearer [REDACTED]")
-    .replace(COOKIE_HEADER_RE, (_, name: string) =>
+    .replace(
+      new RegExp(`\\b((?:Proxy-)?Authorization):[ \\t]*${valuePattern}`, "gi"),
+      (_, name: string) => `${name}: [REDACTED]`,
+    )
+    .replace(new RegExp(`\\bBearer\\s+${tokenPattern}`, "gi"), "Bearer [REDACTED]")
+    .replace(new RegExp(`\\b((?:Set-)?Cookie):[ \\t]*${valuePattern}`, "gi"), (_, name: string) =>
       name.toLowerCase() === "set-cookie" ? "Set-Cookie: [REDACTED]" : "Cookie: [REDACTED]",
     )
     .replace(JSON_AUTH_RE, "$1[REDACTED]$3")
     .replace(JSON_COOKIE_RE, "$1[REDACTED]$3")
-    .replace(SECRET_ASSIGNMENT_RE, "$1=[REDACTED]")
-    .replace(AUTHORIZATION_EQUALS_RE, (assignment) =>
-      assignment.toLowerCase().startsWith("proxy-")
-        ? "proxy-authorization=[REDACTED]"
-        : "authorization=[REDACTED]",
+    .replace(
+      new RegExp(
+        `\\b(api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|private[_-]?key|password|secret|token)\\b["']?\\s*[:=]\\s*["']?${valuePattern}`,
+        "gi",
+      ),
+      "$1=[REDACTED]",
+    )
+    .replace(
+      new RegExp(`\\b(?:proxy-)?authorization\\b["']?\\s*=\\s*["']?${valuePattern}`, "gi"),
+      (assignment) =>
+        assignment.toLowerCase().startsWith("proxy-")
+          ? "proxy-authorization=[REDACTED]"
+          : "authorization=[REDACTED]",
     );
 }
 
