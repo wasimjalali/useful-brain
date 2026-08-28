@@ -129,7 +129,79 @@ type EvidenceRow = {
   text: string;
   token_estimate: number;
   citation_label: string;
+  document_id: string | null;
 };
+
+function isUniqueConstraintError(error: unknown): boolean {
+  const text = error instanceof Error ? error.message : String(error);
+  return /UNIQUE constraint failed/i.test(text);
+}
+
+type RequestIdClaim = {
+  request_id: string;
+  conversation_id: string;
+  user_message_id: string;
+  assistant_message_id: string;
+  owner_principal_id: string;
+};
+
+async function loadRequestIdClaim(
+  db: OperationsDatabase,
+  requestId: string,
+): Promise<RequestIdClaim | null> {
+  return db
+    .prepare(
+      `SELECT request_id, conversation_id, user_message_id, assistant_message_id, owner_principal_id
+       FROM request_id_claims WHERE request_id = ?`,
+    )
+    .bind(requestId)
+    .first<RequestIdClaim>();
+}
+
+async function materializeClaimedTurn(
+  db: OperationsDatabase,
+  claim: RequestIdClaim,
+  input: { question: string; now: number },
+): Promise<void> {
+  await db.batch([
+    db
+      .prepare(
+        `INSERT INTO conversations (id, owner_principal_id, title, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO NOTHING`,
+      )
+      .bind(
+        claim.conversation_id,
+        claim.owner_principal_id,
+        deriveServerConversationTitle(input.question),
+        input.now,
+        input.now,
+      ),
+    db
+      .prepare(
+        `INSERT INTO messages (id, conversation_id, request_id, role, content, status, created_at, updated_at)
+         VALUES (?, ?, NULL, 'user', ?, 'completed', ?, ?)
+         ON CONFLICT(id) DO NOTHING`,
+      )
+      .bind(claim.user_message_id, claim.conversation_id, input.question, input.now, input.now),
+    db
+      .prepare(
+        `INSERT INTO messages (id, conversation_id, request_id, role, content, status, created_at, updated_at)
+         VALUES (?, ?, ?, 'assistant', '', 'pending', ?, ?)
+         ON CONFLICT(id) DO NOTHING`,
+      )
+      .bind(
+        claim.assistant_message_id,
+        claim.conversation_id,
+        claim.request_id,
+        input.now + 1,
+        input.now + 1,
+      ),
+    db
+      .prepare(`UPDATE conversations SET updated_at = ? WHERE id = ?`)
+      .bind(input.now, claim.conversation_id),
+  ]);
+}
 
 export async function createPendingTurn(
   db: OperationsDatabase,
@@ -158,47 +230,76 @@ export async function createPendingTurn(
     };
   }
 
+  const existingClaim = await loadRequestIdClaim(db, requestId);
+  if (existingClaim) {
+    if (existingClaim.owner_principal_id !== ownerPrincipalId) {
+      throw new ConversationStoreError("FORBIDDEN");
+    }
+    try {
+      await materializeClaimedTurn(db, existingClaim, input);
+    } catch (error) {
+      if (!isUniqueConstraintError(error)) {
+        throw error;
+      }
+    }
+    await assertConversationOwner(db, existingClaim.conversation_id, ownerPrincipalId);
+    return {
+      conversationId: existingClaim.conversation_id,
+      assistantMessageId: existingClaim.assistant_message_id,
+      duplicate: true,
+    };
+  }
+
   let conversationId: string;
   if (input.conversationId) {
     conversationId = parseBoundedId(input.conversationId, "conversation id");
     await assertConversationOwner(db, conversationId, ownerPrincipalId);
   } else {
     conversationId = newBoundedId("c");
-    await db
-      .prepare(
-        `INSERT INTO conversations (id, owner_principal_id, title, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        conversationId,
-        ownerPrincipalId,
-        deriveServerConversationTitle(input.question),
-        input.now,
-        input.now,
-      )
-      .run();
   }
-
   const userId = newBoundedId("m");
   const assistantMessageId = newBoundedId("m");
-  await db.batch([
-    db
-      .prepare(
-        `INSERT INTO messages (id, conversation_id, request_id, role, content, status, created_at, updated_at)
-         VALUES (?, ?, NULL, 'user', ?, 'completed', ?, ?)`,
-      )
-      .bind(userId, conversationId, input.question, input.now, input.now),
-    db
-      .prepare(
-        `INSERT INTO messages (id, conversation_id, request_id, role, content, status, created_at, updated_at)
-         VALUES (?, ?, ?, 'assistant', '', 'pending', ?, ?)`,
-      )
-      .bind(assistantMessageId, conversationId, requestId, input.now + 1, input.now + 1),
-    db
-      .prepare(`UPDATE conversations SET updated_at = ? WHERE id = ?`)
-      .bind(input.now, conversationId),
-  ]);
-  return { conversationId, assistantMessageId, duplicate: false };
+  await db
+    .prepare(
+      `INSERT INTO request_id_claims (
+         request_id, conversation_id, user_message_id, assistant_message_id, owner_principal_id, created_at
+       ) VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(request_id) DO NOTHING`,
+    )
+    .bind(requestId, conversationId, userId, assistantMessageId, ownerPrincipalId, input.now)
+    .run();
+  const winner = await loadRequestIdClaim(db, requestId);
+  if (!winner) {
+    throw new ConversationStoreError("request id claim is missing");
+  }
+  if (winner.owner_principal_id !== ownerPrincipalId) {
+    throw new ConversationStoreError("FORBIDDEN");
+  }
+  try {
+    await materializeClaimedTurn(db, winner, input);
+  } catch (error) {
+    if (!isUniqueConstraintError(error)) {
+      throw error;
+    }
+  }
+  const materialized = await db
+    .prepare(`SELECT id, conversation_id FROM messages WHERE request_id = ?`)
+    .bind(requestId)
+    .first<{ id: string; conversation_id: string }>();
+  if (materialized) {
+    await assertConversationOwner(db, materialized.conversation_id, ownerPrincipalId);
+    return {
+      conversationId: materialized.conversation_id,
+      assistantMessageId: materialized.id,
+      duplicate: materialized.id !== assistantMessageId,
+    };
+  }
+  await assertConversationOwner(db, winner.conversation_id, ownerPrincipalId);
+  return {
+    conversationId: winner.conversation_id,
+    assistantMessageId: winner.assistant_message_id,
+    duplicate: winner.assistant_message_id !== assistantMessageId,
+  };
 }
 
 export async function completeTurn(
@@ -339,7 +440,7 @@ export async function completeTurn(
           item.text,
           item.tokenEstimate,
           item.citationLabel,
-          null,
+          item.documentId ?? null,
           input.corpusGenerationId,
           assistantMessageId,
           completionToken,
@@ -425,7 +526,7 @@ export async function loadReplay(
 
   const evidence = await db
     .prepare(
-      `SELECT rank, score, chunk_id, source, section, text, token_estimate, citation_label
+      `SELECT rank, score, chunk_id, source, section, text, token_estimate, citation_label, document_id
        FROM evidence_snapshots WHERE message_id = ? ORDER BY rank ASC`,
     )
     .bind(message.id)
@@ -469,6 +570,7 @@ export async function loadReplay(
         text: item.text,
         tokenEstimate: item.token_estimate,
         citationLabel: item.citation_label,
+        documentId: item.document_id,
       })),
     },
     promptVersion: message.prompt_version,

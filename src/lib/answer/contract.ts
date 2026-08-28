@@ -16,6 +16,7 @@ export type RetrievalResultForAnswer = {
   section: string;
   text: string;
   tokenEstimate: number;
+  documentId?: string | null;
 };
 
 export type CitedRetrievalResult = RetrievalResultForAnswer & {
@@ -98,6 +99,7 @@ export function formatEvidenceForPrompt(evidence: CitedRetrievalResult[]) {
       [
         `${item.citationLabel} ${item.source} > ${item.section}`,
         `Chunk ID: ${item.chunkId}`,
+        ...(item.documentId ? [`Document ID: ${item.documentId}`] : []),
         `Score: ${item.score.toFixed(3)}`,
         `Text: ${item.text}`,
       ].join("\n"),

@@ -15,6 +15,7 @@ describe("D1 migrations", () => {
     expect(operationsFiles).toContain("0003_agent_runs.sql");
     expect(operationsFiles).toContain("0004_idempotent_effects.sql");
     expect(operationsFiles).toContain("0005_turn_completion_token.sql");
+    expect(operationsFiles).toContain("0006_request_id_claims.sql");
     const corpusSql = readFileSync(path.join(root, "corpus", "0001_init.sql"), "utf8");
     const operationsSql = readFileSync(path.join(root, "operations", "0001_init.sql"), "utf8");
     expect(corpusSql).not.toEqual(operationsSql);
@@ -45,6 +46,13 @@ describe("D1 migrations", () => {
     expect(completionSql).toMatch(/ADD COLUMN completion_token/);
     expect(completionSql).toMatch(/UNIQUE INDEX messages_by_completion_token/);
     expect(completionSql).toMatch(/CREATE TABLE turn_completion_claims/);
+    const requestIdClaimsSql = readFileSync(
+      path.join(process.cwd(), "migrations/operations/0006_request_id_claims.sql"),
+      "utf8",
+    );
+    expect(requestIdClaimsSql).toMatch(/CREATE TABLE request_id_claims/);
+    expect(requestIdClaimsSql).toMatch(/request_id TEXT PRIMARY KEY/);
+    expect(requestIdClaimsSql).not.toMatch(/INSERT\s+OR\s+REPLACE/i);
 
     for (const directory of ["corpus", "operations"]) {
       for (const file of readdirSync(path.join(root, directory))) {

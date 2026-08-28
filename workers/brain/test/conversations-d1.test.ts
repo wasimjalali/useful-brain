@@ -30,6 +30,7 @@ describe("operations conversation snapshots", () => {
         section: "Standard Return Window",
         text: "Opened products may be returned within 30 days.",
         tokenEstimate: 12,
+        documentId: "return_policy",
       },
     ]);
     const completed = await completeTurn(env.OPERATIONS_DB, {
@@ -57,6 +58,11 @@ describe("operations conversation snapshots", () => {
     expect(replayed).toEqual(completed);
     expect(replayed?.answer).toContain("Opened products may be returned within 30 days. [1]");
     expect(replayed?.retrieval.results).toEqual(evidence);
+    expect(replayed?.retrieval.results[0]?.documentId).toBe("return_policy");
+    expect(replayed?.retrieval.results[0]?.chunkId).toBe("return_policy__chunk_002");
+    expect(replayed?.retrieval.results[0]?.text).toContain("Opened products may be returned");
+    expect(replayed?.retrieval.results[0]?.citationLabel).toBe("[1]");
+    expect(replayed?.corpusGenerationId).toBe("gen-1");
     expect(replayed?.structuredAnswer.answerType).toBe("grounded");
     expect(replayed?.promptVersion).toBe(PROMPT_VERSION);
   });
@@ -247,5 +253,54 @@ describe("operations conversation snapshots", () => {
     );
     const label = replayed?.answer.includes("alpha") ? "alpha" : "beta";
     expect(replayed?.retrieval.results[0]?.chunkId).toBe(`chunk-${label}`);
+  });
+
+  it("collapses concurrent first turns with the same request id onto one conversation", async () => {
+    await seedPrincipals();
+    const attempts = await Promise.all([
+      createPendingTurn(env.OPERATIONS_DB, {
+        ownerPrincipalId: "principal-alice",
+        requestId: "req-concurrent-1",
+        question: "What is the refund window?",
+        now: 80,
+      }),
+      createPendingTurn(env.OPERATIONS_DB, {
+        ownerPrincipalId: "principal-alice",
+        requestId: "req-concurrent-1",
+        question: "What is the refund window?",
+        now: 81,
+      }),
+    ]);
+    expect(attempts[0].conversationId).toBe(attempts[1].conversationId);
+    expect(attempts[0].assistantMessageId).toBe(attempts[1].assistantMessageId);
+    expect(attempts.some((attempt) => attempt.duplicate)).toBe(true);
+    const byRequest = await env.OPERATIONS_DB.prepare(
+      "SELECT COUNT(*) AS count FROM messages WHERE request_id = ?",
+    )
+      .bind("req-concurrent-1")
+      .first<{ count: number }>();
+    const users = await env.OPERATIONS_DB.prepare(
+      `SELECT COUNT(*) AS count FROM messages
+       WHERE conversation_id = ? AND role = 'user'`,
+    )
+      .bind(attempts[0].conversationId)
+      .first<{ count: number }>();
+    const assistants = await env.OPERATIONS_DB.prepare(
+      `SELECT COUNT(*) AS count FROM messages
+       WHERE conversation_id = ? AND role = 'assistant'`,
+    )
+      .bind(attempts[0].conversationId)
+      .first<{ count: number }>();
+    const orphans = await env.OPERATIONS_DB.prepare(
+      `SELECT COUNT(*) AS count FROM conversations c
+       WHERE c.owner_principal_id = ?
+         AND NOT EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id)`,
+    )
+      .bind("principal-alice")
+      .first<{ count: number }>();
+    expect(byRequest?.count).toBe(1);
+    expect(users?.count).toBe(1);
+    expect(assistants?.count).toBe(1);
+    expect(orphans?.count).toBe(0);
   });
 });
