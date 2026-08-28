@@ -8,5 +8,5 @@
 6. Security: every connector/MCP/plugin result is prefixed untrusted; HTTP stays origin-allowlist-only with redirects refused and streams at most 1 MiB before parsing; mutating MCP and action-sink tools are sequential, approval-bound and idempotent; revocation blocks further writes; rate limits fail closed; stored connector config rejects nested, camelCase, hyphenated and prefixed token, secret, API-key and password fields.
 7. Cloudflare resources created and measured cost: none new. Idle remains approximately the existing $5 Workers Paid minimum. Gross model cost: $0. Uncovered cash cost: $0. No production resources. No billing product.
 8. Data migrations: none. Connector registry is an in-memory synthetic catalog for this phase.
-9. Remaining risks: no remote MCP over the network; no production connector secrets; Access JWT unused on the operator path.
+9. Remaining risks: no remote MCP over the network; no production connector secrets; Access JWT unused on the operator path. Approved `mcp_create_ticket` now resumes through the durable dispatcher in the Phase 7A P2 follow-up.
 10. Recommended next phase: Phase 7A (staging release candidate, synthetic only). Entry gate is open. Phase 7B stays closed.

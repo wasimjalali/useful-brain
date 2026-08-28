@@ -1,6 +1,6 @@
 # Useful Brain implementation execution tracker
 
-Status: Phase 7A complete on `phase-1-through-7a-staging`. Consolidated PR: [#13](https://github.com/wasimjalali/useful-brain/pull/13). Phase 0 and Phase 1 code are merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10), [PR #11](https://github.com/wasimjalali/useful-brain/pull/11)). Staging resources are live. Product boundary (Wasim 2026-08-27): local portfolio agent — no billing, public signup or required Cloudflare Access. The independent-review P1 repair batch and final blocker re-review are green locally; PR #13 is cleared to merge. Phase 7B stays closed.
+Status: Phase 7A is merged on `main` ([PR #13](https://github.com/wasimjalali/useful-brain/pull/13)). Independent-review P2 repairs are on `grok/phase-7a-p2-repairs`. Phase 0 and Phase 1 code are merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10), [PR #11](https://github.com/wasimjalali/useful-brain/pull/11)). Staging resources are live. Product boundary (Wasim 2026-08-27): local portfolio agent — no billing, public signup or required Cloudflare Access. Phase 7B stays closed.
 
 Architecture authority: `docs/useful-brain-master-plan.md`
 
@@ -353,6 +353,7 @@ Authorized for continuous execution after Phase 6. Synthetic data only.
 - [x] Burooj migration-ledger completion. Evidence: [docs/burooj-migration-ledger.md](burooj-migration-ledger.md) complete for 7A. Phase 7B deletion stays closed.
 - [x] Recoverable Burooj archive creation. Evidence: local gitignored `.archives/burooj-630ba08dc7cad6aa71942d6842ce6d8d55a26873.bundle` (~97 MB), SHA-256 `2e8733d7884f963ab02e5633646515131c33af870f75e9ffa332679f587dcaf8`, `git bundle verify` ok, `HEAD` / `refs/heads/main` `630ba08dc7cad6aa71942d6842ce6d8d55a26873`. Not committed. Do not push Burooj.
 - [x] Record independent-review P2 follow-ups for Grok 4.6 without blocking the Phase 7A PR. Evidence: [independent review P2 bug backlog](independent-review-p2-backlog.md).
+- [x] Repair the eight recorded P2 items on `grok/phase-7a-p2-repairs` with regressions. Evidence: backlog repair notes; Node 78/383, Brain 9/33, Ingestion 4/11; local gates 2026-08-28. Phase 7B stays closed.
 
 Exit: staging is the release candidate with restore, incident and budget evidence. No real company data. No billing, public signup or required Cloudflare Access.
 

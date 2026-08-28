@@ -8,7 +8,7 @@ The product was previously named Nura RAG Copilot. The product name, package nam
 
 The architecture is finalized in the [Useful Brain production master plan](./docs/useful-brain-master-plan.md). This is a local portfolio product for hiring-manager demonstration: no billing, public signup or required Cloudflare Access.
 
-Phases 0–7A live on `phase-1-through-7a-staging`. Convex remains the live application UI until Phase 7B, which stays closed.
+Phases 0–7A are merged to `main`. Convex remains the live application UI until Phase 7B, which stays closed.
 
 ## Target product
 
