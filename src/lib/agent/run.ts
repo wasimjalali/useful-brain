@@ -113,6 +113,18 @@ export function toolCallsFromMessages(messages: AgentMessage[]): RecordedToolCal
   return recorded;
 }
 
+function assistantTokenTotals(messages: AgentMessage[]): { input: number; output: number } {
+  let input = 0;
+  let output = 0;
+  for (const message of messages) {
+    if (message.role === "assistant") {
+      input += message.usage.input;
+      output += message.usage.output;
+    }
+  }
+  return { input, output };
+}
+
 export async function runKnowledgeAgent(input: {
   question: string;
   pipeline: Pick<KnowledgePipeline, "search">;
@@ -153,6 +165,7 @@ export async function runKnowledgeAgent(input: {
     }),
   ]);
   const allowed = new Set(tools.map((tool) => tool.name));
+  const agentRef: { current?: Agent } = {};
   const agent = new Agent({
     initialState: {
       systemPrompt: [
@@ -225,6 +238,8 @@ export async function runKnowledgeAgent(input: {
       try {
         budgets.assertWithinWallTime();
         budgets.noteTurn();
+        const tokens = assistantTokenTotals(agentRef.current?.state.messages ?? []);
+        budgets.assertTokenTotals(tokens.input, tokens.output);
         return false;
       } catch (error) {
         if (error instanceof BudgetExceededError) {
@@ -249,6 +264,7 @@ export async function runKnowledgeAgent(input: {
       };
     },
   });
+  agentRef.current = agent;
 
   const pending = agent.prompt(input.question);
   const abortNow = () => agent.abort();
@@ -275,11 +291,8 @@ export async function runKnowledgeAgent(input: {
     }
   }
   try {
-    for (const message of agent.state.messages) {
-      if (message.role === "assistant") {
-        budgets.noteTokens(message.usage.input, message.usage.output);
-      }
-    }
+    const tokens = assistantTokenTotals(agent.state.messages);
+    budgets.assertTokenTotals(tokens.input, tokens.output);
   } catch (error) {
     if (error instanceof BudgetExceededError) {
       budgetErrorMessage = error.message;

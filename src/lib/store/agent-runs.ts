@@ -1,3 +1,4 @@
+import { mutatingIdempotencyKey } from "../agent/approvals";
 import { AGENT_BUDGETS } from "../agent/budgets";
 import { approvalsMatch, argumentFingerprint, type ApprovalBinding } from "../agent/policy";
 import { parseBoundedId, parseMutatingIdempotencyKey } from "../cf/bounded-id";
@@ -486,4 +487,63 @@ export async function loadAgentReplay(
         }
       : null,
   };
+}
+
+export async function serverOwnedApprovalBinding(
+  run: StoredAgentRun,
+  now: number,
+): Promise<ApprovalBinding> {
+  const pending = run.toolCalls.filter((call) => call.status === "pending_approval");
+  if (run.status !== "pending_approval" || pending.length !== 1) {
+    throw new Error("agent run is not pending an approval");
+  }
+  const call = pending[0];
+  if (
+    run.approval &&
+    (run.approval.status === "pending" || run.approval.status === "approved")
+  ) {
+    if (
+      run.approval.principalId !== run.principalId ||
+      run.approval.conversationId !== run.conversationId ||
+      run.approval.tool !== call.tool ||
+      run.approval.argumentFingerprint !== call.argumentFingerprint
+    ) {
+      throw new Error("stored approval does not match the pending tool call");
+    }
+    return {
+      principalId: run.approval.principalId,
+      conversationId: run.approval.conversationId,
+      tool: run.approval.tool,
+      argumentFingerprint: run.approval.argumentFingerprint,
+      idempotencyKey: run.approval.idempotencyKey,
+      expiresAt: run.approval.expiresAt,
+    };
+  }
+  return {
+    principalId: run.principalId,
+    conversationId: run.conversationId,
+    tool: call.tool,
+    argumentFingerprint: call.argumentFingerprint,
+    idempotencyKey: await mutatingIdempotencyKey(
+      call.tool,
+      call.normalizedArguments,
+      `${run.principalId}-${run.conversationId}-${run.id}`,
+    ),
+    expiresAt: now + AGENT_BUDGETS.approvalExpiryMs,
+  };
+}
+
+export function clientApprovalMatchesServer(
+  client: ApprovalBinding | undefined,
+  server: ApprovalBinding,
+): boolean {
+  if (!client) {
+    return true;
+  }
+  return (
+    client.principalId === server.principalId &&
+    client.conversationId === server.conversationId &&
+    client.tool === server.tool &&
+    client.argumentFingerprint === server.argumentFingerprint
+  );
 }

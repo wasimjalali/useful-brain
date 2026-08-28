@@ -42,7 +42,7 @@ export class BudgetTracker {
 
   noteTurn(): void {
     this.turns += 1;
-    if (this.turns > AGENT_BUDGETS.maxTurns) {
+    if (this.turns >= AGENT_BUDGETS.maxTurns) {
       throw new BudgetExceededError("TURN_LIMIT", "turn budget exhausted");
     }
   }
@@ -61,9 +61,16 @@ export class BudgetTracker {
   }
 
   noteTokens(input: number, output: number): void {
-    this.inputTokens += input;
-    this.outputTokens += output;
-    if (this.inputTokens > AGENT_BUDGETS.maxInputTokens || this.outputTokens > AGENT_BUDGETS.maxOutputTokens) {
+    this.assertTokenTotals(this.inputTokens + input, this.outputTokens + output);
+  }
+
+  assertTokenTotals(input: number, output: number): void {
+    this.inputTokens = input;
+    this.outputTokens = output;
+    if (
+      this.inputTokens > AGENT_BUDGETS.maxInputTokens ||
+      this.outputTokens > AGENT_BUDGETS.maxOutputTokens
+    ) {
       throw new BudgetExceededError("TOKEN_LIMIT", "token budget exhausted");
     }
   }

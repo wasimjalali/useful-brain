@@ -305,6 +305,30 @@ describe("operations conversation snapshots", () => {
     expect(orphans?.count).toBe(0);
   });
 
+  it("rejects a reused request id when the question does not match the claim", async () => {
+    await seedPrincipals();
+    const first = await createPendingTurn(env.OPERATIONS_DB, {
+      ownerPrincipalId: "principal-alice",
+      requestId: "req-mismatch-1",
+      question: "What is the refund window?",
+      now: 85,
+    });
+    await expect(
+      createPendingTurn(env.OPERATIONS_DB, {
+        ownerPrincipalId: "principal-alice",
+        requestId: "req-mismatch-1",
+        question: "What is the discount policy?",
+        now: 86,
+      }),
+    ).rejects.toThrow(/request payload does not match the claimed request id/);
+    const users = await env.OPERATIONS_DB.prepare(
+      `SELECT content FROM messages WHERE conversation_id = ? AND role = 'user'`,
+    )
+      .bind(first.conversationId)
+      .first<{ content: string }>();
+    expect(users?.content).toBe("What is the refund window?");
+  });
+
   it("replays and bounds history by parent user message when timestamps collide", async () => {
     await seedPrincipals();
     const seed = await createPendingTurn(env.OPERATIONS_DB, {

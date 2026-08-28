@@ -10,6 +10,8 @@ const JSON_COOKIE_RE = /(["'](?:set-cookie|cookie)["']\s*:\s*["'])([^"']+)(["'])
 const SECRET_ASSIGNMENT_RE =
   /\b(api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|password|secret)\b["']?\s*[:=]\s*["']?[^\s"',}]+/gi;
 const AUTHORIZATION_EQUALS_RE = /\bauthorization\b["']?\s*=\s*["']?[^\s"',}]+/gi;
+const SECRET_JSON_KEY_RE =
+  /^(authorization|cookie|set-cookie|api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|password|secret)$/i;
 
 function utf8TrailingSequenceLength(startByte: number): number {
   if (startByte < 0x80) {
@@ -41,6 +43,34 @@ export function boundUtf8Bytes(text: string, maxBytes: number): string {
   return new TextDecoder().decode(bytes.subarray(0, end));
 }
 
+export function redactJsonSecrets(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(redactJsonSecrets);
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, nested]) => [
+        key,
+        SECRET_JSON_KEY_RE.test(key) ? "[REDACTED]" : redactJsonSecrets(nested),
+      ]),
+    );
+  }
+  return value;
+}
+
+function redactPlainTextSecrets(text: string): string {
+  return text
+    .replace(BEARER_RE, "Bearer [REDACTED]")
+    .replace(BASIC_RE, "Authorization: Basic [REDACTED]")
+    .replace(COOKIE_RE, (header) =>
+      header.toLowerCase().startsWith("set-cookie:") ? "Set-Cookie: [REDACTED]" : "Cookie: [REDACTED]",
+    )
+    .replace(JSON_AUTH_SCHEME_RE, "$1$2 [REDACTED]$4")
+    .replace(JSON_COOKIE_RE, "$1[REDACTED]$3")
+    .replace(SECRET_ASSIGNMENT_RE, "$1=[REDACTED]")
+    .replace(AUTHORIZATION_EQUALS_RE, "authorization=[REDACTED]");
+}
+
 export function redactToolResultForStorage(
   text: string,
   maxBytes = AGENT_BUDGETS.maxRedactedToolResultBytes,
@@ -52,15 +82,11 @@ export function redactToolResultForStorage(
       break;
     }
   }
-  const scrubbed = stripped
-    .replace(BEARER_RE, "Bearer [REDACTED]")
-    .replace(BASIC_RE, "Authorization: Basic [REDACTED]")
-    .replace(COOKIE_RE, (header) =>
-      header.toLowerCase().startsWith("set-cookie:") ? "Set-Cookie: [REDACTED]" : "Cookie: [REDACTED]",
-    )
-    .replace(JSON_AUTH_SCHEME_RE, "$1$2 [REDACTED]$4")
-    .replace(JSON_COOKIE_RE, "$1[REDACTED]$3")
-    .replace(SECRET_ASSIGNMENT_RE, "$1=[REDACTED]")
-    .replace(AUTHORIZATION_EQUALS_RE, "authorization=[REDACTED]");
+  let scrubbed = stripped;
+  try {
+    scrubbed = JSON.stringify(redactJsonSecrets(JSON.parse(stripped)));
+  } catch {
+    scrubbed = redactPlainTextSecrets(stripped);
+  }
   return boundUtf8Bytes(scrubbed, maxBytes);
 }

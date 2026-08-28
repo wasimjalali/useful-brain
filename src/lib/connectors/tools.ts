@@ -38,6 +38,21 @@ function toolErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+async function callMcpTool(
+  client: Client,
+  params: { name: string; arguments: Record<string, unknown> },
+  signal?: AbortSignal,
+) {
+  const deadline = toolDeadlineSignal(AGENT_BUDGETS.readToolTimeoutMs, signal);
+  return awaitWithDeadline(
+    client.callTool(params, undefined, {
+      signal: deadline,
+      timeout: AGENT_BUDGETS.readToolTimeoutMs,
+    }),
+    deadline,
+  );
+}
+
 function untrusted(payload: unknown) {
   return {
     content: [{ type: "text" as const, text: `${UNTRUSTED_CONNECTOR_PREFIX}\n${JSON.stringify(payload)}` }],
@@ -160,13 +175,13 @@ export function createMcpLookupTool(input: {
       }
       try {
         input.registry.assertUsable("mcp-northwind", "mcp.read");
-        const deadline = toolDeadlineSignal(AGENT_BUDGETS.readToolTimeoutMs, signal);
-        const result = await awaitWithDeadline(
-          input.client.callTool({
+        const result = await callMcpTool(
+          input.client,
+          {
             name: "northwind_lookup",
             arguments: { ticketId: params.ticketId },
-          }),
-          deadline,
+          },
+          signal,
         );
         const text = toolText(result, AGENT_BUDGETS.maxRawExternalBytes);
         return {
@@ -174,7 +189,8 @@ export function createMcpLookupTool(input: {
           details: { hit: !text.includes("not_found") },
         };
       } catch (error) {
-        const message = error instanceof ConnectorRegistryError ? error.message : "mcp read failed";
+        const message =
+          error instanceof ConnectorRegistryError ? error.message : toolErrorMessage(error, "mcp read failed");
         return { ...untrusted({ error: message }), details: { hit: false } };
       }
     },
@@ -225,13 +241,13 @@ export function createMcpCreateTicketTool(input: {
       try {
         input.registry.assertUsable("mcp-northwind", "mcp.write");
         const created = await input.executor.run(idempotencyKey, async () => {
-          const deadline = toolDeadlineSignal(AGENT_BUDGETS.readToolTimeoutMs, signal);
-          const result = await awaitWithDeadline(
-            input.client.callTool({
+          const result = await callMcpTool(
+            input.client,
+            {
               name: "create_ticket",
               arguments: { title: params.title },
-            }),
-            deadline,
+            },
+            signal,
           );
           return toolText(result, AGENT_BUDGETS.maxRawExternalBytes);
         });
@@ -240,7 +256,10 @@ export function createMcpCreateTicketTool(input: {
           details: { created: true },
         };
       } catch (error) {
-        const message = error instanceof Error ? error.message : "mcp write failed";
+        const message =
+          error instanceof ConnectorRegistryError
+            ? error.message
+            : toolErrorMessage(error, "mcp write failed");
         return { ...untrusted({ error: message }), details: {}, terminate: true };
       }
     },

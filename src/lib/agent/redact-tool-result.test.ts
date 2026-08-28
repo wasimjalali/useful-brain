@@ -11,7 +11,7 @@ describe("persisted tool-result redaction", () => {
       ),
     ).toBe("Authorization: Bearer [REDACTED] authorization=[REDACTED]");
     expect(redactToolResultForStorage('UNTRUSTED_EVIDENCE\n{"api_key":"sk-live-aaaa"}')).toBe(
-      '{"api_key=[REDACTED]"}',
+      '{"api_key":"[REDACTED]"}',
     );
     expect(
       redactToolResultForStorage(
@@ -22,12 +22,17 @@ describe("persisted tool-result redaction", () => {
       redactToolResultForStorage(
         '{"Authorization":"Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==","Cookie":"session=portfolio-secret"}',
       ),
-    ).toBe('{"Authorization":"Basic [REDACTED]","Cookie":"[REDACTED]"}');
+    ).toBe('{"Authorization":"[REDACTED]","Cookie":"[REDACTED]"}');
     expect(
       redactToolResultForStorage(
         '{"authorization": "Bearer supersecret.token", "Set-Cookie": "sid=abc"}',
       ),
-    ).toBe('{"authorization": "Bearer [REDACTED]", "Set-Cookie": "[REDACTED]"}');
+    ).toBe('{"authorization":"[REDACTED]","Set-Cookie":"[REDACTED]"}');
+    expect(
+      redactToolResultForStorage(
+        '{"Authorization":"ApiKey top-secret","nested":{"password":"correct horse battery"}}',
+      ),
+    ).toBe('{"Authorization":"[REDACTED]","nested":{"password":"[REDACTED]"}}');
   });
 
   it("bounds storage by UTF-8 bytes rather than JS string length", () => {

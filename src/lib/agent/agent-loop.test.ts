@@ -193,11 +193,20 @@ describe("policy gateway", () => {
 describe("budgets", () => {
   it("stops after the turn limit", () => {
     const budgets = new BudgetTracker();
-    expect(() => {
-      for (let i = 0; i < 9; i += 1) {
-        budgets.noteTurn();
-      }
-    }).toThrow(BudgetExceededError);
+    for (let i = 0; i < AGENT_BUDGETS.maxTurns - 1; i += 1) {
+      budgets.noteTurn();
+    }
+    expect(budgets.turns).toBe(AGENT_BUDGETS.maxTurns - 1);
+    expect(() => budgets.noteTurn()).toThrow(BudgetExceededError);
+    expect(budgets.turns).toBe(AGENT_BUDGETS.maxTurns);
+  });
+
+  it("stops when cumulative token totals exceed the budget before the next turn", () => {
+    const budgets = new BudgetTracker();
+    budgets.assertTokenTotals(AGENT_BUDGETS.maxInputTokens, 1);
+    expect(() => budgets.assertTokenTotals(AGENT_BUDGETS.maxInputTokens + 1, 1)).toThrow(
+      /token budget exhausted/,
+    );
   });
 
   it("counts every native HTTP MCP plugin mutating and search tool once", () => {

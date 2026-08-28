@@ -23,6 +23,14 @@ export type HistoryMessageRow = {
 
 export function pairCompletedHistoryTurns(rows: HistoryMessageRow[]): StoredHistoryTurn[] {
   const byId = new Map(rows.map((row) => [row.id, row]));
+  const reservedParentIds = new Set(
+    rows
+      .filter(
+        (row) =>
+          row.role === "assistant" && row.status === "completed" && row.parent_user_message_id,
+      )
+      .map((row) => row.parent_user_message_id as string),
+  );
   const usedUserIds = new Set<string>();
   const pendingUsers: HistoryMessageRow[] = [];
   const turns: StoredHistoryTurn[] = [];
@@ -43,7 +51,10 @@ export function pairCompletedHistoryTurns(rows: HistoryMessageRow[]): StoredHist
       turns.push({ question: parent.content, answer: row.content });
       continue;
     }
-    while (pendingUsers.length > 0 && usedUserIds.has(pendingUsers[0].id)) {
+    while (
+      pendingUsers.length > 0 &&
+      (usedUserIds.has(pendingUsers[0].id) || reservedParentIds.has(pendingUsers[0].id))
+    ) {
       pendingUsers.shift();
     }
     const user = pendingUsers.shift();
@@ -187,7 +198,12 @@ type RequestIdClaim = {
   user_message_id: string;
   assistant_message_id: string;
   owner_principal_id: string;
+  payload_digest: string | null;
 };
+
+async function requestPayloadDigest(question: string): Promise<string> {
+  return sha256Hex(question);
+}
 
 async function loadRequestIdClaim(
   db: OperationsDatabase,
@@ -195,11 +211,27 @@ async function loadRequestIdClaim(
 ): Promise<RequestIdClaim | null> {
   return db
     .prepare(
-      `SELECT request_id, conversation_id, user_message_id, assistant_message_id, owner_principal_id
+      `SELECT request_id, conversation_id, user_message_id, assistant_message_id,
+              owner_principal_id, payload_digest
        FROM request_id_claims WHERE request_id = ?`,
     )
     .bind(requestId)
     .first<RequestIdClaim>();
+}
+
+function assertClaimCompatible(
+  claim: RequestIdClaim,
+  input: { ownerPrincipalId: string; payloadDigest: string; conversationId?: string },
+): void {
+  if (claim.owner_principal_id !== input.ownerPrincipalId) {
+    throw new ConversationStoreError("FORBIDDEN");
+  }
+  if (claim.payload_digest && claim.payload_digest !== input.payloadDigest) {
+    throw new ConversationStoreError("request payload does not match the claimed request id");
+  }
+  if (input.conversationId && input.conversationId !== claim.conversation_id) {
+    throw new ConversationStoreError("request payload does not match the claimed request id");
+  }
 }
 
 async function materializeClaimedTurn(
@@ -260,6 +292,7 @@ export async function createPendingTurn(
 ): Promise<{ conversationId: string; assistantMessageId: string; duplicate: boolean }> {
   const ownerPrincipalId = parseBoundedId(input.ownerPrincipalId, "principal id");
   const requestId = parseBoundedId(input.requestId, "request id");
+  const payloadDigest = await requestPayloadDigest(input.question);
   const duplicate = await db
     .prepare(
       `SELECT id, conversation_id, status FROM messages WHERE request_id = ? AND role = 'assistant'`,
@@ -268,6 +301,14 @@ export async function createPendingTurn(
     .first<{ id: string; conversation_id: string; status: string }>();
   if (duplicate) {
     await assertConversationOwner(db, duplicate.conversation_id, ownerPrincipalId);
+    const claim = await loadRequestIdClaim(db, requestId);
+    if (claim) {
+      assertClaimCompatible(claim, {
+        ownerPrincipalId,
+        payloadDigest,
+        conversationId: input.conversationId,
+      });
+    }
     return {
       conversationId: duplicate.conversation_id,
       assistantMessageId: duplicate.id,
@@ -277,9 +318,11 @@ export async function createPendingTurn(
 
   const existingClaim = await loadRequestIdClaim(db, requestId);
   if (existingClaim) {
-    if (existingClaim.owner_principal_id !== ownerPrincipalId) {
-      throw new ConversationStoreError("FORBIDDEN");
-    }
+    assertClaimCompatible(existingClaim, {
+      ownerPrincipalId,
+      payloadDigest,
+      conversationId: input.conversationId,
+    });
     try {
       await materializeClaimedTurn(db, existingClaim, input);
     } catch (error) {
@@ -307,19 +350,30 @@ export async function createPendingTurn(
   await db
     .prepare(
       `INSERT INTO request_id_claims (
-         request_id, conversation_id, user_message_id, assistant_message_id, owner_principal_id, created_at
-       ) VALUES (?, ?, ?, ?, ?, ?)
+         request_id, conversation_id, user_message_id, assistant_message_id,
+         owner_principal_id, created_at, payload_digest
+       ) VALUES (?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(request_id) DO NOTHING`,
     )
-    .bind(requestId, conversationId, userId, assistantMessageId, ownerPrincipalId, input.now)
+    .bind(
+      requestId,
+      conversationId,
+      userId,
+      assistantMessageId,
+      ownerPrincipalId,
+      input.now,
+      payloadDigest,
+    )
     .run();
   const winner = await loadRequestIdClaim(db, requestId);
   if (!winner) {
     throw new ConversationStoreError("request id claim is missing");
   }
-  if (winner.owner_principal_id !== ownerPrincipalId) {
-    throw new ConversationStoreError("FORBIDDEN");
-  }
+  assertClaimCompatible(winner, {
+    ownerPrincipalId,
+    payloadDigest,
+    conversationId: input.conversationId,
+  });
   try {
     await materializeClaimedTurn(db, winner, input);
   } catch (error) {

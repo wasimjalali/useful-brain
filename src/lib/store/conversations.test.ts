@@ -62,6 +62,44 @@ describe("conversation helpers", () => {
     ]);
   });
 
+  it("does not let a null-parent assistant consume a later parent-linked user", () => {
+    expect(
+      pairCompletedHistoryTurns([
+        {
+          id: "u-linked",
+          role: "user",
+          content: "linked question",
+          status: "completed",
+          parent_user_message_id: null,
+        },
+        {
+          id: "u-legacy",
+          role: "user",
+          content: "legacy question",
+          status: "completed",
+          parent_user_message_id: null,
+        },
+        {
+          id: "a-legacy",
+          role: "assistant",
+          content: "legacy answer",
+          status: "completed",
+          parent_user_message_id: null,
+        },
+        {
+          id: "a-linked",
+          role: "assistant",
+          content: "linked answer",
+          status: "completed",
+          parent_user_message_id: "u-linked",
+        },
+      ]),
+    ).toEqual([
+      { question: "legacy question", answer: "legacy answer" },
+      { question: "linked question", answer: "linked answer" },
+    ]);
+  });
+
   it("persists durable state before releasing the run lock", async () => {
     const order: string[] = [];
     const evidence = addCitationLabels([
