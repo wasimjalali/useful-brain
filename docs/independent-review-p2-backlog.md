@@ -4,7 +4,7 @@ Status: repaired on `grok/phase-7a-p2-repairs`. Owner: Grok 4.6 xhigh. Sources: 
 
 These findings were real correctness or durability bugs, but none was a confirmed P0/P1 or high/critical security blocker for the synthetic Phase 7A release candidate. Historical findings below are preserved. Each item now records its regression, fix and verification. Phase 7B stays closed.
 
-Local proof for this repair (2026-08-28, Node `v22.22.2`): `npx tsc --noEmit` exit 0; `npm run typecheck:workers` exit 0; `npm run lint` exit 0; Node Vitest 78 files / 383 tests passed; Brain workerd 9 files / 33 tests passed; Ingestion workerd 4 files / 11 tests passed; `npm run build` Next 16.3.3 exit 0; `npm run build:cf` OpenNext 1.20.3 exit 0; wrangler 4.126.0 `--dry-run --env staging` web gzip 1608.06 KiB (`IDENTITY_MODE=disabled`, `LOOPBACK_RUNTIME=false`), brain gzip 13.67 KiB, ingestion gzip 9.68 KiB; `npm audit --omit=dev --audit-level=high` 0 vulnerabilities.
+Local proof for this repair (2026-08-28, Node `v22.22.2`): `npx tsc --noEmit` exit 0; `npm run typecheck:workers` exit 0; `npm run lint` exit 0; Node Vitest 80 files / 391 tests passed; Brain workerd 9 files / 35 tests passed; Ingestion workerd 4 files / 11 tests passed; `npm run build` Next 16.3.3 exit 0; `npm run build:cf` OpenNext 1.20.3 exit 0; wrangler 4.126.0 `--dry-run --env staging` web gzip 1608.06 KiB (`IDENTITY_MODE=disabled`, `LOOPBACK_RUNTIME=false`), brain gzip 14.01 KiB, ingestion gzip 9.68 KiB; `npm audit --omit=dev --audit-level=high` 0 vulnerabilities.
 
 ## P2-1: total tool-call budget misses non-search tools
 
@@ -94,9 +94,49 @@ Local proof for this repair (2026-08-28, Node `v22.22.2`): `npx tsc --noEmit` ex
 - Regression: `workers/brain/test/conversations-d1.test.ts` replay asserts `documentId`, `chunkId`, text, `[1]`, `corpusGenerationId` and owner-scoped load.
 - Verification: Brain workerd conversation tests passed.
 
+## Follow-up P2s from independent Sol xhigh review (after the eight repairs)
+
+Independent GPT-5.6 Sol xhigh review of PR #14 (Cursor Task `bc-ec42973e-79b3-528e-badc-3ee89ae34f70`) confirmed four more in-plan P2s. Codex CLI `codex review --base origin/main` could not complete: first session `01a0490c-f75d-7810-8ff3-55a5e26c2b24` died on sandbox `EPERM` listen, retry session `01a04918-4433-75c0-87d4-febe4b0061b3` returned workspace out of credits. Sol xhigh is the designated independent reviewer in `AGENTS.md`.
+
+### P2-9: approval resume reconciliation was not invoked after DLQ exhaustion
+
+- Location: `workers/brain/wrangler.jsonc` DLQ consumers; `workers/brain/src/index.ts` queue handler; `workers/brain/src/approval-resume.ts` list/replay helpers.
+- Cause: the DLQ consumer has three retries and no further DLQ. `replayRecoverableApprovalResumes` existed but was not called from a scheduled handler, queue path or operator command. After eight failed deliveries Cloudflare discards the message while D1 still has `approved` + `pending_approval`.
+- Contract: `docs/useful-brain-master-plan.md:285` requires one durable deterministic resume after approval.
+- Repair: `enqueueRecoverableApprovalResumes` re-enqueues identifier-only `{ runId, idempotencyKey }` payloads from D1. Brain `scheduled()` calls it. Loopback and staging wrangler set `triggers.crons` to `*/5 * * * *`. Production `crons` is `[]` so this PR does not provision a production cron. Resume stays idempotent.
+- Regression: `src/lib/cf/wrangler-config.test.ts` cron assertions; `workers/brain/test/approval-resume.test.ts` enqueue + `scheduled` + consume without a second effect.
+- Verification: Brain workerd approval-resume tests passed.
+
+### P2-10: model and read-tool timeouts were unused
+
+- Location: `src/lib/agent/budgets.ts`; `src/lib/agent/run.ts`; `src/lib/connectors/http-allowlist.ts`; `src/lib/connectors/tools.ts`; `src/lib/agent/search-knowledge.ts`.
+- Cause: `modelTimeoutMs` and `readToolTimeoutMs` were constants only. Wall time was checked before a tool call. HTTP fetch did not receive the agent abort signal.
+- Contract: `docs/useful-brain-master-plan.md:331` (60s model timeout, 10s read-tool timeout, 90s wall time).
+- Repair: `toolDeadlineSignal` / `awaitWithDeadline`. Model stream uses a 60s deadline. Search, HTTP and MCP reads use a 10s deadline plus the agent signal. `fetchAllowlistedSource` forwards `AbortSignal`. `afterToolCall` re-checks wall time.
+- Regression: `src/lib/agent/deadlines.test.ts`; `src/lib/connectors/http-allowlist.test.ts` hung fetch; `src/lib/connectors/phase6.test.ts` hung HTTP read.
+- Verification: focused Node Vitest passed.
+
+### P2-11: persisted tool results were raw and counted JS string length
+
+- Location: `src/lib/agent/run.ts` `toolCallsFromMessages`; `src/lib/store/agent-runs.ts`.
+- Cause: storage used the untrusted tool text with `.slice` by UTF-16 code units. `afterToolCall`'s `details.redacted` was not what persistence wrote. A bearer token in an HTTP or MCP payload landed in `tool_calls.redacted_result`. 32,768 CJK code units are 98,304 UTF-8 bytes.
+- Contract: `AGENTS.md:74` and `docs/useful-brain-master-plan.md:331` (32 KiB persisted redacted tool results; no secrets in ordinary D1 rows).
+- Repair: `redactToolResultForStorage` strips untrusted prefixes, scrubs bearer tokens and secret assignments, then truncates on UTF-8 byte boundaries. `toolCallsFromMessages` persists that value.
+- Regression: `src/lib/agent/redact-tool-result.test.ts`; `src/lib/agent/agent-loop.test.ts` secret-bearing plugin result.
+- Verification: focused Node Vitest passed.
+
+### P2-12: timestamp ties swapped questions and answers
+
+- Location: `src/lib/store/conversations.ts` `loadReplay` and `loadBoundedHistory`.
+- Cause: pairing used only `created_at`. Two user rows at the same timestamp and two assistant rows at timestamp+1 ordered as user, user, assistant, assistant and attached the wrong question.
+- Contract: `AGENTS.md:63` and `docs/useful-brain-master-plan.md:54` replayable conversation snapshots.
+- Repair: operations migration `0007_parent_user_message.sql`. `materializeClaimedTurn` stores `parent_user_message_id` on the assistant row. Replay and bounded history join on that parent. Local workerd only until `0007` is applied to staging operations D1.
+- Regression: `workers/brain/test/conversations-d1.test.ts` concurrent same-timestamp turns.
+- Verification: Brain workerd conversation tests passed.
+
 ## Adversarial review of remaining Phase 1–7A (after the eight repairs)
 
-Confirmed in-plan defects found in this pass: none beyond the eight backlog items above.
+Confirmed in-plan defects from the Grok pass: none beyond the original eight. Confirmed in-plan defects from the independent Sol xhigh pass: P2-9 through P2-12 above, now repaired.
 
 Rejected false positives:
 
@@ -114,5 +154,5 @@ For each follow-up repair:
 2. Run the focused regression.
 3. Run `npx tsc --noEmit`, `npm run typecheck:workers`, `npm run lint`, `npm test` and `npm run build` with Node `22.22.2`.
 4. Run staging dry-runs for web, Brain and ingestion plus `npm audit --omit=dev --audit-level=high`.
-5. Run `codex review --base origin/main` and fix confirmed P0/P1 or high/critical findings.
+5. Independent review is `codex review --base origin/main`. If Codex CLI is out of credits, GPT-5.6 Sol xhigh via a fresh independent process is the substitute designated reviewer. Fix confirmed P0/P1 or high/critical findings.
 6. Use a new branch and PR. Do not start Phase 7B, apply real company data, create production resources, delete Convex or delete Burooj.
