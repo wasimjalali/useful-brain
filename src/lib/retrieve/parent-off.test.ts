@@ -23,9 +23,18 @@ describe("locked retrieval fingerprint", () => {
       rerankCandidates: 20,
       reranker: "@cf/baai/bge-reranker-base",
       relevanceFloor: 0.05,
+      ftsMatchStrategy: "stopword-or-v1",
     });
+    expect(FAKE_PROVIDER_FINGERPRINT.maxTokens).toBe(500);
+    expect(FAKE_PROVIDER_FINGERPRINT.overlapTokens).toBe(50);
     expect(FAKE_PROVIDER_FINGERPRINT.vectorWeight).toBe(0.2);
     expect(FAKE_PROVIDER_FINGERPRINT.keywordWeight).toBe(0.8);
+    expect(fingerprintId(FAKE_PROVIDER_FINGERPRINT)).toContain("500/50");
+    expect(fingerprintId(FAKE_PROVIDER_FINGERPRINT)).toContain("0.20/0.80");
+    expect(fingerprintId(REAL_STACK_FINGERPRINT)).toContain("300/30");
+    expect(fingerprintId(REAL_STACK_FINGERPRINT)).toContain("0.70/0.30");
+    expect(fingerprintId(FAKE_PROVIDER_FINGERPRINT)).toContain("fts-stopword-or-v1");
+    expect(fingerprintId(REAL_STACK_FINGERPRINT)).toContain("fts-stopword-or-v1");
     expect(fingerprintId(REAL_STACK_FINGERPRINT)).not.toBe(fingerprintId(FAKE_PROVIDER_FINGERPRINT));
   });
 });

@@ -101,4 +101,102 @@ describe("external-content FTS5", () => {
     expect(afterDeniedInsert.results.map((row) => row.chunk_id)).toEqual(["doc__body__000"]);
     expect(afterDeniedInsert.results[0]?.rank).toBe(allowedRank);
   });
+
+  it("selects stronger BM25 matches before the chunk-id window and hides the store rank", async () => {
+    await env.CORPUS_DB.prepare(
+      "INSERT INTO corpus_generations (id, state, created_at, updated_at) VALUES (?, 'draft', ?, ?)",
+    )
+      .bind("gen-fts-order", 1, 1)
+      .run();
+    const { sql, params } = aclSqlAndParams({
+      userId: "eng_ic",
+      roles: ["standard"],
+      departments: ["engineering"],
+    });
+    const now = 3;
+    const weakIds = ["chunk-aaa", "chunk-bbb", "chunk-ccc", "chunk-ddd", "chunk-eee"];
+    for (const [index, chunkId] of weakIds.entries()) {
+      await env.CORPUS_DB.prepare(UPSERT_CHUNK_SQL).bind(
+        chunkId,
+        "doc-order",
+        "ver-1",
+        "gen-fts-order",
+        "Body",
+        index,
+        "refund",
+        0,
+        6,
+        `${"d".repeat(62)}o${index}`,
+        `${"v".repeat(38)}o${index}`,
+        "a".repeat(32),
+        "public",
+        "[]",
+        "[]",
+        "{}",
+        now,
+      ).run();
+    }
+    await env.CORPUS_DB.prepare(UPSERT_CHUNK_SQL).bind(
+      "chunk-zzz",
+      "doc-order",
+      "ver-1",
+      "gen-fts-order",
+      "Body",
+      9,
+      "refund refund refund refund refund refund refund refund",
+      0,
+      55,
+      "e".repeat(63) + "z",
+      "w".repeat(39) + "z",
+      "a".repeat(32),
+      "public",
+      "[]",
+      "[]",
+      "{}",
+      now,
+    ).run();
+    const rows = await env.CORPUS_DB.prepare(keywordSearchSql(sql))
+      .bind(fts5MatchQuery("refund"), "gen-fts-order", ...params, 3)
+      .all<{ chunk_id: string; rank: number }>();
+    expect(rows.results.map((row) => row.chunk_id)).toContain("chunk-zzz");
+    expect(rows.results[0]?.chunk_id).toBe("chunk-zzz");
+    expect(rows.results.every((row) => row.rank === 0)).toBe(true);
+  });
+
+  it("keeps natural-language questions on refund content without requiring question words", async () => {
+    await env.CORPUS_DB.prepare(
+      "INSERT INTO corpus_generations (id, state, created_at, updated_at) VALUES (?, 'draft', ?, ?)",
+    )
+      .bind("gen-fts-nl", 1, 1)
+      .run();
+    await env.CORPUS_DB.prepare(UPSERT_CHUNK_SQL).bind(
+      "refund__body__000",
+      "refund",
+      "ver-1",
+      "gen-fts-nl",
+      "Returns",
+      0,
+      "Customers may request a refund within 30 days.",
+      0,
+      47,
+      "f".repeat(64),
+      "x".repeat(40),
+      "a".repeat(32),
+      "public",
+      "[]",
+      "[]",
+      "{}",
+      4,
+    ).run();
+    const { sql, params } = aclSqlAndParams({
+      userId: "eng_ic",
+      roles: ["standard"],
+      departments: ["engineering"],
+    });
+    const rows = await env.CORPUS_DB.prepare(keywordSearchSql(sql))
+      .bind(fts5MatchQuery("What is the refund window?"), "gen-fts-nl", ...params, 6)
+      .all<{ chunk_id: string; rank: number }>();
+    expect(rows.results.map((row) => row.chunk_id)).toEqual(["refund__body__000"]);
+    expect(rows.results[0]?.rank).toBe(0);
+  });
 });
