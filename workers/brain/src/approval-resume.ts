@@ -26,13 +26,15 @@ export function parseApprovalResumeMessage(value: unknown): ApprovalResumeMessag
   };
 }
 
+const DURABLE_RESUME_TOOLS = new Set(["create_draft", "action_sink_write", "mcp_create_ticket"]);
+
 function assertSupportedArguments(tool: string, value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("approved tool arguments are invalid");
   }
   const args = value as Record<string, unknown>;
   if (
-    (tool !== "create_draft" && tool !== "action_sink_write") ||
+    !DURABLE_RESUME_TOOLS.has(tool) ||
     Object.keys(args).length !== 1 ||
     typeof args.title !== "string" ||
     args.title.length === 0
@@ -128,4 +130,42 @@ export async function resumeApprovedAgentRun(
       .bind(now, runId),
   ]);
   return { resumed: true };
+}
+
+export async function listRecoverableApprovalResumes(
+  db: OperationsDatabase,
+  limit = 20,
+): Promise<ApprovalResumeMessage[]> {
+  const bounded = Math.max(1, Math.min(limit, 20));
+  const rows = await db
+    .prepare(
+      `SELECT a.run_id AS run_id, a.idempotency_key AS idempotency_key
+       FROM approvals a
+       JOIN agent_runs r ON r.id = a.run_id
+       WHERE a.status = 'approved'
+         AND r.status = 'pending_approval'
+         AND a.run_id IS NOT NULL
+       ORDER BY a.created_at ASC
+       LIMIT ?`,
+    )
+    .bind(bounded)
+    .all<{ run_id: string; idempotency_key: string }>();
+  return rows.results.map((row) =>
+    parseApprovalResumeMessage({
+      runId: row.run_id,
+      idempotencyKey: row.idempotency_key,
+    }),
+  );
+}
+
+export async function replayRecoverableApprovalResumes(
+  db: OperationsDatabase,
+  enqueue: (message: ApprovalResumeMessage) => Promise<void>,
+  limit = 20,
+): Promise<{ enqueued: number }> {
+  const messages = await listRecoverableApprovalResumes(db, limit);
+  for (const message of messages) {
+    await enqueue(message);
+  }
+  return { enqueued: messages.length };
 }

@@ -55,6 +55,34 @@ describe("protected Worker configuration", () => {
     }
   });
 
+  it("gives every approval-resume consumer a dedicated dead-letter queue", () => {
+    const config = readJsonc("workers/brain/wrangler.jsonc");
+    const inspect = (target: Record<string, unknown>) => {
+      const queues = target.queues as {
+        consumers?: Array<{ queue: string; dead_letter_queue?: string }>;
+      };
+      const consumers = queues.consumers ?? [];
+      const primary = consumers.filter(
+        (consumer) =>
+          consumer.queue.includes("approval-resume") && !consumer.queue.includes("dlq"),
+      );
+      expect(primary.length).toBeGreaterThan(0);
+      for (const consumer of primary) {
+        expect(consumer.dead_letter_queue).toMatch(/^useful-brain-approval-resume-dlq-/);
+        expect(consumer.dead_letter_queue).not.toBe(consumer.queue);
+      }
+      const deadLetters = consumers.filter((consumer) =>
+        consumer.queue.includes("approval-resume-dlq"),
+      );
+      expect(deadLetters).toHaveLength(primary.length);
+    };
+    inspect(config);
+    const environments = config.env as Record<string, Record<string, unknown>>;
+    for (const name of ["development", "staging", "production"]) {
+      inspect(environments[name]);
+    }
+  });
+
   it("exposes only staging Web on workers.dev and keeps loopback off that URL", () => {
     const config = readJsonc("wrangler.jsonc");
     expectInternalWorker(config);

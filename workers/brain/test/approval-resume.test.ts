@@ -15,10 +15,18 @@ import {
   upsertApproval,
 } from "../../../src/lib/store/agent-runs";
 import { createPendingTurn } from "../../../src/lib/store/conversations";
+import {
+  listRecoverableApprovalResumes,
+  parseApprovalResumeMessage,
+  replayRecoverableApprovalResumes,
+} from "../src/approval-resume";
 import worker from "../src";
 import { seedPrincipals } from "./seed";
 
-async function approvedRun(suffix: string): Promise<{
+async function approvedRun(
+  suffix: string,
+  tool: "create_draft" | "mcp_create_ticket" = "create_draft",
+): Promise<{
   runId: string;
   binding: ApprovalBinding;
 }> {
@@ -43,7 +51,7 @@ async function approvedRun(suffix: string): Promise<{
     runId,
     status: "pending_approval",
     toolCalls: [{
-      tool: "create_draft",
+      tool,
       argumentFingerprint: argumentFingerprint({ title: "alpha" }),
       normalizedArguments: { title: "alpha" },
       redactedResult: "pending_approval",
@@ -54,7 +62,7 @@ async function approvedRun(suffix: string): Promise<{
   const binding: ApprovalBinding = {
     principalId: "principal-alice",
     conversationId: pending.conversationId,
-    tool: "create_draft",
+    tool,
     argumentFingerprint: argumentFingerprint({ title: "alpha" }),
     idempotencyKey: `resume-${suffix}`,
     expiresAt: Date.now() + 60_000,
@@ -129,5 +137,83 @@ describe("approval resume queue", () => {
       "SELECT COUNT(*) AS count FROM synthetic_mutating_effects WHERE idempotency_key = ?",
     ).bind(binding.idempotencyKey).first<{ count: number }>();
     expect(effect?.count).toBe(0);
+  });
+
+  it("reconstructs an approved mcp_create_ticket exactly once", async () => {
+    const { runId, binding } = await approvedRun("mcp", "mcp_create_ticket");
+    const first = createMessageBatch("useful-brain-approval-resume-development", [{
+      id: "resume-msg-mcp-1",
+      timestamp: new Date(),
+      attempts: 1,
+      body: { runId, idempotencyKey: binding.idempotencyKey },
+    }]);
+    const second = createMessageBatch("useful-brain-approval-resume-dlq-development", [{
+      id: "resume-msg-mcp-2",
+      timestamp: new Date(),
+      attempts: 6,
+      body: { runId, idempotencyKey: binding.idempotencyKey },
+    }]);
+    const ctx = createExecutionContext();
+    await worker.queue(first, env, ctx);
+    await worker.queue(second, env, ctx);
+    expect((await getQueueResult(first, ctx)).explicitAcks).toEqual(["resume-msg-mcp-1"]);
+    expect((await getQueueResult(second, ctx)).explicitAcks).toEqual(["resume-msg-mcp-2"]);
+    const effect = await env.OPERATIONS_DB.prepare(
+      `SELECT COUNT(*) AS count, tool, normalized_arguments_json
+       FROM synthetic_mutating_effects WHERE idempotency_key = ?`,
+    ).bind(binding.idempotencyKey).first<{
+      count: number;
+      tool: string;
+      normalized_arguments_json: string;
+    }>();
+    expect(effect).toMatchObject({
+      count: 1,
+      tool: "mcp_create_ticket",
+      normalized_arguments_json: '{"title":"alpha"}',
+    });
+    const run = await env.OPERATIONS_DB.prepare(
+      "SELECT status FROM agent_runs WHERE id = ?",
+    ).bind(runId).first<{ status: string }>();
+    expect(run?.status).toBe("completed");
+  });
+
+  it("replays identifier-only recoverable approvals without repeating a completed effect", async () => {
+    const { runId, binding } = await approvedRun("dlq");
+    const listed = await listRecoverableApprovalResumes(env.OPERATIONS_DB);
+    const mine = listed.find((message) => message.runId === runId);
+    expect(mine).toEqual(parseApprovalResumeMessage({
+      runId,
+      idempotencyKey: binding.idempotencyKey,
+    }));
+    expect(Object.keys(mine ?? {})).toEqual(["runId", "idempotencyKey"]);
+    const targeted: Array<{ runId: string; idempotencyKey: string }> = [];
+    await replayRecoverableApprovalResumes(env.OPERATIONS_DB, async (message) => {
+      if (message.runId === runId) {
+        targeted.push(message);
+      }
+    });
+    expect(targeted).toEqual([{ runId, idempotencyKey: binding.idempotencyKey }]);
+    const batch = createMessageBatch("useful-brain-approval-resume-dlq-development", [{
+      id: "resume-msg-dlq",
+      timestamp: new Date(),
+      attempts: 6,
+      body: targeted[0],
+    }]);
+    const ctx = createExecutionContext();
+    await worker.queue(batch, env, ctx);
+    expect((await getQueueResult(batch, ctx)).explicitAcks).toEqual(["resume-msg-dlq"]);
+    const remaining = await listRecoverableApprovalResumes(env.OPERATIONS_DB);
+    expect(remaining.some((message) => message.runId === runId)).toBe(false);
+    const after: Array<{ runId: string }> = [];
+    await replayRecoverableApprovalResumes(env.OPERATIONS_DB, async (message) => {
+      if (message.runId === runId) {
+        after.push(message);
+      }
+    });
+    expect(after).toEqual([]);
+    const effect = await env.OPERATIONS_DB.prepare(
+      "SELECT COUNT(*) AS count FROM synthetic_mutating_effects WHERE idempotency_key = ?",
+    ).bind(binding.idempotencyKey).first<{ count: number }>();
+    expect(effect?.count).toBe(1);
   });
 });
