@@ -4,7 +4,7 @@ Status: repaired on `grok/phase-7a-p2-repairs`. Owner: Grok 4.6 xhigh. Sources: 
 
 These findings were real correctness or durability bugs, but none was a confirmed P0/P1 or high/critical security blocker for the synthetic Phase 7A release candidate. Historical findings below are preserved. Each item now records its regression, fix and verification. Phase 7B stays closed.
 
-Local proof for this repair (2026-08-28, Node `v22.22.2`): `npx tsc --noEmit` exit 0; `npm run typecheck:workers` exit 0; `npm run lint` exit 0; Node Vitest 80 files / 393 tests passed; Brain workerd 9 files / 38 tests passed; Ingestion workerd 4 files / 11 tests passed; `npm run build` Next 16.3.3 exit 0; `npm run build:cf` OpenNext 1.20.3 exit 0; wrangler 4.126.0 `--dry-run --env staging` web gzip 1608.06 KiB (`IDENTITY_MODE=disabled`, `LOOPBACK_RUNTIME=false`), brain gzip 14.52 KiB, ingestion gzip 9.68 KiB; `npm audit --omit=dev --audit-level=high` 0 vulnerabilities.
+Local proof for this repair (2026-08-28, Node `v22.22.2`): `npx tsc --noEmit` exit 0; `npm run typecheck:workers` exit 0; `npm run lint` exit 0; Node Vitest 80 files / 396 tests passed; Brain workerd 10 files / 41 tests passed; Ingestion workerd 4 files / 11 tests passed; `npm run build` Next 16.3.3 exit 0; `npm run build:cf` OpenNext 1.20.3 exit 0; wrangler 4.126.0 `--dry-run --env staging` web gzip 1608.07 KiB (`IDENTITY_MODE=disabled`, `LOOPBACK_RUNTIME=false`), brain gzip 15.09 KiB, ingestion gzip 9.68 KiB; `npm audit --omit=dev --audit-level=high` 0 vulnerabilities.
 
 ## P2-1: total tool-call budget misses non-search tools
 
@@ -163,8 +163,8 @@ Independent GPT-5.6 Sol xhigh review of PR #14 (Cursor Task `bc-ec42973e-79b3-52
 - Location: `src/lib/agent/redact-tool-result.ts`.
 - Cause: header regexes required `Authorization:` / `Cookie:` form. `{"Authorization":"Basic ..."}` and `{"Cookie":"..."}` in persisted tool JSON were stored verbatim.
 - Contract: `AGENTS.md:74` and `docs/useful-brain-master-plan.md:331` (no secrets in ordinary D1 rows).
-- Repair: JSON object-key forms for Authorization Bearer/Basic/Token and Cookie / Set-Cookie are replaced with `[REDACTED]` before UTF-8 bounding.
-- Regression: `src/lib/agent/redact-tool-result.test.ts` JSON Basic + Cookie and spaced Bearer + Set-Cookie objects.
+- Repair: parseable JSON is walked and sensitive keys (`authorization`, `cookie`, `password`, `api_key`, and the existing secret-name set) are replaced with `[REDACTED]`, including nested objects and non-Bearer schemes such as `ApiKey`. Non-JSON text still uses header and assignment regexes, then UTF-8 bounding.
+- Regression: `src/lib/agent/redact-tool-result.test.ts` JSON Basic + Cookie, spaced Bearer + Set-Cookie, `ApiKey`, and a nested multiword password.
 - Verification: focused Node Vitest passed.
 
 ### P2-17: resume writes were not conditional on still-approved state
@@ -181,13 +181,45 @@ Independent GPT-5.6 Sol xhigh review of PR #14 (Cursor Task `bc-ec42973e-79b3-52
 - Location: `src/lib/store/conversations.ts` `loadBoundedHistory`.
 - Cause: pairing required `parent_user_message_id`. Migration `0007` does not backfill. Pre-migration completed assistants were skipped, so bounded history dropped those turns. `loadReplay` already fell back to `created_at`.
 - Contract: `AGENTS.md:63` and `docs/useful-brain-master-plan.md:54` replayable conversation snapshots.
-- Repair: `pairCompletedHistoryTurns` uses parent IDs when present and sequential pairing only for null-parent assistants. Parent-linked users are not reused. No correlated timestamp UPDATE in `0007`.
-- Regression: Node `src/lib/store/conversations.test.ts` mixed legacy + linked rows; Brain `workers/brain/test/conversations-d1.test.ts` inserts a completed assistant with `parent_user_message_id` NULL and still returns the turn beside a parented turn.
+- Repair: `pairCompletedHistoryTurns` uses parent IDs when present and sequential pairing only for null-parent assistants. Linked parent IDs are reserved before sequential fallback so a null-parent assistant cannot consume a later parent-linked user. No correlated timestamp UPDATE in `0007`.
+- Regression: Node `src/lib/store/conversations.test.ts` mixed legacy + linked rows and tied ordering where both users precede a null-parent assistant. Brain `workers/brain/test/conversations-d1.test.ts` inserts a completed assistant with `parent_user_message_id` NULL and still returns the turn beside a parented turn.
 - Verification: focused Node Vitest and Brain workerd conversation tests passed.
+
+### P2-19: MCP deadlines did not cancel callTool
+
+- Location: `src/lib/connectors/tools.ts`.
+- Cause: `awaitWithDeadline` rejected on abort while `Client.callTool` kept running. MCP SDK 1.30.0 exposes `RequestOptions.signal`.
+- Repair: `callMcpTool` passes the combined deadline signal and `timeout` into `callTool`. AbortError is framed as untrusted `aborted`.
+- Regression: `src/lib/connectors/phase6.test.ts` mock client records the forwarded signal and aborts.
+- Verification: focused Node Vitest passed.
+
+### P2-20: eight model turns still allowed a ninth
+
+- Location: `src/lib/agent/budgets.ts` `noteTurn`; `src/lib/agent/run.ts` `shouldStopAfterTurn`.
+- Cause: `noteTurn` threw only when `turns > 8`, after the turn. The eighth turn returned continue, so a ninth model call could start. Token totals were summed only after idle.
+- Repair: `noteTurn` stops when `turns >= 8`. `shouldStopAfterTurn` and the post-idle finalizer call `assertTokenTotals` from current assistant usage.
+- Regression: `src/lib/agent/agent-loop.test.ts` eighth `noteTurn` throws; token assert rejects `maxInputTokens + 1`.
+- Verification: focused Node Vitest passed.
+
+### P2-21: approval start accepted client key and expiry
+
+- Location: `workers/brain/src/index.ts` `/approvals/start`; `src/lib/store/agent-runs.ts` `serverOwnedApprovalBinding`.
+- Cause: the browser supplied the full approval binding, including idempotency key and expiry. Those were not compared to a server-owned record.
+- Repair: start loads the run, builds the binding from the pending tool call (or the already-stored approval), ignores client key and expiry, and rejects tool/fingerprint/principal/conversation mismatches. The response returns the server binding.
+- Regression: `workers/brain/test/approval-start.test.ts` substituted key/expiry are ignored; tampered fingerprint is 400 with zero approval rows.
+- Verification: Brain workerd approval-start tests passed.
+
+### P2-22: request-ID claims did not bind the question
+
+- Location: `src/lib/store/conversations.ts` `createPendingTurn`; `migrations/operations/0008_request_payload_digest.sql`.
+- Cause: concurrent first turns with one request ID and different questions could persist either question on the winning IDs.
+- Repair: claims store `payload_digest` (SHA-256 of the question). Mismatched digest or a different supplied conversation ID fail closed. Local workerd until `0008` is applied to staging operations D1.
+- Regression: `workers/brain/test/conversations-d1.test.ts` reused request ID with a different question throws and leaves the original user content.
+- Verification: Brain workerd conversation tests passed.
 
 ## Adversarial review of remaining Phase 1–7A (after the eight repairs)
 
-Confirmed in-plan defects from the Grok pass: none beyond the original eight. Confirmed in-plan defects from the independent Sol xhigh passes: P2-9 through P2-18 above, now repaired.
+Confirmed in-plan defects from the Grok pass: none beyond the original eight. Confirmed in-plan defects from the independent Sol xhigh passes: P2-9 through P2-22 above, now repaired.
 
 Rejected false positives:
 
@@ -196,8 +228,9 @@ Rejected false positives:
 - Durable Object `sql.exec` in `ConversationRunLock` is DO SQLite, not D1 `.exec()` newline splitting.
 - `ACCESS_TEAM_DOMAIN` / `ACCESS_AUD` in Brain vitest miniflare bindings are JWT test fixtures. They are not in `wrangler.jsonc` and were not invented as product config.
 - Production approval-resume DLQ names are placeholders because `RESOURCES_PROVISIONED=false` and Phase 7B is closed.
-- MCP `awaitWithDeadline` does not cancel the underlying `client.callTool` promise. Phase 6 MCP is in-process `InMemoryTransport`; live HTTP already passes `AbortSignal` to fetch; the MCP SDK `callTool` has no abort argument. Inventing an SDK abort wrapper is out of 7A. `IdempotentExecutor` retry after abort remains a live-MCP follow-up, not the Worker D1 resume path.
 - Durable resume does not re-check live connector revocation. Worker resume is a D1 `synthetic_mutating_effects` insert, not a live MCP call. Policy is rechecked before persist. Live connector revocation on resume needs persisted connector state, which is not in the 7A Worker. Remaining risk, not a 7A code change.
+- Normalized tool arguments stay in `tool_calls.normalized_arguments_json` because durable resume must reconstruct the exact call. Redacting them would break fingerprint match and replay. Connector token envelope encryption remains a later milestone.
+- `parseStructuredGroundedAnswer` drops unknown citation labels so published paragraphs contain zero invalid IDs. That is the locked Phase 4 mixed-paragraph contract. Pi host grounding already refuses unknown labels via `BRAIN_INVALID_CITATION`. Refusing the whole Convex-path answer on a mixed `[1]` plus `[999]` would change that contract and can lower locked eval floors.
 
 ## Required landing gates
 
