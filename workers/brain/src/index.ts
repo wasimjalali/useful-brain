@@ -1,4 +1,5 @@
 import { AccessJwtUnavailable, AccessJwtVerifier } from "../../../src/lib/auth/access-jwt";
+import type { DirectoryRecord } from "../../../src/lib/auth/principal";
 import { authenticateWorkerRequest } from "../../../src/lib/auth/worker-identity";
 import { parseBoundedId } from "../../../src/lib/cf/bounded-id";
 import { writeOperationalLog } from "../../../src/lib/cf/operational-log";
@@ -18,6 +19,26 @@ import {
   type PrincipalDirectoryRow,
 } from "../../../src/lib/store/principal-directory";
 import type { ApprovalBinding } from "../../../src/lib/agent/policy";
+import { executeTurn } from "../../../src/lib/brain/execute-turn";
+import { runManualEvaluations } from "../../../src/lib/brain/eval-run";
+import { ensureLoopbackPrincipal } from "../../../src/lib/store/loopback-principal";
+import {
+  deleteConversation,
+  listRecentConversations,
+  loadConversationForUi,
+} from "../../../src/lib/store/conversation-queries";
+import { loadKnowledgeInventory } from "../../../src/lib/store/knowledge-inventory";
+import {
+  latestReadyOrActiveGenerationId,
+  loadSeedDocumentsFromGeneration,
+  mergeSeedDocuments,
+  seedNorthwindCorpus,
+  type SeedDocumentInput,
+} from "../../../src/lib/store/corpus-seed";
+import { listRecentEvalRuns } from "../../../src/lib/store/eval-runs";
+import { promoteGeneration, type SqlExecutor } from "../../../src/lib/store/corpus-d1";
+import type { WorkersAiRunner } from "../../../src/lib/embeddings/workers-ai-embed";
+import type { CorpusSql, VectorizeIndex } from "../../../src/lib/retrieve/cloudflare-pipeline";
 import { ConversationRunLock } from "./conversation-lock";
 import { ApprovalWorkflow } from "./approval-workflow";
 import {
@@ -44,6 +65,9 @@ export type BrainEnv = {
         run(): Promise<{ meta?: { changes?: number } }>;
         all<T>(): Promise<{ results: T[] }>;
       };
+      first<T>(): Promise<T | null>;
+      run(): Promise<{ meta?: { changes?: number } }>;
+      all<T>(): Promise<{ results: T[] }>;
     };
     batch(statements: unknown[]): Promise<unknown>;
   };
@@ -62,6 +86,9 @@ export type BrainEnv = {
     }>;
   };
   APPROVAL_RESUME_QUEUE?: Queue<{ runId: string; idempotencyKey: string }>;
+  CORPUS_DB?: OperationsDatabase;
+  VECTORIZE?: VectorizeIndex;
+  AI?: WorkersAiRunner;
 };
 
 let accessVerifier: AccessJwtVerifier | undefined;
@@ -130,6 +157,23 @@ async function requireConversationOwner(
   }
 }
 
+function requireOperator(roles: string[]): void {
+  if (!roles.includes("operator")) {
+    throw new WorkerForbiddenError();
+  }
+}
+
+function turnDeps(env: BrainEnv, principal: DirectoryRecord) {
+  return {
+    operations: env.OPERATIONS_DB as OperationsDatabase,
+    corpus: env.CORPUS_DB as CorpusSql | undefined,
+    vectorize: env.VECTORIZE,
+    ai: env.AI,
+    lockFor: (conversationId: string) => env.CONVERSATION.getByName(conversationId),
+    principal,
+  };
+}
+
 const brainWorker = {
   async fetch(request: Request, env: BrainEnv, _ctx?: unknown): Promise<Response> {
     const started = Date.now();
@@ -149,6 +193,14 @@ const brainWorker = {
         });
         return new Response("ok", { headers: withRequestId(new Headers(), requestId) });
       }
+
+      if (identityMode === "loopback") {
+        await ensureLoopbackPrincipal(
+          env.OPERATIONS_DB as OperationsDatabase,
+          env.LOOPBACK_SUBJECT ?? "dev@localhost",
+        );
+      }
+      await env.OPERATIONS_DB.prepare("PRAGMA foreign_keys = ON").run();
 
       const principal = await authenticateWorkerRequest({
         identityMode,
@@ -324,12 +376,238 @@ const brainWorker = {
         return json(result, requestId, result.ok ? 200 : result.status);
       }
 
+      if (path === "/turns" && request.method === "POST") {
+        operation = "turns";
+        let body: {
+          question?: string;
+          conversationId?: string;
+          requestId?: string;
+          persistConversation?: boolean;
+        };
+        try {
+          body = (await request.json()) as typeof body;
+        } catch {
+          throw new WorkerValidationError();
+        }
+        const question = typeof body.question === "string" ? body.question.trim() : "";
+        if (!question || question.length > 2000) {
+          throw new WorkerValidationError();
+        }
+        const turnRequestId = parseBoundedId(body.requestId ?? requestId, "request id");
+        const conversationId = body.conversationId
+          ? parseBoundedId(body.conversationId, "conversation id")
+          : undefined;
+        const answer = await executeTurn({
+          ...turnDeps(env, principal),
+          question,
+          conversationId,
+          requestId: turnRequestId,
+          persistConversation: body.persistConversation,
+        });
+        writeOperationalLog({
+          requestId,
+          principalKind: principal.kind,
+          operation,
+          status: "ok",
+          durationMs: Date.now() - started,
+        });
+        return json(answer, requestId);
+      }
+
+      if (path === "/conversations" && request.method === "GET") {
+        operation = "conversations";
+        const conversations = await listRecentConversations(
+          env.OPERATIONS_DB as OperationsDatabase,
+          principal.id,
+        );
+        writeOperationalLog({
+          requestId,
+          principalKind: principal.kind,
+          operation,
+          status: "ok",
+          durationMs: Date.now() - started,
+        });
+        return json(conversations, requestId);
+      }
+
+      const conversationMatch = path.match(/^\/conversations\/([^/]+)$/);
+      if (conversationMatch && request.method === "GET") {
+        operation = "conversation-get";
+        const conversationId = parseBoundedId(conversationMatch[1], "conversation id");
+        const conversation = await loadConversationForUi(
+          env.OPERATIONS_DB as OperationsDatabase,
+          conversationId,
+          principal.id,
+        );
+        writeOperationalLog({
+          requestId,
+          principalKind: principal.kind,
+          operation,
+          status: "ok",
+          durationMs: Date.now() - started,
+        });
+        return json(conversation, requestId);
+      }
+      if (conversationMatch && request.method === "DELETE") {
+        operation = "conversation-delete";
+        const conversationId = parseBoundedId(conversationMatch[1], "conversation id");
+        await deleteConversation(
+          env.OPERATIONS_DB as OperationsDatabase,
+          conversationId,
+          principal.id,
+        );
+        writeOperationalLog({
+          requestId,
+          principalKind: principal.kind,
+          operation,
+          status: "ok",
+          durationMs: Date.now() - started,
+        });
+        return json({ ok: true }, requestId);
+      }
+
+      if (path === "/knowledge" && request.method === "GET") {
+        operation = "knowledge";
+        if (!env.CORPUS_DB) {
+          return json(
+            {
+              documents: [],
+              chunks: [],
+              embeddingStorageStatus: {
+                storedDocuments: 0,
+                storedChunks: 0,
+                embeddedChunks: 0,
+                lastRunStatus: "not_started",
+                lastRunMessage: null,
+                lastEmbeddedAt: null,
+                activeVersionId: null,
+                readyVersionId: null,
+                corpusStatus: "not_started",
+              },
+            },
+            requestId,
+          );
+        }
+        const inventory = await loadKnowledgeInventory(env.CORPUS_DB as SqlExecutor);
+        writeOperationalLog({
+          requestId,
+          principalKind: principal.kind,
+          operation,
+          status: "ok",
+          durationMs: Date.now() - started,
+        });
+        return json(inventory, requestId);
+      }
+
+      if (path === "/knowledge/seed" && request.method === "POST") {
+        operation = "knowledge-seed";
+        requireOperator(principal.roles);
+        if (!env.CORPUS_DB) {
+          throw new WorkerValidationError();
+        }
+        let body: { documents?: SeedDocumentInput[]; merge?: boolean };
+        try {
+          body = (await request.json()) as { documents?: SeedDocumentInput[]; merge?: boolean };
+        } catch {
+          throw new WorkerValidationError();
+        }
+        const incoming = Array.isArray(body.documents) ? body.documents : [];
+        let documents = incoming;
+        if (body.merge === true) {
+          const generationId = await latestReadyOrActiveGenerationId(env.CORPUS_DB as SqlExecutor);
+          const existing = generationId
+            ? await loadSeedDocumentsFromGeneration(env.CORPUS_DB as SqlExecutor, generationId)
+            : [];
+          documents = mergeSeedDocuments(existing, incoming);
+        }
+        if (documents.length === 0) {
+          throw new WorkerValidationError();
+        }
+        const seeded = await seedNorthwindCorpus({
+          db: env.CORPUS_DB as SqlExecutor,
+          documents,
+          ai: env.AI,
+          vectorize: env.VECTORIZE,
+        });
+        writeOperationalLog({
+          requestId,
+          principalKind: principal.kind,
+          operation,
+          status: "ok",
+          durationMs: Date.now() - started,
+        });
+        return json(seeded, requestId);
+      }
+
+      if (path === "/knowledge/promote" && request.method === "POST") {
+        operation = "knowledge-promote";
+        requireOperator(principal.roles);
+        if (!env.CORPUS_DB) {
+          throw new WorkerValidationError();
+        }
+        let body: { generationId?: string };
+        try {
+          body = (await request.json()) as { generationId?: string };
+        } catch {
+          throw new WorkerValidationError();
+        }
+        const generationId = parseBoundedId(body.generationId, "generation id");
+        await promoteGeneration(env.CORPUS_DB as SqlExecutor, generationId);
+        writeOperationalLog({
+          requestId,
+          principalKind: principal.kind,
+          operation,
+          status: "ok",
+          durationMs: Date.now() - started,
+        });
+        return json({ ok: true, generationId }, requestId);
+      }
+
+      if (path === "/evaluations" && request.method === "GET") {
+        operation = "evaluations";
+        const runs = await listRecentEvalRuns(env.OPERATIONS_DB as OperationsDatabase, principal.id);
+        writeOperationalLog({
+          requestId,
+          principalKind: principal.kind,
+          operation,
+          status: "ok",
+          durationMs: Date.now() - started,
+        });
+        return json(runs, requestId);
+      }
+
+      if (path === "/evaluations/run" && request.method === "POST") {
+        operation = "evaluations-run";
+        const result = await runManualEvaluations({
+          operations: env.OPERATIONS_DB as OperationsDatabase,
+          principal,
+          turn: {
+            corpus: env.CORPUS_DB as CorpusSql | undefined,
+            vectorize: env.VECTORIZE,
+            ai: env.AI,
+            lockFor: (conversationId: string) => env.CONVERSATION.getByName(conversationId),
+          },
+        });
+        writeOperationalLog({
+          requestId,
+          principalKind: principal.kind,
+          operation,
+          status: "ok",
+          durationMs: Date.now() - started,
+        });
+        return json(result, requestId);
+      }
+
       return new Response("not found", {
         status: 404,
         headers: withRequestId(new Headers(), requestId),
       });
     } catch (error) {
-      const publicError = toPublicWorkerError(error, requestId);
+      const mapped =
+        error instanceof ConversationStoreError && error.message === "FORBIDDEN"
+          ? new WorkerForbiddenError()
+          : error;
+      const publicError = toPublicWorkerError(mapped, requestId);
       writeOperationalLog({
         requestId,
         operation,
@@ -337,7 +615,7 @@ const brainWorker = {
         durationMs: Date.now() - started,
         errorCode: publicError.code,
       });
-      return workerErrorResponse(error, requestId);
+      return workerErrorResponse(mapped, requestId);
     }
   },
   async queue(

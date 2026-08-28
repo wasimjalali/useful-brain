@@ -3,7 +3,7 @@ export type ReleaseMode = (typeof RELEASE_MODES)[number];
 
 export type ReleasePlan = {
   mode: ReleaseMode;
-  liveBackend: "convex" | "cloudflare";
+  liveBackend: "cloudflare";
   syntheticOnly: true;
   canaryPercent: 0 | 10 | 100;
 };
@@ -17,23 +17,20 @@ export class ReleasePlanError extends Error {
 
 export function planRelease(mode: ReleaseMode): ReleasePlan {
   if (mode === "shadow") {
-    return { mode, liveBackend: "convex", syntheticOnly: true, canaryPercent: 0 };
+    return { mode, liveBackend: "cloudflare", syntheticOnly: true, canaryPercent: 0 };
   }
   if (mode === "canary") {
-    return { mode, liveBackend: "convex", syntheticOnly: true, canaryPercent: 10 };
+    return { mode, liveBackend: "cloudflare", syntheticOnly: true, canaryPercent: 10 };
   }
   return { mode, liveBackend: "cloudflare", syntheticOnly: true, canaryPercent: 100 };
 }
 
 export function assertSyntheticRelease(plan: ReleasePlan): void {
   if (plan.syntheticOnly !== true) {
-    throw new ReleasePlanError("Phase 7A cannot leave synthetic-only traffic");
+    throw new ReleasePlanError("Release cannot leave synthetic-only traffic");
   }
-  if (plan.mode === "staging_primary" && plan.liveBackend !== "cloudflare") {
-    throw new ReleasePlanError("staging-primary must use the Cloudflare staging stack");
-  }
-  if (plan.mode !== "staging_primary" && plan.liveBackend !== "convex") {
-    throw new ReleasePlanError("shadow and canary keep Convex as the live UI");
+  if (plan.liveBackend !== "cloudflare") {
+    throw new ReleasePlanError("live backend must be Cloudflare");
   }
 }
 

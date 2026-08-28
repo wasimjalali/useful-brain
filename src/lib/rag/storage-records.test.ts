@@ -7,7 +7,7 @@ import {
 } from "./storage-records";
 
 describe("storage record helpers", () => {
-  it("maps synthetic documents into stable Convex source records", () => {
+  it("maps synthetic documents into stable source records", () => {
     const records = toSourceDocumentRecords([
       {
         source: "return_policy.md",
@@ -27,7 +27,7 @@ describe("storage record helpers", () => {
     ]);
   });
 
-  it("maps visible chunks into Convex chunk records", () => {
+  it("maps visible chunks into chunk records", () => {
     const records = toDocumentChunkRecords([
       {
         id: "return_policy__chunk_001",

@@ -1,30 +1,33 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { AppError } from "@/lib/rag/app-errors";
 import { extractUploadedText } from "@/lib/rag/extract-upload";
 
-const writeFile = vi.fn();
-const fetchAction = vi.fn();
-const fetchMutation = vi.fn();
-const fetchQuery = vi.fn();
+const brainJson = vi.fn();
 const revalidatePath = vi.fn();
 
-vi.mock("node:fs", () => {
-  const promises = { writeFile: (...args: unknown[]) => writeFile(...args) };
-  return { promises, default: { promises } };
-});
-
-vi.mock("convex/nextjs", () => ({
-  fetchAction: (...args: unknown[]) => fetchAction(...args),
-  fetchMutation: (...args: unknown[]) => fetchMutation(...args),
-  fetchQuery: (...args: unknown[]) => fetchQuery(...args),
+vi.mock("@/lib/cf/brain-client", () => ({
+  brainJson: (...args: unknown[]) => brainJson(...args),
 }));
 
 vi.mock("next/cache", () => ({
   revalidatePath: (...args: unknown[]) => revalidatePath(...args),
 }));
 
-vi.mock("@/lib/rag/load-documents", () => ({
-  loadSyntheticDocuments: vi.fn().mockResolvedValue([]),
+vi.mock("@/lib/eval/northwind-seed", () => ({
+  northwindSeedDocuments: () => [
+    {
+      documentId: "nw_test",
+      title: "Test",
+      sourceName: "Test",
+      sourcePath: "northwind/test.md",
+      accessScope: "public",
+      allowedRoles: [],
+      allowedDepartments: [],
+      body: "Test body.",
+      metadata: {},
+    },
+  ],
 }));
 
 describe("extractUploadedText", () => {
@@ -91,8 +94,7 @@ describe("extractUploadedText", () => {
 describe("addSyntheticDocumentAction", () => {
   beforeEach(() => {
     vi.resetModules();
-    writeFile.mockReset();
-    fetchAction.mockReset();
+    brainJson.mockReset();
     revalidatePath.mockReset();
   });
 
@@ -119,7 +121,7 @@ describe("addSyntheticDocumentAction", () => {
     await expect(addSyntheticDocumentAction(formData)).rejects.toThrow(
       /under 120 characters/i,
     );
-    expect(writeFile).not.toHaveBeenCalled();
+    expect(brainJson).not.toHaveBeenCalled();
   });
 
   it("rejects a body over 50,000 characters", async () => {
@@ -132,7 +134,7 @@ describe("addSyntheticDocumentAction", () => {
     await expect(addSyntheticDocumentAction(formData)).rejects.toThrow(
       /under 50,000 characters/i,
     );
-    expect(writeFile).not.toHaveBeenCalled();
+    expect(brainJson).not.toHaveBeenCalled();
   });
 
   it("rejects a title that slugifies to empty (no letters or numbers)", async () => {
@@ -145,17 +147,11 @@ describe("addSyntheticDocumentAction", () => {
     await expect(addSyntheticDocumentAction(formData)).rejects.toThrow(
       /letters or numbers/i,
     );
-    expect(writeFile).not.toHaveBeenCalled();
+    expect(brainJson).not.toHaveBeenCalled();
   });
 
-  it("slugifies a normal title and writes within the synthetic-docs directory", async () => {
-    writeFile.mockResolvedValue(undefined);
-    fetchAction.mockResolvedValue({
-      storedDocuments: 1,
-      storedChunks: 1,
-      embeddedChunks: 1,
-      message: "ok",
-    });
+  it("slugifies a normal title and merges the document into Brain", async () => {
+    brainJson.mockResolvedValue({ generationId: "g-1", chunkCount: 1, vectorize: "skipped" });
 
     const addSyntheticDocumentAction = await importAction();
     const formData = formDataOf({
@@ -165,19 +161,26 @@ describe("addSyntheticDocumentAction", () => {
 
     await addSyntheticDocumentAction(formData);
 
-    expect(writeFile).toHaveBeenCalledTimes(1);
-    const [writtenPath, contents, options] = writeFile.mock.calls[0];
-    expect(writtenPath).toMatch(/synthetic-docs[\\/]shipping_returns_policy\.md$/);
-    expect(writtenPath).not.toMatch(/\.\./);
-    expect(contents).toContain("# Shipping & Returns Policy!");
-    expect(options).toEqual({ flag: "wx" });
-    expect(fetchAction).toHaveBeenCalledTimes(1);
+    expect(brainJson).toHaveBeenCalledWith("/knowledge/seed", {
+      method: "POST",
+      json: {
+        merge: true,
+        documents: [
+          expect.objectContaining({
+            documentId: "nw_upload_shipping_returns_policy",
+            title: "Shipping & Returns Policy!",
+            sourcePath: "northwind/uploads/shipping_returns_policy.md",
+            accessScope: "public",
+            body: "# Shipping & Returns Policy!\n\nBody text describing the policy.",
+          }),
+        ],
+      },
+    });
     expect(revalidatePath).toHaveBeenCalledWith("/");
   });
 
-  it("surfaces a clear error when embedding fails after a successful write", async () => {
-    writeFile.mockResolvedValue(undefined);
-    fetchAction.mockRejectedValue(new Error("model unreachable"));
+  it("surfaces a clear error when Brain seed fails", async () => {
+    brainJson.mockRejectedValue(new Error("model unreachable"));
 
     const addSyntheticDocumentAction = await importAction();
     const formData = formDataOf({
@@ -186,20 +189,13 @@ describe("addSyntheticDocumentAction", () => {
     });
 
     await expect(addSyntheticDocumentAction(formData)).rejects.toThrow(
-      /added but embedding failed/i,
+      /could not be stored/i,
     );
-    expect(writeFile).toHaveBeenCalledTimes(1);
-    expect(revalidatePath).toHaveBeenCalledWith("/");
+    expect(revalidatePath).not.toHaveBeenCalled();
   });
 
   it("uses the uploaded file's derived title and text when title/body are blank", async () => {
-    writeFile.mockResolvedValue(undefined);
-    fetchAction.mockResolvedValue({
-      storedDocuments: 1,
-      storedChunks: 1,
-      embeddedChunks: 1,
-      message: "ok",
-    });
+    brainJson.mockResolvedValue({ generationId: "g-1", chunkCount: 1, vectorize: "skipped" });
 
     const addSyntheticDocumentAction = await importAction();
     const formData = new FormData();
@@ -214,18 +210,26 @@ describe("addSyntheticDocumentAction", () => {
 
     await addSyntheticDocumentAction(formData);
 
-    expect(writeFile).toHaveBeenCalledTimes(1);
-    const [writtenPath, contents] = writeFile.mock.calls[0];
-    expect(writtenPath).toMatch(/uploaded_policy\.md$/);
-    expect(contents).toContain("# uploaded policy");
-    expect(contents).toContain("Uploaded document body.");
+    expect(brainJson).toHaveBeenCalledWith("/knowledge/seed", {
+      method: "POST",
+      json: {
+        merge: true,
+        documents: [
+          expect.objectContaining({
+            documentId: "nw_upload_uploaded_policy",
+            title: "uploaded policy",
+            body: "# uploaded policy\n\nUploaded document body.",
+          }),
+        ],
+      },
+    });
   });
 });
 
 describe("askGroundedQuestion", () => {
   beforeEach(() => {
     vi.resetModules();
-    fetchAction.mockReset();
+    brainJson.mockReset();
   });
 
   async function importAction() {
@@ -235,38 +239,45 @@ describe("askGroundedQuestion", () => {
 
   it("returns a serialized success result", async () => {
     const answer = {
-      question: "Can I return an opened product?",
-      answer: "Opened products may be returned within 30 days. [1]",
+      question: "What is the first-response target for a P1 support ticket?",
+      answer: "P1 tickets have a first-response target of 1 hour. [1]",
     };
-    fetchAction.mockResolvedValue(answer);
+    brainJson.mockResolvedValue(answer);
     const askGroundedQuestion = await importAction();
 
     const result = await askGroundedQuestion({
-      question: "Can I return an opened product?",
+      question: "What is the first-response target for a P1 support ticket?",
       conversationId: null,
       requestId: "request-1",
     });
 
     expect(result).toEqual({ ok: true, data: answer });
-    expect(fetchAction).toHaveBeenCalledWith(
-      expect.anything(),
+    expect(brainJson).toHaveBeenCalledWith(
+      "/turns",
       expect.objectContaining({
-        question: "Can I return an opened product?",
-        conversationId: undefined,
-        requestId: "request-1",
+        method: "POST",
+        json: expect.objectContaining({
+          question: "What is the first-response target for a P1 support ticket?",
+          conversationId: undefined,
+          requestId: "request-1",
+        }),
       }),
     );
-    expect(fetchAction.mock.calls[0][1]).not.toHaveProperty("history");
+    expect(brainJson.mock.calls[0][1].json).not.toHaveProperty("history");
   });
 
   it("returns stable provider error data instead of throwing", async () => {
-    fetchAction.mockRejectedValue(
-      new Error("The model service is temporarily unavailable. Try again."),
+    brainJson.mockRejectedValue(
+      new AppError(
+        "PROVIDER_TEMPORARY",
+        "The model service is temporarily unavailable. Try again.",
+        true,
+      ),
     );
     const askGroundedQuestion = await importAction();
 
     const result = await askGroundedQuestion({
-      question: "Can I return an opened product?",
+      question: "What is the first-response target for a P1 support ticket?",
       conversationId: null,
       requestId: "request-2",
     });
@@ -298,6 +309,6 @@ describe("askGroundedQuestion", () => {
         retryable: false,
       },
     });
-    expect(fetchAction).not.toHaveBeenCalled();
+    expect(brainJson).not.toHaveBeenCalled();
   });
 });

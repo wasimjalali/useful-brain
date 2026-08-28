@@ -42,18 +42,35 @@ export type BrainService = {
 };
 
 export function createBrainBoundRequest(request: Request, path = "/whoami"): Request {
+  return createBrainServiceRequest({
+    incomingHeaders: request.headers,
+    path,
+    method: "GET",
+  });
+}
+
+export function createBrainServiceRequest(input: {
+  incomingHeaders: Headers;
+  path: string;
+  method?: string;
+  body?: string | null;
+}): Request {
   const headers = new Headers();
-  const assertion = readAccessAssertion(request.headers);
+  const assertion = readAccessAssertion(input.incomingHeaders);
   if (assertion) {
     headers.set(ACCESS_ASSERTION_HEADER, assertion);
   }
-  const requestId = request.headers.get("x-request-id");
+  const requestId = input.incomingHeaders.get("x-request-id");
   if (requestId) {
     headers.set("x-request-id", requestId);
   }
-  return new Request(new URL(path, "https://brain.internal"), {
-    method: "GET",
+  if (input.body != null) {
+    headers.set("content-type", "application/json");
+  }
+  return new Request(new URL(input.path, "https://brain.internal"), {
+    method: input.method ?? "GET",
     headers,
+    body: input.body ?? undefined,
   });
 }
 

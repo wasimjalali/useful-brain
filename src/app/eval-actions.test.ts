@@ -1,49 +1,36 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const fetchAction = vi.fn();
-const fetchMutation = vi.fn();
+import { AppError } from "@/lib/rag/app-errors";
 
-vi.mock("convex/nextjs", () => ({
-  fetchAction: (...args: unknown[]) => fetchAction(...args),
-  fetchMutation: (...args: unknown[]) => fetchMutation(...args),
+const brainJson = vi.fn();
+
+vi.mock("@/lib/cf/brain-client", () => ({
+  brainJson: (...args: unknown[]) => brainJson(...args),
 }));
 
 describe("runEvalsAction", () => {
   beforeEach(() => {
-    vi.resetModules();
-    fetchAction.mockReset();
-    fetchMutation.mockReset();
-    fetchMutation.mockResolvedValue("run-1");
+    brainJson.mockReset();
   });
 
-  it("serializes stable error data for failed evaluation cases", async () => {
-    fetchAction.mockRejectedValue(
-      new Error("The model service is temporarily unavailable. Try again."),
-    );
+  it("forwards a completed evaluation run from Brain", async () => {
+    const payload = {
+      ranAt: "2026-08-28T12:00:00.000Z",
+      total: 10,
+      passed: 8,
+      results: [],
+    };
+    brainJson.mockResolvedValue(payload);
     const { runEvalsAction } = await import("./eval-actions");
 
-    const result = await runEvalsAction();
-    const serialized = JSON.parse(JSON.stringify(result));
-
-    expect(serialized.ok).toBe(true);
-    expect(serialized.data.results[0].error).toEqual({
-      code: "PROVIDER_TEMPORARY",
-      message: "The model service is temporarily unavailable. Try again.",
-      retryable: true,
-    });
-    expect(fetchMutation).toHaveBeenCalled();
+    await expect(runEvalsAction()).resolves.toEqual({ ok: true, data: payload });
+    expect(brainJson).toHaveBeenCalledWith("/evaluations/run", { method: "POST", json: {} });
   });
 
-  it("interrupts the run when a case result cannot be persisted", async () => {
-    fetchAction.mockResolvedValue({
-      structuredAnswer: { answerType: "insufficient_evidence", paragraphs: [] },
-      retrieval: { results: [] },
-    });
-    fetchMutation
-      .mockResolvedValueOnce("run-1")
-      .mockRejectedValueOnce(new Error("database unavailable"))
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(null);
+  it("serializes a Brain failure as a stable action error", async () => {
+    brainJson.mockRejectedValue(
+      new AppError("INTERNAL_ERROR", "The evaluation result could not be saved.", true),
+    );
     const { runEvalsAction } = await import("./eval-actions");
 
     const result = await runEvalsAction();
@@ -56,6 +43,5 @@ describe("runEvalsAction", () => {
         retryable: true,
       },
     });
-    expect(fetchAction).toHaveBeenCalledTimes(1);
   });
 });

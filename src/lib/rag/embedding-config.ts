@@ -1,27 +1,16 @@
-export const EMBEDDING_DIMENSIONS = 1536;
+import { EMBEDDING_DIMENSIONS as WORKERS_AI_DIMENSIONS, EMBEDDING_MODEL } from "../embeddings/instructions";
+
+export const EMBEDDING_DIMENSIONS = WORKERS_AI_DIMENSIONS;
 
 export const embeddingConfig = {
-  provider: "azure-openai",
-  model: "text-embedding-3-small",
+  provider: "cloudflare-workers-ai",
+  model: EMBEDDING_MODEL,
   dimensions: EMBEDDING_DIMENSIONS,
-  deploymentEnvVar: "AZURE_OPENAI_EMBEDDING_DEPLOYMENT",
 } as const;
 
-type EmbeddingEnv = {
-  AZURE_OPENAI_EMBEDDING_DEPLOYMENT?: string;
-};
-
-export function isEmbeddingReady(env: EmbeddingEnv) {
-  if (!env.AZURE_OPENAI_EMBEDDING_DEPLOYMENT?.trim()) {
-    return {
-      ok: false,
-      message:
-        "Set AZURE_OPENAI_EMBEDDING_DEPLOYMENT before generating embeddings.",
-    };
-  }
-
+export function isEmbeddingReady() {
   return {
-    ok: true,
-    message: "Embedding deployment is configured.",
+    ok: true as const,
+    message: "Workers AI embeddings are configured on Brain.",
   };
 }

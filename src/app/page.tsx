@@ -1,7 +1,4 @@
-import { fetchQuery } from "convex/nextjs";
-
 import { RagVisibilityDashboard } from "@/components/rag-visibility-dashboard";
-import { api } from "../../convex/_generated/api";
 import {
   addSyntheticDocumentAction,
   askGroundedQuestion,
@@ -9,93 +6,29 @@ import {
   embedSyntheticDocumentsAction,
   loadConversationAction,
   importLegacyConversationsAction,
+  loadWorkspaceSnapshot,
   promoteCorpusVersionAction,
 } from "./actions";
-import { chunkDocuments } from "@/lib/rag/chunk";
-import { loadSyntheticDocuments } from "@/lib/rag/load-documents";
-import { emptyEmbeddingStorageStatus } from "@/lib/rag/storage-records";
-import type { DocumentChunk, KnowledgeDocument } from "@/lib/rag/types";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const [corpus, embeddingStorageStatus, conversations, evalRuns] = await Promise.all([
-    loadCorpus(),
-    getEmbeddingStorageStatus(),
-    getRecentConversations(),
-    getRecentEvalRuns(),
-  ]);
-  const { documents, chunks } = corpus;
+  const snapshot = await loadWorkspaceSnapshot();
 
   return (
     <RagVisibilityDashboard
-      chunks={chunks}
-      documents={documents}
+      chunks={snapshot.chunks}
+      documents={snapshot.documents}
       addDocumentAction={addSyntheticDocumentAction}
       embedAction={embedSyntheticDocumentsAction}
       askAction={askGroundedQuestion}
       deleteConversationAction={deleteConversationAction}
-      embeddingStorageStatus={embeddingStorageStatus}
-      initialConversations={conversations}
-      initialEvalRuns={evalRuns}
+      embeddingStorageStatus={snapshot.embeddingStorageStatus}
+      initialConversations={snapshot.conversations}
+      initialEvalRuns={snapshot.evalRuns}
       importLegacyConversationsAction={importLegacyConversationsAction}
       loadConversationAction={loadConversationAction}
       promoteCorpusAction={promoteCorpusVersionAction}
     />
   );
-}
-
-async function getRecentConversations() {
-  try {
-    const conversations = await fetchQuery(api.conversations.listRecent);
-    return conversations.map((conversation) => ({
-      ...conversation,
-      id: conversation.id,
-      turns: [],
-    }));
-  } catch {
-    return [];
-  }
-}
-
-async function getRecentEvalRuns() {
-  try {
-    const runs = await fetchQuery(api.evaluations.listRecent);
-    return runs
-      .filter((run) => run.status === "completed")
-      .map((run) => ({
-        ranAt: run.ranAt,
-        total: run.total,
-        passed: run.passed,
-        results: run.results,
-      }));
-  } catch {
-    return [];
-  }
-}
-
-// Loading and chunking run on every request. Chunking throws loudly on a bad
-// corpus (e.g. a slug collision), which is correct for tests, but here it would
-// crash the whole page on every render with no way to recover from the UI. So
-// degrade to an empty corpus (chat still works via Convex retrieval) and log
-// server-side instead of bricking the app.
-async function loadCorpus(): Promise<{
-  documents: KnowledgeDocument[];
-  chunks: DocumentChunk[];
-}> {
-  try {
-    const documents = await loadSyntheticDocuments();
-    return { documents, chunks: chunkDocuments(documents) };
-  } catch (error) {
-    console.error("Failed to load or chunk the synthetic corpus:", error);
-    return { documents: [], chunks: [] };
-  }
-}
-
-async function getEmbeddingStorageStatus() {
-  try {
-    return await fetchQuery(api.ragStorage.getStorageStatus);
-  } catch {
-    return emptyEmbeddingStorageStatus;
-  }
 }

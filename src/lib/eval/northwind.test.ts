@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
 
 import { loadNorthwindCorpus } from "./northwind-loader";
+import { northwindSeedDocuments } from "./northwind-seed";
 
 describe("Northwind eval corpus", () => {
   it("loads 65 documents and 120 unique questions", () => {
     const { documents, questions, principals } = loadNorthwindCorpus();
+    const seed = northwindSeedDocuments();
     expect(documents).toHaveLength(65);
+    expect(seed).toHaveLength(65);
+    expect(seed.map((document) => document.documentId).sort()).toEqual(
+      documents.map((document) => document.documentId).sort(),
+    );
     expect(questions).toHaveLength(120);
     expect(new Set(questions.map((question) => question.questionId)).size).toBe(120);
     expect(questions[0].questionId).toBe("q001");

@@ -1,3 +1,4 @@
+import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
@@ -8,3 +9,7 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+
+if (!process.env.VITEST && process.env.NODE_ENV !== "production") {
+  void initOpenNextCloudflareForDev();
+}

@@ -1,10 +1,10 @@
 # Burooj migration ledger
 
-Status: complete for Phase 7A. Named Sanad contracts are ported with TypeScript tests. The recoverable Burooj archive is local-only (gitignored `.archives/burooj-630ba08dc7cad6aa71942d6842ce6d8d55a26873.bundle`, SHA-256 `2e8733d7884f963ab02e5633646515131c33af870f75e9ffa332679f587dcaf8`). Do not delete Burooj. Phase 7B stays closed.
+Status: complete for the Cloudflare UI cutover. Named Sanad contracts are ported with TypeScript tests. Northwind (65 documents, 120 questions) is in `content/northwind/`. The recoverable Burooj archive is local-only (gitignored `.archives/burooj-630ba08dc7cad6aa71942d6842ce6d8d55a26873.bundle`, SHA-256 `2e8733d7884f963ab02e5633646515131c33af870f75e9ffa332679f587dcaf8`). Local sibling checkout deleted 2026-08-28. GitHub `wasimjalali/burooj` deletion is blocked on the `delete_repo` token scope.
 
 Sanad source commit: `630ba08dc7cad6aa71942d6842ce6d8d55a26873`  
-Sibling checkout: `/Users/wasimjalali/Desktop/Personal Project/Burooj`  
-Checkout note: HEAD matches the locked commit. The worktree is dirty with Tabari UI files only; Sanad sources used for this ledger were not modified.
+Sibling checkout: deleted 2026-08-28 (was `/Users/wasimjalali/Desktop/Personal Project/Burooj`)  
+Checkout note: HEAD matched the locked commit at archive time. Restore from the local git bundle if needed.
 
 Target contract tests named below are planned Useful Brain files unless Status is Ported.
 
@@ -56,7 +56,7 @@ The fake-provider CI ratchet is a **separate** fingerprint. The 2026-08-26 unpai
 | Connector lifecycle and SSRF controls | `sanad/src/sanad/connectors/` | `test_connectors.py`, `test_live_http.py` | Ingestion connectors | `src/lib/connectors/http-allowlist.test.ts`, `src/lib/connectors/github-tree.test.ts`, `src/lib/connectors/config-scrub.test.ts`, `src/lib/connectors/phase6.test.ts` | Ported: GitHub truncated listings fail; stale delete only after complete list+ingest; HTTP allowlist-only with redirects refused and a 1 MiB stream bound; recursive secret scrub covers prefixed and camelCase variants; named `CONNECTOR_*` bindings. Phase 6 adds registry, MCP in-process server, action-sink and plugin adapter through the same policy gateway. Not a marketplace. |
 | Answer contract | `sanad/tests/test_brain_answer_contract.py` | same | RAG answer validation | `src/lib/answer/contract.test.ts` | Ported: structured `grounded` / `insufficient_evidence`, current-run citation labels and cited-text support, empty retrieval abstains |
 | Host grounding finalizer | `tabari/tests/agent/test_brain_grounding.py` | same | Brain host finalizer | `src/lib/agent/host-grounding.test.ts` | Ported: must-retrieve, current-turn `search_knowledge` evidence text, cited-claim validation, deterministic unavailable without transport leakage. Tabari session-DB/finalize_turn and deferred-tool cache are not ported |
-| Current Nura citation/refusal/ops records | Useful Brain `convex/groundedAnswer.ts`, `convex/operations.ts` | `convex/groundedAnswer.test.ts`, `convex/operations.test.ts`, `src/lib/eval/run-eval.test.ts` | Keep through Phase 4 shadow | `src/lib/answer/convex-shadow.test.ts` plus existing Convex tests | Shadow parity; Convex remains the live UI |
+| Current Nura citation/refusal/ops records | Useful Brain `convex/groundedAnswer.ts`, `convex/operations.ts` (removed 2026-08-28) | historical Convex tests | `src/lib/answer/contract.ts` | `src/lib/answer/contract.test.ts` | Ported; live UI is Cloudflare |
 | Pi knowledge agent, policy gateway, sequential mutating tools, Workflow approval | Tabari host finalizer + Sanad tool policy contracts | `test_brain_grounding.py` plus Useful Brain Phase 5 tests | Brain Pi loop | `src/lib/agent/agent-loop.test.ts`, `workers/brain/test/approval-workflow.test.ts`, `workers/brain/test/approval-resume.test.ts`, `workers/brain/test/agent-runs.test.ts` | Ported: `search_knowledge` + host finalizer; `beforeToolCall` extra guard; policy inside `execute()`; high-risk denied; `waitForEvent` 15 minutes; timeout expiry; identifier-only resume Queue; D1 reconstruct and policy recheck. Tabari session SQLite is not ported |
 
 ## Invariants that must survive the TypeScript rewrite

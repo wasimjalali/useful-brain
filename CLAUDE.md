@@ -30,19 +30,20 @@ npm test -- retrieval
 
 The product is now named Useful Brain. Active UI terminology lives in `src/lib/useful-brain-config.ts`. The constellation mark and wordmark live in `src/components/useful-brain-logo.tsx`.
 
-The working backend under `convex/` is legacy migration source code. It still powers the current application until the Cloudflare path reaches the cutover gates. Do not extend Convex for new target behavior.
+The live backend is Cloudflare Workers (web + Brain). Convex has been removed. Do not reintroduce it.
 
-The target backend does not exist yet. Do not start it until the external architecture review has been incorporated and the planning gate in `AGENTS.md` is open.
+The target backend is the Cloudflare path in `docs/useful-brain-master-plan.md`.
 
 ## Current code map
 
-- `convex/`: current identity, conversations, corpus versions, vector retrieval, evaluations and provider adapters.
-- `content/synthetic-docs/`: current synthetic support corpus.
+- `workers/brain/`: identity, conversations, retrieval, evaluations and Pi Agent Core.
+- `workers/ingestion/`: corpus ingest workflows.
+- `content/northwind/`: Northwind support corpus (65 documents, 120 questions).
 - `src/app/`: Next.js App Router, server actions, global styles and metadata.
 - `src/components/`: workspace, chat, evidence, knowledge and evaluation UI.
-- `src/lib/rag/`: current loading, chunking, retrieval types and answer helpers.
-- `src/lib/eval/`: current evaluation battery.
-- `docs/useful-brain-master-plan.md`: source of truth for the target architecture.
+- `src/lib/rag/`: loading, chunking, retrieval types and answer helpers.
+- `src/lib/eval/`: evaluation battery.
+- `docs/useful-brain-master-plan.md`: source of truth for the architecture.
 - `docs/superpowers/`: historical Nura design and implementation records.
 
 ## Important current behavior to preserve

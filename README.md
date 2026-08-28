@@ -8,7 +8,7 @@ The product was previously named Nura RAG Copilot. The product name, package nam
 
 The architecture is finalized in the [Useful Brain production master plan](./docs/useful-brain-master-plan.md). This is a local portfolio product for hiring-manager demonstration: no billing, public signup or required Cloudflare Access.
 
-Phases 0–7A are merged to `main`. Convex remains the live application UI until Phase 7B, which stays closed.
+Phases 0–7A are merged to `main`. The live UI is Cloudflare Brain (D1, Vectorize, Workers AI). GLM 5.3 Flash is the chat model. Convex has been removed. Commercial Phase 7B (real company data, production resource set) stays closed.
 
 ## Target product
 
@@ -38,22 +38,26 @@ Phases 0–7A are merged to `main`. Convex remains the live application UI until
 
 ## Current implementation
 
-The current working application still uses Convex and its existing model-provider adapter. It already provides:
+The working application is Next.js talking to the Brain Worker over a Service Binding:
 
-- visible vector retrieval and inline citations
+- visible vector and keyword retrieval with inline citations
 - grounded refusals when evidence is missing
-- server-owned conversations and evidence snapshots
+- server-owned conversations and evidence snapshots in operations D1
 - versioned corpus builds with explicit promotion
-- persisted evaluation runs and sanitized operation records
-- provider retry, idempotency and role checks
+- persisted evaluation runs
+- Workers AI chat (`@cf/zai-org/glm-5.3-flash`), embeddings (`@cf/qwen/qwen3-embedding-0.6b`), and rerank (`@cf/baai/bge-reranker-base`)
 
-Convex and the old provider path are migration sources, not target dependencies. Do not provision new resources for them.
+Local UI with Brain connected:
+
+```bash
+npm run preview:cf
+```
+
+That command builds OpenNext, applies local D1 migrations, and runs `wrangler dev` with the web and Brain configs so the `BRAIN` service binding is live on `127.0.0.1`.
 
 ## Burooj migration source
 
-The sibling `Burooj` repository contains the Sanad Brain implementation that Useful Brain will preserve before Burooj is retired. The migration ledger in the master plan names the retrieval, ACL, connector, reconciliation, corpus and evaluation behavior that must be rewritten in TypeScript.
-
-Burooj must not be deleted until all retirement gates in the master plan pass and a recoverable archive exists.
+Northwind (65 documents, 120 questions) lives in `content/northwind/`. The recoverable Burooj archive is the gitignored `.archives/burooj-630ba08dc7cad6aa71942d6842ce6d8d55a26873.bundle`. The local Burooj checkout was deleted 2026-08-28. GitHub repo deletion needs the `delete_repo` token scope.
 
 ## Development
 

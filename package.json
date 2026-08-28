@@ -37,14 +37,14 @@
     "typecheck:spike:pi": "npm --prefix spikes/phase-0-pi-worker run typecheck",
     "test:spike:pi": "npm --prefix spikes/phase-0-pi-worker test",
     "build:cf": "opennextjs-cloudflare build",
-    "preview:cf": "opennextjs-cloudflare build && opennextjs-cloudflare preview"
+    "db:local": "CI=true wrangler d1 migrations apply useful-brain-corpus-development --local --persist-to .wrangler/state -c workers/brain/wrangler.jsonc && CI=true wrangler d1 migrations apply useful-brain-operations-development --local --persist-to .wrangler/state -c workers/brain/wrangler.jsonc",
+    "preview:cf": "opennextjs-cloudflare build && npm run db:local && wrangler dev -c wrangler.jsonc -c workers/brain/wrangler.jsonc --ip 127.0.0.1 --persist-to .wrangler/state"
   },
   "dependencies": {
     "@earendil-works/pi-agent-core": "0.84.3",
     "@earendil-works/pi-ai": "0.84.3",
     "@modelcontextprotocol/sdk": "1.30.0",
     "@opennextjs/cloudflare": "1.20.3",
-    "convex": "^1.42.1",
     "next": "16.3.3",
     "rclone.js": "0.6.6",
     "react": "19.2.4",

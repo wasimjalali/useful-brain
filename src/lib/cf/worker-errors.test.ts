@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { AccessJwtError, AccessJwtUnavailable } from "../auth/access-jwt";
 import { IdentityConfigError } from "../auth/identity-mode";
-import { toPublicWorkerError, WorkerValidationError, workerErrorResponse } from "./worker-errors";
+import {
+  toPublicWorkerError,
+  WorkerBusyError,
+  WorkerValidationError,
+  workerErrorResponse,
+} from "./worker-errors";
 
 describe("worker error contracts", () => {
   it("maps a bad token to AUTH_REQUIRED without leaking verifier detail", () => {
@@ -41,6 +46,17 @@ describe("worker error contracts", () => {
       retryable: false,
       requestId: "req-json",
     });
+  });
+
+  it("maps a held conversation lock to RATE_LIMITED", async () => {
+    expect(toPublicWorkerError(new WorkerBusyError(), "req-busy")).toEqual({
+      code: "RATE_LIMITED",
+      message: "An answer is already in progress.",
+      retryable: true,
+      requestId: "req-busy",
+    });
+    const response = workerErrorResponse(new WorkerBusyError(), "req-busy");
+    expect(response.status).toBe(429);
   });
 
   it("does not put hosts, ports or JWKS URLs in the JSON body", async () => {

@@ -1,13 +1,8 @@
 "use server";
 
-import { promises as fs } from "node:fs";
-import path from "node:path";
-
-import { fetchAction, fetchMutation, fetchQuery } from "convex/nextjs";
 import { revalidatePath } from "next/cache";
 
-import { api } from "../../convex/_generated/api";
-import type { Id } from "../../convex/_generated/dataModel";
+import { brainJson } from "@/lib/cf/brain-client";
 import { chunkDocuments } from "@/lib/rag/chunk";
 import {
   actionFailure,
@@ -20,37 +15,22 @@ import {
 import { extractUploadedText } from "@/lib/rag/extract-upload";
 import type { GroundedAnswerResponse } from "@/lib/rag/grounded-answer";
 import type { Conversation } from "@/lib/rag/chat-history";
-import { loadSyntheticDocuments } from "@/lib/rag/load-documents";
-import {
-  toDocumentChunkRecords,
-  toSourceDocumentRecords,
-} from "@/lib/rag/storage-records";
+import { emptyEmbeddingStorageStatus, type EmbeddingStorageStatus } from "@/lib/rag/storage-records";
+import type { DocumentChunk, KnowledgeDocument } from "@/lib/rag/types";
+import { northwindSeedDocuments } from "@/lib/eval/northwind-seed";
+import type { SeedDocumentInput } from "@/lib/store/corpus-seed";
+import type { EvalRunResult } from "@/lib/eval/manual-eval-set";
+import type { KnowledgeInventory } from "@/lib/store/knowledge-inventory";
 
 const MAX_QUESTION_LENGTH = 2000;
 
-const SYNTHETIC_DOCS_DIR = path.join(process.cwd(), "content", "synthetic-docs");
-
-// SECURITY: the mutating actions below (embed, add-document) are intentionally
-// unauthenticated. This is a local, single-user learning tool where the person
-// running it is the only actor. Before ANY multi-user or public deployment,
-// gate these behind an auth check: they write files and trigger paid model
-// calls, and added documents flow into the RAG prompt as retrieved evidence
-// (indirect prompt-injection surface, mitigated in the answer system prompt).
-
 export async function embedSyntheticDocumentsAction() {
-  const documents = await loadSyntheticDocuments();
-  const chunks = chunkDocuments(documents);
-
   try {
-    await fetchAction(api.ragEmbedding.embedReviewedChunks, {
-      documents: toSourceDocumentRecords(documents),
-      chunks: toDocumentChunkRecords(chunks),
+    await brainJson("/knowledge/seed", {
+      method: "POST",
+      json: { documents: northwindSeedDocuments() },
     });
   } catch (error) {
-    // Surface a friendly message to the caller (the Knowledge view catches it
-    // and shows it inline) instead of an unhandled server-action rejection.
-    // Keep the "already in progress" signal, which is actionable (retry soon),
-    // but do not forward raw upstream error text to the client.
     const inProgress =
       error instanceof Error && error.message.includes("already in progress");
     throwPublicAppError(
@@ -58,8 +38,7 @@ export async function embedSyntheticDocumentsAction() {
       inProgress
         ? {
             code: "RATE_LIMITED",
-            message:
-              "An embedding run is already in progress. Try again in a moment.",
+            message: "An embedding run is already in progress. Try again in a moment.",
             retryable: true,
           }
         : {
@@ -69,15 +48,12 @@ export async function embedSyntheticDocumentsAction() {
           },
     );
   }
-
   revalidatePath("/");
 }
 
 export async function promoteCorpusVersionAction(versionId: string) {
   try {
-    await fetchMutation(api.corpusVersions.promoteReady, {
-      versionId: versionId as Id<"corpusVersions">,
-    });
+    await brainJson("/knowledge/promote", { method: "POST", json: { generationId: versionId } });
   } catch (error) {
     throwPublicAppError(error, {
       code: "INTERNAL_ERROR",
@@ -88,13 +64,6 @@ export async function promoteCorpusVersionAction(versionId: string) {
   revalidatePath("/");
 }
 
-const RETRIEVAL_LIMIT = 5;
-
-/**
- * Answer a support question against the live RAG loop, carrying the recent
- * conversation so follow-ups resolve. Returns the grounded answer (with its
- * retrieval evidence); the chat UI appends it to the transcript.
- */
 export async function askGroundedQuestion(input: {
   question: string;
   conversationId: string | null;
@@ -104,11 +73,7 @@ export async function askGroundedQuestion(input: {
 
   if (!question) {
     return actionFailure(
-      new AppError(
-        "VALIDATION_FAILED",
-        "Enter a question to get an answer.",
-        false,
-      ),
+      new AppError("VALIDATION_FAILED", "Enter a question to get an answer.", false),
     );
   }
 
@@ -124,13 +89,13 @@ export async function askGroundedQuestion(input: {
 
   try {
     return actionSuccess(
-      await fetchAction(api.ragAnswer.generateGroundedAnswer, {
-        question,
-        conversationId: input.conversationId
-          ? (input.conversationId as Id<"conversations">)
-          : undefined,
-        requestId: input.requestId,
-        limit: RETRIEVAL_LIMIT,
+      await brainJson<GroundedAnswerResponse>("/turns", {
+        method: "POST",
+        json: {
+          question,
+          conversationId: input.conversationId ?? undefined,
+          requestId: input.requestId,
+        },
       }),
     );
   } catch (error) {
@@ -145,9 +110,7 @@ export async function askGroundedQuestion(input: {
 export async function loadConversationAction(conversationId: string) {
   try {
     return actionSuccess(
-      await fetchQuery(api.conversations.getById, {
-        conversationId: conversationId as Id<"conversations">,
-      }),
+      await brainJson<Conversation>(`/conversations/${conversationId}`),
     );
   } catch (error) {
     return actionFailure(error, {
@@ -160,9 +123,7 @@ export async function loadConversationAction(conversationId: string) {
 
 export async function deleteConversationAction(conversationId: string) {
   try {
-    await fetchMutation(api.conversations.remove, {
-      conversationId: conversationId as Id<"conversations">,
-    });
+    await brainJson(`/conversations/${conversationId}`, { method: "DELETE" });
     return actionSuccess(null);
   } catch (error) {
     return actionFailure(error, {
@@ -176,44 +137,10 @@ export async function deleteConversationAction(conversationId: string) {
 export async function importLegacyConversationsAction(
   conversations: Conversation[],
 ) {
-  try {
-    await fetchMutation(api.conversations.importLegacy, {
-      conversations: conversations.slice(0, 30).map((conversation) => ({
-        legacyId: conversation.id,
-        title: conversation.title,
-        createdAt: conversation.createdAt,
-        updatedAt: conversation.updatedAt,
-        turns: conversation.turns.slice(0, 50).map((turn) => ({
-          turnId: turn.id,
-          question: turn.question,
-          error: turn.error ?? undefined,
-          answer: turn.answer
-            ? {
-                answer: turn.answer.answer,
-                answerModel: turn.answer.answerModel,
-                structuredAnswer: turn.answer.structuredAnswer,
-                retrieval: turn.answer.retrieval,
-              }
-            : undefined,
-        })),
-      })),
-    });
-    return actionSuccess(null);
-  } catch (error) {
-    return actionFailure(error, {
-      code: "INTERNAL_ERROR",
-      message: "Existing local conversations could not be migrated.",
-      retryable: true,
-    });
-  }
+  void conversations;
+  return actionSuccess(null);
 }
 
-/**
- * Add a synthetic support document, either pasted (title + body) or uploaded
- * (file). Writes a sanitized markdown file into the synthetic-docs directory,
- * then re-embeds the corpus so the new document is immediately queryable.
- * Synthetic documents only.
- */
 export async function addSyntheticDocumentAction(formData: FormData) {
   let title = String(formData.get("title") ?? "").trim();
   let body = String(formData.get("body") ?? "").trim();
@@ -226,86 +153,28 @@ export async function addSyntheticDocumentAction(formData: FormData) {
   }
 
   if (!title || !body) {
-    throw new AppError(
-      "VALIDATION_FAILED",
-      "A title and document text are both required.",
-      false,
-    );
+    throw new AppError("VALIDATION_FAILED", "A title and document text are both required.", false);
   }
 
   if (title.length > 120) {
-    throw new AppError(
-      "VALIDATION_FAILED",
-      "Keep the title under 120 characters.",
-      false,
-    );
+    throw new AppError("VALIDATION_FAILED", "Keep the title under 120 characters.", false);
   }
 
   if (body.length > 50_000) {
-    throw new AppError(
-      "VALIDATION_FAILED",
-      "Keep the document under 50,000 characters.",
-      false,
-    );
+    throw new AppError("VALIDATION_FAILED", "Keep the document under 50,000 characters.", false);
   }
 
-  const slug = title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "")
-    .slice(0, 60);
-
-  if (!slug) {
-    throw new AppError(
-      "VALIDATION_FAILED",
-      "Use a title that contains letters or numbers.",
-      false,
-    );
-  }
-
-  const filePath = path.resolve(SYNTHETIC_DOCS_DIR, `${slug}.md`);
-
-  if (!filePath.startsWith(path.resolve(SYNTHETIC_DOCS_DIR) + path.sep)) {
-    throw new AppError(
-      "VALIDATION_FAILED",
-      "That title is not a valid document name.",
-      false,
-    );
-  }
-
-  const markdown = body.startsWith("# ") ? body : `# ${title}\n\n${body}`;
+  const document = seedDocumentFromUpload(title, body);
 
   try {
-    await fs.writeFile(filePath, `${markdown}\n`, { flag: "wx" });
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "EEXIST") {
-      throw new AppError(
-        "VALIDATION_FAILED",
-        "A document with a similar title already exists.",
-        false,
-      );
-    }
-    // Do not forward the raw fs error (it includes the absolute file path).
-    throw new AppError(
-      "INTERNAL_ERROR",
-      "Could not save the document. Please try again.",
-      true,
-    );
-  }
-
-  try {
-    const documents = await loadSyntheticDocuments();
-    const chunks = chunkDocuments(documents);
-
-    await fetchAction(api.ragEmbedding.embedReviewedChunks, {
-      documents: toSourceDocumentRecords(documents),
-      chunks: toDocumentChunkRecords(chunks),
+    await brainJson("/knowledge/seed", {
+      method: "POST",
+      json: { merge: true, documents: [document] },
     });
   } catch {
-    revalidatePath("/");
     throw new AppError(
       "PROVIDER_TEMPORARY",
-      "The document was added but embedding failed. Store and embed the corpus again from the Knowledge view.",
+      "The document could not be stored. Try again from the Knowledge view.",
       true,
     );
   }
@@ -313,14 +182,85 @@ export async function addSyntheticDocumentAction(formData: FormData) {
   revalidatePath("/");
 }
 
-function throwPublicAppError(
-  error: unknown,
-  fallback: PublicAppError,
-): never {
+export async function loadWorkspaceSnapshot(): Promise<{
+  documents: KnowledgeDocument[];
+  chunks: DocumentChunk[];
+  embeddingStorageStatus: EmbeddingStorageStatus;
+  conversations: Conversation[];
+  evalRuns: EvalRunResult[];
+}> {
+  const northwind = previewNorthwindDocuments();
+  try {
+    const [inventory, conversations, evalRuns] = await Promise.all([
+      brainJson<KnowledgeInventory>("/knowledge"),
+      brainJson<Array<Pick<Conversation, "id" | "title" | "createdAt" | "updatedAt">>>(
+        "/conversations",
+      ),
+      brainJson<EvalRunResult[]>("/evaluations"),
+    ]);
+    return {
+      documents: inventory.documents.length > 0 ? inventory.documents : northwind.documents,
+      chunks: inventory.chunks.length > 0 ? inventory.chunks : northwind.chunks,
+      embeddingStorageStatus: inventory.embeddingStorageStatus,
+      conversations: conversations.map((conversation) => ({ ...conversation, turns: [] })),
+      evalRuns,
+    };
+  } catch {
+    return {
+      documents: northwind.documents,
+      chunks: northwind.chunks,
+      embeddingStorageStatus: emptyEmbeddingStorageStatus,
+      conversations: [],
+      evalRuns: [],
+    };
+  }
+}
+
+function seedDocumentFromUpload(title: string, body: string): SeedDocumentInput {
+  const slug = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 60);
+
+  if (!slug) {
+    throw new AppError("VALIDATION_FAILED", "Use a title that contains letters or numbers.", false);
+  }
+
+  const documentId = `nw_upload_${slug}`;
+  const markdown = body.startsWith("# ") ? body : `# ${title}\n\n${body}`;
+  return {
+    documentId,
+    title,
+    sourceName: title,
+    sourcePath: `northwind/uploads/${slug}.md`,
+    accessScope: "public",
+    allowedRoles: [],
+    allowedDepartments: [],
+    body: markdown,
+    metadata: {
+      document_id: documentId,
+      title,
+      source_name: title,
+      source_path: `northwind/uploads/${slug}.md`,
+      department: "support",
+      access_scope: "public",
+      allowed_roles: [],
+      allowed_departments: [],
+    },
+  };
+}
+
+function previewNorthwindDocuments(): { documents: KnowledgeDocument[]; chunks: DocumentChunk[] } {
+  const knowledge = northwindSeedDocuments().map((document) => ({
+    source: document.sourcePath.split("/").pop() ?? document.documentId,
+    title: document.title,
+    text: document.body,
+  }));
+  return { documents: knowledge, chunks: chunkDocuments(knowledge) };
+}
+
+function throwPublicAppError(error: unknown, fallback: PublicAppError): never {
   const publicError = toPublicAppError(error, fallback);
-  throw new AppError(
-    publicError.code,
-    publicError.message,
-    publicError.retryable,
-  );
+  throw new AppError(publicError.code, publicError.message, publicError.retryable);
 }

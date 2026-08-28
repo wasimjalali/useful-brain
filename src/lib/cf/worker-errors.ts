@@ -20,12 +20,20 @@ export class WorkerForbiddenError extends Error {
   }
 }
 
+export class WorkerBusyError extends Error {
+  constructor(message = "An answer is already in progress.") {
+    super(message);
+    this.name = "WorkerBusyError";
+  }
+}
+
 export type WorkerErrorCode =
   | "AUTH_REQUIRED"
   | "FORBIDDEN"
   | "UNAVAILABLE"
   | "VALIDATION_FAILED"
-  | "INTERNAL_ERROR";
+  | "INTERNAL_ERROR"
+  | "RATE_LIMITED";
 
 export type PublicWorkerError = {
   code: WorkerErrorCode;
@@ -42,6 +50,14 @@ export function toPublicWorkerError(error: unknown, requestId: string): PublicWo
       code: "FORBIDDEN",
       message: "You cannot access that resource.",
       retryable: false,
+      requestId,
+    };
+  }
+  if (error instanceof WorkerBusyError) {
+    return {
+      code: "RATE_LIMITED",
+      message: "An answer is already in progress.",
+      retryable: true,
       requestId,
     };
   }
@@ -106,6 +122,8 @@ export function workerErrorResponse(error: unknown, requestId: string): Response
         ? 503
         : body.code === "VALIDATION_FAILED"
           ? 400
+          : body.code === "RATE_LIMITED"
+            ? 429
           : 500;
   return Response.json(body, {
     status: body.code === "FORBIDDEN" ? 403 : status,
