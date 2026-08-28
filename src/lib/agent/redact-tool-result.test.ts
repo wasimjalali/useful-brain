@@ -9,7 +9,7 @@ describe("persisted tool-result redaction", () => {
       redactToolResultForStorage(
         "UNTRUSTED_CONNECTOR_RESULT\nAuthorization: Bearer supersecret.token authorization=also-secret",
       ),
-    ).toBe("Authorization: [REDACTED] authorization=[REDACTED]");
+    ).toBe("Authorization: [REDACTED]");
     expect(redactToolResultForStorage('UNTRUSTED_EVIDENCE\n{"api_key":"sk-live-aaaa"}')).toBe(
       '{"api_key":"[REDACTED]"}',
     );
@@ -51,6 +51,35 @@ describe("persisted tool-result redaction", () => {
     expect(
       redactToolResultForStorage('{"message":"password: correct horse battery"}'),
     ).toBe('{"message":"password=[REDACTED]"}');
+    expect(
+      redactToolResultForStorage(
+        'Authorization: Digest username="Mufasa", response="response-secret"',
+      ),
+    ).toBe("Authorization: [REDACTED]");
+    expect(redactToolResultForStorage("Authorization:ApiKey no-space-secret")).toBe(
+      "Authorization: [REDACTED]",
+    );
+    expect(redactToolResultForStorage("Bearer abc~opaque-secret")).toBe("Bearer [REDACTED]");
+    expect(
+      redactToolResultForStorage("Proxy-Authorization: Basic cHJveHk6c2VjcmV0"),
+    ).toBe("Proxy-Authorization: [REDACTED]");
+    expect(redactToolResultForStorage('{"token":"opaque-secret"}')).toBe(
+      '{"token":"[REDACTED]"}',
+    );
+    expect(redactToolResultForStorage('{"X-API-Key":"x-secret"}')).toBe(
+      '{"X-API-Key":"[REDACTED]"}',
+    );
+    expect(
+      redactToolResultForStorage('{"Proxy-Authorization":"Basic cHJveHk6c2VjcmV0"}'),
+    ).toBe('{"Proxy-Authorization":"[REDACTED]"}');
+    expect(
+      redactToolResultForStorage('{"message":"Authorization: Token opaque-secret"}'),
+    ).toBe('{"message":"Authorization: [REDACTED]"}');
+    expect(
+      redactToolResultForStorage(
+        '{"message":"Authorization: Digest username=\\"Mufasa\\", response=\\"response-secret\\""}',
+      ),
+    ).toBe('{"message":"Authorization: [REDACTED]"}');
   });
 
   it("bounds storage by UTF-8 bytes rather than JS string length", () => {
