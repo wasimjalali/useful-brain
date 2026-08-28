@@ -57,7 +57,7 @@ That command builds OpenNext and runs `wrangler dev` with the web and Brain conf
 
 ## Burooj migration source
 
-Northwind (65 documents, 120 questions) lives in `content/northwind/`. The recoverable Burooj archive is the gitignored `.archives/burooj-630ba08dc7cad6aa71942d6842ce6d8d55a26873.bundle`.
+Northwind (65 documents, 120 questions) lives in `content/northwind/`. The recoverable Burooj archive is the gitignored `.archives/burooj-630ba08dc7cad6aa71942d6842ce6d8d55a26873.bundle`. The local Burooj checkout was deleted 2026-08-28. GitHub repo deletion needs the `delete_repo` token scope.
 
 ## Development
 

@@ -1,10 +1,10 @@
 # Burooj migration ledger
 
-Status: complete for the Cloudflare UI cutover. Named Sanad contracts are ported with TypeScript tests. Northwind (65 documents, 120 questions) is in `content/northwind/`. The recoverable Burooj archive is local-only (gitignored `.archives/burooj-630ba08dc7cad6aa71942d6842ce6d8d55a26873.bundle`, SHA-256 `2e8733d7884f963ab02e5633646515131c33af870f75e9ffa332679f587dcaf8`). Wasim authorized Burooj deletion on 2026-08-28 after archive verify.
+Status: complete for the Cloudflare UI cutover. Named Sanad contracts are ported with TypeScript tests. Northwind (65 documents, 120 questions) is in `content/northwind/`. The recoverable Burooj archive is local-only (gitignored `.archives/burooj-630ba08dc7cad6aa71942d6842ce6d8d55a26873.bundle`, SHA-256 `2e8733d7884f963ab02e5633646515131c33af870f75e9ffa332679f587dcaf8`). Local sibling checkout deleted 2026-08-28. GitHub `wasimjalali/burooj` deletion is blocked on the `delete_repo` token scope.
 
 Sanad source commit: `630ba08dc7cad6aa71942d6842ce6d8d55a26873`  
-Sibling checkout: `/Users/wasimjalali/Desktop/Personal Project/Burooj`  
-Checkout note: HEAD matches the locked commit. The worktree is dirty with Tabari UI files only; Sanad sources used for this ledger were not modified.
+Sibling checkout: deleted 2026-08-28 (was `/Users/wasimjalali/Desktop/Personal Project/Burooj`)  
+Checkout note: HEAD matched the locked commit at archive time. Restore from the local git bundle if needed.
 
 Target contract tests named below are planned Useful Brain files unless Status is Ported.
 

@@ -78,7 +78,7 @@ Do not introduce Convex. Do not propose or add Microsoft Foundry. Do not add Lan
 - Rewrite useful Sanad behavior in TypeScript. Do not paste the Python or unrelated Tabari framework.
 - Port the 65-document Northwind corpus, all 120 questions and named contract tests before retirement.
 - Keep a migration ledger that maps every retained behavior to its Useful Brain implementation and test.
-- Do not delete Burooj until the Northwind corpus (65 documents, 120 questions) is in this repo, the recoverable archive is verified, and Wasim confirms deletion. Wasim confirmed deletion on 2026-08-28 after those gates.
+- Do not delete Burooj until the Northwind corpus (65 documents, 120 questions) is in this repo, the recoverable archive is verified, and Wasim confirms deletion. Wasim confirmed deletion on 2026-08-28 after those gates. Local sibling checkout deleted 2026-08-28. GitHub `wasimjalali/burooj` still needs `gh auth refresh -h github.com -s delete_repo`.
 
 ## Approved packages
 

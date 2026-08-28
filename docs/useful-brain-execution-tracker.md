@@ -366,8 +366,8 @@ Authorized separately from commercial Phase 7B. Loopback + existing staging skel
 - [x] Northwind eval battery and sample questions. Evidence: `src/lib/eval/manual-eval-set.ts`, `src/lib/eval/northwind.test.ts`.
 - [x] Remove Convex from the live path and `package.json`.
 - [x] Brain wrangler dry-run after Pi chat path: **882.95 KiB / gzip 165.15 KiB** (development and staging).
-- [ ] Independent review: Gemini 3.7 Flash high.
-- [ ] Burooj archive verify then delete GitHub repo and local sibling. Archive SHA-256 `2e8733d7884f963ab02e5633646515131c33af870f75e9ffa332679f587dcaf8` verified 2026-08-28.
+- [x] Independent review: Gemini 3.7 Flash high. Verdict approve; no P0/P1 or high/critical findings. Non-blocking P2s left unchanged (legacy localStorage key name, empty-corpus preview, fail-closed tool-argument parse).
+- [x] Local Burooj sibling deleted 2026-08-28 after archive verify (SHA-256 `2e8733d7884f963ab02e5633646515131c33af870f75e9ffa332679f587dcaf8`, `git bundle verify` ok). GitHub `wasimjalali/burooj` deletion is blocked on the `delete_repo` scope (`gh auth refresh -h github.com -s delete_repo`). Archive retained at gitignored `.archives/burooj-630ba08dc7cad6aa71942d6842ce6d8d55a26873.bundle`.
 
 ### Phase 7B: production launch and retirement
 
@@ -379,7 +379,7 @@ Requires one final explicit Wasim approval. Do not start. This is not a commerci
 - [ ] Production-primary cutover
 - [ ] Rollback-window expiry
 - [x] Convex repository deletion (local cutover 2026-08-28; remote Convex deployment retirement is still out of scope)
-- [ ] Burooj deletion (authorized; waiting for archive verify after UI cutover)
+- [ ] Burooj GitHub deletion (local sibling removed 2026-08-28; GitHub needs `delete_repo` scope)
 - [ ] Destructive legacy-resource removal
 
 Exit: only after Wasim explicitly approves real production cutover and retirement.
