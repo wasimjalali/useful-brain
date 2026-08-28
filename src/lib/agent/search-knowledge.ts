@@ -17,6 +17,11 @@ const SearchParams = Type.Object({
   query: Type.String({ minLength: 1 }),
 });
 
+function fileName(pathOrName: string): string {
+  const parts = pathOrName.split("/");
+  return parts[parts.length - 1] || pathOrName;
+}
+
 export function createSearchKnowledgeTool(input: {
   pipeline: Pick<KnowledgePipeline, "search">;
   principal: Principal;
@@ -64,13 +69,14 @@ export function createSearchKnowledgeTool(input: {
         );
         const ledger = input.ledger ?? createLedger();
         const hits = response.hits.map((hit) => {
-          const label = appendSearchHit(ledger, {
-            chunkId: hit.chunkId,
-            documentId: hit.citation.documentId,
-            version: null,
-            section: hit.citation.sectionHeading,
-            text: hit.content,
-          });
+        const label = appendSearchHit(ledger, {
+          chunkId: hit.chunkId,
+          documentId: hit.citation.documentId,
+          version: null,
+          section: hit.citation.sectionHeading,
+          text: hit.content,
+          source: fileName(hit.citation.sourcePath || hit.citation.sourceName),
+        });
           return {
             chunk_id: hit.chunkId,
             content: hit.content,

@@ -19,18 +19,29 @@ export type Conversation = {
   updatedAt: number;
 };
 
-// Single-user, local tool: history lives in the browser rather than a Convex
-// table (a server-side conversations store would be overkill for one user).
+// Browser-local draft history. Server-owned conversations live in operations D1.
 const STORAGE_KEY = "nura.conversations.v1";
 const MIGRATION_KEY = "nura.conversations.migrated-to-convex.v1";
 export const MAX_CONVERSATIONS = 30;
 
+type BrowserStorage = {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+};
+
+function browserStorage(): BrowserStorage | null {
+  const candidate = (globalThis as { localStorage?: BrowserStorage }).localStorage;
+  return candidate ?? null;
+}
+
 export function loadConversations(): Conversation[] {
-  if (typeof window === "undefined") {
+  const storage = browserStorage();
+  if (!storage) {
     return [];
   }
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = storage.getItem(STORAGE_KEY);
     if (!raw) {
       return [];
     }
@@ -45,11 +56,12 @@ export function loadConversations(): Conversation[] {
 }
 
 export function saveConversations(conversations: Conversation[]): void {
-  if (typeof window === "undefined") {
+  const storage = browserStorage();
+  if (!storage) {
     return;
   }
   try {
-    window.localStorage.setItem(
+    storage.setItem(
       STORAGE_KEY,
       JSON.stringify(conversations.slice(0, MAX_CONVERSATIONS)),
     );
@@ -60,15 +72,16 @@ export function saveConversations(conversations: Conversation[]): void {
 }
 
 export function loadLegacyConversationsForMigration(): Conversation[] {
-  if (typeof window === "undefined") return [];
-  if (window.localStorage.getItem(MIGRATION_KEY) === "true") return [];
+  const storage = browserStorage();
+  if (!storage || storage.getItem(MIGRATION_KEY) === "true") return [];
   return loadConversations();
 }
 
 export function markLegacyConversationMigrationComplete(): void {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(MIGRATION_KEY, "true");
-  window.localStorage.removeItem(STORAGE_KEY);
+  const storage = browserStorage();
+  if (!storage) return;
+  storage.setItem(MIGRATION_KEY, "true");
+  storage.removeItem(STORAGE_KEY);
 }
 
 export function deriveConversationTitle(question: string): string {

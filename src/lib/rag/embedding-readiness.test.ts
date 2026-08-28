@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { EMBEDDING_MODEL } from "../embeddings/instructions";
 import {
   EMBEDDING_DIMENSIONS,
   embeddingConfig,
@@ -8,13 +9,13 @@ import {
 import { validateEmbeddingDimensions } from "./vector-validation";
 
 describe("embedding readiness", () => {
-  it("locks the embedding model and dimensions", () => {
+  it("locks the Workers AI embedding model and dimensions", () => {
     expect(embeddingConfig).toEqual({
-      provider: "azure-openai",
-      model: "text-embedding-3-small",
-      dimensions: 1536,
-      deploymentEnvVar: "AZURE_OPENAI_EMBEDDING_DEPLOYMENT",
+      provider: "cloudflare-workers-ai",
+      model: EMBEDDING_MODEL,
+      dimensions: 1024,
     });
+    expect(EMBEDDING_DIMENSIONS).toBe(1024);
   });
 
   it("accepts vectors with the configured dimensions", () => {
@@ -22,8 +23,8 @@ describe("embedding readiness", () => {
 
     expect(validateEmbeddingDimensions(vector)).toEqual({
       ok: true,
-      actualDimensions: 1536,
-      expectedDimensions: 1536,
+      actualDimensions: 1024,
+      expectedDimensions: 1024,
     });
   });
 
@@ -31,8 +32,8 @@ describe("embedding readiness", () => {
     expect(validateEmbeddingDimensions([0.1, 0.2, 0.3])).toEqual({
       ok: false,
       actualDimensions: 3,
-      expectedDimensions: 1536,
-      message: "Expected 1536 dimensions but received 3.",
+      expectedDimensions: 1024,
+      message: "Expected 1024 dimensions but received 3.",
     });
   });
 
@@ -58,19 +59,10 @@ describe("embedding readiness", () => {
     });
   });
 
-  it("reports readiness when the deployment name is configured", () => {
-    expect(isEmbeddingReady({ AZURE_OPENAI_EMBEDDING_DEPLOYMENT: "" })).toEqual({
-      ok: false,
-      message:
-        "Set AZURE_OPENAI_EMBEDDING_DEPLOYMENT before generating embeddings.",
-    });
-    expect(
-      isEmbeddingReady({
-        AZURE_OPENAI_EMBEDDING_DEPLOYMENT: "text-embedding-3-small",
-      }),
-    ).toEqual({
+  it("reports Workers AI embeddings as configured", () => {
+    expect(isEmbeddingReady()).toEqual({
       ok: true,
-      message: "Embedding deployment is configured.",
+      message: "Workers AI embeddings are configured on Brain.",
     });
   });
 });

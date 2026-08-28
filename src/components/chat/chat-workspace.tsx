@@ -16,10 +16,10 @@ import type { EvidenceItem } from "./evidence-inspector";
 export { type EvidenceItem } from "./evidence-inspector";
 
 const SAMPLE_QUESTIONS = [
-  "Can customers return opened products?",
-  "Does express shipping change the order cutoff?",
-  "How much can an agent discount without manager approval?",
-  "How do I pause a subscription for a month?",
+  "What is the first-response target for a P1 support ticket?",
+  "What email address do customers use for support?",
+  "How much parental leave does Northwind provide?",
+  "What is the refund window for an annual plan?",
 ];
 
 type ChatWorkspaceProps = {

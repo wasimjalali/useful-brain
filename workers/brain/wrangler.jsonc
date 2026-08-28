@@ -41,7 +41,8 @@
     }
   ],
   "ai": {
-    "binding": "AI"
+    "binding": "AI",
+    "remote": true
   },
   "queues": {
     "producers": [
@@ -121,7 +122,7 @@
         }
       ],
       "vectorize": [{ "binding": "VECTORIZE", "index_name": "useful-brain-development" }],
-      "ai": { "binding": "AI" },
+      "ai": { "binding": "AI", "remote": true },
       "queues": {
         "producers": [
           { "binding": "INGEST_QUEUE", "queue": "useful-brain-ingest-development" },

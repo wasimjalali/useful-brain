@@ -48,6 +48,7 @@ export type EvidenceIdentity = {
   version: string | null;
   section: string;
   text: string;
+  source?: string;
 };
 
 export type TurnEvidenceLedger = {

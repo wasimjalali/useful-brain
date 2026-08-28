@@ -10,21 +10,21 @@ Useful Brain is a local, single-operator knowledge and action agent for Wasim’
 
 The target architecture lives in `docs/useful-brain-master-plan.md`. Execute from `docs/useful-brain-execution-tracker.md`.
 
-Phase 0 is merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10)). Phase 1 code is merged ([PR #11](https://github.com/wasimjalali/useful-brain/pull/11), follow-up `40f89d7`). Staging resources are provisioned. Operator identity is loopback on 127.0.0.1. Cloudflare Access is optional ported code, not a launch requirement. Independent review is a single consolidated PR after Phase 7A, not a per-phase gate.
+Phase 0 is merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10)). Phase 1 code is merged ([PR #11](https://github.com/wasimjalali/useful-brain/pull/11), follow-up `40f89d7`). Phases 2–7A are merged. Staging resources are provisioned. Operator identity is loopback on 127.0.0.1. Cloudflare Access is optional ported code, not a launch requirement.
 
-Wasim granted standing authorization on 2026-08-26 for Grok 4.6 xhigh to execute Phase 1 through Phase 6 and Phase 7A without ordinary phase-by-phase approval. That covers approved packages, master-plan D1 schema and auth changes, staging-only Cloudflare resources, synthetic Workers AI and model evaluations inside the safety limits, branches/commits/PRs, merging green PRs, continuing to the next phase, updating planning documents, evidence-based Cloudflare-hosted model selection, and using eligible Cloudflare credits for staging infrastructure and Workers AI. It does **not** cover real company data, production cutover, destructive retirement, uncovered external-provider spending, unlimited usage, Convex deletion, or Burooj deletion.
+Wasim granted standing authorization on 2026-08-26 for Grok 4.6 xhigh to execute Phase 1 through Phase 6 and Phase 7A without ordinary phase-by-phase approval. On 2026-08-28 Wasim authorized the local Cloudflare UI cutover: wire Brain to the Next.js UI, remove Convex and Azure, use Workers AI GLM 5.3 Flash for chat, and delete Burooj after Northwind is in this repo. That does **not** cover real company data, a new production resource set, or commercial launch.
 
-Phase 7 is split: 7A (staging release candidate) is inside this authorization; 7B (production launch and retirement) requires one final explicit Wasim approval.
+Phase 7B (production launch with real company data and a production resource set) still requires one final explicit Wasim approval.
 
 Do not skip phase exit criteria or silently change the master plan. Keep historical Nura documents as historical records unless they cause active instructions to become ambiguous.
 
-The implementation model is Grok 4.6 xhigh. GPT-5.6 Sol xhigh owns architecture adjudication and final integration review. Neither model approves its own critical security work. `codex review --base main` is the independent review gate; a self-review is not independent.
+The implementation model is Grok 4.6 xhigh. Independent review of remaining work is Gemini 3.7 Flash high. Do not use GPT-5.6 Sol. Neither model approves its own critical security work.
 
 ## Current and target stacks
 
-The current working backend is Convex. It remains only as the migration source and rollback path.
+The live application backend is Cloudflare: Next.js on OpenNext, Brain Worker, D1, Vectorize, Workers AI, and Pi Agent Core. Convex has been removed from the live path.
 
-The finalized target is:
+The stack is:
 
 - Frontend: Next.js App Router with TypeScript, deployed to Cloudflare Workers through OpenNext initially.
 - Styling: Tailwind CSS v4 with role-named design tokens.
@@ -39,7 +39,7 @@ The finalized target is:
 - Model routing: AI Gateway.
 - Agent framework: `@earendil-works/pi-agent-core` with the minimum `pi-ai` provider imports.
 
-Do not introduce Convex into new target code. Do not propose or add Microsoft Foundry. Do not add LangChain, LangGraph, CrewAI, Cloudflare Agents SDK or another competing agent framework.
+Do not introduce Convex. Do not propose or add Microsoft Foundry. Do not add LangChain, LangGraph, CrewAI, Cloudflare Agents SDK or another competing agent framework.
 
 ## Safety rules
 
@@ -78,7 +78,7 @@ Do not introduce Convex into new target code. Do not propose or add Microsoft Fo
 - Rewrite useful Sanad behavior in TypeScript. Do not paste the Python or unrelated Tabari framework.
 - Port the 65-document Northwind corpus, all 120 questions and named contract tests before retirement.
 - Keep a migration ledger that maps every retained behavior to its Useful Brain implementation and test.
-- Do not delete Burooj until Section 12 of the master plan passes and Wasim confirms deletion.
+- Do not delete Burooj until the Northwind corpus (65 documents, 120 questions) is in this repo, the recoverable archive is verified, and Wasim confirms deletion. Wasim confirmed deletion on 2026-08-28 after those gates.
 
 ## Approved packages
 
@@ -92,7 +92,7 @@ Compatible patched transitive overrides are authorized after full verification. 
 
 ## Stop conditions
 
-Stop and batch remaining manual work only when: a change contradicts the fixed architecture; a confirmed high/critical risk has no safe in-plan solution; a required package is outside the approved list and no package-free path exists; a new paid subscription or add-on is required; confirmed credits do not cover a required paid operation; a gross usage safety limit would be exceeded; real company content or production credentials are required; production deployment or real traffic cutover is reached; Convex or Burooj deletion is reached; an irreversible destructive action is required; or a manual identity/domain/protected-secret bootstrap is unavoidable.
+Stop and batch remaining manual work only when: a change contradicts the fixed architecture; a confirmed high/critical risk has no safe in-plan solution; a required package is outside the approved list and no package-free path exists; a new paid subscription or add-on is required; confirmed credits do not cover a required paid operation; a gross usage safety limit would be exceeded; real company content or production credentials are required; commercial production deployment or real traffic cutover is reached; an irreversible destructive action is required beyond the authorized Convex and Burooj retirement; or a manual identity/domain/protected-secret bootstrap is unavoidable.
 
 ## Development workflow
 
@@ -102,8 +102,7 @@ Stop and batch remaining manual work only when: a change contradicts the fixed a
 - Keep changes surgical and update markdown made stale by the change.
 - Verify every completed change with `npx tsc --noEmit`, `npm run lint`, `npm test`, `npm run build`, relevant workerd tests, Wrangler dry runs, the dependency audit and security tests.
 - For Next.js and Cloudflare changes, verify current official documentation rather than relying on memory.
-- Run independent review with `codex review --base main`. Fix every confirmed P0/P1 and every confirmed high or critical security finding. Merge automatically only when GitHub checks and independent review are green. Then start the next phase from updated `main` without asking Wasim.
-- Do not open a PR per phase. One consolidated PR lands after Phase 7A. GitHub Actions quota is exhausted; local proof is `npx tsc --noEmit`, `npm run lint`, `npm test`, `npm run test:workers`, `npm run build`, Wrangler dry-runs, `npm audit --omit=dev --audit-level=high`, and the phase reports.
+- Run independent review with Gemini 3.7 Flash high. Fix every confirmed P0/P1 and every confirmed high or critical security finding. Merge automatically only when GitHub checks and independent review are green.
 
 ## Interface
 
@@ -115,4 +114,3 @@ Useful Brain is a local portfolio product. Keep the existing left-aligned worksp
 - Keep company terminology in `src/lib/useful-brain-config.ts`.
 - Do not add public signup, billing, SSO onboarding or tenant switching.
 - Operator identity is loopback on 127.0.0.1 with `LOOPBACK_RUNTIME`. Never enable loopback on a public `workers.dev` URL. Staging may use `IDENTITY_MODE=disabled` for skeleton smoke. Cloudflare Access is optional demonstration code, not a required production perimeter.
-- The legacy `NURA_ALLOW_ANONYMOUS_DEV` flag remains only until the Convex path is retired.

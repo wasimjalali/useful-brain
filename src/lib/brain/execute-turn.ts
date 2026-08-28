@@ -1,0 +1,298 @@
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
+
+import type { Principal } from "../acl/access";
+import type { DirectoryRecord } from "../auth/principal";
+import { PROMPT_VERSION, answerFromEvidence, structuredAnswerToText } from "../answer/contract";
+import { structuredJsonFromGroundedProse } from "../answer/prose-to-structured";
+import {
+  LIVE_KNOWLEDGE_SYSTEM_PROMPT,
+  runKnowledgeAgent,
+  type AgentRuntime,
+} from "../agent/run";
+import { WorkerBusyError, WorkerForbiddenError, WorkerValidationError } from "../cf/worker-errors";
+import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL } from "../embeddings/instructions";
+import type { WorkersAiRunner } from "../embeddings/workers-ai-embed";
+import { glm53FlashModel } from "../models/glm-5-3-flash";
+import { createWorkersAiChatStream } from "../models/workers-ai-chat";
+import { CHAT_MODEL_ID } from "../models/selection";
+import type { GroundedAnswerResponse } from "../rag/grounded-answer";
+import { CloudflareKnowledgePipeline, type CorpusSql, type VectorizeIndex } from "../retrieve/cloudflare-pipeline";
+import { REAL_STACK_FINGERPRINT, fingerprintId } from "../retrieve/fingerprint";
+import { FakeReranker } from "../retrieve/rerank";
+import { WorkersAiReranker } from "../retrieve/workers-ai-reranker";
+import type { KnowledgePipeline } from "../retrieve/pipeline";
+import { activeGenerationId, type SqlExecutor } from "../store/corpus-d1";
+import {
+  completeTurn,
+  ConversationStoreError,
+  createPendingTurn,
+  failTurn,
+  loadBoundedHistory,
+  loadReplay,
+  persistThenRelease,
+  type OperationsDatabase,
+  type StoredHistoryTurn,
+} from "../store/conversations";
+
+export type ConversationLockStub = {
+  acquire(runId: string): Promise<{ ok: boolean; status?: number; runId?: string }>;
+  release(runId: string): Promise<{ ok: boolean }>;
+};
+
+export type ExecuteTurnInput = {
+  operations: OperationsDatabase;
+  corpus?: CorpusSql;
+  vectorize?: VectorizeIndex;
+  ai?: WorkersAiRunner;
+  lockFor(conversationId: string): ConversationLockStub;
+  principal: DirectoryRecord;
+  question: string;
+  conversationId?: string;
+  requestId: string;
+  persistConversation?: boolean;
+  now?: number;
+};
+
+export async function executeTurn(input: ExecuteTurnInput): Promise<GroundedAnswerResponse> {
+  const now = input.now ?? Date.now();
+  const persist = input.persistConversation !== false;
+  const retrievalPrincipal: Principal = {
+    userId: input.principal.id,
+    roles: input.principal.roles,
+    departments: input.principal.departments,
+  };
+  const policyPrincipal = { id: input.principal.id };
+  const pipeline = await knowledgePipeline(input);
+  const runtime = liveRuntime(input.ai);
+
+  if (!persist) {
+    const result = await runKnowledgeAgent({
+      question: input.question,
+      pipeline,
+      principal: retrievalPrincipal,
+      policyPrincipal,
+      conversationId: input.conversationId ?? "eval-ephemeral",
+      runtime,
+    });
+    return responseFromAgent(input.question, result.finalResponse, result.evidence, result.model);
+  }
+
+  let pending: { conversationId: string; assistantMessageId: string; duplicate: boolean };
+  try {
+    pending = await createPendingTurn(input.operations, {
+      ownerPrincipalId: input.principal.id,
+      conversationId: input.conversationId,
+      requestId: input.requestId,
+      question: input.question,
+      now,
+    });
+  } catch (error) {
+    throw mapStoreError(error);
+  }
+
+  if (pending.duplicate) {
+    const completed = await loadReplay(input.operations, pending.assistantMessageId, input.principal.id);
+    if (completed) {
+      return replayToResponse(completed);
+    }
+    throw new WorkerBusyError();
+  }
+
+  const lock = input.lockFor(pending.conversationId);
+  const acquired = await lock.acquire(pending.assistantMessageId);
+  if (!acquired.ok) {
+    await failTurn(input.operations, {
+      assistantMessageId: pending.assistantMessageId,
+      ownerPrincipalId: input.principal.id,
+      errorCode: "RATE_LIMITED",
+      now,
+    }).catch(() => undefined);
+    throw new WorkerBusyError();
+  }
+
+  try {
+    const history = await loadBoundedHistory(
+      input.operations,
+      pending.conversationId,
+      input.principal.id,
+    );
+    const result = await runKnowledgeAgent({
+      question: input.question,
+      pipeline,
+      principal: retrievalPrincipal,
+      policyPrincipal,
+      conversationId: pending.conversationId,
+      priorMessages: historyToAgentMessages(history, resultModelId(runtime)),
+      runtime,
+    });
+    const rawModelJson = structuredJsonFromGroundedProse(result.finalResponse, result.evidence);
+    const corpusGenerationId = (await activeGenerationIdFor(input)) ?? "none";
+    const completed = await persistThenRelease({
+      persist: () =>
+        completeTurn(input.operations, {
+          ownerPrincipalId: input.principal.id,
+          assistantMessageId: pending.assistantMessageId,
+          requestId: input.requestId,
+          rawModelJson,
+          evidence: result.evidence,
+          answerModel: result.model,
+          embeddingModel: EMBEDDING_MODEL,
+          embeddingDimensions: EMBEDDING_DIMENSIONS,
+          promptVersion: result.promptVersion || PROMPT_VERSION,
+          retrievalConfigVersion: fingerprintId(REAL_STACK_FINGERPRINT),
+          corpusGenerationId,
+          now: Date.now(),
+        }),
+      release: () => lock.release(pending.assistantMessageId),
+    });
+    return replayToResponse(completed);
+  } catch (error) {
+    await failTurn(input.operations, {
+      assistantMessageId: pending.assistantMessageId,
+      ownerPrincipalId: input.principal.id,
+      errorCode: "INTERNAL_ERROR",
+      now: Date.now(),
+    }).catch(() => undefined);
+    await lock.release(pending.assistantMessageId).catch(() => undefined);
+    throw mapStoreError(error);
+  }
+}
+
+async function knowledgePipeline(
+  input: ExecuteTurnInput,
+): Promise<Pick<KnowledgePipeline, "search">> {
+  if (!input.corpus) {
+    return emptyPipeline();
+  }
+  const generationId = await activeGenerationId(input.corpus as unknown as SqlExecutor);
+  if (!generationId) {
+    return emptyPipeline();
+  }
+  return new CloudflareKnowledgePipeline({
+    db: input.corpus,
+    vectorize: input.vectorize ?? {
+      query: async () => ({ matches: [] }),
+    },
+    ai: input.ai ?? { run: async () => ({ data: [] }) },
+    reranker: input.ai ? new WorkersAiReranker(input.ai) : new FakeReranker(),
+    generationId,
+    fingerprint: REAL_STACK_FINGERPRINT,
+  });
+}
+
+function emptyPipeline(): Pick<KnowledgePipeline, "search"> {
+  return {
+    search: async ({ query }) => ({
+      hits: [],
+      trace: {
+        query,
+        finalChunkIds: [],
+        vectorScores: {},
+        keywordScores: {},
+        fusedScores: {},
+        rerankScores: {},
+        fingerprint: fingerprintId(REAL_STACK_FINGERPRINT),
+      },
+    }),
+  };
+}
+
+function liveRuntime(ai: WorkersAiRunner | undefined): AgentRuntime | undefined {
+  if (!ai) {
+    return undefined;
+  }
+  return {
+    model: glm53FlashModel(),
+    stream: createWorkersAiChatStream({
+      run: (model, payload) => ai.run(model, payload),
+    }),
+    systemPrompt: LIVE_KNOWLEDGE_SYSTEM_PROMPT,
+  };
+}
+
+function resultModelId(runtime: AgentRuntime | undefined): string {
+  return runtime?.model.id ?? CHAT_MODEL_ID;
+}
+
+function historyToAgentMessages(history: StoredHistoryTurn[], modelId: string): AgentMessage[] {
+  const messages: AgentMessage[] = [];
+  for (const turn of history) {
+    messages.push({ role: "user", content: turn.question, timestamp: Date.now() });
+    messages.push({
+      role: "assistant",
+      content: [{ type: "text", text: turn.answer }],
+      api: "openai-completions",
+      provider: "cloudflare-workers-ai",
+      model: modelId,
+      usage: {
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 0,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      },
+      stopReason: "stop",
+      timestamp: Date.now(),
+    });
+  }
+  return messages;
+}
+
+function responseFromAgent(
+  question: string,
+  finalResponse: string,
+  evidence: GroundedAnswerResponse["retrieval"]["results"],
+  model: string,
+): GroundedAnswerResponse {
+  const raw = structuredJsonFromGroundedProse(finalResponse, evidence);
+  const structured = answerFromEvidence(raw, evidence);
+  return {
+    question,
+    answer: structuredAnswerToText(structured),
+    answerModel: model,
+    structuredAnswer: structured,
+    retrieval: {
+      embeddingModel: EMBEDDING_MODEL,
+      embeddingDimensions: EMBEDDING_DIMENSIONS,
+      results: evidence,
+    },
+  };
+}
+
+function replayToResponse(replay: {
+  conversationId: string;
+  assistantMessageId: string;
+  question: string;
+  answer: string;
+  answerModel: string;
+  structuredAnswer: GroundedAnswerResponse["structuredAnswer"];
+  retrieval: GroundedAnswerResponse["retrieval"];
+}): GroundedAnswerResponse {
+  return {
+    question: replay.question,
+    answer: replay.answer,
+    answerModel: replay.answerModel,
+    structuredAnswer: replay.structuredAnswer,
+    retrieval: replay.retrieval,
+    conversationId: replay.conversationId,
+    assistantMessageId: replay.assistantMessageId,
+  };
+}
+
+function mapStoreError(error: unknown): unknown {
+  if (error instanceof ConversationStoreError && error.message === "FORBIDDEN") {
+    return new WorkerForbiddenError();
+  }
+  if (error instanceof ConversationStoreError) {
+    return new WorkerValidationError();
+  }
+  return error;
+}
+
+async function activeGenerationIdFor(input: ExecuteTurnInput): Promise<string | null> {
+  if (!input.corpus) {
+    return null;
+  }
+  return activeGenerationId(input.corpus as unknown as SqlExecutor);
+}

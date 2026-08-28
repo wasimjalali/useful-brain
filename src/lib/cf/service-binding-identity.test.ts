@@ -4,6 +4,7 @@ import {
   UnsignedPrincipalError,
   assertionForBrain,
   createBrainBoundRequest,
+  createBrainServiceRequest,
 } from "./service-binding-identity";
 
 describe("service-binding identity", () => {
@@ -45,5 +46,20 @@ describe("service-binding identity", () => {
     expect(forwarded.headers.get("cf-access-authenticated-user-email")).toBeNull();
     expect(forwarded.headers.get("cookie")).toBeNull();
     expect(forwarded.headers.get("authorization")).toBeNull();
+  });
+
+  it("forwards JSON Brain mutations without spoofable principal headers", () => {
+    const forwarded = createBrainServiceRequest({
+      incomingHeaders: new Headers({
+        "cf-access-jwt-assertion": "signed.jwt.token",
+        "x-useful-brain-principal": "alice@karkoai.com",
+      }),
+      path: "/turns",
+      method: "POST",
+      body: JSON.stringify({ question: "ping", requestId: "turn-1" }),
+    });
+    expect(forwarded.method).toBe("POST");
+    expect(forwarded.headers.get("content-type")).toBe("application/json");
+    expect(forwarded.headers.get("x-useful-brain-principal")).toBeNull();
   });
 });

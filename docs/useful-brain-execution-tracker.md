@@ -1,12 +1,12 @@
 # Useful Brain implementation execution tracker
 
-Status: Phase 7A is merged on `main` ([PR #13](https://github.com/wasimjalali/useful-brain/pull/13)). Independent-review P2 repairs are on `grok/phase-7a-p2-repairs`. Phase 0 and Phase 1 code are merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10), [PR #11](https://github.com/wasimjalali/useful-brain/pull/11)). Staging resources are live. Product boundary (Wasim 2026-08-27): local portfolio agent — no billing, public signup or required Cloudflare Access. Phase 7B stays closed.
+Status: Phase 7A is merged on `main` ([PR #13](https://github.com/wasimjalali/useful-brain/pull/13), P2 repairs [PR #14](https://github.com/wasimjalali/useful-brain/pull/14)). Local Cloudflare UI cutover is on `grok/cloudflare-ui-cutover`. Product boundary: local portfolio agent — no billing, public signup or required Cloudflare Access. Commercial Phase 7B (real company data, production resource set) stays closed.
 
 Architecture authority: `docs/useful-brain-master-plan.md`
 
 Execution prompt: `docs/useful-brain-grok-execution-prompt.md`
 
-Standing authorization: 2026-08-26. Grok 4.6 xhigh may execute Phase 1 through Phase 6 and Phase 7A without ordinary phase-by-phase approval. Phase 7B stays closed.
+Standing authorization: 2026-08-26 for Phases 1–7A. Wasim 2026-08-28 authorized local UI cutover, Convex removal, Workers AI GLM 5.3 Flash, and Burooj deletion after Northwind is in this repo.
 
 ## 1. Objective
 
@@ -29,9 +29,9 @@ This file is the implementation checklist and evidence ledger. Update it as work
 - Loopback local operator on 127.0.0.1. Cloudflare Access JWT is optional ported code, not a required perimeter. No billing or public signup.
 - Pi Agent Core as the only agent loop.
 - One policy gateway for native tools, MCP and plugins.
-- Convex remains a migration source and rollback path until cutover.
+- Convex remains a historical migration source in docs only. The live UI is Cloudflare.
 
-Changing one of these decisions is an architecture change. Stop, write the evidence and request GPT-5.6 Sol adjudication before editing code to follow a different design.
+Changing one of these decisions is an architecture change. Stop, write the evidence and request adjudication before editing code to follow a different design.
 
 ## 3. Approval boundaries
 
@@ -57,8 +57,8 @@ Grok must still stop and ask Wasim before:
 - exceeding a configured gross usage safety limit
 - using a service not covered by confirmed credits
 - changing a fixed architecture decision
-- deleting Convex code, data or resources
-- deleting or archiving the Burooj repository
+- deleting Convex code, data or resources (superseded 2026-08-28 for repository code only; do not delete remote Convex deployments without a separate check)
+- deleting or archiving the Burooj repository (authorized 2026-08-28 after Northwind-in-repo and archive verify)
 - Phase 7B production launch, real traffic cutover or destructive legacy-resource removal
 - a manual identity, domain or protected-secret bootstrap that cannot be done in code
 
@@ -357,6 +357,18 @@ Authorized for continuous execution after Phase 6. Synthetic data only.
 
 Exit: staging is the release candidate with restore, incident and budget evidence. No real company data. No billing, public signup or required Cloudflare Access.
 
+### Local Cloudflare UI cutover (Wasim 2026-08-28)
+
+Authorized separately from commercial Phase 7B. Loopback + existing staging skeleton. No real company data. No new production resource set.
+
+- [x] Select GLM 5.3 Flash for chat; keep Qwen 0.6b embeddings and BGE rerank. Evidence: [model-selection-report.md](model-selection-report.md), `src/lib/models/selection.ts`.
+- [x] Point Next.js UI at Brain over the Service Binding. Evidence: `src/app/actions.ts`, `src/lib/cf/brain-client.ts`, `workers/brain/src/index.ts`, `workers/brain/test/ui-api.test.ts`.
+- [x] Northwind eval battery and sample questions. Evidence: `src/lib/eval/manual-eval-set.ts`, `src/lib/eval/northwind.test.ts`.
+- [x] Remove Convex from the live path and `package.json`.
+- [x] Brain wrangler dry-run after Pi chat path: **882.95 KiB / gzip 165.15 KiB** (development and staging).
+- [ ] Independent review: Gemini 3.7 Flash high.
+- [ ] Burooj archive verify then delete GitHub repo and local sibling. Archive SHA-256 `2e8733d7884f963ab02e5633646515131c33af870f75e9ffa332679f587dcaf8` verified 2026-08-28.
+
 ### Phase 7B: production launch and retirement
 
 Requires one final explicit Wasim approval. Do not start. This is not a commercial launch and must not add billing, public signup or required Cloudflare Access.
@@ -366,8 +378,8 @@ Requires one final explicit Wasim approval. Do not start. This is not a commerci
 - [ ] Real production traffic
 - [ ] Production-primary cutover
 - [ ] Rollback-window expiry
-- [ ] Convex deletion
-- [ ] Burooj deletion
+- [x] Convex repository deletion (local cutover 2026-08-28; remote Convex deployment retirement is still out of scope)
+- [ ] Burooj deletion (authorized; waiting for archive verify after UI cutover)
 - [ ] Destructive legacy-resource removal
 
 Exit: only after Wasim explicitly approves real production cutover and retirement.

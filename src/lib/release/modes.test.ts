@@ -10,15 +10,15 @@ import {
   planRelease,
 } from "./modes";
 
-describe("Phase 7A synthetic release candidate", () => {
-  it("keeps Convex live in shadow and canary, and uses Cloudflare only for staging-primary", () => {
+describe("synthetic Cloudflare release plans", () => {
+  it("keeps Cloudflare as the live backend in every mode", () => {
     expect(planRelease("shadow")).toEqual({
       mode: "shadow",
-      liveBackend: "convex",
+      liveBackend: "cloudflare",
       syntheticOnly: true,
       canaryPercent: 0,
     });
-    expect(planRelease("canary")).toMatchObject({ liveBackend: "convex", canaryPercent: 10 });
+    expect(planRelease("canary")).toMatchObject({ liveBackend: "cloudflare", canaryPercent: 10 });
     const primary = planRelease("staging_primary");
     expect(primary.liveBackend).toBe("cloudflare");
     expect(primary.canaryPercent).toBe(100);

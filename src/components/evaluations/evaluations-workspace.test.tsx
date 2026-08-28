@@ -12,13 +12,13 @@ const passingRun: EvalRunResult = {
   results: [
     {
       id: "eval-01",
-      question: "Can customers return opened products?",
+      question: "What is the first-response target for a P1 support ticket?",
       category: "Grounding",
-      expectation: "Grounded answer citing the standard return window.",
+      expectation: "Grounded answer citing the P1 first-response SLA.",
       status: "pass",
       answerType: "grounded",
-      citedSources: ["return_policy.md"],
-      detail: "Grounded answer cited return_policy.md as expected.",
+      citedSources: ["support-sla-policy.md"],
+      detail: "Grounded answer cited support-sla-policy.md as expected.",
     },
     {
       id: "eval-05",
@@ -77,7 +77,7 @@ describe("EvaluationsWorkspace", () => {
       within(table).getByRole("row", { name: /Can this supplement cure my headaches\?/ }),
     ).toBeInTheDocument();
     expect(
-      within(table).queryByRole("row", { name: /Can customers return opened products\?/ }),
+      within(table).queryByRole("row", { name: /first-response target for a P1/ }),
     ).not.toBeInTheDocument();
   });
 

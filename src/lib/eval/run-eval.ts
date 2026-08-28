@@ -1,10 +1,9 @@
 import type { EvalAssertion } from "./manual-eval-set";
 
 /**
- * The subset of convex/ragAnswer.ts's generateGroundedAnswer response that
- * evaluateCase needs. Kept as a local structural type (instead of importing
- * from convex/) so this file has no network or backend dependency and stays
- * unit-testable with hand-built fixtures.
+ * The subset of a grounded-answer response that evaluateCase needs. Kept as a
+ * local structural type so this file has no network or backend dependency and
+ * stays unit-testable with hand-built fixtures.
  */
 export type GroundedAnswerForEval = {
   answer: string;
@@ -68,7 +67,7 @@ function getCitedSources(answer: GroundedAnswerForEval): string[] {
  * Pure assertion logic for a live eval run. Takes an already-fetched grounded
  * answer (no network calls here) and checks it against the case's expected
  * outcome. All assertion logic lives here so it is unit-testable without a
- * Convex deployment or a real model call.
+ * live model call.
  */
 export function evaluateCase(
   assertion: EvalAssertion,
