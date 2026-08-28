@@ -181,10 +181,10 @@ Approved 2026-08-26. Planning assumptions for the first isolated company deploym
 
 ### Users and concurrency
 
-- Up to 50 employees
+- Northwind-demo planning envelope: up to 50 principals
 - Up to 10 concurrent chat or agent runs
 - Up to 5 service-token callers
-- One isolated application and Cloudflare resource set per company
+- One isolated application and Cloudflare resource set for this operator. Not a billed multi-company product.
 
 ### Initial product scope
 
@@ -222,6 +222,6 @@ Cost:
 - Idle deployment: existing $5 Workers Paid account minimum, with effectively $0 incremental idle Cloudflare cost
 - First-pilot Cloudflare platform budget: no more than $25 per month
 - External generation-model budget: no more than $75 per month
-- Initial combined operating budget: no more than $100 per company per month
+- Initial combined operating budget: no more than $100 per month (infrastructure safety limit, not a customer billing product)
 - Credits are excluded from cost justification until the billing dashboard confirms Developer Platform eligibility
 - Add budget alerts before any repeated live-stack evaluation or external model workload

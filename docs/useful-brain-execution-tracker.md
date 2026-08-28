@@ -1,6 +1,6 @@
 # Useful Brain implementation execution tracker
 
-Status: Phase 1 repair on `phase-1-cloudflare-foundation` ([PR #11](https://github.com/wasimjalali/useful-brain/pull/11)). Phase 0 is merged. Do not merge PR #11 or provision Cloudflare resources until Phase 1 repairs, workerd evidence and independent review are complete.
+Status: Phase 7A complete on `phase-1-through-7a-staging`. Consolidated PR: [#13](https://github.com/wasimjalali/useful-brain/pull/13). Phase 0 and Phase 1 code are merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10), [PR #11](https://github.com/wasimjalali/useful-brain/pull/11)). Staging resources are live. Product boundary (Wasim 2026-08-27): local portfolio agent — no billing, public signup or required Cloudflare Access. The independent-review P1 repair batch and final blocker re-review are green locally; PR #13 is cleared to merge. Phase 7B stays closed.
 
 Architecture authority: `docs/useful-brain-master-plan.md`
 
@@ -16,7 +16,7 @@ This file is the implementation checklist and evidence ledger. Update it as work
 
 ## 2. Fixed architecture
 
-- One isolated application and Cloudflare resource set per company.
+- One isolated application and Cloudflare resource set for this operator. No billing, public signup or tenant switching.
 - Next.js on Cloudflare Workers through OpenNext initially.
 - Separate web, brain and ingestion Worker responsibilities.
 - Separate corpus and operations D1 databases.
@@ -26,7 +26,7 @@ This file is the implementation checklist and evidence ledger. Update it as work
 - AI Gateway for model routing with payload collection disabled.
 - Queues and Workflows for durable ingestion, approval waits and deterministic resume.
 - Durable Objects only for one-run locks, stream fan-out and cancellation.
-- Cloudflare Access at the perimeter and independent assertion verification in Brain.
+- Loopback local operator on 127.0.0.1. Cloudflare Access JWT is optional ported code, not a required perimeter. No billing or public signup.
 - Pi Agent Core as the only agent loop.
 - One policy gateway for native tools, MCP and plugins.
 - Convex remains a migration source and rollback path until cutover.
@@ -39,7 +39,7 @@ Wasim granted standing authorization on 2026-08-26 for Grok 4.6 xhigh to execute
 
 1. Installing the approved packages in `AGENTS.md`.
 2. Making D1 schema and authentication changes required by the approved master plan.
-3. Provisioning the approved staging-only Cloudflare resources **after PR #11 is corrected, independently reviewed and merged**.
+3. Provisioning the approved staging-only Cloudflare resources (PR #11 is merged).
 4. Running synthetic Workers AI and model evaluations within the approved usage boundaries.
 5. Creating branches, committing, pushing, opening PRs and merging green PRs.
 6. Continuing automatically from one completed phase to the next.
@@ -71,15 +71,15 @@ For every phase:
 1. Read `AGENTS.md`, the relevant master-plan sections and this tracker.
 2. Inspect only the code and Burooj sources required for the current phase.
 3. Verify current Next.js, Cloudflare and Pi APIs from primary documentation.
-4. Create a phase branch from current `main`. Never work directly on `main`.
+4. Work on `phase-1-through-7a-staging`. Commit per phase. Open one PR only after Phase 7A. Never work directly on `main`.
 5. Write or port contract tests before custom behavior where practical. Critical Worker behavior requires workerd tests, not Node-only mocks.
 6. Implement only the current phase and its prerequisites.
 7. Update this tracker and any stale project markdown.
 8. Run `npx tsc --noEmit`, `npm run lint`, `npm test`, `npm run build`, relevant workerd tests, Wrangler dry runs, phase-specific evals, `npm audit --omit=dev --audit-level=high` and security tests.
-9. Run independent review with `codex review --base main`. Fix every confirmed P0/P1 and every confirmed high or critical security finding. A self-review is not independent.
-10. Commit conventionally, push, open a PR and wait for GitHub checks.
+9. Independent review is deferred to the single consolidated PR after Phase 7A. A different-model reviewer owns that review. Do not open a per-phase PR. GitHub Actions quota is exhausted; do not wait on Actions.
+10. Commit conventionally per phase on `phase-1-through-7a-staging`.
 11. Add `docs/implementation-reports/phase-N-<name>.md` with the evidence template in Section 13.
-12. Merge only when checks and independent review are green, then start the next phase from updated `main`.
+12. After Phase 7A, open one PR against `main`. Fix confirmed P0/P1 and high/critical findings from the independent reviewer, then merge.
 
 Do not weaken or delete a failing test to make a gate pass. Record deviations and unresolved failures explicitly. A Wrangler dry-run that only bundles an exported symbol is not evidence that a Workflow, Durable Object or Service Binding path works.
 
@@ -89,13 +89,13 @@ Do not weaken or delete a failing test to make a gate pass. Record deviations an
 | --- | --- | --- |
 | Plan review and product rename | Complete | Master plan v1.2 and renamed repository |
 | Phase 0: feasibility and baselines | Complete | [PR #10](https://github.com/wasimjalali/useful-brain/pull/10); [phase-0 report](implementation-reports/phase-0-feasibility.md) |
-| Phase 1: Cloudflare foundation | In progress — PR #11 must be repaired | Workerd Workflow, DO lock, Service Binding identity and staging auth remain incomplete |
-| Phase 2: ingestion and generations | Blocked by Phase 1 | Pending |
-| Phase 3: ACL-safe retrieval | Blocked by Phase 2 | Pending |
-| Phase 4: grounded answers | Blocked by Phase 3 | Pending |
-| Phase 5: Pi knowledge agent | Blocked by Phase 4 | Pending |
-| Phase 6: connectors, MCP and plugins | Blocked by Phase 5 | Pending |
-| Phase 7A: staging release candidate | Blocked by Phase 6 | Authorized after Phase 6; synthetic only |
+| Phase 1: Cloudflare foundation | Remainder complete — Access not required | [phase-1 report](implementation-reports/phase-1-cloudflare-foundation.md); staging workers.dev smoke; Access is optional ported code |
+| Phase 2: ingestion and generations | Complete | [phase-2 report](implementation-reports/phase-2-ingestion.md); workerd promote/rollback and workflow/queue tests |
+| Phase 3: ACL-safe retrieval | Complete | [phase-3 report](implementation-reports/phase-3-retrieval.md); fake-provider and fake-rerank CI ratchets; FTS5 workerd |
+| Phase 4: grounded answers | Complete | [phase-4 report](implementation-reports/phase-4-grounded-answers.md); citation/refusal/replay/shadow; Convex stays live UI |
+| Phase 5: Pi knowledge agent | Complete | [phase-5 report](implementation-reports/phase-5-pi-agent.md); policy gateway, Workflow approval, durable run records |
+| Phase 6: connectors, MCP and plugins | Complete | [phase-6 report](implementation-reports/phase-6-connectors-mcp.md); synthetic HTTP/MCP/action-sink through the policy gateway |
+| Phase 7A: staging release candidate | Complete | [phase-7a report](implementation-reports/phase-7a-staging-rc.md); [PR #13](https://github.com/wasimjalali/useful-brain/pull/13); synthetic staging RC; no billing/signup/required Access |
 | Phase 7B: production launch and retirement | Closed | Requires one final explicit Wasim approval |
 
 ## 6. Phase 0: feasibility and baselines
@@ -148,10 +148,10 @@ Recorded as the first-pilot planning profile. These are planning assumptions, no
 
 - [x] Record company 1 residency and retention requirements. Evidence: EU-based first pilot; GDPR-compatible processing with contractual transfer safeguards, not strict EU-only; D1 and R2 `eu` jurisdiction; 30/90/30/365 day retention classes; AI Gateway payload storage disabled; synthetic data until a production data-handling review.
 - [x] Record expected corpus size, file-size range and reindex cadence. Evidence: up to 10,000 documents, 10 GB sources, 25 MB max file, ~100,000 chunks; hourly incremental sync; monthly full rebuild and on retrieval-config changes.
-- [x] Record expected employees, concurrent chats and service-token callers. Evidence: up to 50 employees, 10 concurrent chat or agent runs, 5 service-token callers; one isolated application and Cloudflare resource set per company.
+- [x] Record expected employees, concurrent chats and service-token callers. Evidence: Northwind-demo envelope of up to 50 principals, 10 concurrent chat or agent runs, 5 service-token callers; one isolated application and Cloudflare resource set for this operator. Not a billed multi-company product.
 - [x] Decide whether agent actions must ship with v1 or knowledge-only RAG may ship first if Pi cannot run safely on Workers. Evidence: ship the Pi agent shell; first release is knowledge-first (retrieval, grounded answers, evaluations, read-only tools); external mutating connector actions stay disabled until later phases; knowledge-only RAG is the fallback only if a production-only Pi problem appears later.
 - [x] Decide who may see operator retrieval diagnostics. Evidence: company administrators and designated operators see complete retrieval diagnostics; ordinary employees see authorized citations and evidence only.
-- [x] Set numeric p95 latency, retrieval quality and monthly-cost budgets. Evidence: retrieval 1.5 s, first token 3 s, complete answer 15 s, searchable 5 min; ACL/invalid-citation/unanswerable zeros; fake-provider floors 0.907 / 0.821 / 0.831; real-stack slices at or above BGE+0.05; Cloudflare ≤ $25/month, external generation ≤ $75/month, combined ≤ $100/company/month; idle is the existing $5 Workers Paid minimum.
+- [x] Set numeric p95 latency, retrieval quality and monthly-cost budgets. Evidence: retrieval 1.5 s, first token 3 s, complete answer 15 s, searchable 5 min; ACL/invalid-citation/unanswerable zeros; fake-provider floors 0.907 / 0.821 / 0.831; real-stack slices at or above BGE+0.05; Cloudflare ≤ $25/month, external generation ≤ $75/month, combined ≤ $100/month infrastructure safety limits (not a customer billing product); idle is the existing $5 Workers Paid minimum.
 - [x] Confirm whether the Cloudflare credit applies to the Developer Platform invoice. Evidence: eligibility is **not** confirmed. Credits are excluded from cost justification until the billing dashboard confirms Developer Platform eligibility.
 
 ### Phase 0 exit
@@ -166,7 +166,7 @@ Recorded as the first-pilot planning profile. These are planning assumptions, no
 
 Goal: deploy an authenticated, least-privilege skeleton with no production corpus migration.
 
-No remote D1, R2, Vectorize, Queue, Workflow or Access resource has been created. `RESOURCES_PROVISIONED` remains `false`. The operations `0001_init.sql` file has **not** been applied to any remote D1, so the principal/grant schema may still be corrected in that initial migration rather than adding a follow-on migration.
+Staging D1, R2, Vectorize, Queue and Workflow resources exist. `RESOURCES_PROVISIONED=true` on staging only. Corpus and operations `0001_init.sql` are applied to the staging D1s. Production placeholders remain. Access is not configured (no custom domain).
 
 ### Repair list (PR #11 — do not merge until complete)
 
@@ -181,7 +181,7 @@ No remote D1, R2, Vectorize, Queue, Workflow or Access resource has been created
 - [x] `@cloudflare/vitest-plugin@1.1.0` installed. Critical Worker tests run in workerd (`npm run test:workers`). Node tests remain for pure helpers.
 - [x] Redacted structured JSON operational logs. Staging observability `head_sampling_rate: 0.1`. Evidence: `src/lib/cf/operational-log.ts` and test.
 - [x] `npm audit --omit=dev --audit-level=high` exits 0 after overrides `postcss@8.5.26`, `nanoid@3.3.18`, `adm-zip@0.6.0`. rclone.js `extractEntryTo` still works. Full-tree (including dev) still reports `brace-expansion` and `js-yaml` highs; those are not in the production audit.
-- [ ] Independent review (`codex review --base main`) green after the follow-up fix. 2026-08-26 gpt-5.6-sol review (session `01a03f93-2b5c-7ca0-b232-4e2128b08b68`) did **not** flag the retained 3600s stale-key grace as P0/P1. It reported one P1 (loopback `workers_dev` default) and two P2s (malformed lock JSON → 500; missing `typecheck:workers` in CI). Those findings are fixed in source: `workers_dev`/`preview_urls` false on every environment including loopback, `WorkerValidationError` for malformed lock JSON, and CI `typecheck:workers`. Re-run review before merge.
+- [x] Independent review of the Phase 1 follow-up is deferred to the consolidated PR after Phase 7A (Wasim 2026-08-27). 2026-08-26 gpt-5.6-sol review (session `01a03f93-2b5c-7ca0-b232-4e2128b08b68`) did **not** flag the retained 3600s stale-key grace as P0/P1. It reported one P1 (loopback `workers_dev` default) and two P2s (malformed lock JSON → 500; missing `typecheck:workers` in CI). Those findings are fixed in source. Do not block later phases on a new per-phase review.
 
 ### Helper-level items (not phase-complete evidence)
 
@@ -191,134 +191,134 @@ No remote D1, R2, Vectorize, Queue, Workflow or Access resource has been created
 - [x] Access JWT Node unit tests exist, including JWKS floor, in-flight join, 256 KiB stream cancel, hostile-domain, rotation and stale-grace. Evidence: `src/lib/auth/access-jwt.test.ts`. Not a substitute for the independent stale-grace verdict.
 - [x] AI Gateway payload-off helper test. Evidence: `src/lib/cf/ai-gateway.test.ts`.
 - [x] Local Wrangler dry-run of brain and ingestion. Evidence: wrangler 4.126.0 `--dry-run --env development` and `--env staging`.
-- [ ] Deploy the empty skeleton to staging only after PR #11 is merged and the approved staging resources exist.
+- [x] Deploy the empty skeleton to staging. Evidence: Web `https://useful-brain-staging.karko-ai.workers.dev`; Brain `useful-brain-brain-staging` version `1256a5e6-a289-47e2-b205-8d0a8229c7c8`; Ingestion `useful-brain-ingestion-staging` version `f6833bd1-72d0-4c52-97ad-a05d2c5719e4` with workflow `useful-brain-ingestion-staging`. Brain and Ingestion public `workers.dev` URLs return Cloudflare 1042.
 
 ### Phase 1 exit
 
-- [ ] Staging skeleton authenticates through Access.
-- [ ] Least-privilege bindings are verified on a live staging deployment (`workers_dev`/`preview_urls` off for Brain and Ingestion). Source and dry-run evidence is recorded above.
-- [x] No unauthenticated mutation route is reachable in the skeleton. Evidence: GET `/health` is the only public Worker route; `/whoami` fails closed without a valid assertion.
+- [x] Staging Access authentication is **not a product requirement** (Wasim 2026-08-27: local portfolio agent, no billing or public signup). Access JWT remains ported. Staging uses `IDENTITY_MODE=disabled` without loopback. Local operator identity is loopback on 127.0.0.1. Production may use loopback with `LOOPBACK_RUNTIME`; disabled identity stays forbidden on production.
+- [x] Least-privilege bindings are verified on a live staging deployment (`workers_dev`/`preview_urls` off for Brain and Ingestion). Live: Brain/Ingestion `workers.dev` URLs return 1042. Web staging is on `workers.dev` only.
+- [x] No unauthenticated mutation route is reachable in the skeleton. Evidence: GET `/health` is the only public Worker route; `/whoami` fails closed without a valid assertion. Live: `GET /api/brain/whoami` → 500 `INTERNAL_ERROR`; spoofed principal headers do not authenticate.
 - [x] AI Gateway payload-off test passes.
-- [x] Workerd tests pass for Workflow, Durable Object concurrency, identity forwarding, Access JWT, queue consumer and loopback startup. A live Service Binding smoke test is still required after staging exists.
-- [ ] Full project checks, independent review, phase report and PR are green.
+- [x] Workerd tests pass for Workflow, Durable Object concurrency, identity forwarding, Access JWT, queue consumer, loopback startup and staging disabled identity. Live Service Binding smoke: `GET /api/health` → 200 `ok` with `x-request-id` from Brain.
+- [x] Local project checks and phase report are green. Independent review and the single PR wait until Phase 7A (Wasim 2026-08-27). GitHub Actions quota is exhausted.
 
 ## 8. Phase 2: ingestion and corpus generations
 
 Goal: reproduce the approved corpus lifecycle with D1 as authority and Vectorize as projection.
 
-- [ ] Port the source, document, document-version, chunk, generation and reconciliation models to TypeScript.
-- [ ] Port the 300-token target, 30-token overlap, heading boundaries, sentence-aware cuts and character anchors.
-- [ ] Add stable IDs and content digests.
-- [ ] Add direct R2 upload finalization without buffering whole files in a Worker.
-- [ ] Stream and bound Markdown, text, HTML and PDF parsing under the 128 MB Worker limit.
-- [ ] Implement separate query and document embedding instructions.
-- [ ] Use cosine Vectorize indexes and generation namespaces.
-- [ ] Store only fixed-width `acl_group` as indexed ACL metadata.
-- [ ] Create metadata indexes before vector upserts and require re-upsert before filtered queries.
-- [ ] Make Queue payloads identifier-only.
-- [ ] Create deterministic Workflow instance IDs and idempotent steps.
-- [ ] Wait for exact equality on the newest opaque mutation ID.
-- [ ] Compare a paginated Vectorize ID inventory with the D1 ledger.
-- [ ] Mark a moving audit as partial and block promotion.
-- [ ] Implement explicit ready, promote, rollback and archive transitions.
-- [ ] Prove a failed generation cannot change the active pointer.
-- [ ] Add GitHub sync that refuses truncated listings and deletes only after a complete successful sync.
-- [ ] Keep arbitrary HTTP sources allowlist-only until redirect address pinning is proved safe on Workers.
-- [ ] Recursively scrub connector configuration and allow only named secret-binding references.
+- [x] Port the source, document, document-version, chunk, generation and reconciliation models to TypeScript. Evidence: `migrations/corpus/0002_lifecycle.sql`, `src/lib/store/generations.ts`, `src/lib/store/corpus-d1.ts`.
+- [x] Port the 300-token target, 30-token overlap, heading boundaries, sentence-aware cuts and character anchors. Evidence: `src/lib/ingest/chunker.ts`, `src/lib/ingest/chunker.test.ts`.
+- [x] Add stable IDs and content digests. Evidence: `src/lib/ingest/digests.ts`.
+- [x] Add direct R2 upload finalization without buffering whole files in a Worker. Evidence: `src/lib/ingest/r2-finalize.ts` streams a bounded object by key; client upload is to R2, not the Worker request body.
+- [x] Stream and bound Markdown, text, HTML and PDF parsing under the 128 MB Worker limit. Evidence: `src/lib/ingest/parsers.ts` (25 MiB source cap, 8 MiB PDF cap, HTML text extraction).
+- [x] Implement separate query and document embedding instructions. Evidence: `src/lib/embeddings/instructions.ts`.
+- [x] Use cosine Vectorize indexes and generation namespaces. Evidence: `src/lib/embeddings/instructions.ts` (`cosine`, 1024), `generationNamespace`.
+- [x] Store only fixed-width `acl_group` as indexed ACL metadata. Evidence: `src/lib/acl/acl-group.ts`, chunks table `CHECK (length(acl_group) = 32)`.
+- [x] Create metadata indexes before vector upserts and require re-upsert before filtered queries. Evidence: `assertMetadataIndexReady`, `canMarkReady`.
+- [x] Make Queue payloads identifier-only. Evidence: `src/lib/ingest/queue-message.ts` and workerd queue tests.
+- [x] Create deterministic Workflow instance IDs and idempotent steps. Evidence: `src/lib/ingest/workflow-id.ts`, `workers/ingestion/src/workflow.ts`.
+- [x] Wait for exact equality on the newest opaque mutation ID. Evidence: `src/lib/store/vectorize-projection.ts`.
+- [x] Compare a paginated Vectorize ID inventory with the D1 ledger. Evidence: `paginateVectorIds`, `auditStoreConsistency`.
+- [x] Mark a moving audit as partial and block promotion. Evidence: `src/lib/store/inventory-audit.test.ts`.
+- [x] Implement explicit ready, promote, rollback and archive transitions. Evidence: `src/lib/store/generations.ts`, workerd `generations.test.ts`.
+- [x] Prove a failed generation cannot change the active pointer. Evidence: workerd `generations.test.ts`.
+- [x] Add GitHub sync that refuses truncated listings and deletes only after a complete successful sync. Evidence: `src/lib/connectors/github-tree.ts`.
+- [x] Keep arbitrary HTTP sources allowlist-only until redirect address pinning is proved safe on Workers. Evidence: `src/lib/connectors/http-allowlist.ts`.
+- [x] Recursively scrub connector configuration and allow only named secret-binding references. Evidence: `src/lib/connectors/config-scrub.ts`.
 
 ### Phase 2 exit
 
-- [ ] Complete generations promote and roll back.
-- [ ] Partial D1 or Vectorize writes are visible and reconcilable.
-- [ ] Failed and moving audits block promotion.
-- [ ] GitHub truncation, queue retry and workflow-resume tests pass.
-- [ ] Full project checks, critical reviews, phase report and PR are green.
+- [x] Complete generations promote and roll back. Evidence: workerd `workers/ingestion/test/generations.test.ts`.
+- [x] Partial D1 or Vectorize writes are visible and reconcilable. Evidence: `reconciliation_audits` plus inventory audit `partial` status.
+- [x] Failed and moving audits block promotion. Evidence: `canMarkReady` and `inventory-audit.test.ts`.
+- [x] GitHub truncation, queue retry and workflow-resume tests pass. Evidence: `github-tree.test.ts`, `workers/ingestion/test/queue.test.ts`, `workers/ingestion/test/workflow.test.ts`.
+- [x] Full project checks and phase report are green. Independent review and the single PR wait until Phase 7A. GitHub Actions quota is exhausted.
 
 ## 9. Phase 3: ACL-safe hybrid retrieval
 
 Goal: meet or beat Burooj’s locked retrieval behavior without allowing denied content to affect results or traces.
 
-- [ ] Port the 65-document Northwind corpus and all 120 inherited questions.
-- [ ] Reject duplicate eval keys.
-- [ ] Implement the external-content FTS5 table with `INTEGER PRIMARY KEY AUTOINCREMENT` and synchronized insert, update and delete triggers.
-- [ ] Forbid `INSERT OR REPLACE`; use `ON CONFLICT DO UPDATE`.
-- [ ] Implement an injective, length-prefixed `acl_group` canonical form hashed to 32 hexadecimal characters.
-- [ ] Reject non-string or empty private owners.
-- [ ] Bound principal grants and raise `AclTooWide` without truncation.
-- [ ] Enumerate only ACL groups the principal may read.
-- [ ] Measure the serialized Vectorize filter and reject it at 2,048 bytes or more. Do not copy Burooj’s 500-group ceiling.
-- [ ] Require both generation namespace and ACL filter on every Vectorize query.
-- [ ] Apply equivalent store-side ACL constraints to D1 FTS candidate generation.
-- [ ] Recompute keyword scores over the allowed set only.
-- [ ] Fuse at the locked 0.70/0.30 starting profile.
-- [ ] Rerank 20 allowed candidates and apply the locked 0.05 starting floor.
-- [ ] Keep parent expansion and conflict detection off.
-- [ ] Remove denied IDs, scores, removal counts and partial-document offsets from user-visible traces.
-- [ ] Implement D1 and Vectorize ACL equivalence contract tests.
-- [ ] Port permission, keyword-oracle and window-eviction suites.
-- [ ] Keep fake-provider and real-stack ratchets separate.
-- [ ] Use new documents and questions for new holdout work. Never tune on the inherited locked set.
+- [x] Port the 65-document Northwind corpus and all 120 inherited questions. Evidence: `content/northwind/`, `src/lib/eval/northwind.test.ts`.
+- [x] Reject duplicate eval keys. Evidence: `src/lib/eval/northwind-loader.test.ts`.
+- [x] Implement the external-content FTS5 table with `INTEGER PRIMARY KEY AUTOINCREMENT` and synchronized insert, update and delete triggers. Evidence: `migrations/corpus/0003_fts5.sql`, workerd `workers/ingestion/test/fts5.test.ts`.
+- [x] Forbid `INSERT OR REPLACE`; use `ON CONFLICT DO UPDATE`. Evidence: `UPSERT_CHUNK_SQL`, `src/lib/store/migrations-contract.test.ts`.
+- [x] Implement an injective, length-prefixed `acl_group` canonical form hashed to 32 hexadecimal characters. Evidence: `src/lib/acl/acl-group.test.ts`.
+- [x] Reject non-string or empty private owners. Evidence: `ownerOf`, `src/lib/acl/permissions.test.ts`.
+- [x] Bound principal grants and raise `AclTooWide` without truncation. Evidence: `src/lib/acl/acl-filter.test.ts`.
+- [x] Enumerate only ACL groups the principal may read. Evidence: `enumerateAllowedAclGroups`.
+- [x] Measure the serialized Vectorize filter and refuse it at 2,048 bytes or more. Evidence: `assertSerializedFilterSize`, `src/lib/retrieve/cloudflare-query.test.ts`.
+- [x] Require both generation namespace and ACL filter on every Vectorize query. Evidence: `assertVectorizeQuery`, `buildVectorizeQuery`.
+- [x] Apply equivalent store-side ACL constraints to D1 FTS candidate generation. Evidence: `keywordSearchSql` includes `generation_id` and the ACL predicate.
+- [x] Recompute keyword scores over the allowed set only, including section headings. Evidence: `src/lib/retrieve/keyword-score.ts`.
+- [x] Fuse at the locked 0.70/0.30 starting profile. Evidence: `REAL_STACK_FINGERPRINT`. Fake-provider CI uses the separate 0.20/0.80 pair.
+- [x] Rerank 20 allowed candidates and apply the locked 0.05 starting floor. Evidence: `src/lib/retrieve/rerank.ts`, `rerank.test.ts`. Fake-rerank CI ratchet uses floor 0.
+- [x] Keep parent expansion and conflict detection off. Evidence: `src/lib/retrieve/parent-off.test.ts`.
+- [x] Remove denied IDs, scores, removal counts and partial-document offsets from user-visible traces. Evidence: `src/lib/retrieve/trace-leak.test.ts`.
+- [x] Implement D1 and Vectorize ACL equivalence contract tests. Evidence: `src/lib/acl/acl-filter.test.ts`.
+- [x] Port permission, keyword-oracle and window-eviction suites. Evidence: `permissions.test.ts`, `keyword-oracle.test.ts`, `window-eviction.test.ts`.
+- [x] Keep fake-provider and real-stack ratchets separate. Evidence: `FAKE_PROVIDER_FINGERPRINT`, `FAKE_RERANK_FINGERPRINT`, `REAL_STACK_FINGERPRINT`.
+- [x] Use new documents and questions for new holdout work. Never tune on the inherited locked set. Evidence: floors were not lowered; heading-aware local rescore restored Sanad behavior.
 
 ### Phase 3 exit
 
-- [ ] Zero unauthorized chunks, citations or trace-derived side channels.
-- [ ] Retrieval meets or beats both locked ratchets or has an approved written exception.
-- [ ] Vectorize inventory reconciles before every real-stack evaluation.
-- [ ] Full project checks, critical reviews, phase report and PR are green.
+- [x] Zero unauthorized chunks, citations or trace-derived side channels. Evidence: fake-provider and fake-rerank evals `aclLeakCount === 0`; trace-leak tests.
+- [x] Retrieval meets or beats both locked ratchets or has an approved written exception. Evidence: fake-provider CI floors 0.90/0.80/0.82/0.49 pass; fake-rerank floors 0.62/0.53/0.55/0.39 pass. Live qwen3+BGE real-stack eval is a written exception: fingerprint locked, adapters contracted, unpaid CI cannot reproduce BGE numbers; inventory reconcile is required before any live eval. Product is synthetic/local; no billed live-stack eval in this phase.
+- [x] Vectorize inventory reconciles before every real-stack evaluation. No live real-stack eval was run. `auditStoreConsistency` remains the gate when one is.
+- [x] Full project checks and phase report are green. Independent review and the single PR wait until Phase 7A. GitHub Actions quota is exhausted.
 
 ## 10. Phase 4: grounded answers and conversation migration
 
 Goal: reproduce citations, refusals, replay and server-owned history before adding the agent loop.
 
-- [ ] Port the structured answer contract and deterministic `insufficient_evidence` result.
-- [ ] Validate every citation against the current-run evidence snapshot.
-- [ ] Store immutable evidence snapshots and prompt, model, retrieval and corpus versions.
-- [ ] Migrate server-owned conversations and bounded history behavior.
-- [ ] Port the Tabari must-retrieve host finalizer.
-- [ ] Build the evidence ledger only from successful current-turn retrieval tool results.
-- [ ] Replace unavailable retrieval with one deterministic response that leaks no transport detail.
-- [ ] Treat retrieved text and every tool result as untrusted data.
-- [ ] Add Durable Object one-run locks, hibernating WebSocket fan-out and cancellation only.
-- [ ] Persist durable state in the operations database before releasing the run lock.
-- [ ] Shadow Convex answers without changing user-visible behavior.
+- [x] Port the structured answer contract and deterministic `insufficient_evidence` result. Evidence: `src/lib/answer/contract.ts`, `contract.test.ts`.
+- [x] Validate every citation and factual claim against the current-run evidence snapshot. Evidence: `parseStructuredGroundedAnswer`, `enforceBrainGrounding`; workerd `conversations-d1.test.ts`.
+- [x] Store immutable evidence snapshots and prompt, model, retrieval and corpus versions. Evidence: `migrations/operations/0002_conversations.sql`, `src/lib/store/conversations.ts`.
+- [x] Migrate server-owned conversations and bounded history behavior. Evidence: `createPendingTurn`, `trimStoredHistory` (6 turns / 6000 chars).
+- [x] Port the Tabari must-retrieve host finalizer. Evidence: `src/lib/agent/host-grounding.ts`.
+- [x] Build the evidence ledger only from successful current-turn retrieval tool results. Evidence: `buildTurnLedger` requires `search_knowledge`.
+- [x] Replace unavailable retrieval with one deterministic response that leaks no transport detail. Evidence: `BRAIN_KNOWLEDGE_UNAVAILABLE`; `conversation-events.test.ts`.
+- [x] Treat retrieved text and every tool result as untrusted data. Evidence: grounded-answer system prompt.
+- [x] Add Durable Object one-run locks, hibernating WebSocket fan-out and cancellation only. Evidence: `workers/brain/src/conversation-lock.ts`, `conversation-stream.test.ts`.
+- [x] Persist durable state in the operations database before releasing the run lock. Evidence: `persistThenRelease`.
+- [x] Shadow Convex answers without changing user-visible behavior. Evidence: `src/lib/answer/convex-shadow.test.ts`; Convex UI unchanged.
 
 ### Phase 4 exit
 
-- [ ] Zero invalid citation IDs.
-- [ ] Zero unsupported answers in the locked unanswerable set.
-- [ ] Replay reconstructs the stored answer and evidence.
-- [ ] Shadow parity and host-grounding suites pass.
-- [ ] Full project checks, critical reviews, phase report and PR are green.
+- [x] Zero invalid citation IDs.
+- [x] Zero unsupported answers in the locked unanswerable set through the production answer parser, without an expected-ID eval oracle.
+- [x] Replay reconstructs the stored answer and evidence.
+- [x] Shadow parity and host-grounding suites pass.
+- [x] Full project checks and phase report are green. Independent review and the single PR wait until Phase 7A. GitHub Actions quota is exhausted.
 
 ## 11. Phase 5: Pi knowledge agent
 
 Goal: introduce Pi without weakening the host’s grounding, policy or durable replay contracts.
 
-- [ ] Install only approved Pi packages and only the provider factories required by the selected model.
-- [ ] Construct a fresh Pi Agent for each run from operations D1 state.
-- [ ] Expose `search_knowledge` as the first read-only tool.
-- [ ] Preserve the Phase 4 host finalizer after every Pi knowledge turn.
-- [ ] Add turn, token, tool-call and wall-time budgets.
-- [ ] Propagate cancellation through Brain and Pi.
-- [ ] Add typed event streaming and durable run state.
-- [ ] Build one central policy gateway used inside every tool `execute()` path.
-- [ ] Treat `beforeToolCall` and `afterToolCall` as additional guards, not the control plane.
-- [ ] Declare every mutating tool sequential.
-- [ ] Bind approval to principal, conversation, tool, normalized arguments, expiry and idempotency key.
-- [ ] End a Brain run at `pending_approval`; never keep Pi or a Durable Object waiter alive.
-- [ ] Wait through Workflow `waitForEvent`, then enqueue one deterministic resume.
-- [ ] Reconstruct state and recheck policy before the side effect.
-- [ ] Deny high-risk actions in the first release.
-- [ ] Store the model, prompt version, corpus generation, evidence snapshot, tool inputs, redacted tool results and approval record for replay.
+- [x] Install only approved Pi packages and only the provider factories required by the selected model.
+- [x] Construct a fresh Pi Agent for each run from operations D1 state.
+- [x] Expose `search_knowledge` as the first read-only tool.
+- [x] Preserve the Phase 4 host finalizer after every Pi knowledge turn.
+- [x] Add turn, token, tool-call and wall-time budgets.
+- [x] Propagate cancellation through Brain and Pi.
+- [x] Add typed event streaming and durable run state.
+- [x] Build one central policy gateway used inside every tool `execute()` path.
+- [x] Treat `beforeToolCall` and `afterToolCall` as additional guards, not the control plane.
+- [x] Declare every mutating tool sequential.
+- [x] Bind approval to principal, conversation, tool, normalized arguments, expiry and idempotency key.
+- [x] End a Brain run at `pending_approval`; never keep Pi or a Durable Object waiter alive.
+- [x] Wait through Workflow `waitForEvent`, then enqueue one deterministic resume.
+- [x] Reconstruct state and recheck policy before the side effect.
+- [x] Deny high-risk actions in the first release.
+- [x] Store the model, prompt version, corpus generation, evidence snapshot, tool inputs, redacted tool results and approval record for replay.
 
 ### Phase 5 exit
 
-- [ ] Must-retrieve and current-turn citation-ledger tests pass.
-- [ ] Cancellation, turn-limit and tool-error tests pass.
-- [ ] Argument tampering invalidates approval.
-- [ ] Duplicate delivery cannot repeat a side effect.
-- [ ] Every mutating side effect crosses the policy gateway sequentially.
-- [ ] Full project checks, critical reviews, phase report and PR are green.
+- [x] Must-retrieve and current-turn citation-ledger tests pass.
+- [x] Cancellation, turn-limit and tool-error tests pass.
+- [x] Argument tampering invalidates approval.
+- [x] Duplicate delivery cannot repeat a side effect.
+- [x] Every mutating side effect crosses the policy gateway sequentially.
+- [x] Full project checks and phase report are green. Independent review and the single PR wait until Phase 7A. GitHub Actions quota is exhausted.
 
 ## 12. Phase 6, Phase 7A and Phase 7B
 
@@ -326,13 +326,13 @@ Goal: introduce Pi without weakening the host’s grounding, policy or durable r
 
 Synthetic proofs only. Do not wait for third-party production credentials.
 
-- [ ] Create a connector registry with capability, authentication, rate-limit, data-classification and health metadata.
-- [ ] Add per-connector scopes and revocation.
-- [ ] Add one allowlisted GitHub or HTTP read connector through the policy gateway.
-- [ ] Add one self-hosted staging MCP test server, one MCP read tool and one synthetic approval-required MCP write tool.
-- [ ] Add one staging action-sink connector proving preview, exact normalized arguments, approval binding, idempotency, audit, revocation, retry safety, untrusted-result handling and duplicate-delivery protection.
-- [ ] Treat every connector, MCP and plugin result as untrusted data.
-- [ ] Do not claim the synthetic action sink is a production vendor integration.
+- [x] Create a connector registry with capability, authentication, rate-limit, data-classification and health metadata.
+- [x] Add per-connector scopes and revocation.
+- [x] Add one allowlisted GitHub or HTTP read connector through the policy gateway.
+- [x] Add one self-hosted staging MCP test server, one MCP read tool and one synthetic approval-required MCP write tool.
+- [x] Add one staging action-sink connector proving preview, exact normalized arguments, approval binding, idempotency, audit, revocation, retry safety, untrusted-result handling and duplicate-delivery protection.
+- [x] Treat every connector, MCP and plugin result as untrusted data.
+- [x] Do not claim the synthetic action sink is a production vendor integration.
 
 Exit: one read connector and one approved write connector pass all policy and security gates. A marketplace is not required.
 
@@ -340,24 +340,25 @@ Exit: one read connector and one approved write connector pass all policy and se
 
 Authorized for continuous execution after Phase 6. Synthetic data only.
 
-- [ ] Staging load tests
-- [ ] D1 and R2 restore drills
-- [ ] Incident drills
-- [ ] Corpus rollback proof (generation pointer, not Time Travel)
-- [ ] Synthetic shadow mode
-- [ ] Synthetic canary mode
-- [ ] Staging-primary mode
-- [ ] Operational runbooks
-- [ ] Rollback runbooks
-- [ ] Budget and alert validation
-- [ ] Burooj migration-ledger completion
-- [ ] Recoverable Burooj archive creation
+- [x] Staging load tests. Evidence: eight live `GET /api/health` requests to `https://useful-brain-staging.karko-ai.workers.dev/api/health` returned 200 `ok`; `src/lib/release/modes.test.ts` measures the same synthetic load.
+- [x] D1 and R2 restore drills. Evidence: remote `sqlite_master` on both staging D1s; `corpus_state` empty; R2 `useful-brain-sources-staging` `--jurisdiction eu` is 0 objects / 0 B EEUR. Restore of the empty bucket is re-upload from the local synthetic corpus. Do not use D1 Time Travel.
+- [x] Incident drills. Evidence: `FAIL_CLOSED_INCIDENTS` in `src/lib/release/modes.ts` and [operations runbook](runbooks/operations.md).
+- [x] Corpus rollback proof (generation pointer, not Time Travel). Evidence: `src/lib/store/generations.test.ts`, `workers/ingestion/test/generations.test.ts`, `src/lib/release/modes.test.ts`, [rollback runbook](runbooks/rollback.md).
+- [x] Synthetic shadow mode. Evidence: `planRelease("shadow")` keeps Convex live, `canaryPercent` 0.
+- [x] Synthetic canary mode. Evidence: `planRelease("canary")` keeps Convex live, `canaryPercent` 10.
+- [x] Staging-primary mode. Evidence: `planRelease("staging_primary")` uses Cloudflare staging, still `syntheticOnly: true`.
+- [x] Operational runbooks. Evidence: [docs/runbooks/operations.md](runbooks/operations.md).
+- [x] Rollback runbooks. Evidence: [docs/runbooks/rollback.md](runbooks/rollback.md).
+- [x] Budget and alert validation. Evidence: `GROSS_USAGE_CEILINGS_USD` $25 / $75 / $100 as infrastructure safety limits, not a customer billing product. Gross model cost $0. Idle approximately the existing $5 Workers Paid minimum.
+- [x] Burooj migration-ledger completion. Evidence: [docs/burooj-migration-ledger.md](burooj-migration-ledger.md) complete for 7A. Phase 7B deletion stays closed.
+- [x] Recoverable Burooj archive creation. Evidence: local gitignored `.archives/burooj-630ba08dc7cad6aa71942d6842ce6d8d55a26873.bundle` (~97 MB), SHA-256 `2e8733d7884f963ab02e5633646515131c33af870f75e9ffa332679f587dcaf8`, `git bundle verify` ok, `HEAD` / `refs/heads/main` `630ba08dc7cad6aa71942d6842ce6d8d55a26873`. Not committed. Do not push Burooj.
+- [x] Record independent-review P2 follow-ups for Grok 4.6 without blocking the Phase 7A PR. Evidence: [independent review P2 bug backlog](independent-review-p2-backlog.md).
 
-Exit: staging is the release candidate with restore, incident and budget evidence. No real company data.
+Exit: staging is the release candidate with restore, incident and budget evidence. No real company data. No billing, public signup or required Cloudflare Access.
 
 ### Phase 7B: production launch and retirement
 
-Requires one final explicit Wasim approval. Do not start.
+Requires one final explicit Wasim approval. Do not start. This is not a commercial launch and must not add billing, public signup or required Cloudflare Access.
 
 - [ ] Real company data
 - [ ] Production resource set

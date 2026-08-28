@@ -10,6 +10,14 @@
     "WRANGLER_ACCESS_DEV": "false",
     "LOOPBACK_RUNTIME": "true"
   },
+  "d1_databases": [
+    {
+      "binding": "CORPUS_DB",
+      "database_name": "useful-brain-corpus-test",
+      "database_id": "00000000-0000-4000-8000-000000000001",
+      "migrations_dir": "../../migrations/corpus"
+    }
+  ],
   "workflows": [
     {
       "name": "useful-brain-ingestion-test",

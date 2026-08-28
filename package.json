@@ -2,7 +2,7 @@
   "name": "useful-brain",
   "version": "0.1.0",
   "private": true,
-  "description": "A company knowledge and action agent with source-grounded answers, visible evidence and controlled tool use.",
+  "description": "A local portfolio knowledge and action agent with source-grounded answers, visible evidence and controlled tool use.",
   "license": "MIT",
   "author": "Wasim Jalali",
   "repository": {
@@ -21,7 +21,7 @@
     "citations"
   ],
   "engines": {
-    "node": ">=20"
+    "node": ">=22.19.0"
   },
   "scripts": {
     "dev": "next dev",
@@ -40,12 +40,16 @@
     "preview:cf": "opennextjs-cloudflare build && opennextjs-cloudflare preview"
   },
   "dependencies": {
+    "@earendil-works/pi-agent-core": "0.84.3",
+    "@earendil-works/pi-ai": "0.84.3",
+    "@modelcontextprotocol/sdk": "1.30.0",
     "@opennextjs/cloudflare": "1.20.3",
     "convex": "^1.42.1",
     "next": "16.3.3",
     "rclone.js": "0.6.6",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "typebox": "1.3.7",
     "unpdf": "^1.6.2"
   },
   "overrides": {

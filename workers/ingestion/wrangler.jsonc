@@ -113,8 +113,8 @@
       },
       "vars": {
         "RUNTIME_ENV": "staging",
-        "IDENTITY_MODE": "access",
-        "RESOURCES_PROVISIONED": "false",
+        "IDENTITY_MODE": "disabled",
+        "RESOURCES_PROVISIONED": "true",
         "WRANGLER_ACCESS_DEV": "false",
         "LOOPBACK_RUNTIME": "false"
       },
@@ -122,7 +122,7 @@
         {
           "binding": "CORPUS_DB",
           "database_name": "useful-brain-corpus-staging",
-          "database_id": "00000000-0000-4000-8000-000000000011",
+          "database_id": "d9c08e55-e2fa-4489-a9ee-50fdf818d62c",
           "migrations_dir": "../../migrations/corpus"
         }
       ],

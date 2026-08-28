@@ -48,6 +48,18 @@
       {
         "binding": "INGEST_QUEUE",
         "queue": "useful-brain-ingest-development"
+      },
+      {
+        "binding": "APPROVAL_RESUME_QUEUE",
+        "queue": "useful-brain-approval-resume-development"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "useful-brain-approval-resume-development",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 5
       }
     ]
   },
@@ -63,6 +75,13 @@
     {
       "tag": "v1",
       "new_sqlite_classes": ["ConversationRunLock"]
+    }
+  ],
+  "workflows": [
+    {
+      "name": "useful-brain-approval",
+      "binding": "APPROVAL_WORKFLOW",
+      "class_name": "ApprovalWorkflow"
     }
   ],
   "env": {
@@ -95,12 +114,31 @@
       "ai": { "binding": "AI" },
       "queues": {
         "producers": [
-          { "binding": "INGEST_QUEUE", "queue": "useful-brain-ingest-development" }
+          { "binding": "INGEST_QUEUE", "queue": "useful-brain-ingest-development" },
+          {
+            "binding": "APPROVAL_RESUME_QUEUE",
+            "queue": "useful-brain-approval-resume-development"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "useful-brain-approval-resume-development",
+            "max_batch_size": 10,
+            "max_batch_timeout": 5,
+            "max_retries": 5
+          }
         ]
       },
       "durable_objects": {
         "bindings": [{ "name": "CONVERSATION", "class_name": "ConversationRunLock" }]
-      }
+      },
+      "workflows": [
+        {
+          "name": "useful-brain-approval-development",
+          "binding": "APPROVAL_WORKFLOW",
+          "class_name": "ApprovalWorkflow"
+        }
+      ]
     },
     "staging": {
       "workers_dev": false,
@@ -111,8 +149,8 @@
       },
       "vars": {
         "RUNTIME_ENV": "staging",
-        "IDENTITY_MODE": "access",
-        "RESOURCES_PROVISIONED": "false",
+        "IDENTITY_MODE": "disabled",
+        "RESOURCES_PROVISIONED": "true",
         "WRANGLER_ACCESS_DEV": "false",
         "LOOPBACK_RUNTIME": "false",
         "LOOPBACK_SUBJECT": ""
@@ -121,24 +159,45 @@
         {
           "binding": "CORPUS_DB",
           "database_name": "useful-brain-corpus-staging",
-          "database_id": "00000000-0000-4000-8000-000000000011",
+          "database_id": "d9c08e55-e2fa-4489-a9ee-50fdf818d62c",
           "migrations_dir": "../../migrations/corpus"
         },
         {
           "binding": "OPERATIONS_DB",
           "database_name": "useful-brain-operations-staging",
-          "database_id": "00000000-0000-4000-8000-000000000012",
+          "database_id": "c2f5b3bc-3924-4e7e-be25-b1aa2020ac3e",
           "migrations_dir": "../../migrations/operations"
         }
       ],
       "vectorize": [{ "binding": "VECTORIZE", "index_name": "useful-brain-staging" }],
       "ai": { "binding": "AI" },
       "queues": {
-        "producers": [{ "binding": "INGEST_QUEUE", "queue": "useful-brain-ingest-staging" }]
+        "producers": [
+          { "binding": "INGEST_QUEUE", "queue": "useful-brain-ingest-staging" },
+          {
+            "binding": "APPROVAL_RESUME_QUEUE",
+            "queue": "useful-brain-approval-resume-staging"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "useful-brain-approval-resume-staging",
+            "max_batch_size": 10,
+            "max_batch_timeout": 5,
+            "max_retries": 5
+          }
+        ]
       },
       "durable_objects": {
         "bindings": [{ "name": "CONVERSATION", "class_name": "ConversationRunLock" }]
-      }
+      },
+      "workflows": [
+        {
+          "name": "useful-brain-approval-staging",
+          "binding": "APPROVAL_WORKFLOW",
+          "class_name": "ApprovalWorkflow"
+        }
+      ]
     },
     "production": {
       "workers_dev": false,
@@ -168,11 +227,32 @@
       "vectorize": [{ "binding": "VECTORIZE", "index_name": "useful-brain-production" }],
       "ai": { "binding": "AI" },
       "queues": {
-        "producers": [{ "binding": "INGEST_QUEUE", "queue": "useful-brain-ingest-production" }]
+        "producers": [
+          { "binding": "INGEST_QUEUE", "queue": "useful-brain-ingest-production" },
+          {
+            "binding": "APPROVAL_RESUME_QUEUE",
+            "queue": "useful-brain-approval-resume-production"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "useful-brain-approval-resume-production",
+            "max_batch_size": 10,
+            "max_batch_timeout": 5,
+            "max_retries": 5
+          }
+        ]
       },
       "durable_objects": {
         "bindings": [{ "name": "CONVERSATION", "class_name": "ConversationRunLock" }]
-      }
+      },
+      "workflows": [
+        {
+          "name": "useful-brain-approval-production",
+          "binding": "APPROVAL_WORKFLOW",
+          "class_name": "ApprovalWorkflow"
+        }
+      ]
     }
   }
 }

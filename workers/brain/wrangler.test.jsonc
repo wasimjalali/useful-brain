@@ -19,6 +19,14 @@
       "migrations_dir": "../../migrations/operations"
     }
   ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "APPROVAL_RESUME_QUEUE",
+        "queue": "useful-brain-approval-resume-test"
+      }
+    ]
+  },
   "durable_objects": {
     "bindings": [
       {
@@ -31,6 +39,13 @@
     {
       "tag": "v1",
       "new_sqlite_classes": ["ConversationRunLock"]
+    }
+  ],
+  "workflows": [
+    {
+      "name": "useful-brain-approval-test",
+      "binding": "APPROVAL_WORKFLOW",
+      "class_name": "ApprovalWorkflow"
     }
   ]
 }

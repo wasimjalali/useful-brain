@@ -1,30 +1,30 @@
 # Useful Brain production master plan
 
-Status: finalized and approved for phased implementation, version 1.4
+Status: finalized and approved for phased implementation, version 1.5
 
-Date: 2026-08-26
+Date: 2026-08-26; product-boundary update 2026-08-27
 
-Implementation status: approved. Phase 0 is merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10)). Phase 1 is [PR #11](https://github.com/wasimjalali/useful-brain/pull/11) and must be repaired before merge. Standing authorization (2026-08-26) covers Phase 1 through Phase 6 and Phase 7A. Phase 7B remains closed. Do not provision Cloudflare resources until PR #11 is corrected, independently reviewed and merged.
+Implementation status: approved. Phase 0 is merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10)). Phase 1 code is merged ([PR #11](https://github.com/wasimjalali/useful-brain/pull/11)). Staging resources are provisioned. Wasim 2026-08-27: this is a local portfolio product, not a billed or public company SaaS. Cloudflare Access is not a launch requirement. Standing authorization (2026-08-26) covers Phase 1 through Phase 6 and Phase 7A. Phase 7B remains closed.
 
 ## 1. Decision
 
-Useful Brain will be a Cloudflare-native company knowledge and action system. Convex and Microsoft Foundry are legacy implementation details and are not part of the target architecture.
+Useful Brain will be a Cloudflare-native local portfolio knowledge and action system. Convex and Microsoft Foundry are legacy implementation details and are not part of the target architecture.
 
-Cloudflare will own the application runtime, relational data, object storage, vector search, durable jobs, queues, real-time coordination, identity perimeter, AI routing and operational telemetry. Model inference remains replaceable behind Cloudflare AI Gateway. Workers AI is the default for embeddings and reranking. The main agent model may be Cloudflare-hosted or reached through AI Gateway, but it must clear the same quality, tool-use, latency and cost gates.
+Cloudflare will own the application runtime, relational data, object storage, vector search, durable jobs, queues, real-time coordination, optional identity verification, AI routing and operational telemetry. Model inference remains replaceable behind Cloudflare AI Gateway. Workers AI is the default for embeddings and reranking. The main agent model may be Cloudflare-hosted or reached through AI Gateway, but it must clear the same quality, tool-use, latency and cost gates.
 
-The deployment boundary is one application and one isolated resource set per company. This is not a shared multi-tenant database. Each company receives separate corpus and operations D1 databases so indexing load, corpus recovery and live conversations do not share one single-threaded database. That boundary fits D1's horizontal scaling model, limits blast radius and makes company-specific identity, retention and connector policy easier to enforce.
+The deployment boundary is one application and one isolated resource set for this operator. This is not a shared multi-tenant database and not a product that is sold or offered as public signup. Corpus and operations stay on separate D1 databases so indexing load, corpus recovery and live conversations do not share one single-threaded database.
 
 ### Why Cloudflare is the right choice
 
 - The Burooj Sanad implementation already proves the important D1, FTS5, Vectorize, Workers AI and Cloudflare Access path.
-- Useful Brain is read-heavy. D1 is suitable when each company has isolated databases, queries are indexed and historical event data is archived before either database reaches the 10 GB ceiling.
+- Useful Brain is read-heavy. D1 is suitable when this operator deployment has isolated databases, queries are indexed and historical event data is archived before either database reaches the 10 GB ceiling.
 - R2, Vectorize, Queues, Workflows and Durable Objects cover the distinct storage and execution shapes instead of forcing them into one database.
-- Cloudflare Access provides a strong company SSO perimeter. D1 remains responsible for application roles, departments and document access rules.
+- Document ACL (public, department, role, private-owner) stays in D1. That is retrieval authorization for the Northwind security demo, not a commercial identity product. Cloudflare Access JWT verification is retained as optional ported code. The operator path is loopback on 127.0.0.1. There is no billing, SSO onboarding, public signup or tenant switching.
 - The Cloudflare credit balance improves runway, but credits are not the architectural reason. The system still needs service boundaries, cost caps and portability seams.
 
 ### Important constraints
 
-- [D1 databases are single-threaded and limited to 10 GB each](https://developers.cloudflare.com/d1/platform/limits/). The answer is two databases per company, short indexed transactions, the Sessions API for replicated reads and R2 archival, not one global D1 database.
+- [D1 databases are single-threaded and limited to 10 GB each](https://developers.cloudflare.com/d1/platform/limits/). The answer is two databases per deployment, short indexed transactions, the Sessions API for replicated reads and R2 archival, not one global D1 database.
 - [Vectorize mutations are asynchronous](https://developers.cloudflare.com/vectorize/reference/client-api/). D1 is authoritative. Vectorize is a rebuildable search projection with a reconciliation ledger.
 - [Vectorize metadata filtering runs before topK selection](https://developers.cloudflare.com/vectorize/reference/metadata-filtering/). ACL metadata indexes must exist before vectors are written.
 - [Queues provide at-least-once delivery](https://developers.cloudflare.com/queues/reference/delivery-guarantees/). Cloudflare does not deduplicate deliveries for the application. Queue payloads carry identifiers only and consumers enforce idempotency.
@@ -34,15 +34,15 @@ The deployment boundary is one application and one isolated resource set per com
 
 ## 2. Product definition
 
-Useful Brain is the central place where a company's employees can:
+Useful Brain is a local portfolio knowledge agent. The operator can:
 
-1. Search and ask questions across approved company knowledge.
+1. Search and ask questions across an approved synthetic (and later personal) knowledge corpus.
 2. Inspect the exact evidence behind every factual answer.
-3. Connect company sources and keep them synchronized.
+3. Connect allowlisted sources and keep them synchronized.
 4. Ask an agent to perform approved work through native tools, MCP servers or plugins.
 5. Review every retrieval decision, tool call, approval and outcome.
 
-The first production target is a private B2B deployment for one company. Public signup, billing, a connector marketplace and shared tenant switching are outside the first production release.
+This is not a billed product, not a public SaaS, and not a multi-company platform. Public signup, billing, SSO onboarding, a connector marketplace and tenant switching are out of scope. The first delivery target is a local loopback operator on 127.0.0.1 plus a synthetic staging skeleton. Hiring-manager demonstration is the product; selling it to companies is not.
 
 ### Non-negotiable product contracts
 
@@ -120,8 +120,7 @@ Burooj must not be deleted until the portability gate in Section 12 passes.
 
 ```mermaid
 flowchart LR
-    U[Employee browser] --> A[Cloudflare Access]
-    A --> W[Web Worker: Next.js]
+    U[Local operator browser] --> W[Web Worker: Next.js]
     W --> B[Brain Worker: Pi, retrieval, finalizer, policy]
     W --> I[Ingestion Worker]
     B <--> D[Conversation Durable Object]
@@ -150,15 +149,15 @@ flowchart LR
 
 | Service | Responsibility | Key rule |
 | --- | --- | --- |
-| Web Worker | Next.js UI, Access assertion intake, request validation and streaming response proxy | Forward the original signed assertion, never a browser-supplied principal |
-| Brain Worker | Access re-verification, Pi loop, retrieval, host grounding finalization, tool registry and policy evaluation | Rehydrate every run from durable state and fail closed |
+| Web Worker | Next.js UI, request validation and streaming response proxy | Forward the operator principal from the configured identity mode, never a browser-supplied grant list |
+| Brain Worker | Identity resolution, Pi loop, retrieval, host grounding finalization, tool registry and policy evaluation | Rehydrate every run from durable state and fail closed |
 | Ingestion Worker | Upload finalization, connector sync entrypoints and queue consumer | Never perform an unbounded parse in an HTTP request |
 | Conversation Durable Object | One active run per conversation, WebSocket event fan-out and cancellation signal | No approval wait or Pi state lives only in memory. Hibernation may erase all in-memory state |
 | Workflows | Source sync, parse, chunk, embed, index, audit, generation promotion, approval waits and approved-run resume | Every step has an idempotency key and bounded retry. Approval uses `waitForEvent` |
 | Queues | Fan-out identifiers, connector events and retry isolation | Payloads contain IDs only. A deterministic application idempotency key creates or resumes one Workflow instance |
 | Tool policy gateway | Authorization, risk classification, approval binding, idempotency and side-effect dispatch | Every tool `execute()` path calls this gateway. Pi hooks are an additional guard, not the control plane |
 
-Service Bindings connect Workers without public HTTP hops, but they do not establish end-user identity. The Brain Worker re-verifies the original Access application assertion before it resolves roles or executes retrieval or tools. Each Worker receives only the bindings and secrets it needs.
+Service Bindings connect Workers without public HTTP hops, but they do not establish end-user identity. Brain resolves the operator principal from the configured identity mode and the operations directory before retrieval or tools. Access JWT verification remains available as optional ported code. Each Worker receives only the bindings and secrets it needs.
 
 ## 5. Data architecture
 
@@ -211,7 +210,7 @@ Every Vectorize query requires both the active-generation namespace and an `acl_
 
 ### Capacity plan
 
-- One corpus D1 database, one operations D1 database, one R2 prefix and one Vectorize index per company deployment.
+- One corpus D1 database, one operations D1 database, one R2 prefix and one Vectorize index for this operator deployment.
 - Keep active operational rows in the operations database. Archive old run events, evidence bodies and full parser artifacts to R2 on a retention schedule.
 - Use short, indexed D1 queries. Never scan large tables from the request path.
 - Enable D1 read replication only with the Sessions API. Writes still go to the primary.
@@ -323,12 +322,12 @@ If this fails, the agent milestone pauses. Knowledge-only RAG may ship first if 
 
 ## 8. Identity, authorization and security
 
-- Cloudflare Access protects every production route. The Web Worker uses `ctx.access` when Access directly invokes it and forwards the original `Cf-Access-Jwt-Assertion` to Brain. Brain independently validates the RS256 signature, key ID, issuer, audience, `iat`, `nbf`, expiry and `type=app` before any data access. Access context does not propagate automatically across a Service Binding.
-- Service-token identity and employee identity occupy explicit, disjoint namespaces. An empty service-token `sub` is never treated as an employee. Every principal has a stable principal ID; uniqueness is `(kind, subject)`; roles and departments attach to the principal ID; grants must not flow through a nullable user foreign key.
-- Loopback asserted development identity depends on a trusted local runtime signal and a loopback-only listener. Caller-controlled headers such as `x-forwarded-for` never prove loopback origin. Staging and production fail startup if loopback is enabled.
-- Brain and Ingestion staging and production set `workers_dev: false` and `preview_urls: false`, receive no public routes, and are reachable only through Service Bindings and approved platform triggers. `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` are protected secrets, never committed staging or production vars.
-- The verified Access subject maps to a principal in the operations database. Roles and departments are server-owned. Browser-supplied claims and trimmed token custom claims never authorize data.
-- The three identity modes are mutually exclusive: Access, loopback-only asserted development identity, or disabled. Production and staging fail at startup if asserted identity or Wrangler `access.dev` is configured.
+- This product is a local portfolio agent. There is no billing, public signup, SSO onboarding or tenant switching. Cloudflare Access is not required to run or demonstrate the system.
+- Operator identity is loopback on 127.0.0.1 with the trusted `LOOPBACK_RUNTIME` signal. Caller-controlled headers such as `x-forwarded-for` never prove loopback origin. Loopback is forbidden on staging `workers.dev`. Production may use loopback for a local bind; it must not use disabled identity.
+- Access JWT verification (RS256, application token, fail closed) remains in the repo as a ported Sanad capability for demonstration. It is not a phase exit or launch gate. Do not invent `ACCESS_TEAM_DOMAIN` or `ACCESS_AUD`.
+- Service-token identity and operator identity occupy explicit, disjoint namespaces. An empty service-token `sub` is never treated as an operator. Every principal has a stable principal ID; uniqueness is `(kind, subject)`; roles and departments attach to the principal ID.
+- Brain and Ingestion staging set `workers_dev: false` and `preview_urls: false`, receive no public routes, and are reachable only through Service Bindings and approved platform triggers.
+- The three identity modes are mutually exclusive: Access (optional), loopback local operator, or disabled. Staging may use disabled for skeleton smoke. Wrangler `access.dev` is forbidden on staging and production.
 - Starting agent execution budgets: 8 model turns, 8 total tool calls, 4 `search_knowledge` calls, 32,000 input tokens, 4,000 output tokens, 90s interactive wall time, 60s model timeout, 10s read-tool timeout, 15-minute approval expiry, 32 KiB persisted redacted tool results, 1 MiB raw external response before parsing. Mutating tools are sequential. High-risk actions are denied. Budgets may be tightened from evidence and must not be loosened beyond the approved cost, security or latency envelope without stopping.
 - Cloudflare-hosted `@cf/...` models are the only eligible default production models. Selection is evidence-based: enumerate the live catalog, shortlist against hard requirements, benchmark the qualified set, and write `docs/model-selection-report.md`. Third-party models through AI Gateway are not the default unless every suitable Cloudflare-hosted candidate fails a hard gate and Wasim later approves an exception.
 - Document authorization supports public, department, role and private-owner scopes. The resulting ACL group is indexed in Vectorize and expressed independently in D1 SQL.
@@ -351,7 +350,7 @@ The restricted operator view must expose:
 - model, prompt, embedding, chunking and corpus versions
 - queue age, workflow state, retry count, dead-letter count and reconciliation drift
 - tool-call risk class, approval latency, execution outcome and idempotency status
-- latency percentiles and usage per company, user, model, connector and operation class
+- latency percentiles and usage per operator, model, connector and operation class
 
 Use Workers Logs for structured operational logs, Analytics Engine for high-cardinality product metrics and AI Gateway for model latency, token and error telemetry. Configure CPU and subrequest caps in Wrangler, upload limits, model budgets, connector rate limits and daily usage alerts. Do not enable response caching for private RAG or agent requests by default.
 
@@ -411,9 +410,9 @@ Two quality ratchets are required: deterministic fake-provider CI floors and rea
 - Record baseline results from both current Nura and Burooj Sanad, including the exact Sanad commit and retrieval fingerprint.
 - Record the first company's residency, corpus-size, reindex-cadence, p95 latency, quality and monthly-cost budgets.
 
-Architecture approval is complete. Phase 0 is merged. Phase 1 PR #11 repair is implemented on `phase-1-cloudflare-foundation` (WorkflowEntrypoint, Access JWT JWKS contracts, Service Binding identity, loopback, principal schema, SQLite Durable Object lock, workerd tests). Do not merge or provision staging until independent review, including the stale-key grace verdict, is green.
+Architecture approval is complete. Phase 0 is merged. Phase 1 code is merged ([PR #11](https://github.com/wasimjalali/useful-brain/pull/11)). Staging resources are provisioned. Product boundary (Wasim 2026-08-27): local portfolio agent, no billing or public signup, Access not required. Independent review is the single consolidated PR after Phase 7A.
 
-Standing authorization (2026-08-26): Grok 4.6 xhigh may execute Phase 1 through Phase 6 and Phase 7A without ordinary phase-by-phase approval. That includes approved packages, master-plan schema and auth changes, staging-only resources after PR #11 merges, synthetic Workers AI/evals inside the safety limits, PRs, merging green PRs, continuing to the next phase, planning-document updates, evidence-based Cloudflare-hosted model selection, and eligible credits for staging infrastructure and Workers AI. It does not include real company data, production cutover, destructive retirement, uncovered external spend or unlimited usage.
+Standing authorization (2026-08-26): Grok 4.6 xhigh may execute Phase 1 through Phase 6 and Phase 7A without ordinary phase-by-phase approval. That includes approved packages, master-plan schema and auth changes, staging-only resources, synthetic Workers AI/evals inside the safety limits, PRs, merging green PRs, continuing to the next phase, planning-document updates, evidence-based Cloudflare-hosted model selection, and eligible credits for staging infrastructure and Workers AI. It does not include real company data, production cutover, destructive retirement, uncovered external spend or unlimited usage.
 
 ### First-pilot planning profile
 
@@ -443,10 +442,10 @@ These are planning assumptions for the first isolated company deployment, not cu
 
 #### Users and concurrency
 
-- Up to 50 employees
+- Northwind-demo planning envelope: up to 50 principals
 - Up to 10 concurrent chat or agent runs
 - Up to 5 service-token callers
-- One isolated application and Cloudflare resource set per company
+- One isolated application and Cloudflare resource set for this operator. This is not a billed multi-company platform.
 
 #### Initial product scope
 
@@ -484,7 +483,7 @@ Cost:
 - Idle deployment: existing $5 Workers Paid account minimum, with effectively $0 incremental idle Cloudflare cost
 - First-pilot Cloudflare platform **safety boundary**: no more than $25 gross per month
 - Workers AI inference **safety boundary**: no more than $75 gross per month
-- Combined **protection limit**: no more than $100 gross per company per month
+- Combined **protection limit**: no more than $100 gross per month
 - These are not reserved budgets, prepaid commitments or expected monthly bills
 - Empty staging Workers, D1, R2, Vectorize, Queues, Workflows, Durable Objects and AI Gateway configuration do not imply $100 of monthly spending
 - Record gross metered cost before credits separately from uncovered cash cost
@@ -499,7 +498,7 @@ Cost:
 - Add Brain-side Access JWT verification, independent corpus and operations D1 migrations, R2, Vectorize, Queues, Workflows, Durable Objects and Service Bindings.
 - Add structured logs, request IDs and safe error contracts.
 
-Exit: authenticated skeleton deploys to staging with least-privilege bindings and smoke tests.
+Exit: operator-identity skeleton deploys to staging with least-privilege bindings and smoke tests. Loopback on 127.0.0.1; staging `workers.dev` may use disabled identity. Cloudflare Access is optional ported code, not this exit.
 
 ### Phase 2: ingestion and corpus generations
 
@@ -557,7 +556,7 @@ Exit: staging is the release candidate. No real company data.
 
 ### Phase 7B: production launch and retirement
 
-Requires one final explicit Wasim approval.
+Requires one final explicit Wasim approval. Do not start. This is not a commercial launch and must not add billing, public signup, SSO onboarding, tenant switching or required Cloudflare Access.
 
 - Real company data, production resource set and real production traffic.
 - Production-primary cutover and rollback-window expiry.
@@ -595,14 +594,14 @@ Grok works from `docs/useful-brain-execution-tracker.md` and the checked-in exec
 
 - Product name: Useful Brain.
 - Infrastructure: Cloudflare-native.
-- Deployment isolation: one resource set per company.
+- Deployment isolation: one resource set for this operator.
 - Web: existing Next.js application on Cloudflare Workers through OpenNext initially.
 - Databases and keyword search: separate corpus and operations D1 databases, with FTS5 in the corpus database.
 - Files: R2.
 - Vector search: Vectorize as a rebuildable projection.
 - Durable ingestion and approval waits: Workflows plus Queues.
 - Conversation coordination and streaming: Durable Objects with WebSocket hibernation, limited to run locking, fan-out and cancellation.
-- Identity perimeter: Cloudflare Access.
+- Identity: loopback local operator. Cloudflare Access JWT is optional ported code, not the required perimeter.
 - Embeddings and reranking: Workers AI.
 - Model routing and telemetry: AI Gateway.
 - Agent framework: Pi Agent Core.
@@ -645,7 +644,7 @@ With the application deployed but no users, files, queued work, vector queries o
 
 The 65-document Burooj migration corpus, 120-question evaluation set and ordinary CI builds fit comfortably inside the storage, vector and build allowances. Repeated full-stack model evals can still create Workers AI or external model charges, so staging receives daily spend limits and alerts before those evals run.
 
-First-pilot operating ceilings, excluding credits: no more than $25 per month Cloudflare platform, $75 per month external generation models, and $100 combined per company per month. Credits are excluded from cost justification until the billing dashboard confirms Developer Platform eligibility. Add budget alerts before any repeated live-stack evaluation or external model workload.
+First-pilot operating ceilings, excluding credits: no more than $25 per month Cloudflare platform, $75 per month external generation models, and $100 combined per month. These are infrastructure safety limits, not a customer billing product. Credits are excluded from cost justification until the Cloudflare billing dashboard confirms Developer Platform eligibility. Add budget alerts before any repeated live-stack evaluation or external model workload.
 
 The account's Cloudflare credits are useful runway only if their billing terms apply to the Developer Platform products used here. That eligibility is not yet confirmed.
 

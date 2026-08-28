@@ -4,13 +4,13 @@ Guidance for coding agents and contributors working in this repository.
 
 ## Purpose
 
-Useful Brain is a private company knowledge and action agent. It retrieves only evidence the current principal may read, cites every factual answer, refuses unsupported claims and performs actions only through a typed tool policy and approval boundary.
+Useful Brain is a local, single-operator knowledge and action agent for Wasim’s portfolio. It retrieves only evidence the current principal may read, cites every factual answer, refuses unsupported claims and performs actions only through a typed tool policy and approval boundary. It is not a billed product, not a public SaaS, and not a multi-company platform.
 
 ## Execution gate
 
 The target architecture lives in `docs/useful-brain-master-plan.md`. Execute from `docs/useful-brain-execution-tracker.md`.
 
-Phase 0 is merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10)). Phase 1 is open as [PR #11](https://github.com/wasimjalali/useful-brain/pull/11) on `phase-1-cloudflare-foundation`. Do not merge PR #11 or provision Cloudflare resources until the Phase 1 repair list in the tracker is complete, independent review is green, and GitHub checks pass.
+Phase 0 is merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10)). Phase 1 code is merged ([PR #11](https://github.com/wasimjalali/useful-brain/pull/11), follow-up `40f89d7`). Staging resources are provisioned. Operator identity is loopback on 127.0.0.1. Cloudflare Access is optional ported code, not a launch requirement. Independent review is a single consolidated PR after Phase 7A, not a per-phase gate.
 
 Wasim granted standing authorization on 2026-08-26 for Grok 4.6 xhigh to execute Phase 1 through Phase 6 and Phase 7A without ordinary phase-by-phase approval. That covers approved packages, master-plan D1 schema and auth changes, staging-only Cloudflare resources, synthetic Workers AI and model evaluations inside the safety limits, branches/commits/PRs, merging green PRs, continuing to the next phase, updating planning documents, evidence-based Cloudflare-hosted model selection, and using eligible Cloudflare credits for staging infrastructure and Workers AI. It does **not** cover real company data, production cutover, destructive retirement, uncovered external-provider spending, unlimited usage, Convex deletion, or Burooj deletion.
 
@@ -29,12 +29,12 @@ The finalized target is:
 - Frontend: Next.js App Router with TypeScript, deployed to Cloudflare Workers through OpenNext initially.
 - Styling: Tailwind CSS v4 with role-named design tokens.
 - Runtime: Cloudflare Workers split into web, brain and ingestion responsibilities.
-- Database and keyword search: separate corpus and operations D1 databases per company deployment, with FTS5 in the corpus database.
+- Database and keyword search: separate corpus and operations D1 databases for this operator deployment, with FTS5 in the corpus database.
 - Object storage: R2.
 - Vector search: Vectorize as a rebuildable projection.
 - Durable work: Workflows and Queues.
 - Real-time coordination: Durable Objects and hibernating WebSockets.
-- Identity perimeter: Cloudflare Access.
+- Identity: loopback local operator on 127.0.0.1. Cloudflare Access JWT verification is retained as a ported capability, not a launch requirement. No billing, public signup or tenant switching.
 - Embeddings and reranking: Workers AI.
 - Model routing: AI Gateway.
 - Agent framework: `@earendil-works/pi-agent-core` with the minimum `pi-ai` provider imports.
@@ -103,15 +103,16 @@ Stop and batch remaining manual work only when: a change contradicts the fixed a
 - Verify every completed change with `npx tsc --noEmit`, `npm run lint`, `npm test`, `npm run build`, relevant workerd tests, Wrangler dry runs, the dependency audit and security tests.
 - For Next.js and Cloudflare changes, verify current official documentation rather than relying on memory.
 - Run independent review with `codex review --base main`. Fix every confirmed P0/P1 and every confirmed high or critical security finding. Merge automatically only when GitHub checks and independent review are green. Then start the next phase from updated `main` without asking Wasim.
-- Do not merge PR #11 until Phase 1 repairs, workerd evidence and independent review are complete.
+- Do not open a PR per phase. One consolidated PR lands after Phase 7A. GitHub Actions quota is exhausted; local proof is `npx tsc --noEmit`, `npm run lint`, `npm test`, `npm run test:workers`, `npm run build`, Wrangler dry-runs, `npm audit --omit=dev --audit-level=high`, and the phase reports.
 
 ## Interface
 
-Useful Brain is an internal operational product. Keep the existing left-aligned workspace, visible evidence inspector and role-named tokens in `src/app/globals.css`. Follow the `design-craft` discipline for all UI changes. Do not add helper copy that restates headings or labels.
+Useful Brain is a local portfolio product. Keep the existing left-aligned workspace, visible evidence inspector and role-named tokens in `src/app/globals.css`. Follow the `design-craft` discipline for all UI changes. Do not add helper copy that restates headings or labels.
 
 ## Deployment model
 
-- Deploy one application and one Cloudflare resource set per company.
+- One application and one Cloudflare resource set for this local/staging portfolio deployment.
 - Keep company terminology in `src/lib/useful-brain-config.ts`.
-- Do not add public signup, billing or tenant switching to the shared foundation.
-- The legacy `NURA_ALLOW_ANONYMOUS_DEV` flag remains only until the Convex path is retired. The Cloudflare replacement must be loopback-only and fail production startup when enabled.
+- Do not add public signup, billing, SSO onboarding or tenant switching.
+- Operator identity is loopback on 127.0.0.1 with `LOOPBACK_RUNTIME`. Never enable loopback on a public `workers.dev` URL. Staging may use `IDENTITY_MODE=disabled` for skeleton smoke. Cloudflare Access is optional demonstration code, not a required production perimeter.
+- The legacy `NURA_ALLOW_ANONYMOUS_DEV` flag remains only until the Convex path is retired.

@@ -1,5 +1,7 @@
 # Useful Brain external critical-review prompt
 
+Historical pre-implementation prompt. Current product boundary (Wasim 2026-08-27): local portfolio agent — no billing, public signup, tenant switching or required Cloudflare Access. Do not treat the Access/per-company SaaS language below as active requirements.
+
 Use this prompt with Claude Opus 4.7 or an equivalent frontier reasoning model that can read both local repositories and current official documentation.
 
 ```xml

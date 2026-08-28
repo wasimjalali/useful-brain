@@ -36,17 +36,40 @@ describe("protected Worker configuration", () => {
         expect(vars.LOOPBACK_RUNTIME).not.toBe("true");
         expect(vars.LOOPBACK_SUBJECT ?? "").toBe("");
       }
+      if (name === "staging") {
+        expect(vars.IDENTITY_MODE).toBe("disabled");
+        expect(vars.RESOURCES_PROVISIONED).toBe("true");
+        const databases = env.d1_databases as Array<{ database_id: string; database_name: string }>;
+        expect(databases.map((db) => db.database_name).sort()).toEqual([
+          "useful-brain-corpus-staging",
+          "useful-brain-operations-staging",
+        ]);
+        for (const db of databases) {
+          expect(db.database_id).not.toMatch(/^00000000-/);
+        }
+      }
+      if (name === "production") {
+        expect(vars.IDENTITY_MODE).toBe("access");
+        expect(vars.RESOURCES_PROVISIONED).toBe("false");
+      }
     }
   });
 
-  it("keeps Web off workers.dev until an Access route exists", () => {
+  it("exposes only staging Web on workers.dev and keeps loopback off that URL", () => {
     const config = readJsonc("wrangler.jsonc");
     expectInternalWorker(config);
     const environments = config.env as Record<string, Record<string, unknown>>;
-    for (const name of ["development", "staging", "production"]) {
-      expectInternalWorker(environments[name]);
-    }
-    expect((environments.staging.vars as Record<string, string>).LOOPBACK_RUNTIME).toBe("false");
+    expectInternalWorker(environments.development);
+    expectInternalWorker(environments.production);
+    expect(environments.staging.workers_dev).toBe(true);
+    expect(environments.staging.preview_urls).toBe(false);
+    expect(environments.staging.route).toBeUndefined();
+    expect(environments.staging.routes).toBeUndefined();
+    const stagingVars = environments.staging.vars as Record<string, string>;
+    expect(stagingVars.IDENTITY_MODE).toBe("disabled");
+    expect(stagingVars.LOOPBACK_RUNTIME).toBe("false");
+    expect(stagingVars.WRANGLER_ACCESS_DEV).toBe("false");
+    expect(stagingVars.RESOURCES_PROVISIONED).toBe("true");
     expect((environments.production.vars as Record<string, string>).IDENTITY_MODE).toBe("access");
   });
 
@@ -55,6 +78,13 @@ describe("protected Worker configuration", () => {
     expect(source).toMatch(/forwardIdentityToBrain/);
     expect(source).toMatch(/getCloudflareContext/);
     expect(source).not.toMatch(/x-useful-brain-principal/);
+  });
+
+  it("web health route probes Brain over the Service Binding without identity headers", () => {
+    const source = readFileSync(path.join(process.cwd(), "src/app/api/health/route.ts"), "utf8");
+    expect(source).toMatch(/brain\.internal\/health/);
+    expect(source).toMatch(/getCloudflareContext/);
+    expect(source).not.toMatch(/cf-access-jwt-assertion|x-useful-brain-principal|LOOPBACK/);
   });
 
   it("keeps Ingestion off workers.dev in every environment", () => {
@@ -72,6 +102,18 @@ describe("protected Worker configuration", () => {
       expect(env.route).toBeUndefined();
       expect(env.routes).toBeUndefined();
       expect(env.services).toBeUndefined();
+      const vars = env.vars as Record<string, string>;
+      if (name === "staging") {
+        expect(vars.IDENTITY_MODE).toBe("disabled");
+        expect(vars.LOOPBACK_RUNTIME).toBe("false");
+        expect(vars.RESOURCES_PROVISIONED).toBe("true");
+        const databases = env.d1_databases as Array<{ database_id: string }>;
+        expect(databases[0]?.database_id).not.toMatch(/^00000000-/);
+      }
+      if (name === "production") {
+        expect(vars.IDENTITY_MODE).toBe("access");
+        expect(vars.RESOURCES_PROVISIONED).toBe("false");
+      }
     }
   });
 });

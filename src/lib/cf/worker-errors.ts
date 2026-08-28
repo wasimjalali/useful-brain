@@ -13,6 +13,13 @@ export class WorkerValidationError extends Error {
   }
 }
 
+export class WorkerForbiddenError extends Error {
+  constructor() {
+    super("FORBIDDEN");
+    this.name = "WorkerForbiddenError";
+  }
+}
+
 export type WorkerErrorCode =
   | "AUTH_REQUIRED"
   | "FORBIDDEN"
@@ -30,6 +37,14 @@ export type PublicWorkerError = {
 const HOST_LEAK = /https?:\/\/|:\d{2,5}|cloudflareaccess\.com|127\.0\.0\.1/i;
 
 export function toPublicWorkerError(error: unknown, requestId: string): PublicWorkerError {
+  if (error instanceof WorkerForbiddenError) {
+    return {
+      code: "FORBIDDEN",
+      message: "You cannot access that resource.",
+      retryable: false,
+      requestId,
+    };
+  }
   if (error instanceof AccessJwtUnavailable) {
     return {
       code: "UNAVAILABLE",

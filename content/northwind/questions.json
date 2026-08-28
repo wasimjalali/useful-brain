@@ -1,0 +1,1675 @@
+{
+  "principals": {
+    "eng_ic": {
+      "user_id": "eng_ic",
+      "roles": [
+        "standard"
+      ],
+      "departments": [
+        "engineering"
+      ]
+    },
+    "eng_lead": {
+      "user_id": "eng_lead",
+      "roles": [
+        "manager"
+      ],
+      "departments": [
+        "engineering"
+      ]
+    },
+    "eng_dir": {
+      "user_id": "eng_dir",
+      "roles": [
+        "director"
+      ],
+      "departments": [
+        "engineering"
+      ]
+    },
+    "hr_generalist": {
+      "user_id": "hr_generalist",
+      "roles": [
+        "standard"
+      ],
+      "departments": [
+        "hr"
+      ]
+    },
+    "hr_manager": {
+      "user_id": "hr_manager",
+      "roles": [
+        "hr_manager"
+      ],
+      "departments": [
+        "hr"
+      ]
+    },
+    "fin_analyst": {
+      "user_id": "fin_analyst",
+      "roles": [
+        "standard"
+      ],
+      "departments": [
+        "finance"
+      ]
+    },
+    "fin_manager": {
+      "user_id": "fin_manager",
+      "roles": [
+        "finance_manager"
+      ],
+      "departments": [
+        "finance"
+      ]
+    },
+    "cfo": {
+      "user_id": "cfo",
+      "roles": [
+        "executive"
+      ],
+      "departments": [
+        "executive",
+        "finance"
+      ]
+    },
+    "sales_rep": {
+      "user_id": "sales_rep",
+      "roles": [
+        "standard"
+      ],
+      "departments": [
+        "sales"
+      ]
+    },
+    "sales_manager": {
+      "user_id": "sales_manager",
+      "roles": [
+        "sales_manager"
+      ],
+      "departments": [
+        "sales"
+      ]
+    },
+    "support_agent": {
+      "user_id": "support_agent",
+      "roles": [
+        "standard"
+      ],
+      "departments": [
+        "support"
+      ]
+    },
+    "support_manager": {
+      "user_id": "support_manager",
+      "roles": [
+        "support_manager"
+      ],
+      "departments": [
+        "support"
+      ]
+    },
+    "legal_counsel": {
+      "user_id": "legal_counsel",
+      "roles": [
+        "standard"
+      ],
+      "departments": [
+        "legal"
+      ]
+    },
+    "ops_coord": {
+      "user_id": "ops_coord",
+      "roles": [
+        "standard"
+      ],
+      "departments": [
+        "operations"
+      ]
+    },
+    "ops_manager": {
+      "user_id": "ops_manager",
+      "roles": [
+        "manager"
+      ],
+      "departments": [
+        "operations"
+      ]
+    }
+  },
+  "questions": [
+    {
+      "id": "q001",
+      "category": "factual",
+      "query": "Which offices does Northwind have and roughly how many people work here?",
+      "principal": "eng_ic",
+      "expected_document_ids": [
+        "nw_hr_employee_handbook"
+      ],
+      "expected_sections": [
+        "Welcome to Northwind Systems"
+      ],
+      "note": "basic company facts; handbook is the umbrella doc"
+    },
+    {
+      "id": "q002",
+      "category": "factual",
+      "query": "How many vacation days do employees hired in London get per year?",
+      "principal": "eng_ic",
+      "expected_document_ids": [
+        "nw_hr_leave_policy",
+        "nw_hr_employee_handbook"
+      ],
+      "expected_sections": [
+        "Annual Leave Entitlements",
+        "Leave and Time Off"
+      ],
+      "note": "regional entitlement table; London is 25, differs from Austin 20"
+    },
+    {
+      "id": "q003",
+      "category": "factual",
+      "query": "If I do not use all my vacation days by year end, how many can roll over and by when must I use them?",
+      "principal": "eng_ic",
+      "expected_document_ids": [
+        "nw_hr_leave_policy",
+        "nw_hr_employee_handbook"
+      ],
+      "expected_sections": [
+        "Carryover and Expiry",
+        "Leave and Time Off"
+      ],
+      "note": "carryover cap 5, use by March 31"
+    },
+    {
+      "id": "q004",
+      "category": "factual",
+      "query": "How many sick days do I get each year and when do I need to provide a doctor's note?",
+      "principal": "support_agent",
+      "expected_document_ids": [
+        "nw_hr_leave_policy"
+      ],
+      "expected_sections": [
+        "Sick Leave"
+      ],
+      "note": "10 days, note required from day 3"
+    },
+    {
+      "id": "q005",
+      "category": "factual",
+      "query": "How far in advance do I have to tell my manager before starting parental leave?",
+      "principal": "support_agent",
+      "expected_document_ids": [
+        "nw_hr_parental_leave"
+      ],
+      "expected_sections": [
+        "Timing and Notice"
+      ],
+      "note": "4 weeks notice, must start within 12 months"
+    },
+    {
+      "id": "q006",
+      "category": "factual",
+      "query": "How many weeks of paid parental leave does a non-birth parent get?",
+      "principal": "hr_generalist",
+      "expected_document_ids": [
+        "nw_hr_parental_leave",
+        "nw_hr_employee_handbook"
+      ],
+      "expected_sections": [
+        "Paid Leave Duration",
+        "Leave and Time Off"
+      ],
+      "note": "16 weeks per parent, distinct from annual leave days"
+    },
+    {
+      "id": "q007",
+      "category": "factual",
+      "query": "How many days a week can I work from home under the standard arrangement?",
+      "principal": "eng_ic",
+      "expected_document_ids": [
+        "nw_hr_remote_work"
+      ],
+      "expected_sections": [
+        "Remote Days"
+      ],
+      "note": "up to 3 days with manager approval"
+    },
+    {
+      "id": "q008",
+      "category": "factual",
+      "query": "How quickly does an investigation start after someone reports harassment?",
+      "principal": "support_agent",
+      "expected_document_ids": [
+        "nw_hr_anti_harassment"
+      ],
+      "expected_sections": [
+        "Investigation Process"
+      ],
+      "note": "investigation starts within 5 business days, done within 10"
+    },
+    {
+      "id": "q009",
+      "category": "factual",
+      "query": "How fast must final pay be issued after an employee's last working day?",
+      "principal": "hr_manager",
+      "expected_document_ids": [
+        "nw_hr_termination_offboarding"
+      ],
+      "expected_sections": [
+        "Final Pay"
+      ],
+      "note": "72 hours; role-scoped doc, hr_manager allowed"
+    },
+    {
+      "id": "q010",
+      "category": "factual",
+      "query": "After someone leaves Northwind, how long can they keep buying our health coverage?",
+      "principal": "hr_manager",
+      "expected_document_ids": [
+        "nw_hr_termination_offboarding"
+      ],
+      "expected_sections": [
+        "Benefits and Continuation"
+      ],
+      "note": "up to 12 months continuation"
+    },
+    {
+      "id": "q011",
+      "category": "factual",
+      "query": "How much do I get for referring a candidate who gets hired, and when is it paid?",
+      "principal": "hr_generalist",
+      "expected_document_ids": [
+        "nw_hr_recruiting_interview"
+      ],
+      "expected_sections": [
+        "Employee Referral Bonus"
+      ],
+      "note": "$1,000 after 90 days; distinct from the $2,000 customer referral"
+    },
+    {
+      "id": "q012",
+      "category": "factual",
+      "query": "How much training money do I get each year and does it roll over if I do not spend it?",
+      "principal": "hr_generalist",
+      "expected_document_ids": [
+        "nw_hr_training_budget"
+      ],
+      "expected_sections": [
+        "Annual Allocation and Rollover"
+      ],
+      "note": "$2,500, no rollover except parental leave case"
+    },
+    {
+      "id": "q013",
+      "category": "factual",
+      "query": "When is the deadline for departments to submit their final budget requests?",
+      "principal": "fin_analyst",
+      "expected_document_ids": [
+        "nw_finance_budget_planning"
+      ],
+      "expected_sections": [
+        "Budget Cycle Timeline"
+      ],
+      "note": "September 30 final submission"
+    },
+    {
+      "id": "q014",
+      "category": "factual",
+      "query": "What is the nightly hotel rate cap for a business trip to London?",
+      "principal": "eng_ic",
+      "expected_document_ids": [
+        "nw_finance_travel_expense",
+        "nw_hr_employee_handbook"
+      ],
+      "expected_sections": [
+        "Hotels and Accommodation",
+        "Expenses and Travel"
+      ],
+      "note": "$350 London cap"
+    },
+    {
+      "id": "q015",
+      "category": "factual",
+      "query": "How much per-diem do I get for meals on a domestic US trip?",
+      "principal": "eng_ic",
+      "expected_document_ids": [
+        "nw_finance_travel_expense",
+        "nw_hr_employee_handbook"
+      ],
+      "expected_sections": [
+        "Per-Diem Meals",
+        "Expenses and Travel"
+      ],
+      "note": "$65 US, no receipts needed"
+    },
+    {
+      "id": "q016",
+      "category": "factual",
+      "query": "From what amount do I need to attach a receipt to an expense claim?",
+      "principal": "support_agent",
+      "expected_document_ids": [
+        "nw_finance_employee_expense",
+        "nw_hr_employee_handbook"
+      ],
+      "expected_sections": [
+        "Receipts and Documentation",
+        "Expenses and Travel"
+      ],
+      "note": "$25 threshold for employees"
+    },
+    {
+      "id": "q017",
+      "category": "factual",
+      "query": "How long do I have to submit an expense report after a purchase?",
+      "principal": "support_agent",
+      "expected_document_ids": [
+        "nw_finance_employee_expense",
+        "nw_hr_employee_handbook"
+      ],
+      "expected_sections": [
+        "Submission Deadlines",
+        "Expenses and Travel"
+      ],
+      "note": "30 days, 10 business days to reimbursement after approval"
+    },
+    {
+      "id": "q018",
+      "category": "factual",
+      "query": "A contractor submitted an approved expense claim. How long until they are paid?",
+      "principal": "ops_coord",
+      "expected_document_ids": [
+        "nw_finance_contractor_expense",
+        "nw_hr_employee_handbook"
+      ],
+      "expected_sections": [
+        "Submission and Payment Timing",
+        "Expenses and Travel"
+      ],
+      "note": "30 business days for contractors, not 10"
+    },
+    {
+      "id": "q019",
+      "category": "factual",
+      "query": "How long does a customer have to request a refund on an annual plan?",
+      "principal": "support_agent",
+      "expected_document_ids": [
+        "nw_finance_refund_policy"
+      ],
+      "expected_sections": [
+        "Refund Windows"
+      ],
+      "note": "14 calendar days from invoice for annual plans"
+    },
+    {
+      "id": "q020",
+      "category": "factual",
+      "query": "Who has to approve a refund that is above $5,000?",
+      "principal": "fin_manager",
+      "expected_document_ids": [
+        "nw_finance_refund_policy"
+      ],
+      "expected_sections": [
+        "Approval Authority"
+      ],
+      "note": "CFO above $5,000; finance manager below"
+    },
+    {
+      "id": "q021",
+      "category": "factual",
+      "query": "What are the standard payment terms on a Northwind invoice?",
+      "principal": "support_agent",
+      "expected_document_ids": [
+        "nw_finance_invoicing_payment"
+      ],
+      "expected_sections": [
+        "Standard Payment Terms"
+      ],
+      "note": "Net 30"
+    },
+    {
+      "id": "q022",
+      "category": "factual",
+      "query": "At what point does a customer's service get suspended for non-payment?",
+      "principal": "support_agent",
+      "expected_document_ids": [
+        "nw_finance_invoicing_payment"
+      ],
+      "expected_sections": [
+        "Late Payment"
+      ],
+      "note": "45 days past due after 7-day notice"
+    },
+    {
+      "id": "q023",
+      "category": "factual",
+      "query": "What is the monthly spending limit on a corporate card issued to a director?",
+      "principal": "eng_dir",
+      "expected_document_ids": [
+        "nw_finance_corporate_card"
+      ],
+      "expected_sections": [
+        "Spending Limits"
+      ],
+      "note": "$25,000 for directors; role-scoped doc, director allowed"
+    },
+    {
+      "id": "q024",
+      "category": "factual",
+      "query": "How long do we keep signed contracts after they come to an end?",
+      "principal": "legal_counsel",
+      "expected_document_ids": [
+        "nw_legal_data_retention"
+      ],
+      "expected_sections": [
+        "Financial and Contract Records"
+      ],
+      "note": "7 years after contract end"
+    },
+    {
+      "id": "q025",
+      "category": "factual",
+      "query": "How long are HR records kept after an employee leaves the company?",
+      "principal": "hr_generalist",
+      "expected_document_ids": [
+        "nw_legal_data_retention"
+      ],
+      "expected_sections": [
+        "HR Records"
+      ],
+      "note": "6 years after employment ends"
+    },
+    {
+      "id": "q026",
+      "category": "factual",
+      "query": "At what annual contract value does a deal need legal review before signature?",
+      "principal": "sales_rep",
+      "expected_document_ids": [
+        "nw_legal_contract_review"
+      ],
+      "expected_sections": [
+        "When Legal Review Is Required"
+      ],
+      "note": "from $100,000 ACV"
+    },
+    {
+      "id": "q027",
+      "category": "factual",
+      "query": "Do I need approval to give a conference talk about my work at Northwind?",
+      "principal": "eng_ic",
+      "expected_document_ids": [
+        "nw_legal_ip_confidentiality"
+      ],
+      "expected_sections": [
+        "Open Source and External Materials"
+      ],
+      "note": "yes, communications review within 5 business days"
+    },
+    {
+      "id": "q028",
+      "category": "factual",
+      "query": "How long do we have to respond to a customer data access request?",
+      "principal": "support_agent",
+      "expected_document_ids": [
+        "nw_legal_privacy_policy"
+      ],
+      "expected_sections": [
+        "Individual Rights"
+      ],
+      "note": "30 days, extendable to 60 with notice"
+    },
+    {
+      "id": "q029",
+      "category": "factual",
+      "query": "How long is the standard term on one of our NDAs?",
+      "principal": "sales_rep",
+      "expected_document_ids": [
+        "nw_legal_nda_policy"
+      ],
+      "expected_sections": [
+        "Templates and Terms"
+      ],
+      "note": "2-year term"
+    },
+    {
+      "id": "q030",
+      "category": "factual",
+      "query": "When is the annual corporate report filing due each year?",
+      "principal": "fin_analyst",
+      "expected_document_ids": [
+        "nw_legal_compliance_calendar"
+      ],
+      "expected_sections": [
+        "Annual Filings"
+      ],
+      "note": "March 31"
+    },
+    {
+      "id": "q031",
+      "category": "factual",
+      "query": "How much goodwill compensation can a support manager approve on their own?",
+      "principal": "support_manager",
+      "expected_document_ids": [
+        "nw_support_complaint_escalation"
+      ],
+      "expected_sections": [
+        "Goodwill and Compensation Rules"
+      ],
+      "note": "up to $500 at ESC-2"
+    },
+    {
+      "id": "q032",
+      "category": "factual",
+      "query": "What is the first response target for a P1 ticket?",
+      "principal": "support_agent",
+      "expected_document_ids": [
+        "nw_support_sla_policy"
+      ],
+      "expected_sections": [
+        "Response and Resolution Targets"
+      ],
+      "note": "1 hour for P1"
+    },
+    {
+      "id": "q033",
+      "category": "factual",
+      "query": "What makes a support ticket P0?",
+      "principal": "support_agent",
+      "expected_document_ids": [
+        "nw_support_ticket_priority"
+      ],
+      "expected_sections": [
+        "Priority Definitions"
+      ],
+      "note": "total outage or complete data loss"
+    },
+    {
+      "id": "q034",
+      "category": "factual",
+      "query": "Is support available around the clock for urgent issues?",
+      "principal": "support_agent",
+      "expected_document_ids": [
+        "nw_support_channels_hours"
+      ],
+      "expected_sections": [
+        "Coverage Hours"
+      ],
+      "note": "24/7 for P0 and P1; business hours otherwise"
+    },
+    {
+      "id": "q035",
+      "category": "factual",
+      "query": "Can the 30-day window for answering a data access request be extended?",
+      "principal": "support_agent",
+      "expected_document_ids": [
+        "nw_support_dsar_process"
+      ],
+      "expected_sections": [
+        "Response Windows"
+      ],
+      "note": "up to 60 days with notice for complex requests"
+    },
+    {
+      "id": "q036",
+      "category": "factual",
+      "query": "How long does a standard customer onboarding take from contract start to go-live?",
+      "principal": "support_manager",
+      "expected_document_ids": [
+        "nw_support_customer_onboarding"
+      ],
+      "expected_sections": [
+        "Purpose"
+      ],
+      "note": "30 days standard, 60 for large implementations"
+    },
+    {
+      "id": "q037",
+      "category": "factual",
+      "query": "What is the resolution target for a SEV-2 incident?",
+      "principal": "eng_ic",
+      "expected_document_ids": [
+        "nw_engineering_incident_escalation"
+      ],
+      "expected_sections": [
+        "SEV-2: Major Incident"
+      ],
+      "note": "24 hours, 30-minute response"
+    },
+    {
+      "id": "q038",
+      "category": "factual",
+      "query": "How long do we keep raw application logs before they are deleted?",
+      "principal": "eng_ic",
+      "expected_document_ids": [
+        "nw_engineering_log_retention"
+      ],
+      "expected_sections": [
+        "Retention Schedule"
+      ],
+      "note": "90 days raw, 1 year aggregated, 7 years security"
+    },
+    {
+      "id": "q039",
+      "category": "factual",
+      "query": "When is the annual deployment freeze at Northwind?",
+      "principal": "eng_dir",
+      "expected_document_ids": [
+        "nw_engineering_deployment"
+      ],
+      "expected_sections": [
+        "Deployment Freeze and Windows"
+      ],
+      "note": "December 15 to January 5; role-scoped doc, director allowed"
+    },
+    {
+      "id": "q040",
+      "category": "factual",
+      "query": "Which days and times are production changes allowed to go out?",
+      "principal": "eng_ic",
+      "expected_document_ids": [
+        "nw_engineering_change_management"
+      ],
+      "expected_sections": [
+        "Change Windows"
+      ],
+      "note": "Tuesday and Thursday 10:00-14:00 CT"
+    },
+    {
+      "id": "q041",
+      "category": "factual",
+      "query": "What stipend do engineers get while they are on call?",
+      "principal": "eng_ic",
+      "expected_document_ids": [
+        "nw_engineering_on_call"
+      ],
+      "expected_sections": [
+        "On-Call Pay and Time Off"
+      ],
+      "note": "$150 per day on call"
+    },
+    {
+      "id": "q042",
+      "category": "factual",
+      "query": "How often do API keys have to be rotated?",
+      "principal": "eng_ic",
+      "expected_document_ids": [
+        "nw_engineering_api_standards"
+      ],
+      "expected_sections": [
+        "Authentication and Security"
+      ],
+      "note": "at least every 90 days"
+    },
+    {
+      "id": "q043",
+      "category": "factual",
+      "query": "What test coverage does the CI pipeline require on changed code?",
+      "principal": "eng_ic",
+      "expected_document_ids": [
+        "nw_engineering_sdlc"
+      ],
+      "expected_sections": [
+        "Testing Requirements"
+      ],
+      "note": "80% on changed code"
+    },
+    {
+      "id": "q044",
+      "category": "factual",
+      "query": "How fast does a critical vulnerability have to be patched?",
+      "principal": "eng_dir",
+      "expected_document_ids": [
+        "nw_engineering_security_vulnerability"
+      ],
+      "expected_sections": [
+        "Vulnerability Management"
+      ],
+      "note": "7 days critical; role-scoped doc, director allowed"
+    },
+    {
+      "id": "q045",
+      "category": "factual",
+      "query": "Who approves a 15% discount on a deal?",
+      "principal": "sales_manager",
+      "expected_document_ids": [
+        "nw_sales_discount_approval"
+      ],
+      "expected_sections": [
+        "Discount Tiers and Approval Authority"
+      ],
+      "note": "10-20% needs the sales VP"
+    },
+    {
+      "id": "q046",
+      "category": "factual",
+      "query": "What price do resellers pay for our products in the first year of a deal?",
+      "principal": "sales_manager",
+      "expected_document_ids": [
+        "nw_sales_partner_program"
+      ],
+      "expected_sections": [
+        "Partner Pricing"
+      ],
+      "note": "80% of list ACV year one"
+    },
+    {
+      "id": "q047",
+      "category": "factual",
+      "query": "How long is a sales quote valid before it expires?",
+      "principal": "sales_rep",
+      "expected_document_ids": [
+        "nw_sales_proposal_quote"
+      ],
+      "expected_sections": [
+        "Quote Validity"
+      ],
+      "note": "30 days"
+    },
+    {
+      "id": "q048",
+      "category": "factual",
+      "query": "How long after my last working day do I have to return my laptop and badge?",
+      "principal": "eng_ic",
+      "expected_document_ids": [
+        "nw_operations_equipment_return"
+      ],
+      "expected_sections": [
+        "Return Windows"
+      ],
+      "note": "30 calendar days; badge on the last day"
+    },
+    {
+      "id": "q049",
+      "category": "factual",
+      "query": "How much notice do customers get before scheduled maintenance?",
+      "principal": "ops_coord",
+      "expected_document_ids": [
+        "nw_operations_scheduled_maintenance"
+      ],
+      "expected_sections": [
+        "Notice Requirements"
+      ],
+      "note": "72 hours notice, 24 hours before window"
+    },
+    {
+      "id": "q050",
+      "category": "factual",
+      "query": "When are board materials due ahead of a board meeting?",
+      "principal": "cfo",
+      "expected_document_ids": [
+        "nw_executive_board_calendar",
+        "nw_legal_compliance_calendar"
+      ],
+      "expected_sections": [
+        "Meeting Schedule",
+        "Legal and Board Deadlines"
+      ],
+      "note": "5 business days; private doc, cfo has executive department"
+    },
+    {
+      "id": "q051",
+      "category": "trap",
+      "query": "A customer paid for a full year of Core upfront and now wants their money back. They insist we have a 30-day return window. What is the actual window?",
+      "principal": "support_agent",
+      "expected_document_ids": [
+        "nw_finance_refund_policy"
+      ],
+      "expected_sections": [
+        "Refund Windows"
+      ],
+      "note": "P1 refund vs equipment return: 14 calendar days for annual plans, not the 30-day equipment window"
+    },
+    {
+      "id": "q052",
+      "category": "trap",
+      "query": "A contractor just told me their approved expense claim has been waiting over two weeks. When should they actually be paid?",
+      "principal": "ops_coord",
+      "expected_document_ids": [
+        "nw_finance_contractor_expense",
+        "nw_hr_employee_handbook"
+      ],
+      "expected_sections": [
+        "Submission and Payment Timing",
+        "Expenses and Travel"
+      ],
+      "note": "P2 contractor vs employee: 30 business days for contractors, employees get 10"
+    },
+    {
+      "id": "q053",
+      "category": "trap",
+      "query": "I am an employee and my expense report was approved on Monday. When will the money hit my account?",
+      "principal": "ops_coord",
+      "expected_document_ids": [
+        "nw_finance_employee_expense",
+        "nw_hr_employee_handbook"
+      ],
+      "expected_sections": [
+        "Submission Deadlines",
+        "Expenses and Travel"
+      ],
+      "note": "P2 reverse direction: 10 business days for employees, not the contractor 30"
+    },
+    {
+      "id": "q054",
+      "category": "trap",
+      "query": "A customer's CEO called furious about a complaint that has been dragging on for a week. They want our CEO's office to respond. How fast must that response come?",
+      "principal": "support_manager",
+      "expected_document_ids": [
+        "nw_support_complaint_escalation"
+      ],
+      "expected_sections": [
+        "ESC-4: Executive Complaints"
+      ],
+      "note": "P3 complaint vs incident: ESC-4 gets a 24-hour CEO-office response, not the 15-minute SEV-1 response"
+    },
+    {
+      "id": "q055",
+      "category": "trap",
+      "query": "Core is down for all customers right now. How quickly must the on-call engineer respond and who gets notified?",
+      "principal": "support_agent",
+      "expected_document_ids": [
+        "nw_engineering_incident_escalation"
+      ],
+      "expected_sections": [
+        "SEV-1: Critical Incident"
+      ],
+      "note": "P3 reverse: SEV-1 15-minute response, CTO and CISO notified; not the complaint path ESC times"
+    },
+    {
+      "id": "q056",
+      "category": "trap",
+      "query": "I am flying to Singapore for a conference next month. What is my daily meal allowance there?",
+      "principal": "eng_ic",
+      "expected_document_ids": [
+        "nw_finance_travel_expense",
+        "nw_hr_employee_handbook"
+      ],
+      "expected_sections": [
+        "Per-Diem Meals",
+        "Expenses and Travel"
+      ],
+      "note": "P4 travel vs general expenses: $75 Singapore per-diem lives in the travel policy"
+    },
+    {
+      "id": "q057",
+      "category": "trap",
+      "query": "A teammate just became a parent and asked how much paid time off they can take. What do I tell them?",
+      "principal": "support_agent",
+      "expected_document_ids": [
+        "nw_hr_parental_leave",
+        "nw_hr_employee_handbook"
+      ],
+      "expected_sections": [
+        "Paid Leave Duration",
+        "Leave and Time Off"
+      ],
+      "note": "P5 parental vs annual leave: 16 weeks parental, not the 20/25/18 annual days"
+    },
+    {
+      "id": "q058",
+      "category": "trap",
+      "query": "How many unused vacation days can I carry into the new year?",
+      "principal": "eng_ic",
+      "expected_document_ids": [
+        "nw_hr_leave_policy",
+        "nw_hr_employee_handbook"
+      ],
+      "expected_sections": [
+        "Carryover and Expiry",
+        "Leave and Time Off"
+      ],
+      "note": "P5 reverse: 5 days carryover from the leave policy, parental leave has no carryover"
+    },
+    {
+      "id": "q059",
+      "category": "trap",
+      "query": "A reseller partner registered a deal and wants to know what they earn on it. What payout model applies?",
+      "principal": "sales_manager",
+      "expected_document_ids": [
+        "nw_sales_partner_program"
+      ],
+      "expected_sections": [
+        "Partner Commissions and Payouts"
+      ],
+      "note": "P6 partner vs referral: 10% recurring quarterly, not the flat $2,000 referral"
+    },
+    {
+      "id": "q060",
+      "category": "trap",
+      "query": "An employee referred a customer who signed an annual contract yesterday. When does the referrer get paid?",
+      "principal": "sales_rep",
+      "expected_document_ids": [
+        "nw_sales_referral_program"
+      ],
+      "expected_sections": [
+        "Payout Amount and Timing"
+      ],
+      "note": "P6 reverse: referral pays after the first invoice is paid, not on the partner quarterly cycle"
+    },
+    {
+      "id": "q061",
+      "category": "trap",
+      "query": "Legal is asking how long we keep authentication and admin action logs. What do we tell them?",
+      "principal": "eng_ic",
+      "expected_document_ids": [
+        "nw_engineering_log_retention"
+      ],
+      "expected_sections": [
+        "What Counts as Security Logs"
+      ],
+      "note": "P7 logs vs records: security logs 7 years in the log policy; the contracts 7-year rule is a different subject"
+    },
+    {
+      "id": "q062",
+      "category": "trap",
+      "query": "We need to run database maintenance that requires a short downtime. When can we schedule it?",
+      "principal": "ops_coord",
+      "expected_document_ids": [
+        "nw_operations_scheduled_maintenance"
+      ],
+      "expected_sections": [
+        "Maintenance Window"
+      ],
+      "note": "P8 maintenance vs changes: Saturday 02:00-04:00 UTC, not the Tue/Thu change windows"
+    },
+    {
+      "id": "q063",
+      "category": "trap",
+      "query": "A customer just opened a P1 ticket for a broken feature. How fast must we respond?",
+      "principal": "support_agent",
+      "expected_document_ids": [
+        "nw_support_sla_policy"
+      ],
+      "expected_sections": [
+        "Response and Resolution Targets"
+      ],
+      "note": "P9 SLA vs incidents: P1 is a 1-hour response; the 15/30-minute numbers belong to SEV incidents"
+    },
+    {
+      "id": "q064",
+      "category": "trap",
+      "query": "We need a 22% discount to close a deal. Who has to approve it?",
+      "principal": "sales_manager",
+      "expected_document_ids": [
+        "nw_sales_discount_approval"
+      ],
+      "expected_sections": [
+        "Discount Tiers and Approval Authority"
+      ],
+      "note": "P10 discount vs contract: above 20% needs the CFO; the contract-value approval chain is a different matrix"
+    },
+    {
+      "id": "q065",
+      "category": "trap",
+      "query": "A customer is threatening legal action over an invoice dispute. How long do we negotiate before formal arbitration begins?",
+      "principal": "sales_manager",
+      "expected_document_ids": [
+        "nw_legal_dispute_resolution"
+      ],
+      "expected_sections": [
+        "Negotiation Period"
+      ],
+      "note": "dispute vs complaint: 60-day negotiation then arbitration; the ESC complaint times are business-hour response targets, not this"
+    },
+    {
+      "id": "q066",
+      "category": "permission",
+      "query": "What is the band minimum and maximum annual base salary for level L5?",
+      "principal": "eng_ic",
+      "expected_document_ids": [],
+      "forbidden_document_ids": [
+        "nw_hr_salary_bands"
+      ],
+      "note": "salary bands live in hr/salary-bands.md (dept [hr]); engineer must get zero hits. Query wording matches the band table so the document would rank if the asker were allowed, which is what makes this a live ACL test"
+    },
+    {
+      "id": "q067",
+      "category": "permission",
+      "query": "How much severance does the CEO get if terminated without cause?",
+      "principal": "hr_manager",
+      "expected_document_ids": [],
+      "forbidden_document_ids": [
+        "nw_executive_severance"
+      ],
+      "note": "executive/severance-policy.md is private [executive]; HR is denied"
+    },
+    {
+      "id": "q068",
+      "category": "permission",
+      "query": "What do non-employee directors get paid per board meeting?",
+      "principal": "fin_analyst",
+      "expected_document_ids": [],
+      "forbidden_document_ids": [
+        "nw_executive_board_calendar"
+      ],
+      "note": "board calendar is private [executive]; finance analyst is denied"
+    },
+    {
+      "id": "q069",
+      "category": "permission",
+      "query": "What is the smallest deal size that needs the board's approval?",
+      "principal": "sales_rep",
+      "expected_document_ids": [],
+      "forbidden_document_ids": [
+        "nw_executive_ma_approval"
+      ],
+      "note": "M&A policy is private [executive]; sales rep is denied"
+    },
+    {
+      "id": "q070",
+      "category": "permission",
+      "query": "What commission rate does a rep earn on new business?",
+      "principal": "support_agent",
+      "expected_document_ids": [],
+      "forbidden_document_ids": [
+        "nw_sales_commission_plan"
+      ],
+      "note": "commission plan is role [sales_manager, director]; support agent is denied"
+    },
+    {
+      "id": "q071",
+      "category": "permission",
+      "query": "What is the monthly spending limit on a VP's corporate card?",
+      "principal": "hr_generalist",
+      "expected_document_ids": [],
+      "forbidden_document_ids": [
+        "nw_finance_corporate_card"
+      ],
+      "note": "corporate card policy is role [manager, director, finance_manager]; HR generalist is denied"
+    },
+    {
+      "id": "q072",
+      "category": "permission",
+      "query": "What is the CSAT target in the agent scorecard?",
+      "principal": "support_agent",
+      "expected_document_ids": [],
+      "forbidden_document_ids": [
+        "nw_support_agent_scorecard"
+      ],
+      "note": "scorecard is role [support_manager, director]; a regular agent is denied"
+    },
+    {
+      "id": "q073",
+      "category": "permission",
+      "query": "How fast must a critical vulnerability be patched?",
+      "principal": "eng_ic",
+      "expected_document_ids": [],
+      "forbidden_document_ids": [
+        "nw_engineering_security_vulnerability"
+      ],
+      "note": "security/vulnerability policy is role [director, it_admin]; regular engineer is denied (contrast q044)"
+    },
+    {
+      "id": "q074",
+      "category": "permission",
+      "query": "What are the final pay rules for an employee being let go?",
+      "principal": "eng_ic",
+      "expected_document_ids": [],
+      "forbidden_document_ids": [
+        "nw_hr_termination_offboarding"
+      ],
+      "note": "termination policy is role [manager, hr_manager]; engineer is denied"
+    },
+    {
+      "id": "q075",
+      "category": "permission",
+      "query": "How are performance ratings calibrated across teams?",
+      "principal": "support_agent",
+      "expected_document_ids": [],
+      "forbidden_document_ids": [
+        "nw_hr_performance_review"
+      ],
+      "note": "performance review policy is role [manager, director, hr_manager]; support agent is denied"
+    },
+    {
+      "id": "q076",
+      "category": "unanswerable",
+      "query": "What is the company match on the 401(k) plan?",
+      "principal": "eng_ic",
+      "expected_document_ids": [],
+      "note": "retirement benefits are never mentioned anywhere in the corpus"
+    },
+    {
+      "id": "q077",
+      "category": "unanswerable",
+      "query": "How much is budgeted for the annual holiday party?",
+      "principal": "support_agent",
+      "expected_document_ids": [],
+      "note": "no social-event budget exists in any document"
+    },
+    {
+      "id": "q078",
+      "category": "unanswerable",
+      "query": "Is there a pet-friendly policy for the offices?",
+      "principal": "hr_generalist",
+      "expected_document_ids": [],
+      "note": "pets are never mentioned in any policy"
+    },
+    {
+      "id": "q079",
+      "category": "unanswerable",
+      "query": "How do I request a standing desk?",
+      "principal": "eng_ic",
+      "expected_document_ids": [],
+      "note": "facilities covers desks and repairs but never standing desks; nearest-passage retrieval must be refused"
+    },
+    {
+      "id": "q080",
+      "category": "unanswerable",
+      "query": "What is the dress code for client meetings?",
+      "principal": "sales_rep",
+      "expected_document_ids": [],
+      "note": "dress code never appears in the corpus"
+    },
+    {
+      "id": "q081",
+      "category": "unanswerable",
+      "query": "Does Northwind offer an employee stock purchase plan?",
+      "principal": "fin_analyst",
+      "expected_document_ids": [],
+      "note": "equity is mentioned only as vesting; no purchase plan exists in the docs"
+    },
+    {
+      "id": "q082",
+      "category": "unanswerable",
+      "query": "Does Northwind offer a childcare stipend for employees with young children?",
+      "principal": "eng_ic",
+      "expected_document_ids": [],
+      "note": "no childcare benefit exists anywhere in the corpus. The previous wording asked about personal phone plans, which the expense policy answers in the negative, so a correct system scored as a failed abstention"
+    },
+    {
+      "id": "q083",
+      "category": "unanswerable",
+      "query": "What is the policy on moonlighting or taking a second job?",
+      "principal": "hr_manager",
+      "expected_document_ids": [],
+      "note": "outside employment is never addressed in any policy"
+    },
+    {
+      "id": "q084",
+      "category": "unanswerable",
+      "query": "Can employees get personal documents notarized at the office?",
+      "principal": "legal_counsel",
+      "expected_document_ids": [],
+      "note": "notary services are never mentioned"
+    },
+    {
+      "id": "q085",
+      "category": "unanswerable",
+      "query": "What happens to my unused sick days if I transfer from Austin to Singapore?",
+      "principal": "support_agent",
+      "expected_document_ids": [],
+      "note": "sick-day expiry exists, but cross-office transfer of sick balances is never defined"
+    },
+    {
+      "id": "q086",
+      "category": "multi_hop",
+      "query": "An incident happens during the December freeze and we need to deploy a fix to production. What process applies and who approves it?",
+      "principal": "eng_lead",
+      "expected_document_ids": [
+        "nw_engineering_change_management",
+        "nw_engineering_deployment"
+      ],
+      "expected_sections": [
+        "Change Freeze",
+        "Emergency Changes"
+      ],
+      "note": "freeze exception in change management + emergency change rules in deployment; both needed"
+    },
+    {
+      "id": "q087",
+      "category": "multi_hop",
+      "query": "A customer's billing dispute has been open for 35 days and they have now filed a complaint about it. How do the two processes interact?",
+      "principal": "support_agent",
+      "expected_document_ids": [
+        "nw_finance_invoicing_payment",
+        "nw_support_complaint_escalation"
+      ],
+      "expected_sections": [
+        "Billing Disputes",
+        "ESC-3: VP Support"
+      ],
+      "note": "invoicing says 30-day disputes move to ESC-3; complaint path defines the ESC-3 level"
+    },
+    {
+      "id": "q088",
+      "category": "multi_hop",
+      "query": "A sales manager wants to explain to a rep how an employee referral payout works and how commission is calculated on a new deal. What are both numbers?",
+      "principal": "sales_manager",
+      "expected_document_ids": [
+        "nw_sales_referral_program",
+        "nw_sales_commission_plan"
+      ],
+      "expected_sections": [
+        "Payout Amount and Timing",
+        "Commission Rates"
+      ],
+      "note": "$2,000 referral after first invoice + 8% commission on new ACV; two documents"
+    },
+    {
+      "id": "q089",
+      "category": "multi_hop",
+      "query": "An employee is leaving next month. What do they need to know about final pay timing, health coverage after departure, and returning their laptop?",
+      "principal": "hr_manager",
+      "expected_document_ids": [
+        "nw_hr_termination_offboarding",
+        "nw_operations_equipment_return"
+      ],
+      "expected_sections": [
+        "Final Pay",
+        "Return Windows"
+      ],
+      "note": "72-hour final pay and 12-month continuation in termination; 30-day return window in equipment"
+    },
+    {
+      "id": "q090",
+      "category": "multi_hop",
+      "query": "A customer received a full refund on a terminated annual plan and now wants their data deleted right away. What timelines apply?",
+      "principal": "support_agent",
+      "expected_document_ids": [
+        "nw_finance_refund_policy",
+        "nw_support_dsar_process"
+      ],
+      "expected_sections": [
+        "Refund and Data",
+        "Response Windows"
+      ],
+      "note": "refund triggers 30-day deletion schedule; DSAR process defines the 30-day deletion window"
+    },
+    {
+      "id": "q091",
+      "category": "factual",
+      "query": "What causes ERR-4417 and what should I check first?",
+      "principal": "support_agent",
+      "expected_document_ids": [
+        "nw_engineering_error_code_reference"
+      ],
+      "expected_sections": [
+        "Data Sync and Atlas Pipeline Errors (ERR-4xxx)"
+      ],
+      "note": "exact token: batch window elapsed before the batch closed"
+    },
+    {
+      "id": "q092",
+      "category": "factual",
+      "query": "A customer is seeing ERR-1180. What does that error mean?",
+      "principal": "eng_ic",
+      "expected_document_ids": [
+        "nw_engineering_error_code_reference"
+      ],
+      "expected_sections": [
+        "Authentication and Session Errors (ERR-1xxx)"
+      ],
+      "note": "exact token: valid token presented against the wrong tenant"
+    },
+    {
+      "id": "q093",
+      "category": "factual",
+      "query": "What is ERR-7702 and who do I hand it to?",
+      "principal": "support_agent",
+      "expected_document_ids": [
+        "nw_engineering_error_code_reference"
+      ],
+      "expected_sections": [
+        "Billing and Entitlement Errors (ERR-7xxx)"
+      ],
+      "note": "exact token: missing entitlement grant for a purchased module"
+    },
+    {
+      "id": "q094",
+      "category": "factual",
+      "query": "We are getting ERR-9331 in production. What is failing?",
+      "principal": "eng_lead",
+      "expected_document_ids": [
+        "nw_engineering_error_code_reference"
+      ],
+      "expected_sections": [
+        "Platform and Infrastructure Errors (ERR-9xxx)"
+      ],
+      "note": "exact token: object store write exceeded its timeout"
+    },
+    {
+      "id": "q095",
+      "category": "factual",
+      "query": "Which runbook is RB-ATL-07 and when do I follow it?",
+      "principal": "support_agent",
+      "expected_document_ids": [
+        "nw_support_atlas_runbook"
+      ],
+      "expected_sections": [
+        "Diagnosing a Stalled Sync"
+      ],
+      "note": "exact token: the runbook's own reference id, cited in the response record"
+    },
+    {
+      "id": "q096",
+      "category": "factual",
+      "query": "What is the default and the hard maximum for atlas.sync.max_inflight_batches?",
+      "principal": "support_manager",
+      "expected_document_ids": [
+        "nw_support_atlas_runbook"
+      ],
+      "expected_sections": [
+        "Throughput and Backpressure Tuning"
+      ],
+      "note": "exact token: setting key, default 4, hard maximum 16"
+    },
+    {
+      "id": "q097",
+      "category": "factual",
+      "query": "What does atlas.sync.batch_window_ms control and what is its default?",
+      "principal": "eng_ic",
+      "expected_document_ids": [
+        "nw_support_atlas_runbook"
+      ],
+      "expected_sections": [
+        "Diagnosing a Stalled Sync"
+      ],
+      "note": "exact token: setting key, default 900000"
+    },
+    {
+      "id": "q098",
+      "category": "factual",
+      "query": "Can a customer run 15.0.0-rc3 in production?",
+      "principal": "sales_rep",
+      "expected_document_ids": [
+        "nw_engineering_release_notes_2026"
+      ],
+      "expected_sections": [
+        "Release 15.0.0-rc3, July 2026 Preview"
+      ],
+      "note": "exact token: version string; appears in three sections, the answer is only in the preview one"
+    },
+    {
+      "id": "q099",
+      "category": "factual",
+      "query": "What is DRP-11 and who can declare it activated?",
+      "principal": "ops_coord",
+      "expected_document_ids": [
+        "nw_operations_dr_runbook"
+      ],
+      "expected_sections": [
+        "Activation Criteria and Declaration Authority"
+      ],
+      "note": "exact token: disaster recovery plan revision id (contrast q114, same token, denied principal)"
+    },
+    {
+      "id": "q100",
+      "category": "factual",
+      "query": "What is Yusuf Delacroix responsible for?",
+      "principal": "ops_manager",
+      "expected_document_ids": [
+        "nw_operations_dr_runbook"
+      ],
+      "expected_sections": [
+        "Communication, Stand-Down and Post-Event Review"
+      ],
+      "note": "exact token: a person named exactly once in the whole corpus"
+    },
+    {
+      "id": "q101",
+      "category": "factual",
+      "query": "What is form HR-114 and when do I sign it?",
+      "principal": "eng_ic",
+      "expected_document_ids": [
+        "nw_hr_onboarding_guide"
+      ],
+      "expected_sections": [
+        "Week One: Access, Equipment and Orientation",
+        "The 90-Day Checkpoint"
+      ],
+      "note": "exact token: equipment issue and attestation form; appears in two sections, either is a correct citation"
+    },
+    {
+      "id": "q102",
+      "category": "factual",
+      "query": "What is NW-BUDDY and how long does it last?",
+      "principal": "support_agent",
+      "expected_document_ids": [
+        "nw_hr_onboarding_guide"
+      ],
+      "expected_sections": [
+        "Weeks Two Through Four: Role Ramp"
+      ],
+      "note": "exact token: peer-pairing programme, eight weeks, buddy outside the reporting line"
+    },
+    {
+      "id": "q103",
+      "category": "factual",
+      "query": "Who signs HR-208 and what does it close out?",
+      "principal": "hr_generalist",
+      "expected_document_ids": [
+        "nw_hr_onboarding_guide"
+      ],
+      "expected_sections": [
+        "The 90-Day Checkpoint"
+      ],
+      "note": "exact token: checkpoint confirmation record, manager and HR both sign"
+    },
+    {
+      "id": "q104",
+      "category": "factual",
+      "query": "When do I have to use PF-204 and what verification does it require?",
+      "principal": "fin_analyst",
+      "expected_document_ids": [
+        "nw_finance_procurement_forms"
+      ],
+      "expected_sections": [
+        "Vendor Onboarding and the Supplier Packet"
+      ],
+      "note": "exact token: vendor master data change form, two-person callback verification"
+    },
+    {
+      "id": "q105",
+      "category": "factual",
+      "query": "What does Clause 7.3(b) commit us to?",
+      "principal": "legal_counsel",
+      "expected_document_ids": [
+        "nw_legal_dpa_handbook"
+      ],
+      "expected_sections": [
+        "Clause-by-Clause Walkthrough"
+      ],
+      "note": "exact token: breach notification within 48 hours (contrast q115, same token, denied principal)"
+    },
+    {
+      "id": "q106",
+      "category": "factual",
+      "query": "What is SPR-2026 and when does it have to be updated?",
+      "principal": "sales_rep",
+      "expected_document_ids": [
+        "nw_legal_dpa_handbook"
+      ],
+      "expected_sections": [
+        "Subprocessor Management"
+      ],
+      "note": "exact token: published subprocessor register revision"
+    },
+    {
+      "id": "q107",
+      "category": "factual",
+      "query": "What does Ingrid Halloran sign off on?",
+      "principal": "legal_counsel",
+      "expected_document_ids": [
+        "nw_legal_dpa_handbook"
+      ],
+      "expected_sections": [
+        "Cross-Border Transfers"
+      ],
+      "note": "exact token: the Data Protection Officer, named exactly once in the corpus"
+    },
+    {
+      "id": "q108",
+      "category": "factual",
+      "query": "What does the SKU NW-CORE-ENT-500 cover?",
+      "principal": "sales_rep",
+      "expected_document_ids": [
+        "nw_sales_deal_desk"
+      ],
+      "expected_sections": [
+        "Building an Enterprise Quote"
+      ],
+      "note": "exact token: Northwind Core Enterprise 500-seat annual tier"
+    },
+    {
+      "id": "q109",
+      "category": "factual",
+      "query": "What is the default and maximum for meridian.sso.assertion_skew_seconds?",
+      "principal": "support_agent",
+      "expected_document_ids": [
+        "nw_support_meridian_admin"
+      ],
+      "expected_sections": [
+        "Configuring Single Sign-On"
+      ],
+      "note": "exact token: setting key, default 300, maximum 600"
+    },
+    {
+      "id": "q110",
+      "category": "factual",
+      "query": "What delivery guarantee does ATL-STRM-01 provide?",
+      "principal": "eng_ic",
+      "expected_document_ids": [
+        "nw_engineering_atlas_catalog"
+      ],
+      "expected_sections": [
+        "File, Object Store and Streaming Connectors"
+      ],
+      "note": "exact token: the only connector that cannot guarantee exactly-once delivery"
+    },
+    {
+      "id": "q111",
+      "category": "trap",
+      "query": "What happened in INC-8842?",
+      "principal": "support_agent",
+      "expected_document_ids": [
+        "nw_support_atlas_runbook"
+      ],
+      "expected_sections": [
+        "When to Escalate"
+      ],
+      "note": "trap: the incident escalation matrix defines the INC-#### format and the SEV levels, but only the Atlas runbook holds this incident"
+    },
+    {
+      "id": "q112",
+      "category": "trap",
+      "query": "What was approved under CHG-4471?",
+      "principal": "eng_ic",
+      "expected_document_ids": [
+        "nw_engineering_release_notes_2026"
+      ],
+      "expected_sections": [
+        "Release 14.2.1, March 2026"
+      ],
+      "note": "trap: the change management policy defines CHG-#### and emergency change approval, but only the release notes hold this change"
+    },
+    {
+      "id": "q113",
+      "category": "permission",
+      "query": "What is PF-330 and who has to sign it?",
+      "principal": "sales_rep",
+      "expected_document_ids": [],
+      "forbidden_document_ids": [
+        "nw_finance_procurement_forms"
+      ],
+      "note": "procurement forms guide is department [finance, operations]; a sales rep is denied"
+    },
+    {
+      "id": "q114",
+      "category": "permission",
+      "query": "What is DRP-11 and who can declare it activated?",
+      "principal": "support_agent",
+      "expected_document_ids": [],
+      "forbidden_document_ids": [
+        "nw_operations_dr_runbook"
+      ],
+      "note": "DR runbook is department [operations, engineering, executive]; support is denied (contrast q099)"
+    },
+    {
+      "id": "q115",
+      "category": "permission",
+      "query": "What does Clause 7.3(b) commit us to?",
+      "principal": "eng_ic",
+      "expected_document_ids": [],
+      "forbidden_document_ids": [
+        "nw_legal_dpa_handbook"
+      ],
+      "note": "DPA handbook is department [legal, sales, finance]; an engineer is denied (contrast q105)"
+    },
+    {
+      "id": "q116",
+      "category": "multi_hop_expanded",
+      "query": "After a SEV-1, when is the postmortem due and how long must its incident records be retained?",
+      "principal": "eng_lead",
+      "expected_document_ids": [
+        "nw_engineering_incident_escalation",
+        "nw_engineering_log_retention"
+      ],
+      "expected_sections": [
+        "SEV-1: Critical Incident",
+        "What Counts as Security Logs"
+      ],
+      "note": "incident response supplies the postmortem deadline; log policy supplies seven-year retention"
+    },
+    {
+      "id": "q117",
+      "category": "multi_hop_expanded",
+      "query": "An employee approved to work abroad is leaving the company. What remote-work condition applies and when must the laptop be returned?",
+      "principal": "eng_ic",
+      "expected_document_ids": [
+        "nw_hr_remote_work",
+        "nw_operations_equipment_return"
+      ],
+      "expected_sections": [
+        "Long-Term Remote and Working Abroad",
+        "Return Windows"
+      ],
+      "note": "remote-work approval and equipment-return timing come from separate policies"
+    },
+    {
+      "id": "q118",
+      "category": "multi_hop_expanded",
+      "query": "An employee wants to use their development budget for an overseas conference. What training approval and travel approval rules both apply?",
+      "principal": "hr_generalist",
+      "expected_document_ids": [
+        "nw_hr_training_budget",
+        "nw_finance_travel_expense"
+      ],
+      "expected_sections": [
+        "Approval Process",
+        "Travel Approval and Safety"
+      ],
+      "note": "the purchase needs training approval and the trip needs travel approval"
+    },
+    {
+      "id": "q119",
+      "category": "multi_hop_expanded",
+      "query": "A customer contract lets a vendor process personal data. When do Legal review and a data processing addendum become required?",
+      "principal": "legal_counsel",
+      "expected_document_ids": [
+        "nw_legal_contract_review",
+        "nw_legal_dpa_handbook"
+      ],
+      "expected_sections": [
+        "When Legal Review Is Required",
+        "When a Data Processing Addendum Is Required"
+      ],
+      "note": "contract approval and data-processing terms are governed by separate legal documents"
+    },
+    {
+      "id": "q120",
+      "category": "multi_hop_expanded",
+      "query": "A P0 response target was missed and the customer demands compensation above the standard SLA credit. What credit and complaint escalation rules apply?",
+      "principal": "support_manager",
+      "expected_document_ids": [
+        "nw_support_sla_policy",
+        "nw_support_complaint_escalation"
+      ],
+      "expected_sections": [
+        "SLA Credits",
+        "Goodwill and Compensation Rules"
+      ],
+      "note": "the SLA defines the credit; extra compensation follows the complaint path"
+    }
+  ]
+}

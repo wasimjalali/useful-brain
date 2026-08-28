@@ -3,6 +3,7 @@ import { env, exports } from "cloudflare:workers";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { createBrainBoundRequest } from "../../../src/lib/cf/service-binding-identity";
+import { createPendingTurn } from "../../../src/lib/store/conversations";
 import worker from "../src";
 import { AUD, generateSigning, jwksResponse, signToken } from "./jwt";
 import { seedPrincipals } from "./seed";
@@ -131,6 +132,29 @@ describe("Web-to-Brain identity", () => {
     expect(await response.json()).toMatchObject({ id: "principal-dev", kind: "user" });
   });
 
+  it("serves health and fails closed on whoami in staging disabled identity", async () => {
+    const disabledStaging = {
+      ...env,
+      RUNTIME_ENV: "staging",
+      IDENTITY_MODE: "disabled",
+      RESOURCES_PROVISIONED: "true",
+      LOOPBACK_RUNTIME: "false",
+      LOOPBACK_SUBJECT: "",
+    };
+    const health = await fetchWorker(
+      new IncomingRequest("https://brain.internal/health"),
+      disabledStaging,
+    );
+    const whoami = await fetchWorker(
+      new IncomingRequest("https://brain.internal/whoami"),
+      disabledStaging,
+    );
+    expect(health.status).toBe(200);
+    expect(await health.text()).toBe("ok");
+    expect(whoami.status).toBe(500);
+    expect(await whoami.json()).toMatchObject({ code: "INTERNAL_ERROR" });
+  });
+
   it("fails startup when loopback is enabled without the trusted runtime signal", async () => {
     const response = await fetchWorker(
       new IncomingRequest("https://brain.internal/whoami"),
@@ -160,5 +184,56 @@ describe("Web-to-Brain identity", () => {
     );
     expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({ code: "VALIDATION_FAILED" });
+  });
+
+  it("forbids stream, lock and approval routes for another conversation owner", async () => {
+    const token = await signToken(signing.privateKey, signing.kid);
+    const pending = await createPendingTurn(env.OPERATIONS_DB, {
+      ownerPrincipalId: "principal-dev",
+      requestId: "req-route-owner",
+      question: "Private",
+      now: 100,
+    });
+    const headers = {
+      "cf-access-jwt-assertion": token,
+      "content-type": "application/json",
+    };
+    const lock = await fetchWorker(
+      new IncomingRequest("https://brain.internal/lock", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ conversationId: pending.conversationId, runId: "run-owner-test" }),
+      }),
+    );
+    expect(lock.status).toBe(403);
+
+    const stream = await fetchWorker(
+      new IncomingRequest(
+        `https://brain.internal/stream?conversationId=${pending.conversationId}`,
+        { headers: { "cf-access-jwt-assertion": token, Upgrade: "websocket" } },
+      ),
+    );
+    expect(stream.status).toBe(403);
+
+    const binding = {
+      principalId: "principal-alice",
+      conversationId: pending.conversationId,
+      tool: "create_draft",
+      argumentFingerprint: '{"title":"private"}',
+      idempotencyKey: "draft-private",
+      expiresAt: Date.now() + 60_000,
+    };
+    const approval = await fetchWorker(
+      new IncomingRequest("https://brain.internal/approvals/event", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          workflowId: binding.idempotencyKey,
+          decision: "approve",
+          binding,
+        }),
+      }),
+    );
+    expect(approval.status).toBe(403);
   });
 });
