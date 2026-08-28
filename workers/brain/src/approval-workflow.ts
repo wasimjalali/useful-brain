@@ -21,13 +21,6 @@ export type ApprovalEvent = {
   binding: ApprovalBinding;
 };
 
-function eventPayload(event: { payload: ApprovalEvent } | ApprovalEvent): ApprovalEvent {
-  if ("payload" in event && event.payload && "decision" in event.payload) {
-    return event.payload;
-  }
-  return event as ApprovalEvent;
-}
-
 export async function runApprovalWorkflow(
   payload: ApprovalWorkflowParams,
   step: Pick<WorkflowStep, "waitForEvent" | "do">,
@@ -36,12 +29,13 @@ export async function runApprovalWorkflow(
   const runId = parseBoundedId(payload.runId, "run id");
   const binding = payload.binding;
   parseMutatingIdempotencyKey(binding.idempotencyKey);
-  let event: Awaited<ReturnType<WorkflowStep["waitForEvent"]>>;
+  let body: ApprovalEvent;
   try {
-    event = await step.waitForEvent<ApprovalEvent>("wait-for-approval", {
+    const event = await step.waitForEvent<ApprovalEvent>("wait-for-approval", {
       type: "approval",
       timeout: "15 minutes",
     });
+    body = event.payload;
   } catch {
     return step.do("expire-approval", async () => {
       return expireApproval(env.OPERATIONS_DB, {
@@ -51,7 +45,6 @@ export async function runApprovalWorkflow(
       });
     });
   }
-  const body = eventPayload(event);
   const decision = await step.do("persist-decision", async () => {
     return decideApproval(env.OPERATIONS_DB, {
       runId,
