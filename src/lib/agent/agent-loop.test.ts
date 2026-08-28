@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Agent } from "@earendil-works/pi-agent-core";
+import { Type } from "typebox";
 import {
   fauxAssistantMessage,
   fauxProvider,
@@ -8,8 +9,8 @@ import {
 } from "@earendil-works/pi-ai/providers/faux";
 
 import { BudgetExceededError, BudgetTracker } from "./budgets";
-import { argumentFingerprint, policyGateway, toolPolicy } from "./policy";
-import { IdempotentExecutor, approvalFromAttempt, mutatingIdempotencyKey, resumeAfterApproval } from "./approvals";
+import { approvalsMatch, argumentFingerprint, policyGateway, toolPolicy } from "./policy";
+import { IdempotentExecutor, MemoryIdempotencyStore, approvalFromAttempt, mutatingIdempotencyKey, resumeAfterApproval } from "./approvals";
 import { createDeleteRecordsTool, createDraftTool } from "./mutating-tools";
 import { FakeEmbeddingProvider } from "../retrieve/fake-embed";
 import { MemoryChunkStore } from "../retrieve/memory-store";
@@ -47,7 +48,7 @@ async function tinyPipeline() {
 }
 
 describe("policy gateway", () => {
-  it("denies high-risk tools in the first release", () => {
+  it("denies high-risk tools in the first release", async () => {
     expect(toolPolicy("delete_records").risk).toBe("high_risk");
     expect(
       policyGateway({
@@ -55,19 +56,27 @@ describe("policy gateway", () => {
         principal: policyPrincipal,
         conversationId: "c-1",
         args: { recordId: "x" },
-        idempotencyKey: mutatingIdempotencyKey("delete-records", "x"),
+        idempotencyKey: await mutatingIdempotencyKey(
+          "delete_records",
+          { recordId: "x" },
+          "principal-alice-c-1-t1",
+        ),
         now: 1,
       }),
     ).toEqual({ action: "deny", reason: "high-risk actions are denied in the first release" });
   });
 
-  it("invalidates approval when arguments change", () => {
+  it("invalidates approval when arguments change", async () => {
     const approval = approvalFromAttempt({
       principalId: policyPrincipal.id,
       conversationId: "c-1",
       tool: "create_draft",
       args: { title: "alpha" },
-      idempotencyKey: mutatingIdempotencyKey("create-draft", "alpha"),
+      idempotencyKey: await mutatingIdempotencyKey(
+        "create_draft",
+        { title: "alpha" },
+        "principal-alice-c-1-t1",
+      ),
       expiresAt: 10_000,
     });
     const denied = policyGateway({
@@ -75,7 +84,11 @@ describe("policy gateway", () => {
       principal: policyPrincipal,
       conversationId: "c-1",
       args: { title: "beta" },
-      idempotencyKey: mutatingIdempotencyKey("create-draft", "alpha"),
+      idempotencyKey: await mutatingIdempotencyKey(
+        "create_draft",
+        { title: "alpha" },
+        "principal-alice-c-1-t1",
+      ),
       now: 1,
       approval,
     });
@@ -83,15 +96,31 @@ describe("policy gateway", () => {
     expect(argumentFingerprint({ title: "alpha" })).not.toBe(argumentFingerprint({ title: "beta" }));
   });
 
+  it("invalidates approval when its bound expiry changes", () => {
+    const stored = approvalFromAttempt({
+      principalId: policyPrincipal.id,
+      conversationId: "c-1",
+      tool: "create_draft",
+      args: { title: "alpha" },
+      idempotencyKey: "draft-expiry",
+      expiresAt: 10_000,
+    });
+    expect(approvalsMatch(stored, { ...stored, expiresAt: 20_000 }, 1)).toBe(false);
+  });
+
   it("does not repeat a mutating side effect on duplicate delivery", async () => {
-    const executor = new IdempotentExecutor();
+    const executor = new IdempotentExecutor(new MemoryIdempotencyStore());
     const drafts: string[] = [];
     const approval = approvalFromAttempt({
       principalId: policyPrincipal.id,
       conversationId: "c-1",
       tool: "create_draft",
       args: { title: "alpha" },
-      idempotencyKey: mutatingIdempotencyKey("create-draft", "alpha"),
+      idempotencyKey: await mutatingIdempotencyKey(
+        "create_draft",
+        { title: "alpha" },
+        "principal-alice-c-1-t1",
+      ),
       expiresAt: Date.now() + 60_000,
     });
     const tool = createDraftTool({
@@ -102,8 +131,28 @@ describe("policy gateway", () => {
       approval,
     });
     await tool.execute("t1", { title: "alpha" });
-    await tool.execute("t2", { title: "alpha" });
+    await tool.execute("t1", { title: "alpha" });
     expect(drafts).toEqual(["alpha"]);
+  });
+
+  it("scopes mutation keys to the exact arguments and action attempt", async () => {
+    const first = await mutatingIdempotencyKey(
+      "sink_write",
+      { title: `${"a".repeat(90)} first` },
+      "principal-alice-c-1-t1",
+    );
+    const second = await mutatingIdempotencyKey(
+      "sink_write",
+      { title: `${"a".repeat(90)} second` },
+      "principal-alice-c-1-t1",
+    );
+    const otherConversation = await mutatingIdempotencyKey(
+      "sink_write",
+      { title: `${"a".repeat(90)} first` },
+      "principal-alice-c-2-t1",
+    );
+    expect(new Set([first, second, otherConversation])).toHaveLength(3);
+    expect(first).toMatch(/^[A-Za-z0-9][A-Za-z0-9.-]{0,127}$/);
   });
 
   it("requires sequential execution for mutating tools", () => {
@@ -152,6 +201,44 @@ describe("budgets", () => {
 });
 
 describe("Pi knowledge agent", () => {
+  it("blocks a registered mutating tool in the host before any side effect", async () => {
+    const pipeline = await tinyPipeline();
+    const effects: string[] = [];
+    const result = await runKnowledgeAgent({
+      question: "create a draft",
+      searchQuery: "alpha",
+      pipeline,
+      principal,
+      policyPrincipal,
+      conversationId: "c-1",
+      tools: [
+        {
+          name: "create_draft",
+          label: "Unsafe draft",
+          description: "Test tool whose execute path omits the policy gateway.",
+          parameters: Type.Object({ query: Type.String() }),
+          executionMode: "sequential",
+          execute: async (_id, params: unknown) => {
+            const query = (params as { query: string }).query;
+            effects.push(query);
+            return { content: [{ type: "text" as const, text: query }], details: {} };
+          },
+        },
+      ],
+    });
+
+    expect(effects).toEqual([]);
+    expect(result.pendingApproval).toBe(true);
+    expect(result.pendingApprovalBinding).toEqual(
+      expect.objectContaining({
+        principalId: "principal-alice",
+        conversationId: "c-1",
+        tool: "create_draft",
+        argumentFingerprint: argumentFingerprint({ query: "alpha" }),
+      }),
+    );
+  }, 20_000);
+
   it("calls search_knowledge, then host-grounds the answer", async () => {
     const pipeline = await tinyPipeline();
     const result = await runKnowledgeAgent({
@@ -210,7 +297,7 @@ describe("Pi knowledge agent", () => {
   }, 20_000);
 
   it("ends a mutating tool at pending_approval without executing the side effect", async () => {
-    const executor = new IdempotentExecutor();
+    const executor = new IdempotentExecutor(new MemoryIdempotencyStore());
     const drafts: string[] = [];
     const tool = createDraftTool({
       principal: policyPrincipal,
@@ -225,7 +312,7 @@ describe("Pi knowledge agent", () => {
   });
 
   it("stops the Pi loop at pending_approval without a waiter", async () => {
-    const executor = new IdempotentExecutor();
+    const executor = new IdempotentExecutor(new MemoryIdempotencyStore());
     const drafts: string[] = [];
     const tool = createDraftTool({
       principal: policyPrincipal,

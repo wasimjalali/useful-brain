@@ -26,9 +26,13 @@ export function createDraftTool(input: {
     description: "Create a reversible draft. Sequential mutating tool.",
     parameters: DraftParams,
     executionMode: "sequential",
-    execute: async (_id, params: Static<typeof DraftParams>, signal) => {
+    execute: async (toolCallId, params: Static<typeof DraftParams>, signal) => {
       signal?.throwIfAborted();
-      const idempotencyKey = mutatingIdempotencyKey("create-draft", params.title);
+      const idempotencyKey = await mutatingIdempotencyKey(
+        "create_draft",
+        params,
+        `${input.principal.id}-${input.conversationId}-${toolCallId}`,
+      );
       const decision = policyGateway({
         tool: "create_draft",
         principal: input.principal,
@@ -74,14 +78,18 @@ export function createDeleteRecordsTool(input: {
     description: "High-risk deletion. Denied in the first release.",
     parameters: DeleteParams,
     executionMode: "sequential",
-    execute: async (_id, params: Static<typeof DeleteParams>, signal) => {
+    execute: async (toolCallId, params: Static<typeof DeleteParams>, signal) => {
       signal?.throwIfAborted();
       const decision = policyGateway({
         tool: "delete_records",
         principal: input.principal,
         conversationId: input.conversationId,
         args: params,
-        idempotencyKey: mutatingIdempotencyKey("delete-records", params.recordId),
+        idempotencyKey: await mutatingIdempotencyKey(
+          "delete_records",
+          params,
+          `${input.principal.id}-${input.conversationId}-${toolCallId}`,
+        ),
         now: Date.now(),
       });
       return {

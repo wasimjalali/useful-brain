@@ -136,9 +136,17 @@ export class KnowledgePipeline {
 
   private async rerank(query: string, merged: ScoredChunk[]): Promise<ScoredChunk[]> {
     if (!this.reranker) {
-      return simpleRerank(merged, merged.length);
+      return simpleRerank(
+        merged,
+        merged.length,
+        this.fingerprint.channelOverlapBonus,
+      );
     }
-    const ordered = simpleRerank(merged, merged.length);
+    const ordered = simpleRerank(
+      merged,
+      merged.length,
+      this.fingerprint.channelOverlapBonus,
+    );
     const head = ordered.slice(0, this.fingerprint.rerankCandidates);
     const passages = head.map((item) => rerankWithHeading(item.chunk.sectionHeading, item.chunk.content));
     const scores = await this.reranker.rerank(query, passages);

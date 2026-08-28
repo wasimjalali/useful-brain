@@ -1,7 +1,7 @@
-import { parseBoundedId } from "../cf/bounded-id";
+import { parseMutatingIdempotencyKey } from "../cf/bounded-id";
 
 export function workflowInstanceId(idempotencyKey: string): string {
-  return parseBoundedId(idempotencyKey, "idempotency key");
+  return parseMutatingIdempotencyKey(idempotencyKey);
 }
 
 export function isWorkflowAlreadyExists(error: unknown): boolean {

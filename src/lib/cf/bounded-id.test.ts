@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { BoundedIdError, parseBoundedId } from "./bounded-id";
+import { BoundedIdError, parseBoundedId, parseMutatingIdempotencyKey } from "./bounded-id";
 
 describe("bounded IDs", () => {
   it("accepts a compact identifier", () => {
@@ -12,5 +12,11 @@ describe("bounded IDs", () => {
     expect(() => parseBoundedId("x".repeat(129), "run id")).toThrow(BoundedIdError);
     expect(() => parseBoundedId("../etc/passwd", "run id")).toThrow(BoundedIdError);
     expect(() => parseBoundedId("id with space", "run id")).toThrow(BoundedIdError);
+  });
+
+  it("forbids underscores and colons in mutating idempotency keys", () => {
+    expect(parseMutatingIdempotencyKey("draft-alpha.1")).toBe("draft-alpha.1");
+    expect(() => parseMutatingIdempotencyKey("draft_alpha")).toThrow(BoundedIdError);
+    expect(() => parseMutatingIdempotencyKey("draft:alpha")).toThrow(BoundedIdError);
   });
 });

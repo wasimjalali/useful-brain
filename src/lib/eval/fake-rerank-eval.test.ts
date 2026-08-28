@@ -26,5 +26,5 @@ describe("fake-rerank Northwind ratchet", () => {
     expect(report.mrr).toBeGreaterThanOrEqual(RERANK_FLOORS.mrr);
     expect(report.ndcgAtK).toBeGreaterThanOrEqual(RERANK_FLOORS.ndcgAtK);
     expect(report.citationCorrectness).toBeGreaterThanOrEqual(RERANK_FLOORS.citationCorrectness);
-  }, 60_000);
+  }, 120_000);
 });

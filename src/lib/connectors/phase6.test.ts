@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { IdempotentExecutor, approvalFromAttempt, mutatingIdempotencyKey } from "../agent/approvals";
+import { IdempotentExecutor, MemoryIdempotencyStore, approvalFromAttempt, mutatingIdempotencyKey } from "../agent/approvals";
 import { argumentFingerprint, toolPolicy } from "../agent/policy";
-import { startSyntheticMcp } from "./mcp-session";
+import { startSyntheticMcp, toolText } from "./mcp-session";
 import { ConnectorRegistryError, seedSyntheticConnectors } from "./registry";
 import {
   ActionSink,
@@ -65,6 +65,30 @@ describe("Phase 6 connectors, MCP and plugins", () => {
     }
   });
 
+  it("cancels an HTTP response that exceeds the raw external byte budget", async () => {
+    const registry = seedSyntheticConnectors();
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array(1024 * 1024 + 1));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const tool = createHttpReadTool({
+      registry,
+      principal,
+      conversationId: "c-1",
+      fetchImpl: async () => new Response(stream, { status: 200 }),
+    });
+    const result = await tool.execute("t1", { url: "https://docs.example.com/large.md" });
+    expect(cancelled).toBe(true);
+    if (result.content[0]?.type === "text") {
+      expect(result.content[0].text).toContain("exceeds");
+    }
+  });
+
   it("looks up a ticket through the in-process MCP server", async () => {
     const registry = seedSyntheticConnectors();
     const session = await startSyntheticMcp();
@@ -87,10 +111,19 @@ describe("Phase 6 connectors, MCP and plugins", () => {
     }
   });
 
+  it("rejects an MCP result beyond the raw external byte budget", () => {
+    expect(() =>
+      toolText(
+        { content: [{ type: "text", text: "x".repeat(1025) }] },
+        1024,
+      ),
+    ).toThrow(/exceeds 1024 bytes/);
+  });
+
   it("requires approval before an MCP write and is idempotent after approval", async () => {
     const registry = seedSyntheticConnectors();
     const session = await startSyntheticMcp();
-    const executor = new IdempotentExecutor();
+    const executor = new IdempotentExecutor(new MemoryIdempotencyStore());
     try {
       const blocked = createMcpCreateTicketTool({
         registry,
@@ -108,7 +141,11 @@ describe("Phase 6 connectors, MCP and plugins", () => {
         conversationId: "c-1",
         tool: "mcp_create_ticket",
         args: { title: "alpha" },
-        idempotencyKey: mutatingIdempotencyKey("mcp-ticket", "alpha"),
+        idempotencyKey: await mutatingIdempotencyKey(
+          "mcp_create_ticket",
+          { title: "alpha" },
+          "principal-alice-c-1-t1",
+        ),
         expiresAt: Date.now() + 60_000,
       });
       const allowed = createMcpCreateTicketTool({
@@ -119,8 +156,8 @@ describe("Phase 6 connectors, MCP and plugins", () => {
         executor,
         approval,
       });
-      await allowed.execute("t2", { title: "alpha" });
-      await allowed.execute("t3", { title: "alpha" });
+      await allowed.execute("t1", { title: "alpha" });
+      await allowed.execute("t1", { title: "alpha" });
       expect(session.tickets.filter((ticket) => ticket.title === "alpha")).toHaveLength(1);
     } finally {
       await session.close();
@@ -130,7 +167,7 @@ describe("Phase 6 connectors, MCP and plugins", () => {
   it("proves the synthetic action sink: preview, binding, idempotency, audit, revocation, retry", async () => {
     const registry = seedSyntheticConnectors();
     const sink = new ActionSink();
-    const executor = new IdempotentExecutor();
+    const executor = new IdempotentExecutor(new MemoryIdempotencyStore());
     const preview = sink.preview("alpha");
     expect(preview.args).toEqual({ title: "alpha" });
     expect(argumentFingerprint(preview.args)).toBe(argumentFingerprint({ title: "alpha" }));
@@ -151,7 +188,11 @@ describe("Phase 6 connectors, MCP and plugins", () => {
       conversationId: "c-1",
       tool: "action_sink_write",
       args: preview.args,
-      idempotencyKey: mutatingIdempotencyKey("sink", "alpha"),
+      idempotencyKey: await mutatingIdempotencyKey(
+        "action_sink_write",
+        { title: "alpha" },
+        "principal-alice-c-1-t1",
+      ),
       expiresAt: Date.now() + 60_000,
     });
     const allowed = createActionSinkTool({
@@ -162,9 +203,16 @@ describe("Phase 6 connectors, MCP and plugins", () => {
       executor,
       approval,
     });
-    await allowed.execute("t2", { title: "alpha" });
-    await allowed.execute("t3", { title: "alpha" });
-    expect(sink.writes).toEqual([{ key: mutatingIdempotencyKey("sink", "alpha"), title: "alpha" }]);
+    await allowed.execute("t1", { title: "alpha" });
+    await allowed.execute("t1", { title: "alpha" });
+    expect(sink.writes).toEqual([{
+      key: await mutatingIdempotencyKey(
+        "action_sink_write",
+        { title: "alpha" },
+        "principal-alice-c-1-t1",
+      ),
+      title: "alpha",
+    }]);
     expect(registry.audit.some((event) => event.action === "call" && event.connectorId === "action-sink")).toBe(
       true,
     );
@@ -181,7 +229,11 @@ describe("Phase 6 connectors, MCP and plugins", () => {
         conversationId: "c-1",
         tool: "action_sink_write",
         args: { title: "beta" },
-        idempotencyKey: mutatingIdempotencyKey("sink", "beta"),
+        idempotencyKey: await mutatingIdempotencyKey(
+          "action_sink_write",
+          { title: "beta" },
+          "principal-alice-c-1-t5",
+        ),
         expiresAt: Date.now() + 60_000,
       }),
     });

@@ -122,8 +122,12 @@ export function filterChunks(
 }
 
 export async function aclShapeFor(chunk: AccessControlled): Promise<AclShape> {
+  const accessScope = String(chunk.accessScope);
+  if (!(["public", "department", "role", "private"] as string[]).includes(accessScope)) {
+    throw new Error("chunk access scope is missing or invalid");
+  }
   return {
-    accessScope: (String(chunk.accessScope) as AccessScope) || "public",
+    accessScope: accessScope as AccessScope,
     allowedRoles: [...chunk.allowedRoles].sort(),
     allowedDepartments: [...chunk.allowedDepartments].sort(),
     ownerUserId: ownerFromControlled(chunk),
@@ -190,7 +194,15 @@ export function aclSqlAndParams(acl: AclFilter): { sql: string; params: string[]
 }
 
 export function keywordSearchSql(aclSql: string): string {
-  return `SELECT c.chunk_id AS chunk_id, bm25(chunks_fts) AS rank FROM chunks_fts JOIN chunks c ON c.id = chunks_fts.rowid WHERE chunks_fts MATCH ? AND c.generation_id = ? AND ${aclSql} ORDER BY rank, c.chunk_id LIMIT ?`;
+  return `SELECT c.chunk_id AS chunk_id, 0.0 AS rank FROM chunks_fts JOIN chunks c ON c.id = chunks_fts.rowid WHERE chunks_fts MATCH ? AND c.generation_id = ? AND ${aclSql} ORDER BY c.chunk_id LIMIT ?`;
+}
+
+export function fts5MatchQuery(raw: string): string {
+  const terms = raw.match(/[\p{L}\p{N}_]+/gu) ?? [];
+  if (terms.length === 0) {
+    throw new Error("FTS query contains no searchable terms");
+  }
+  return terms.map((term) => `"${term.replaceAll('"', '""')}"`).join(" AND ");
 }
 
 export function principalHasFullDocumentAccess(principal: Principal, chunks: ChunkRecord[]): boolean {

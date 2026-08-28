@@ -19,6 +19,14 @@
       "migrations_dir": "../../migrations/operations"
     }
   ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "APPROVAL_RESUME_QUEUE",
+        "queue": "useful-brain-approval-resume-test"
+      }
+    ]
+  },
   "durable_objects": {
     "bindings": [
       {

@@ -84,10 +84,14 @@ export function fuseCandidates(input: {
   return scored.slice(0, input.candidateLimit);
 }
 
-export function simpleRerank(scored: ScoredChunk[], topK: number): ScoredChunk[] {
+export function simpleRerank(
+  scored: ScoredChunk[],
+  topK: number,
+  channelOverlapBonus = 0.05,
+): ScoredChunk[] {
   const reranked = scored.map((item) => {
     const both = item.vectorScore !== null && item.keywordScore !== null;
-    return { ...item, rerankScore: item.mergedScore + (both ? 0.05 : 0) };
+    return { ...item, rerankScore: item.mergedScore + (both ? channelOverlapBonus : 0) };
   });
   reranked.sort((left, right) => {
     const leftScore = left.rerankScore ?? 0;

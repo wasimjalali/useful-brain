@@ -4,6 +4,7 @@ import {
   AclTooWide,
   MAX_FILTER_TERMS,
   aclFilterFor,
+  aclShapeFor,
   canAccessChunk,
   chunkMatchesFilter,
   enumerateAllowedAclGroups,
@@ -71,6 +72,19 @@ describe("ACL predicate equivalence", () => {
         departments: ["engineering"],
       }),
     ).toThrow(AclTooWide);
+  });
+
+  it("rejects an empty or unknown ACL scope instead of projecting it as public", async () => {
+    for (const accessScope of ["", "unknown"]) {
+      await expect(
+        aclShapeFor({
+          accessScope,
+          allowedRoles: [],
+          allowedDepartments: [],
+          ownerUserId: "",
+        }),
+      ).rejects.toThrow(/access scope/);
+    }
   });
 
   it("enumerates only allowed acl_group keys and refuses a 2048-byte filter", async () => {

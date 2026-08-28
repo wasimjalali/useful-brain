@@ -5,6 +5,7 @@ export const REAL_STACK_FINGERPRINT = {
   vectorWeight: 0.7,
   keywordWeight: 0.3,
   keywordCandidates: 6,
+  channelOverlapBonus: 0.05,
   rerankCandidates: 20,
   reranker: "@cf/baai/bge-reranker-base",
   relevanceFloor: 0.05,
@@ -19,6 +20,7 @@ export const FAKE_PROVIDER_FINGERPRINT = {
   vectorWeight: 0.2,
   keywordWeight: 0.8,
   keywordCandidates: 6,
+  channelOverlapBonus: 0.02,
   rerankCandidates: 20,
   reranker: "none",
   relevanceFloor: 0,
@@ -33,6 +35,7 @@ export const FAKE_RERANK_FINGERPRINT = {
   vectorWeight: 0.55,
   keywordWeight: 0.45,
   keywordCandidates: 6,
+  channelOverlapBonus: 0.05,
   rerankCandidates: 20,
   reranker: "fake",
   relevanceFloor: 0,
@@ -49,6 +52,7 @@ export type RetrievalFingerprint = {
   literalVectorWeight?: number;
   literalKeywordWeight?: number;
   keywordCandidates: number;
+  channelOverlapBonus: number;
   rerankCandidates: number;
   reranker: string;
   relevanceFloor: number;
@@ -62,6 +66,7 @@ export function fingerprintId(fingerprint: RetrievalFingerprint): string {
     `${fingerprint.maxTokens}/${fingerprint.overlapTokens}`,
     `${fingerprint.vectorWeight.toFixed(2)}/${fingerprint.keywordWeight.toFixed(2)}`,
     `kw${fingerprint.keywordCandidates}`,
+    `cb${fingerprint.channelOverlapBonus.toFixed(2)}`,
     `rr${fingerprint.rerankCandidates}`,
     fingerprint.reranker,
     `floor${fingerprint.relevanceFloor}`,

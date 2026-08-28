@@ -9,7 +9,15 @@ import {
 import type { Principal } from "../acl/access";
 import { PROMPT_VERSION } from "../answer/contract";
 import type { KnowledgePipeline } from "../retrieve/pipeline";
-import { argumentFingerprint } from "./policy";
+import { mutatingIdempotencyKey } from "./approvals";
+import {
+  argumentFingerprint,
+  normalizeToolArguments,
+  policyGateway,
+  PolicyError,
+  toolPolicy,
+  type ApprovalBinding,
+} from "./policy";
 import { AGENT_BUDGETS, BudgetExceededError, BudgetTracker } from "./budgets";
 import {
   BRAIN_KNOWLEDGE_UNAVAILABLE,
@@ -27,6 +35,7 @@ export type KnowledgeRunResult = {
   messages: AgentMessage[];
   aborted: boolean;
   pendingApproval: boolean;
+  pendingApprovalBinding?: ApprovalBinding;
   model: string;
   promptVersion: string;
   errorMessage?: string;
@@ -93,8 +102,9 @@ export function toolCallsFromMessages(messages: AgentMessage[]): RecordedToolCal
     recorded.push({
       tool: message.toolName,
       argumentFingerprint: argumentFingerprint(argsByCallId.get(message.toolCallId) ?? {}),
+      normalizedArguments: normalizeToolArguments(argsByCallId.get(message.toolCallId) ?? {}),
       redactedResult: text.replace(/^UNTRUSTED_EVIDENCE\n/, "").slice(0, AGENT_BUDGETS.maxRedactedToolResultBytes),
-      status: message.isError ? "error" : pending ? "pending_approval" : denied ? "denied" : "ok",
+      status: pending ? "pending_approval" : message.isError ? "error" : denied ? "denied" : "ok",
     });
   }
   return recorded;
@@ -110,8 +120,11 @@ export async function runKnowledgeAgent(input: {
   abort?: AbortController;
   searchQuery?: string;
   tools?: AgentTool[];
+  approval?: ApprovalBinding | null;
+  now?: number;
 }): Promise<KnowledgeRunResult> {
   const budgets = new BudgetTracker();
+  let pendingApprovalBinding: ApprovalBinding | undefined;
   const tools: AgentTool[] =
     input.tools ??
     [
@@ -130,7 +143,9 @@ export async function runKnowledgeAgent(input: {
     fauxAssistantMessage([fauxText("Searching."), fauxToolCall(defaultTool, { query })], {
       stopReason: "toolUse",
     }),
-    fauxAssistantMessage([fauxText("Leave accrues monthly.[1]")], { stopReason: "stop" }),
+    fauxAssistantMessage([fauxText("Employees accrue 1.5 days of leave per month.[1]")], {
+      stopReason: "stop",
+    }),
   ]);
   const allowed = new Set(tools.map((tool) => tool.name));
   const agent = new Agent({
@@ -153,7 +168,39 @@ export async function runKnowledgeAgent(input: {
       if (!allowed.has(context.toolCall.name)) {
         return { block: true, reason: "tool is not enabled for this run", terminate: true };
       }
-      return undefined;
+      try {
+        const registered = toolPolicy(context.toolCall.name);
+        const idempotencyKey =
+          registered.risk === "read"
+            ? "read-only"
+            : await mutatingIdempotencyKey(
+                context.toolCall.name,
+                context.args,
+                `${input.policyPrincipal.id}-${input.conversationId}-${context.toolCall.id}`,
+              );
+        const decision = policyGateway({
+          tool: context.toolCall.name,
+          principal: input.policyPrincipal,
+          conversationId: input.conversationId,
+          args: context.args,
+          idempotencyKey,
+          now: input.now ?? Date.now(),
+          approval: input.approval,
+        });
+        if (decision.action === "pending_approval") {
+          pendingApprovalBinding = decision.binding;
+          return { block: true, reason: "pending_approval", terminate: true };
+        }
+        if (decision.action === "deny") {
+          return { block: true, reason: decision.reason, terminate: true };
+        }
+        return undefined;
+      } catch (error) {
+        if (error instanceof PolicyError) {
+          return { block: true, reason: "tool denied by policy", terminate: true };
+        }
+        throw error;
+      }
     },
     shouldStopAfterTurn: async () => {
       try {
@@ -190,6 +237,7 @@ export async function runKnowledgeAgent(input: {
   await pending;
   await agent.waitForIdle();
 
+  let budgetErrorMessage: string | undefined;
   try {
     for (const message of agent.state.messages) {
       if (message.role === "assistant") {
@@ -197,7 +245,9 @@ export async function runKnowledgeAgent(input: {
       }
     }
   } catch (error) {
-    if (!(error instanceof BudgetExceededError)) {
+    if (error instanceof BudgetExceededError) {
+      budgetErrorMessage = error.message;
+    } else {
       throw error;
     }
   }
@@ -218,13 +268,17 @@ export async function runKnowledgeAgent(input: {
   const searchErrored = recorded.some((call) => call.tool === SEARCH_KNOWLEDGE_TOOL && call.status === "error");
   return {
     finalResponse:
-      grounded ??
+      (budgetErrorMessage ? BRAIN_KNOWLEDGE_UNAVAILABLE : grounded) ??
       (searchErrored ? BRAIN_KNOWLEDGE_UNAVAILABLE : BRAIN_MUST_RETRIEVE),
     messages: snapshotAgentMessages(agent.state.messages),
-    aborted: Boolean(agent.state.errorMessage) || input.abort?.signal.aborted === true,
+    aborted:
+      Boolean(agent.state.errorMessage) ||
+      Boolean(budgetErrorMessage) ||
+      input.abort?.signal.aborted === true,
     pendingApproval,
+    pendingApprovalBinding,
     model: agent.state.model.id,
     promptVersion: PROMPT_VERSION,
-    errorMessage: agent.state.errorMessage,
+    errorMessage: agent.state.errorMessage ?? budgetErrorMessage,
   };
 }

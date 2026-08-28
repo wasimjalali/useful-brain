@@ -48,6 +48,18 @@
       {
         "binding": "INGEST_QUEUE",
         "queue": "useful-brain-ingest-development"
+      },
+      {
+        "binding": "APPROVAL_RESUME_QUEUE",
+        "queue": "useful-brain-approval-resume-development"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "useful-brain-approval-resume-development",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 5
       }
     ]
   },
@@ -102,7 +114,19 @@
       "ai": { "binding": "AI" },
       "queues": {
         "producers": [
-          { "binding": "INGEST_QUEUE", "queue": "useful-brain-ingest-development" }
+          { "binding": "INGEST_QUEUE", "queue": "useful-brain-ingest-development" },
+          {
+            "binding": "APPROVAL_RESUME_QUEUE",
+            "queue": "useful-brain-approval-resume-development"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "useful-brain-approval-resume-development",
+            "max_batch_size": 10,
+            "max_batch_timeout": 5,
+            "max_retries": 5
+          }
         ]
       },
       "durable_objects": {
@@ -148,7 +172,21 @@
       "vectorize": [{ "binding": "VECTORIZE", "index_name": "useful-brain-staging" }],
       "ai": { "binding": "AI" },
       "queues": {
-        "producers": [{ "binding": "INGEST_QUEUE", "queue": "useful-brain-ingest-staging" }]
+        "producers": [
+          { "binding": "INGEST_QUEUE", "queue": "useful-brain-ingest-staging" },
+          {
+            "binding": "APPROVAL_RESUME_QUEUE",
+            "queue": "useful-brain-approval-resume-staging"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "useful-brain-approval-resume-staging",
+            "max_batch_size": 10,
+            "max_batch_timeout": 5,
+            "max_retries": 5
+          }
+        ]
       },
       "durable_objects": {
         "bindings": [{ "name": "CONVERSATION", "class_name": "ConversationRunLock" }]
@@ -189,7 +227,21 @@
       "vectorize": [{ "binding": "VECTORIZE", "index_name": "useful-brain-production" }],
       "ai": { "binding": "AI" },
       "queues": {
-        "producers": [{ "binding": "INGEST_QUEUE", "queue": "useful-brain-ingest-production" }]
+        "producers": [
+          { "binding": "INGEST_QUEUE", "queue": "useful-brain-ingest-production" },
+          {
+            "binding": "APPROVAL_RESUME_QUEUE",
+            "queue": "useful-brain-approval-resume-production"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "useful-brain-approval-resume-production",
+            "max_batch_size": 10,
+            "max_batch_timeout": 5,
+            "max_retries": 5
+          }
+        ]
       },
       "durable_objects": {
         "bindings": [{ "name": "CONVERSATION", "class_name": "ConversationRunLock" }]

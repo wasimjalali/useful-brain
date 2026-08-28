@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { answerFromEvidence, buildInsufficientEvidenceAnswer } from "../answer/contract";
+import { answerFromEvidence } from "../answer/contract";
 import { hitsToEvidence } from "../answer/evidence";
 import { ingestNorthwind } from "./ingest-northwind";
 import { loadNorthwindCorpus } from "./northwind-loader";
@@ -40,12 +40,8 @@ describe("locked unanswerable set", () => {
         ],
       });
       const parsed = answerFromEvidence(tempting, evidence);
-      const refused =
-        question.expectedDocumentIds.length === 0
-          ? buildInsufficientEvidenceAnswer()
-          : parsed;
-      expect(refused.answerType).toBe("insufficient_evidence");
-      expect(refused.paragraphs.every((paragraph) => paragraph.citations.length === 0)).toBe(true);
+      expect(parsed.answerType).toBe("insufficient_evidence");
+      expect(parsed.paragraphs.every((paragraph) => paragraph.citations.length === 0)).toBe(true);
     }
   }, 60_000);
 });

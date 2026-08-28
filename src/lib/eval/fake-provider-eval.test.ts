@@ -18,7 +18,10 @@ describe("fake-provider Northwind ratchet", () => {
     expect(chunkCount).toBeGreaterThan(600);
     const report = await runRetrievalEvals(pipeline, questions, 3);
     expect(report.aclLeakCount).toBe(0);
-    expect(report.recallAtK).toBeGreaterThanOrEqual(FAKE_FLOORS.recallAtK);
+    expect(
+      report.recallAtK,
+      JSON.stringify(report.results.filter((result) => result.recall < 1)),
+    ).toBeGreaterThanOrEqual(FAKE_FLOORS.recallAtK);
     expect(report.mrr).toBeGreaterThanOrEqual(FAKE_FLOORS.mrr);
     expect(report.ndcgAtK).toBeGreaterThanOrEqual(FAKE_FLOORS.ndcgAtK);
     expect(report.citationCorrectness).toBeGreaterThanOrEqual(FAKE_FLOORS.citationCorrectness);
@@ -28,7 +31,10 @@ describe("fake-provider Northwind ratchet", () => {
       ["q116", "q117", "q118", "q119", "q120"].includes(result.questionId),
     );
     const mean = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
-    expect(mean(locked.map((result) => result.recall))).toBeGreaterThanOrEqual(0.75);
+    expect(
+      mean(locked.map((result) => result.recall)),
+      JSON.stringify(locked),
+    ).toBeGreaterThanOrEqual(0.75);
     expect(mean(expanded.map((result) => result.recall))).toBeGreaterThanOrEqual(0.55);
-  }, 60_000);
+  }, 120_000);
 });

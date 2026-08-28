@@ -3,6 +3,7 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 
 import { IdempotentExecutor, mutatingIdempotencyKey } from "../agent/approvals";
+import { AGENT_BUDGETS } from "../agent/budgets";
 import { normalizeToolArguments, policyGateway, type ApprovalBinding, type PolicyPrincipal } from "../agent/policy";
 import { fetchAllowlistedSource } from "./http-allowlist";
 import { ConnectorRegistry, ConnectorRegistryError } from "./registry";
@@ -30,6 +31,37 @@ function untrusted(payload: unknown) {
   return {
     content: [{ type: "text" as const, text: `${UNTRUSTED_CONNECTOR_PREFIX}\n${JSON.stringify(payload)}` }],
   };
+}
+
+async function readBoundedText(response: Response, maxBytes: number): Promise<string> {
+  const declared = Number(response.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    await response.body?.cancel();
+    throw new Error(`external response exceeds ${maxBytes} bytes`);
+  }
+  if (!response.body) {
+    return "";
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let size = 0;
+  let text = "";
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        return text + decoder.decode();
+      }
+      size += value.byteLength;
+      if (size > maxBytes) {
+        await reader.cancel();
+        throw new Error(`external response exceeds ${maxBytes} bytes`);
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+  } finally {
+    reader.releaseLock();
+  }
 }
 
 export type ActionSinkRecord = { key: string; title: string };
@@ -63,7 +95,7 @@ export function createHttpReadTool(input: {
         principal: input.principal,
         conversationId: input.conversationId,
         args: params,
-        idempotencyKey: mutatingIdempotencyKey("http-read", params.url),
+        idempotencyKey: "http-read",
         now: Date.now(),
       });
       if (decision.action !== "allow") {
@@ -76,7 +108,7 @@ export function createHttpReadTool(input: {
           { origins: connector.originAllowlist ?? [] },
           input.fetchImpl,
         );
-        const text = await response.text();
+        const text = await readBoundedText(response, AGENT_BUDGETS.maxRawExternalBytes);
         return {
           content: [{ type: "text", text: `${UNTRUSTED_CONNECTOR_PREFIX}\n${text.slice(0, 4096)}` }],
           details: { status: response.status },
@@ -107,7 +139,7 @@ export function createMcpLookupTool(input: {
         principal: input.principal,
         conversationId: input.conversationId,
         args: params,
-        idempotencyKey: mutatingIdempotencyKey("mcp-lookup", params.ticketId),
+        idempotencyKey: "mcp-lookup",
         now: Date.now(),
       });
       if (decision.action !== "allow") {
@@ -119,7 +151,7 @@ export function createMcpLookupTool(input: {
           name: "northwind_lookup",
           arguments: { ticketId: params.ticketId },
         });
-        const text = toolText(result);
+        const text = toolText(result, AGENT_BUDGETS.maxRawExternalBytes);
         return {
           content: [{ type: "text", text: frameMcpResult(text) }],
           details: { hit: !text.includes("not_found") },
@@ -147,9 +179,13 @@ export function createMcpCreateTicketTool(input: {
     description: "Synthetic MCP write. Requires approval. Sequential.",
     parameters: McpCreateParams,
     executionMode: "sequential",
-    execute: async (_id, params: Static<typeof McpCreateParams>, signal) => {
+    execute: async (toolCallId, params: Static<typeof McpCreateParams>, signal) => {
       signal?.throwIfAborted();
-      const idempotencyKey = mutatingIdempotencyKey("mcp-ticket", params.title);
+      const idempotencyKey = await mutatingIdempotencyKey(
+        "mcp_create_ticket",
+        params,
+        `${input.principal.id}-${input.conversationId}-${toolCallId}`,
+      );
       const decision = policyGateway({
         tool: "mcp_create_ticket",
         principal: input.principal,
@@ -176,7 +212,7 @@ export function createMcpCreateTicketTool(input: {
             name: "create_ticket",
             arguments: { title: params.title },
           });
-          return toolText(result);
+          return toolText(result, AGENT_BUDGETS.maxRawExternalBytes);
         });
         return {
           content: [{ type: "text", text: frameMcpResult(created) }],
@@ -205,9 +241,13 @@ export function createActionSinkTool(input: {
     description: "Synthetic action sink. Not a production vendor. Requires approval.",
     parameters: SinkParams,
     executionMode: "sequential",
-    execute: async (_id, params: Static<typeof SinkParams>, signal) => {
+    execute: async (toolCallId, params: Static<typeof SinkParams>, signal) => {
       signal?.throwIfAborted();
-      const idempotencyKey = mutatingIdempotencyKey("sink", params.title);
+      const idempotencyKey = await mutatingIdempotencyKey(
+        "action_sink_write",
+        params,
+        `${input.principal.id}-${input.conversationId}-${toolCallId}`,
+      );
       const preview = input.sink.preview(params.title);
       const decision = policyGateway({
         tool: "action_sink_write",
@@ -260,7 +300,7 @@ export function createPluginEchoTool(input: {
         principal: input.principal,
         conversationId: input.conversationId,
         args: params,
-        idempotencyKey: mutatingIdempotencyKey("plugin", params.text),
+        idempotencyKey: "plugin-echo",
         now: Date.now(),
       });
       if (decision.action !== "allow") {

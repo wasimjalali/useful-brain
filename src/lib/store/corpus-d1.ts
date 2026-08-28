@@ -20,6 +20,7 @@ type SqlStatement = {
 
 export type SqlExecutor = {
   prepare(query: string): SqlStatement;
+  batch(statements: SqlStatement[]): Promise<SqlRunResult[]>;
 };
 
 export type GenerationRow = {
@@ -110,18 +111,29 @@ export async function promoteGeneration(
   if (!row || row.state !== "ready") {
     throw new GenerationTransitionError("only a ready generation can be promoted");
   }
-  const previous = await activeGenerationId(db);
-  await db
-    .prepare(`UPDATE corpus_state SET active_generation_id = ? WHERE singleton = 1`)
-    .bind(generationId)
-    .run();
-  await setGenerationState(db, generationId, "active", now);
-  if (previous && previous !== generationId) {
-    const previousRow = await getGeneration(db, previous);
-    if (previousRow?.state === "active") {
-      await setGenerationState(db, previous, "archived", now);
-    }
-  }
+  const statements: SqlStatement[] = [
+    db
+      .prepare(`UPDATE corpus_generations SET state = 'active', updated_at = ? WHERE id = ? AND state = 'ready'`)
+      .bind(now, generationId),
+    db.prepare(
+      `UPDATE corpus_state SET active_generation_id = ?
+       WHERE singleton = 1
+         AND EXISTS (
+           SELECT 1 FROM corpus_generations WHERE id = ? AND state = 'active'
+         )`,
+    )
+      .bind(generationId, generationId),
+    db.prepare(
+      `UPDATE corpus_generations SET state = 'archived', updated_at = ?
+       WHERE id <> ? AND state = 'active'
+         AND EXISTS (
+           SELECT 1 FROM corpus_state
+           WHERE singleton = 1 AND active_generation_id = ?
+         )`,
+    )
+      .bind(now, generationId, generationId),
+  ];
+  await db.batch(statements);
 }
 
 export async function rollbackGeneration(
@@ -137,19 +149,29 @@ export async function rollbackGeneration(
   if (current === previousId) {
     throw new GenerationTransitionError("rollback target is already active");
   }
-  await db
-    .prepare(`UPDATE corpus_state SET active_generation_id = ? WHERE singleton = 1`)
-    .bind(previousId)
-    .run();
-  if (current) {
-    const currentRow = await getGeneration(db, current);
-    if (currentRow?.state === "active") {
-      await setGenerationState(db, current, "archived", now);
-    }
-  }
-  if (previous.state !== "active") {
-    await setGenerationState(db, previousId, "active", now);
-  }
+  const statements: SqlStatement[] = [
+    db
+      .prepare(`UPDATE corpus_generations SET state = 'active', updated_at = ? WHERE id = ? AND state IN ('ready', 'archived')`)
+      .bind(now, previousId),
+    db.prepare(
+      `UPDATE corpus_state SET active_generation_id = ?
+       WHERE singleton = 1
+         AND EXISTS (
+           SELECT 1 FROM corpus_generations WHERE id = ? AND state = 'active'
+         )`,
+    )
+      .bind(previousId, previousId),
+    db.prepare(
+      `UPDATE corpus_generations SET state = 'archived', updated_at = ?
+       WHERE id <> ? AND state = 'active'
+         AND EXISTS (
+           SELECT 1 FROM corpus_state
+           WHERE singleton = 1 AND active_generation_id = ?
+         )`,
+    )
+      .bind(now, previousId, previousId),
+  ];
+  await db.batch(statements);
 }
 
 export async function loadExpectedVectorIds(

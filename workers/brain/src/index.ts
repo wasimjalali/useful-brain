@@ -1,13 +1,13 @@
 import { AccessJwtUnavailable, AccessJwtVerifier } from "../../../src/lib/auth/access-jwt";
 import { authenticateWorkerRequest } from "../../../src/lib/auth/worker-identity";
-import { parseBoundedId } from "../../../src/lib/cf/bounded-id";
+import { parseBoundedId, parseMutatingIdempotencyKey } from "../../../src/lib/cf/bounded-id";
 import { writeOperationalLog } from "../../../src/lib/cf/operational-log";
 import { resolveRequestId, withRequestId } from "../../../src/lib/cf/request-id";
 import { assertWorkerStartup } from "../../../src/lib/cf/startup";
-import { toPublicWorkerError, WorkerValidationError, workerErrorResponse } from "../../../src/lib/cf/worker-errors";
+import { toPublicWorkerError, WorkerForbiddenError, WorkerValidationError, workerErrorResponse } from "../../../src/lib/cf/worker-errors";
 import { isWorkflowAlreadyExists, workflowInstanceId } from "../../../src/lib/ingest/workflow-id";
 import { upsertApproval } from "../../../src/lib/store/agent-runs";
-import type { OperationsDatabase } from "../../../src/lib/store/conversations";
+import { assertConversationOwner, ConversationStoreError, type OperationsDatabase } from "../../../src/lib/store/conversations";
 import {
   LOAD_PRINCIPAL_SQL,
   type PrincipalDirectoryRow,
@@ -15,6 +15,10 @@ import {
 import type { ApprovalBinding } from "../../../src/lib/agent/policy";
 import { ConversationRunLock } from "./conversation-lock";
 import { ApprovalWorkflow } from "./approval-workflow";
+import {
+  parseApprovalResumeMessage,
+  resumeApprovedAgentRun,
+} from "./approval-resume";
 
 export { ConversationRunLock, ApprovalWorkflow };
 
@@ -43,11 +47,15 @@ export type BrainEnv = {
     getByName(name: string): ConversationRunLock;
   };
   APPROVAL_WORKFLOW?: {
-    create(options: { id?: string; params: { binding: ApprovalBinding } }): Promise<{ id: string }>;
+    create(options: {
+      id?: string;
+      params: { runId: string; binding: ApprovalBinding };
+    }): Promise<{ id: string }>;
     get(id: string): Promise<{
       sendEvent(event: { type: string; payload: unknown }): Promise<void>;
     }>;
   };
+  APPROVAL_RESUME_QUEUE?: Queue<{ runId: string; idempotencyKey: string }>;
 };
 
 let accessVerifier: AccessJwtVerifier | undefined;
@@ -95,6 +103,25 @@ function json(body: unknown, requestId: string, status = 200): Response {
     status,
     headers: withRequestId(new Headers(), requestId),
   });
+}
+
+async function requireConversationOwner(
+  env: BrainEnv,
+  conversationId: string,
+  principalId: string,
+): Promise<void> {
+  try {
+    await assertConversationOwner(
+      env.OPERATIONS_DB as OperationsDatabase,
+      conversationId,
+      principalId,
+    );
+  } catch (error) {
+    if (error instanceof ConversationStoreError && error.message === "FORBIDDEN") {
+      throw new WorkerForbiddenError();
+    }
+    throw error;
+  }
 }
 
 const brainWorker = {
@@ -158,6 +185,7 @@ const brainWorker = {
           new URL(request.url).searchParams.get("conversationId"),
           "conversation id",
         );
+        await requireConversationOwner(env, conversationId, principal.id);
         return env.CONVERSATION.getByName(conversationId).fetch(request);
       }
 
@@ -166,9 +194,9 @@ const brainWorker = {
         if (!env.APPROVAL_WORKFLOW) {
           throw new WorkerValidationError();
         }
-        let body: { binding?: ApprovalBinding };
+        let body: { runId?: string; binding?: ApprovalBinding };
         try {
-          body = (await request.json()) as { binding?: ApprovalBinding };
+          body = (await request.json()) as { runId?: string; binding?: ApprovalBinding };
         } catch {
           throw new WorkerValidationError();
         }
@@ -176,13 +204,21 @@ const brainWorker = {
         if (!binding || binding.principalId !== principal.id) {
           throw new WorkerValidationError();
         }
-        parseBoundedId(binding.idempotencyKey, "idempotency key");
-        await upsertApproval(env.OPERATIONS_DB as OperationsDatabase, binding, "pending", Date.now());
+        const runId = parseBoundedId(body.runId, "run id");
+        await requireConversationOwner(env, binding.conversationId, principal.id);
+        parseMutatingIdempotencyKey(binding.idempotencyKey);
+        await upsertApproval(
+          env.OPERATIONS_DB as OperationsDatabase,
+          runId,
+          binding,
+          "pending",
+          Date.now(),
+        );
         const workflowId = workflowInstanceId(binding.idempotencyKey);
         try {
           await env.APPROVAL_WORKFLOW.create({
             id: workflowId,
-            params: { binding },
+            params: { runId, binding },
           });
         } catch (error) {
           if (!isWorkflowAlreadyExists(error)) {
@@ -218,6 +254,13 @@ const brainWorker = {
         if ((body.decision !== "approve" && body.decision !== "reject") || !body.binding) {
           throw new WorkerValidationError();
         }
+        if (
+          body.binding.principalId !== principal.id ||
+          workflowId !== workflowInstanceId(body.binding.idempotencyKey)
+        ) {
+          throw new WorkerForbiddenError();
+        }
+        await requireConversationOwner(env, body.binding.conversationId, principal.id);
         const instance = await env.APPROVAL_WORKFLOW.get(workflowId);
         await instance.sendEvent({
           type: "approval",
@@ -243,6 +286,7 @@ const brainWorker = {
         }
         const conversationId = parseBoundedId(body.conversationId, "conversation id");
         const runId = parseBoundedId(body.runId, "run id");
+        await requireConversationOwner(env, conversationId, principal.id);
         const stub = env.CONVERSATION.getByName(conversationId);
         const result = await (path === "/lock"
           ? stub.acquire(runId)
@@ -274,6 +318,24 @@ const brainWorker = {
         errorCode: publicError.code,
       });
       return workerErrorResponse(error, requestId);
+    }
+  },
+  async queue(
+    batch: { messages: { body: unknown; ack(): void; retry(): void }[] },
+    env: BrainEnv,
+  ): Promise<void> {
+    assertWorkerStartup(env);
+    for (const message of batch.messages) {
+      try {
+        const payload = parseApprovalResumeMessage(message.body);
+        await resumeApprovedAgentRun(
+          env.OPERATIONS_DB as OperationsDatabase,
+          payload,
+        );
+        message.ack();
+      } catch {
+        message.retry();
+      }
     }
   },
 };

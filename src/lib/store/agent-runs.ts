@@ -1,10 +1,12 @@
-import type { ApprovalBinding } from "../agent/policy";
-import { parseBoundedId } from "../cf/bounded-id";
+import { AGENT_BUDGETS } from "../agent/budgets";
+import { approvalsMatch, argumentFingerprint, type ApprovalBinding } from "../agent/policy";
+import { parseBoundedId, parseMutatingIdempotencyKey } from "../cf/bounded-id";
 import { newBoundedId, type OperationsDatabase } from "./conversations";
 
 export type StoredToolCall = {
   tool: string;
   argumentFingerprint: string;
+  normalizedArguments: unknown;
   redactedResult: string;
   status: "ok" | "error" | "denied" | "pending_approval";
 };
@@ -21,7 +23,10 @@ export type StoredAgentRun = {
   corpusGenerationId: string | null;
   evidenceMessageId: string | null;
   toolCalls: Array<StoredToolCall & { id: string }>;
-  approval: ApprovalBinding | null;
+  approval: (ApprovalBinding & {
+    runId: string;
+    status: "pending" | "approved" | "rejected" | "expired";
+  }) | null;
 };
 
 export async function createAgentRun(
@@ -91,17 +96,23 @@ export async function completeAgentRun(
     db
       .prepare(
         `INSERT INTO tool_calls (
-           id, run_id, tool, argument_fingerprint, redacted_result, status, created_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+           id, run_id, tool, argument_fingerprint, normalized_arguments_json,
+           redacted_result, status, created_at
+         ) SELECT ?, ?, ?, ?, ?, ?, ?, ?
+         WHERE EXISTS (
+           SELECT 1 FROM agent_runs WHERE id = ? AND status = 'running'
+         )`,
       )
       .bind(
         newBoundedId("tc"),
         runId,
         call.tool,
         call.argumentFingerprint,
+        JSON.stringify(call.normalizedArguments),
         call.redactedResult,
         call.status,
         input.now + index,
+        runId,
       ),
   );
   statements.push(
@@ -114,43 +125,276 @@ export async function completeAgentRun(
 
 export async function upsertApproval(
   db: OperationsDatabase,
+  runIdInput: string,
   binding: ApprovalBinding,
   status: "pending" | "approved" | "rejected" | "expired",
   now: number,
 ): Promise<void> {
-  const key = parseBoundedId(binding.idempotencyKey, "idempotency key");
+  const runId = parseBoundedId(runIdInput, "run id");
+  const key = parseMutatingIdempotencyKey(binding.idempotencyKey);
+  const principalId = parseBoundedId(binding.principalId, "principal id");
+  const conversationId = parseBoundedId(binding.conversationId, "conversation id");
+  if (binding.expiresAt <= now || binding.expiresAt > now + AGENT_BUDGETS.approvalExpiryMs) {
+    throw new Error("approval expiry is outside the allowed window");
+  }
   const existing = await db
-    .prepare(`SELECT argument_fingerprint FROM approvals WHERE idempotency_key = ?`)
+    .prepare(
+      `SELECT run_id, principal_id, conversation_id, tool, argument_fingerprint, expires_at
+       FROM approvals WHERE idempotency_key = ?`,
+    )
     .bind(key)
-    .first<{ argument_fingerprint: string }>();
+    .first<{
+      run_id: string | null;
+      principal_id: string;
+      conversation_id: string;
+      tool: string;
+      argument_fingerprint: string;
+      expires_at: number;
+    }>();
   if (existing) {
-    if (existing.argument_fingerprint !== binding.argumentFingerprint) {
-      return;
+    if (
+      existing.run_id !== runId ||
+      existing.principal_id !== principalId ||
+      existing.conversation_id !== conversationId ||
+      existing.tool !== binding.tool ||
+      existing.argument_fingerprint !== binding.argumentFingerprint ||
+      existing.expires_at !== binding.expiresAt
+    ) {
+      throw new Error("approval binding mismatch for idempotency key");
     }
-    await db
-      .prepare(`UPDATE approvals SET status = ?, expires_at = ? WHERE idempotency_key = ?`)
-      .bind(status, binding.expiresAt, key)
-      .run();
+    if (status !== "pending") {
+      throw new Error("approval records can only be upserted as pending");
+    }
     return;
+  }
+  if (status !== "pending") {
+    throw new Error("new approval records must start pending");
+  }
+  const run = await db
+    .prepare(
+      `SELECT principal_id, conversation_id, status
+       FROM agent_runs WHERE id = ?`,
+    )
+    .bind(runId)
+    .first<{ principal_id: string; conversation_id: string; status: AgentRunStatus }>();
+  if (
+    !run ||
+    run.status !== "pending_approval" ||
+    run.principal_id !== principalId ||
+    run.conversation_id !== conversationId
+  ) {
+    throw new Error("approval does not match a pending agent run");
+  }
+  const calls = await db
+    .prepare(
+      `SELECT tool, argument_fingerprint, normalized_arguments_json
+       FROM tool_calls WHERE run_id = ? AND status = 'pending_approval'`,
+    )
+    .bind(runId)
+    .all<{
+      tool: string;
+      argument_fingerprint: string;
+      normalized_arguments_json: string;
+    }>();
+  if (calls.results.length !== 1) {
+    throw new Error("agent run must have exactly one pending approval tool");
+  }
+  const call = calls.results[0];
+  const normalizedArguments = JSON.parse(call.normalized_arguments_json) as unknown;
+  if (
+    call.tool !== binding.tool ||
+    call.argument_fingerprint !== binding.argumentFingerprint ||
+    argumentFingerprint(normalizedArguments) !== binding.argumentFingerprint
+  ) {
+    throw new Error("approval binding does not match the pending tool call");
   }
   await db
     .prepare(
       `INSERT INTO approvals (
          idempotency_key, principal_id, conversation_id, tool, argument_fingerprint,
-         expires_at, status, created_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+         expires_at, status, created_at, run_id
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       key,
-      parseBoundedId(binding.principalId, "principal id"),
-      parseBoundedId(binding.conversationId, "conversation id"),
+      principalId,
+      conversationId,
       binding.tool,
       binding.argumentFingerprint,
       binding.expiresAt,
       status,
       now,
+      runId,
     )
     .run();
+}
+
+export async function decideApproval(
+  db: OperationsDatabase,
+  input: {
+    runId: string;
+    storedBinding: ApprovalBinding;
+    eventBinding: ApprovalBinding;
+    decision: "approve" | "reject";
+    now: number;
+  },
+): Promise<{ resume: true; idempotencyKey: string } | { resume: false; reason: string }> {
+  const runId = parseBoundedId(input.runId, "run id");
+  const key = parseMutatingIdempotencyKey(input.storedBinding.idempotencyKey);
+  const row = await db
+    .prepare(
+      `SELECT run_id, principal_id, conversation_id, tool, argument_fingerprint,
+              expires_at, status
+       FROM approvals WHERE idempotency_key = ?`,
+    )
+    .bind(key)
+    .first<{
+      run_id: string | null;
+      principal_id: string;
+      conversation_id: string;
+      tool: string;
+      argument_fingerprint: string;
+      expires_at: number;
+      status: "pending" | "approved" | "rejected" | "expired";
+    }>();
+  if (!row || row.run_id !== runId) {
+    return { resume: false, reason: "approval record does not match the agent run" };
+  }
+  const persisted: ApprovalBinding = {
+    principalId: row.principal_id,
+    conversationId: row.conversation_id,
+    tool: row.tool,
+    argumentFingerprint: row.argument_fingerprint,
+    idempotencyKey: key,
+    expiresAt: row.expires_at,
+  };
+  if (
+    !approvalsMatch(persisted, input.storedBinding, input.now) ||
+    !approvalsMatch(persisted, input.eventBinding, input.now)
+  ) {
+    if (input.now > persisted.expiresAt && row.status === "pending") {
+      await db.batch([
+        db
+          .prepare(
+            `UPDATE approvals SET status = 'expired'
+             WHERE idempotency_key = ? AND status = 'pending'`,
+          )
+          .bind(key),
+        db
+          .prepare(
+            `UPDATE tool_calls SET status = 'denied', redacted_result = 'approval expired'
+             WHERE run_id = ? AND status = 'pending_approval'`,
+          )
+          .bind(runId),
+        db
+          .prepare(
+            `UPDATE agent_runs SET status = 'failed', updated_at = ?
+             WHERE id = ? AND status = 'pending_approval'`,
+          )
+          .bind(input.now, runId),
+      ]);
+    }
+    return { resume: false, reason: "approval does not match stored binding" };
+  }
+  if (input.decision === "reject") {
+    await db.batch([
+      db
+        .prepare(
+          `UPDATE approvals SET status = 'rejected'
+           WHERE idempotency_key = ? AND status = 'pending'`,
+        )
+        .bind(key),
+      db
+        .prepare(
+          `UPDATE tool_calls SET status = 'denied', redacted_result = 'approval rejected'
+           WHERE run_id = ? AND status = 'pending_approval'`,
+        )
+        .bind(runId),
+      db
+        .prepare(
+          `UPDATE agent_runs SET status = 'failed', updated_at = ?
+           WHERE id = ? AND status = 'pending_approval'`,
+        )
+        .bind(input.now, runId),
+    ]);
+    return { resume: false, reason: "rejected" };
+  }
+  if (row.status === "rejected" || row.status === "expired") {
+    return { resume: false, reason: `approval is ${row.status}` };
+  }
+  if (row.status === "pending") {
+    await db
+      .prepare(
+        `UPDATE approvals SET status = 'approved'
+         WHERE idempotency_key = ? AND status = 'pending'`,
+      )
+      .bind(key)
+      .run();
+  }
+  return { resume: true, idempotencyKey: key };
+}
+
+export async function expireApproval(
+  db: OperationsDatabase,
+  input: {
+    runId: string;
+    storedBinding: ApprovalBinding;
+    now: number;
+  },
+): Promise<{ resume: false; reason: string }> {
+  const runId = parseBoundedId(input.runId, "run id");
+  const key = parseMutatingIdempotencyKey(input.storedBinding.idempotencyKey);
+  const row = await db
+    .prepare(
+      `SELECT run_id, principal_id, conversation_id, tool, argument_fingerprint,
+              expires_at, status
+       FROM approvals WHERE idempotency_key = ?`,
+    )
+    .bind(key)
+    .first<{
+      run_id: string | null;
+      principal_id: string;
+      conversation_id: string;
+      tool: string;
+      argument_fingerprint: string;
+      expires_at: number;
+      status: "pending" | "approved" | "rejected" | "expired";
+    }>();
+  if (
+    !row ||
+    row.run_id !== runId ||
+    row.principal_id !== input.storedBinding.principalId ||
+    row.conversation_id !== input.storedBinding.conversationId ||
+    row.tool !== input.storedBinding.tool ||
+    row.argument_fingerprint !== input.storedBinding.argumentFingerprint ||
+    row.expires_at !== input.storedBinding.expiresAt
+  ) {
+    return { resume: false, reason: "approval record does not match the agent run" };
+  }
+  if (row.status !== "pending") {
+    return { resume: false, reason: `approval is ${row.status}` };
+  }
+  await db.batch([
+    db
+      .prepare(
+        `UPDATE approvals SET status = 'expired'
+         WHERE idempotency_key = ? AND status = 'pending'`,
+      )
+      .bind(key),
+    db
+      .prepare(
+        `UPDATE tool_calls SET status = 'denied', redacted_result = 'approval expired'
+         WHERE run_id = ? AND status = 'pending_approval'`,
+      )
+      .bind(runId),
+    db
+      .prepare(
+        `UPDATE agent_runs SET status = 'failed', updated_at = ?
+         WHERE id = ? AND status = 'pending_approval'`,
+      )
+      .bind(input.now, runId),
+  ]);
+  return { resume: false, reason: "expired" };
 }
 
 export async function loadAgentReplay(
@@ -180,7 +424,7 @@ export async function loadAgentReplay(
   }
   const calls = await db
     .prepare(
-      `SELECT id, tool, argument_fingerprint, redacted_result, status
+      `SELECT id, tool, argument_fingerprint, normalized_arguments_json, redacted_result, status
        FROM tool_calls WHERE run_id = ? ORDER BY created_at ASC`,
     )
     .bind(id)
@@ -188,22 +432,26 @@ export async function loadAgentReplay(
       id: string;
       tool: string;
       argument_fingerprint: string;
+      normalized_arguments_json: string;
       redacted_result: string;
       status: StoredToolCall["status"];
     }>();
   const approval = await db
     .prepare(
-      `SELECT idempotency_key, principal_id, conversation_id, tool, argument_fingerprint, expires_at
-       FROM approvals WHERE conversation_id = ? ORDER BY created_at DESC LIMIT 1`,
+      `SELECT idempotency_key, run_id, principal_id, conversation_id, tool,
+              argument_fingerprint, expires_at, status
+       FROM approvals WHERE run_id = ? LIMIT 1`,
     )
-    .bind(run.conversation_id)
+    .bind(id)
     .first<{
       idempotency_key: string;
+      run_id: string;
       principal_id: string;
       conversation_id: string;
       tool: string;
       argument_fingerprint: string;
       expires_at: number;
+      status: "pending" | "approved" | "rejected" | "expired";
     }>();
   return {
     id: run.id,
@@ -218,17 +466,20 @@ export async function loadAgentReplay(
       id: call.id,
       tool: call.tool,
       argumentFingerprint: call.argument_fingerprint,
+      normalizedArguments: JSON.parse(call.normalized_arguments_json) as unknown,
       redactedResult: call.redacted_result,
       status: call.status,
     })),
     approval: approval
       ? {
+          runId: approval.run_id,
           principalId: approval.principal_id,
           conversationId: approval.conversation_id,
           tool: approval.tool,
           argumentFingerprint: approval.argument_fingerprint,
           idempotencyKey: approval.idempotency_key,
           expiresAt: approval.expires_at,
+          status: approval.status,
         }
       : null,
   };

@@ -1,28 +1,127 @@
-import { parseBoundedId } from "../cf/bounded-id";
+import { parseMutatingIdempotencyKey } from "../cf/bounded-id";
+import { sha256Hex } from "../ingest/digests";
+import type { OperationsDatabase } from "../store/conversations";
 import { approvalsMatch, argumentFingerprint, type ApprovalBinding } from "./policy";
 
 export type SideEffect = { key: string; result: unknown };
 
-export class IdempotentExecutor {
-  private readonly done = new Map<string, unknown>();
+type IdempotencyRecord =
+  | { status: "in_progress" }
+  | { status: "completed"; result: unknown };
 
-  async run<T>(idempotencyKey: string, effect: () => Promise<T> | T): Promise<T> {
-    if (this.done.has(idempotencyKey)) {
-      return this.done.get(idempotencyKey) as T;
+export type IdempotencyStore = {
+  claim(idempotencyKey: string, now: number): Promise<boolean>;
+  load(idempotencyKey: string): Promise<IdempotencyRecord | null>;
+  complete(idempotencyKey: string, result: unknown, now: number): Promise<void>;
+};
+
+export class MemoryIdempotencyStore implements IdempotencyStore {
+  private readonly records = new Map<string, IdempotencyRecord>();
+
+  async claim(idempotencyKey: string): Promise<boolean> {
+    if (this.records.has(idempotencyKey)) {
+      return false;
     }
-    const result = await effect();
-    this.done.set(idempotencyKey, result);
-    return result;
+    this.records.set(idempotencyKey, { status: "in_progress" });
+    return true;
   }
 
-  has(idempotencyKey: string): boolean {
-    return this.done.has(idempotencyKey);
+  async load(idempotencyKey: string): Promise<IdempotencyRecord | null> {
+    return this.records.get(idempotencyKey) ?? null;
+  }
+
+  async complete(idempotencyKey: string, result: unknown): Promise<void> {
+    this.records.set(idempotencyKey, { status: "completed", result });
   }
 }
 
-export function mutatingIdempotencyKey(toolSlug: string, value: string): string {
-  const slug = value.replace(/[^A-Za-z0-9.-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
-  return parseBoundedId(`${toolSlug}-${slug || "item"}`, "idempotency key");
+export class D1IdempotencyStore implements IdempotencyStore {
+  constructor(private readonly db: OperationsDatabase) {}
+
+  async claim(idempotencyKey: string, now: number): Promise<boolean> {
+    const result = await this.db
+      .prepare(
+        `INSERT INTO idempotent_effects (
+           idempotency_key, status, result_json, created_at, updated_at
+         ) VALUES (?, 'in_progress', NULL, ?, ?)
+         ON CONFLICT(idempotency_key) DO NOTHING`,
+      )
+      .bind(parseMutatingIdempotencyKey(idempotencyKey), now, now)
+      .run();
+    return (result.meta?.changes ?? 0) === 1;
+  }
+
+  async load(idempotencyKey: string): Promise<IdempotencyRecord | null> {
+    const row = await this.db
+      .prepare(
+        `SELECT status, result_json FROM idempotent_effects WHERE idempotency_key = ?`,
+      )
+      .bind(parseMutatingIdempotencyKey(idempotencyKey))
+      .first<{ status: "in_progress" | "completed"; result_json: string | null }>();
+    if (!row) {
+      return null;
+    }
+    if (row.status === "in_progress") {
+      return { status: "in_progress" };
+    }
+    return { status: "completed", result: JSON.parse(row.result_json ?? "null") as unknown };
+  }
+
+  async complete(idempotencyKey: string, result: unknown, now: number): Promise<void> {
+    const updated = await this.db
+      .prepare(
+        `UPDATE idempotent_effects
+         SET status = 'completed', result_json = ?, updated_at = ?
+         WHERE idempotency_key = ? AND status = 'in_progress'`,
+      )
+      .bind(
+        JSON.stringify(result) ?? "null",
+        now,
+        parseMutatingIdempotencyKey(idempotencyKey),
+      )
+      .run();
+    if ((updated.meta?.changes ?? 0) !== 1) {
+      throw new Error("idempotent effect claim was lost");
+    }
+  }
+}
+
+export class IdempotentExecutor {
+  constructor(private readonly store: IdempotencyStore) {}
+
+  async run<T>(idempotencyKey: string, effect: () => Promise<T> | T): Promise<T> {
+    const existing = await this.store.load(idempotencyKey);
+    if (existing?.status === "completed") {
+      return existing.result as T;
+    }
+    if (!(await this.store.claim(idempotencyKey, Date.now()))) {
+      const claimed = await this.store.load(idempotencyKey);
+      if (claimed?.status === "completed") {
+        return claimed.result as T;
+      }
+      throw new Error("idempotent effect is already in progress or needs reconciliation");
+    }
+    const result = await effect();
+    await this.store.complete(idempotencyKey, result, Date.now());
+    return result;
+  }
+
+  async has(idempotencyKey: string): Promise<boolean> {
+    return (await this.store.load(idempotencyKey))?.status === "completed";
+  }
+}
+
+export async function mutatingIdempotencyKey(
+  toolSlug: string,
+  args: unknown,
+  attemptScope: string,
+): Promise<string> {
+  const slug = toolSlug
+    .replace(/[^A-Za-z0-9.-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
+  const digest = await sha256Hex(argumentFingerprint([attemptScope, args]));
+  return parseMutatingIdempotencyKey(`${slug || "tool"}-${digest.slice(0, 48)}`);
 }
 
 export function approvalFromAttempt(input: {
@@ -38,7 +137,7 @@ export function approvalFromAttempt(input: {
     conversationId: input.conversationId,
     tool: input.tool,
     argumentFingerprint: argumentFingerprint(input.args),
-    idempotencyKey: parseBoundedId(input.idempotencyKey, "idempotency key"),
+    idempotencyKey: parseMutatingIdempotencyKey(input.idempotencyKey),
     expiresAt: input.expiresAt,
   };
 }

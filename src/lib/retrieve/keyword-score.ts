@@ -164,7 +164,7 @@ export function bm25Over(
 }
 
 function passageForRescore(chunk: ChunkRecord): string {
-  return chunk.sectionHeading ? `${chunk.sectionHeading}\n\n${chunk.content}` : chunk.content;
+  return [chunk.title, chunk.sectionHeading, chunk.content].filter(Boolean).join("\n\n");
 }
 
 export function rescoreLocally(

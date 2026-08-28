@@ -82,7 +82,7 @@ export function evaluateToolPolicy(input: {
     tool: input.tool,
     argumentFingerprint: fingerprint,
     idempotencyKey: input.idempotencyKey,
-    expiresAt: input.now + 15 * 60 * 1000,
+    expiresAt: input.approval?.expiresAt ?? input.now + 15 * 60 * 1000,
   };
   if (!input.approval) {
     return { action: "pending_approval", binding };
@@ -124,7 +124,8 @@ export function approvalsMatch(
     stored.conversationId === next.conversationId &&
     stored.tool === next.tool &&
     stored.argumentFingerprint === next.argumentFingerprint &&
-    stored.idempotencyKey === next.idempotencyKey
+    stored.idempotencyKey === next.idempotencyKey &&
+    stored.expiresAt === next.expiresAt
   );
 }
 

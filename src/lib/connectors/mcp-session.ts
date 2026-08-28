@@ -86,15 +86,23 @@ export function frameMcpResult(text: string): string {
   return `${UNTRUSTED_MCP_PREFIX}\n${text}`;
 }
 
-export function toolText(result: unknown): string {
+export function toolText(result: unknown, maxBytes = 1024 * 1024): string {
   if (!result || typeof result !== "object" || !("content" in result) || !Array.isArray(result.content)) {
     return JSON.stringify({ error: "empty_mcp_result" });
   }
-  return result.content
-    .map((part) =>
+  const encoder = new TextEncoder();
+  const parts: string[] = [];
+  let bytes = 0;
+  for (const part of result.content) {
+    const text =
       part && typeof part === "object" && "type" in part && part.type === "text" && "text" in part
         ? String(part.text)
-        : "",
-    )
-    .join("");
+        : "";
+    bytes += encoder.encode(text).byteLength;
+    if (bytes > maxBytes) {
+      throw new Error(`MCP result exceeds ${maxBytes} bytes`);
+    }
+    parts.push(text);
+  }
+  return parts.join("");
 }

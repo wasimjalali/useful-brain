@@ -1,4 +1,8 @@
-import { BoundedIdError, parseBoundedId } from "../cf/bounded-id";
+import {
+  BoundedIdError,
+  parseBoundedId,
+  parseMutatingIdempotencyKey,
+} from "../cf/bounded-id";
 
 export class IngestQueueMessageError extends Error {
   constructor(message: string) {
@@ -20,7 +24,7 @@ export function parseIngestQueueMessage(body: unknown): IngestQueueMessage {
   try {
     return {
       jobId: parseBoundedId(record.jobId, "job id"),
-      idempotencyKey: parseBoundedId(record.idempotencyKey, "idempotency key"),
+      idempotencyKey: parseMutatingIdempotencyKey(record.idempotencyKey),
     };
   } catch (error) {
     if (error instanceof BoundedIdError) {

@@ -180,6 +180,34 @@ describe("grounded answer helpers", () => {
     expect(parsed).toEqual(buildInsufficientEvidenceAnswer());
   });
 
+  it("canonicalizes model-authored insufficient-evidence text", () => {
+    const parsed = parseStructuredGroundedAnswer(
+      JSON.stringify({
+        answerType: "insufficient_evidence",
+        paragraphs: [
+          { text: "The policy definitely allows 60 days.", citations: ["[1]"] },
+        ],
+      }),
+      addCitationLabels(retrievalResults),
+    );
+
+    expect(parsed).toEqual(buildInsufficientEvidenceAnswer());
+  });
+
+  it("refuses factual text that is not a supported cited clause", () => {
+    const parsed = parseStructuredGroundedAnswer(
+      JSON.stringify({
+        answerType: "grounded",
+        paragraphs: [
+          { text: "Opened products must never be returned within 30 days.", citations: ["[1]"] },
+        ],
+      }),
+      addCitationLabels(retrievalResults),
+    );
+
+    expect(parsed).toEqual(buildInsufficientEvidenceAnswer());
+  });
+
   it("converts structured paragraphs back to readable text", () => {
     expect(
       structuredAnswerToText({
@@ -233,7 +261,12 @@ describe("grounded answer helpers", () => {
     const parsed = parseStructuredGroundedAnswer(
       JSON.stringify({
         answerType: "grounded",
-        paragraphs: [{ text: "Both windows apply.", citations: ["[1, 2]"] }],
+        paragraphs: [
+          {
+            text: "Opened products may be returned. Final-sale bundles are not eligible for standard returns.",
+            citations: ["[1, 2]"],
+          },
+        ],
       }),
       addCitationLabels(retrievalResults),
     );
@@ -246,7 +279,10 @@ describe("grounded answer helpers", () => {
       JSON.stringify({
         answerType: "grounded",
         paragraphs: [
-          { text: "Returns close in 30 days.", citations: ["[1] within 30 days"] },
+          {
+            text: "Opened products may be returned within 30 days.",
+            citations: ["[1] within 30 days"],
+          },
         ],
       }),
       addCitationLabels(retrievalResults),

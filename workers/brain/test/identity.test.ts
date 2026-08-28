@@ -3,6 +3,7 @@ import { env, exports } from "cloudflare:workers";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { createBrainBoundRequest } from "../../../src/lib/cf/service-binding-identity";
+import { createPendingTurn } from "../../../src/lib/store/conversations";
 import worker from "../src";
 import { AUD, generateSigning, jwksResponse, signToken } from "./jwt";
 import { seedPrincipals } from "./seed";
@@ -183,5 +184,56 @@ describe("Web-to-Brain identity", () => {
     );
     expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({ code: "VALIDATION_FAILED" });
+  });
+
+  it("forbids stream, lock and approval routes for another conversation owner", async () => {
+    const token = await signToken(signing.privateKey, signing.kid);
+    const pending = await createPendingTurn(env.OPERATIONS_DB, {
+      ownerPrincipalId: "principal-dev",
+      requestId: "req-route-owner",
+      question: "Private",
+      now: 100,
+    });
+    const headers = {
+      "cf-access-jwt-assertion": token,
+      "content-type": "application/json",
+    };
+    const lock = await fetchWorker(
+      new IncomingRequest("https://brain.internal/lock", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ conversationId: pending.conversationId, runId: "run-owner-test" }),
+      }),
+    );
+    expect(lock.status).toBe(403);
+
+    const stream = await fetchWorker(
+      new IncomingRequest(
+        `https://brain.internal/stream?conversationId=${pending.conversationId}`,
+        { headers: { "cf-access-jwt-assertion": token, Upgrade: "websocket" } },
+      ),
+    );
+    expect(stream.status).toBe(403);
+
+    const binding = {
+      principalId: "principal-alice",
+      conversationId: pending.conversationId,
+      tool: "create_draft",
+      argumentFingerprint: '{"title":"private"}',
+      idempotencyKey: "draft-private",
+      expiresAt: Date.now() + 60_000,
+    };
+    const approval = await fetchWorker(
+      new IncomingRequest("https://brain.internal/approvals/event", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          workflowId: binding.idempotencyKey,
+          decision: "approve",
+          binding,
+        }),
+      }),
+    );
+    expect(approval.status).toBe(403);
   });
 });

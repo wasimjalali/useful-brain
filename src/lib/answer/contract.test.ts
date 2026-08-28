@@ -95,6 +95,43 @@ describe("grounded answer contract", () => {
     expect(parsed).toEqual(buildInsufficientEvidenceAnswer());
   });
 
+  it("canonicalizes model-authored insufficient-evidence text", () => {
+    const parsed = parseStructuredGroundedAnswer(
+      JSON.stringify({
+        answerType: "insufficient_evidence",
+        paragraphs: [
+          { text: "The policy definitely allows 60 days.", citations: ["[1]"] },
+        ],
+      }),
+      addCitationLabels(retrievalResults),
+    );
+    expect(parsed).toEqual(buildInsufficientEvidenceAnswer());
+  });
+
+  it("refuses a cited paragraph whose factual claim is not supported by its citation", () => {
+    const parsed = parseStructuredGroundedAnswer(
+      JSON.stringify({
+        answerType: "grounded",
+        paragraphs: [{ text: "The policy includes a 42 percent benefit.", citations: ["[1]"] }],
+      }),
+      addCitationLabels(retrievalResults),
+    );
+    expect(parsed).toEqual(buildInsufficientEvidenceAnswer());
+  });
+
+  it("refuses a contradictory paraphrase even when most words occur in the citation", () => {
+    const parsed = parseStructuredGroundedAnswer(
+      JSON.stringify({
+        answerType: "grounded",
+        paragraphs: [
+          { text: "Opened products must never be returned within 30 days.", citations: ["[1]"] },
+        ],
+      }),
+      addCitationLabels(retrievalResults),
+    );
+    expect(parsed).toEqual(buildInsufficientEvidenceAnswer());
+  });
+
   it("drops uncited paragraphs instead of refusing a mixed answer", () => {
     const parsed = parseStructuredGroundedAnswer(
       JSON.stringify({
@@ -117,7 +154,12 @@ describe("grounded answer contract", () => {
       parseStructuredGroundedAnswer(
         JSON.stringify({
           answerType: "grounded",
-          paragraphs: [{ text: "Both windows apply.", citations: ["[1, 2]"] }],
+          paragraphs: [
+            {
+              text: "Opened products may be returned. Final-sale bundles are not eligible for standard returns.",
+              citations: ["[1, 2]"],
+            },
+          ],
         }),
         evidence,
       ).paragraphs[0].citations,
@@ -126,7 +168,12 @@ describe("grounded answer contract", () => {
       parseStructuredGroundedAnswer(
         JSON.stringify({
           answerType: "grounded",
-          paragraphs: [{ text: "Returns close in 30 days.", citations: ["[1] within 30 days"] }],
+          paragraphs: [
+            {
+              text: "Opened products may be returned within 30 days.",
+              citations: ["[1] within 30 days"],
+            },
+          ],
         }),
         evidence,
       ).paragraphs[0].citations,

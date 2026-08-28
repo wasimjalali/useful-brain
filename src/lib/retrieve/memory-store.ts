@@ -72,7 +72,7 @@ export class MemoryChunkStore {
     if (terms.length === 0) {
       return [];
     }
-    const stats = this.termStats();
+    const stats = this.termStats(acl);
     if (!stats) {
       return [];
     }
@@ -107,7 +107,7 @@ export class MemoryChunkStore {
     return hits.slice(0, limit);
   }
 
-  private termStats() {
+  private termStats(acl: AclFilter) {
     if (this.chunks.size === 0) {
       return null;
     }
@@ -115,6 +115,9 @@ export class MemoryChunkStore {
     const lengths: Record<string, number> = {};
     const documentFrequency: Record<string, number> = {};
     for (const [chunkId, chunk] of this.chunks) {
+      if (!chunkMatchesFilter(acl, chunk)) {
+        continue;
+      }
       const counts: Record<string, number> = {};
       for (const token of tokenize(chunk.content)) {
         counts[token] = (counts[token] ?? 0) + 1;

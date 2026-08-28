@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
 import { UPSERT_CHUNK_SQL } from "../../../src/lib/store/generations";
-import { aclSqlAndParams, keywordSearchSql } from "../../../src/lib/acl/access";
+import { aclSqlAndParams, fts5MatchQuery, keywordSearchSql } from "../../../src/lib/acl/access";
 
 describe("external-content FTS5", () => {
   it("uses AUTOINCREMENT rowids, ON CONFLICT DO UPDATE, and ACL-constrained MATCH", async () => {
@@ -71,5 +71,34 @@ describe("external-content FTS5", () => {
       .bind("refund", "gen-fts", ...params, 6)
       .all<{ chunk_id: string }>();
     expect(rows.results.map((row) => row.chunk_id)).toEqual(["doc__body__000"]);
+    const literal = await env.CORPUS_DB.prepare(keywordSearchSql(sql))
+      .bind(fts5MatchQuery("RF-75"), "gen-fts", ...params, 6)
+      .all<{ chunk_id: string; rank: number }>();
+    expect(literal.results.map((row) => row.chunk_id)).toEqual(["doc__body__000"]);
+    const allowedRank = literal.results[0]?.rank;
+    await env.CORPUS_DB.prepare(UPSERT_CHUNK_SQL).bind(
+      "private__body__000",
+      "private",
+      "ver-private",
+      "gen-fts",
+      "Restricted",
+      0,
+      "RF-75 RF-75 RF-75 restricted",
+      0,
+      31,
+      "f".repeat(64),
+      "w".repeat(40),
+      "b".repeat(32),
+      "private",
+      "[]",
+      "[]",
+      JSON.stringify({ owner_user_id: "other-user" }),
+      now,
+    ).run();
+    const afterDeniedInsert = await env.CORPUS_DB.prepare(keywordSearchSql(sql))
+      .bind(fts5MatchQuery("RF-75"), "gen-fts", ...params, 6)
+      .all<{ chunk_id: string; rank: number }>();
+    expect(afterDeniedInsert.results.map((row) => row.chunk_id)).toEqual(["doc__body__000"]);
+    expect(afterDeniedInsert.results[0]?.rank).toBe(allowedRank);
   });
 });

@@ -11,5 +11,10 @@ describe("connector config scrubbing", () => {
     expect(() => sanitizeStoredConfig({ auth: { token: "ghs_secret" } })).toThrow(ConnectorConfigError);
     expect(() => sanitizeStoredConfig({ secret_binding: "SANAD_CF_API_TOKEN" })).toThrow(/CONNECTOR_/);
     expect(() => sanitizeStoredConfig({ api_key: "x" })).toThrow(/secret/);
+    expect(() => sanitizeStoredConfig({ accessToken: "x" })).toThrow(/secret/);
+    expect(() => sanitizeStoredConfig({ nested: { clientSecret: "x" } })).toThrow(/secret/);
+    expect(() => sanitizeStoredConfig({ "X-Api-Key": "x" })).toThrow(/secret/);
+    expect(() => sanitizeStoredConfig({ clientApiKey: "x" })).toThrow(/secret/);
+    expect(() => sanitizeStoredConfig({ dbPassword: "x" })).toThrow(/secret/);
   });
 });

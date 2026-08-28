@@ -49,10 +49,36 @@ async function scoresWithDenied(includeDenied: boolean): Promise<Record<string, 
   return response.trace.keywordScores;
 }
 
+async function rankedAllowedWithDenied(includeDenied: boolean): Promise<string[]> {
+  const store = new MemoryChunkStore();
+  store.upsert([
+    chunk("allowed-short", "refund refund"),
+    chunk("allowed-long", `refund ${"policy ".repeat(40)}`),
+  ]);
+  if (includeDenied) {
+    store.upsert(
+      Array.from({ length: 20 }, (_, index) =>
+        chunk(`denied-${index}`, `refund ${"secret ".repeat(200)}`, "role"),
+      ),
+    );
+  }
+  return store
+    .keywordSearch(
+      "refund",
+      2,
+      { userId: "eng_ic", roles: ["standard"], departments: ["engineering"] },
+    )
+    .map((hit) => `${hit.chunkId}:${hit.score.toFixed(8)}`);
+}
+
 describe("keyword oracle", () => {
   it("does not publish keyword scores that move when denied chunks are added", async () => {
     const withoutDenied = await scoresWithDenied(false);
     const withDenied = await scoresWithDenied(true);
     expect(withDenied).toEqual(withoutDenied);
+  });
+
+  it("does not let denied chunks influence keyword candidate statistics", async () => {
+    expect(await rankedAllowedWithDenied(true)).toEqual(await rankedAllowedWithDenied(false));
   });
 });

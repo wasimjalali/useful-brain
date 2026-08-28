@@ -5,6 +5,7 @@ import { addCitationLabels, PROMPT_VERSION } from "../../../src/lib/answer/contr
 import {
   completeTurn,
   createPendingTurn,
+  failTurn,
   loadReplay,
   persistThenRelease,
 } from "../../../src/lib/store/conversations";
@@ -175,5 +176,76 @@ describe("operations conversation snapshots", () => {
       "principal-alice",
     );
     expect(replayed?.structuredAnswer.answerType).toBe("grounded");
+  });
+
+  it("does not let another principal fail a pending turn", async () => {
+    await seedPrincipals();
+    const pending = await createPendingTurn(env.OPERATIONS_DB, {
+      ownerPrincipalId: "principal-alice",
+      requestId: "req-owned-failure",
+      question: "Private question",
+      now: 60,
+    });
+    await expect(
+      failTurn(env.OPERATIONS_DB, {
+        assistantMessageId: pending.assistantMessageId,
+        ownerPrincipalId: "principal-bot",
+        errorCode: "CANCELLED",
+        now: 61,
+      }),
+    ).rejects.toThrow(/FORBIDDEN/);
+    const row = await env.OPERATIONS_DB.prepare("SELECT status FROM messages WHERE id = ?")
+      .bind(pending.assistantMessageId)
+      .first<{ status: string }>();
+    expect(row?.status).toBe("pending");
+  });
+
+  it("keeps the completed answer and evidence snapshot from the same writer", async () => {
+    await seedPrincipals();
+    const pending = await createPendingTurn(env.OPERATIONS_DB, {
+      ownerPrincipalId: "principal-alice",
+      requestId: "req-snapshot-race",
+      question: "Race",
+      now: 70,
+    });
+    const complete = (label: string, now: number) => completeTurn(env.OPERATIONS_DB, {
+      ownerPrincipalId: "principal-alice",
+      assistantMessageId: pending.assistantMessageId,
+      requestId: "req-snapshot-race",
+      rawModelJson: JSON.stringify({
+        answerType: "grounded",
+        paragraphs: [{ text: `Answer from ${label}.`, citations: ["[1]"] }],
+      }),
+      evidence: addCitationLabels([{
+        rank: 1,
+        score: 0.9,
+        chunkId: `chunk-${label}`,
+        source: `${label}.md`,
+        section: label,
+        text: `Answer from ${label}.`,
+        tokenEstimate: 3,
+      }]),
+      answerModel: "test-model",
+      embeddingModel: "fake-embed",
+      embeddingDimensions: 8,
+      promptVersion: PROMPT_VERSION,
+      retrievalConfigVersion: "fake-provider",
+      corpusGenerationId: "gen-1",
+      now,
+    });
+    const attempts = await Promise.allSettled([complete("alpha", 71), complete("beta", 72)]);
+    expect(attempts.some((attempt) => attempt.status === "fulfilled")).toBe(true);
+    for (const attempt of attempts) {
+      if (attempt.status === "rejected") {
+        expect(String(attempt.reason)).toMatch(/owned by another writer/);
+      }
+    }
+    const replayed = await loadReplay(
+      env.OPERATIONS_DB,
+      pending.assistantMessageId,
+      "principal-alice",
+    );
+    const label = replayed?.answer.includes("alpha") ? "alpha" : "beta";
+    expect(replayed?.retrieval.results[0]?.chunkId).toBe(`chunk-${label}`);
   });
 });

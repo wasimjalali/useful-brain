@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { addCitationLabels, PROMPT_VERSION } from "../../../src/lib/answer/contract";
 import { argumentFingerprint } from "../../../src/lib/agent/policy";
+import { D1IdempotencyStore, IdempotentExecutor } from "../../../src/lib/agent/approvals";
 import {
   completeTurn,
   createPendingTurn,
@@ -69,12 +70,14 @@ describe("agent run replay records", () => {
         {
           tool: "search_knowledge",
           argumentFingerprint: argumentFingerprint({ query: "how much leave per month" }),
+          normalizedArguments: { query: "how much leave per month" },
           redactedResult: "{\"hits\":1}",
           status: "ok",
         },
         {
           tool: "create_draft",
           argumentFingerprint: argumentFingerprint({ title: "alpha" }),
+          normalizedArguments: { title: "alpha" },
           redactedResult: "pending_approval",
           status: "pending_approval",
         },
@@ -83,6 +86,7 @@ describe("agent run replay records", () => {
     });
     await upsertApproval(
       env.OPERATIONS_DB,
+      created.runId,
       {
         principalId: "principal-alice",
         conversationId: pending.conversationId,
@@ -112,5 +116,112 @@ describe("agent run replay records", () => {
       now: 50,
     });
     expect(again.runId).toBe("run-agent-1");
+  });
+
+  it("rejects reuse of an approval key with a different binding", async () => {
+    await seedPrincipals();
+    const pending = await createPendingTurn(env.OPERATIONS_DB, {
+      ownerPrincipalId: "principal-alice",
+      requestId: "req-binding",
+      question: "Create alpha",
+      now: 95,
+    });
+    await createAgentRun(env.OPERATIONS_DB, {
+      runId: "run-binding",
+      conversationId: pending.conversationId,
+      principalId: "principal-alice",
+      model: "phase5-faux",
+      promptVersion: PROMPT_VERSION,
+      corpusGenerationId: "gen-1",
+      now: 96,
+    });
+    await completeAgentRun(env.OPERATIONS_DB, {
+      runId: "run-binding",
+      status: "pending_approval",
+      toolCalls: [{
+        tool: "create_draft",
+        argumentFingerprint: argumentFingerprint({ title: "alpha" }),
+        normalizedArguments: { title: "alpha" },
+        redactedResult: "pending_approval",
+        status: "pending_approval",
+      }],
+      now: 97,
+    });
+    const binding = {
+      principalId: "principal-alice",
+      conversationId: pending.conversationId,
+      tool: "create_draft",
+      argumentFingerprint: argumentFingerprint({ title: "alpha" }),
+      idempotencyKey: "draft-binding",
+      expiresAt: 99_000,
+    };
+    await upsertApproval(env.OPERATIONS_DB, "run-binding", binding, "pending", 100);
+    await expect(
+      upsertApproval(
+        env.OPERATIONS_DB,
+        "run-binding",
+        { ...binding, principalId: "principal-bot", tool: "send_email" },
+        "approved",
+        101,
+      ),
+    ).rejects.toThrow(/binding/);
+  });
+
+  it("records tool calls once when completion is delivered concurrently", async () => {
+    await seedPrincipals();
+    const pending = await createPendingTurn(env.OPERATIONS_DB, {
+      ownerPrincipalId: "principal-alice",
+      requestId: "req-run-concurrent",
+      question: "Concurrent",
+      now: 110,
+    });
+    await createAgentRun(env.OPERATIONS_DB, {
+      runId: "run-concurrent",
+      conversationId: pending.conversationId,
+      principalId: "principal-alice",
+      model: "phase5-faux",
+      promptVersion: PROMPT_VERSION,
+      corpusGenerationId: "gen-1",
+      now: 111,
+    });
+    const completion = {
+      runId: "run-concurrent",
+      status: "completed" as const,
+      toolCalls: [{
+        tool: "search_knowledge",
+        argumentFingerprint: argumentFingerprint({ query: "Concurrent" }),
+        normalizedArguments: { query: "Concurrent" },
+        redactedResult: "{}",
+        status: "ok" as const,
+      }],
+      now: 112,
+    };
+    await Promise.all([
+      completeAgentRun(env.OPERATIONS_DB, completion),
+      completeAgentRun(env.OPERATIONS_DB, completion),
+    ]);
+    const rows = await env.OPERATIONS_DB.prepare(
+      "SELECT COUNT(*) AS count FROM tool_calls WHERE run_id = ?",
+    ).bind("run-concurrent").first<{ count: number }>();
+    expect(rows?.count).toBe(1);
+  });
+
+  it("deduplicates a completed side effect across executor instances", async () => {
+    let effects = 0;
+    const first = new IdempotentExecutor(new D1IdempotencyStore(env.OPERATIONS_DB));
+    const second = new IdempotentExecutor(new D1IdempotencyStore(env.OPERATIONS_DB));
+    expect(
+      await first.run("sink-durable-effect", () => {
+        effects += 1;
+        return { ok: true };
+      }),
+    ).toEqual({ ok: true });
+    expect(
+      await second.run("sink-durable-effect", () => {
+        effects += 1;
+        return { ok: false };
+      }),
+    ).toEqual({ ok: true });
+    expect(effects).toBe(1);
   });
 });

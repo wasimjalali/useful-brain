@@ -1,4 +1,5 @@
 import { parseBoundedId } from "../cf/bounded-id";
+import { sha256Hex } from "../ingest/digests";
 import {
   type CitedRetrievalResult,
   type StructuredGroundedAnswer,
@@ -225,6 +226,61 @@ export async function completeTurn(
 
   const structured = answerFromEvidence(input.rawModelJson, input.evidence);
   const content = structuredAnswerToText(structured);
+  const completionDigest = await sha256Hex(
+    JSON.stringify({
+      assistantMessageId,
+      ownerPrincipalId: input.ownerPrincipalId,
+      content,
+      structured,
+      evidence: input.evidence,
+      answerModel: input.answerModel,
+      embeddingModel: input.embeddingModel,
+      embeddingDimensions: input.embeddingDimensions,
+      promptVersion: input.promptVersion,
+      retrievalConfigVersion: input.retrievalConfigVersion,
+      corpusGenerationId: input.corpusGenerationId,
+    }),
+  );
+  const completionToken = parseBoundedId(
+    `completion-${completionDigest.slice(0, 48)}`,
+    "completion token",
+  );
+  await db
+    .prepare(
+      `INSERT INTO turn_completion_claims (message_id, completion_token, created_at)
+       SELECT m.id, ?, ?
+       FROM messages m
+       JOIN conversations c ON c.id = m.conversation_id
+       WHERE m.id = ? AND m.status = 'pending' AND c.owner_principal_id = ?
+       ON CONFLICT(message_id) DO NOTHING`,
+    )
+    .bind(
+      completionToken,
+      input.now,
+      assistantMessageId,
+      parseBoundedId(input.ownerPrincipalId, "principal id"),
+    )
+    .run();
+  const completionOwner = await db
+    .prepare(
+      `SELECT m.status, c.completion_token
+       FROM messages m
+       LEFT JOIN turn_completion_claims c ON c.message_id = m.id
+       WHERE m.id = ?`,
+    )
+    .bind(assistantMessageId)
+    .first<{ status: string; completion_token: string | null }>();
+  if (
+    !completionOwner ||
+    completionOwner.status !== "pending" ||
+    completionOwner.completion_token !== completionToken
+  ) {
+    const completed = await loadReplay(db, assistantMessageId, input.ownerPrincipalId);
+    if (completed) {
+      return completed;
+    }
+    throw new ConversationStoreError("assistant completion is owned by another writer");
+  }
   const statements: OperationsStatement[] = [
     db
       .prepare(
@@ -232,8 +288,15 @@ export async function completeTurn(
          SET content = ?, status = 'completed', answer_type = ?, answer_model = ?,
              embedding_model = ?, embedding_dimensions = ?, structured_paragraphs_json = ?,
              prompt_version = ?, retrieval_config_version = ?, corpus_generation_id = ?,
-             updated_at = ?
-         WHERE id = ? AND status = 'pending'`,
+             completion_token = ?, updated_at = ?
+         WHERE id = ? AND status = 'pending'
+           AND conversation_id IN (
+             SELECT id FROM conversations WHERE owner_principal_id = ?
+           )
+           AND EXISTS (
+             SELECT 1 FROM turn_completion_claims
+             WHERE message_id = ? AND completion_token = ?
+           )`,
       )
       .bind(
         content,
@@ -245,8 +308,12 @@ export async function completeTurn(
         input.promptVersion,
         input.retrievalConfigVersion,
         input.corpusGenerationId,
+        completionToken,
         input.now,
         assistantMessageId,
+        parseBoundedId(input.ownerPrincipalId, "principal id"),
+        assistantMessageId,
+        completionToken,
       ),
   ];
   for (const item of input.evidence) {
@@ -256,17 +323,11 @@ export async function completeTurn(
           `INSERT INTO evidence_snapshots (
              message_id, rank, score, chunk_id, source, section, text, token_estimate,
              citation_label, document_id, generation_id
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-           ON CONFLICT(message_id, rank) DO UPDATE SET
-             score = excluded.score,
-             chunk_id = excluded.chunk_id,
-             source = excluded.source,
-             section = excluded.section,
-             text = excluded.text,
-             token_estimate = excluded.token_estimate,
-             citation_label = excluded.citation_label,
-             document_id = excluded.document_id,
-             generation_id = excluded.generation_id`,
+           ) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+           WHERE EXISTS (
+             SELECT 1 FROM messages WHERE id = ? AND completion_token = ?
+           )
+           ON CONFLICT(message_id, rank) DO NOTHING`,
         )
         .bind(
           assistantMessageId,
@@ -280,13 +341,20 @@ export async function completeTurn(
           item.citationLabel,
           null,
           input.corpusGenerationId,
+          assistantMessageId,
+          completionToken,
         ),
     );
   }
   statements.push(
     db
-      .prepare(`UPDATE conversations SET updated_at = ? WHERE id = ?`)
-      .bind(input.now, pending.conversation_id),
+      .prepare(
+        `UPDATE conversations SET updated_at = ?
+         WHERE id = ? AND EXISTS (
+           SELECT 1 FROM messages WHERE id = ? AND completion_token = ?
+         )`,
+      )
+      .bind(input.now, pending.conversation_id, assistantMessageId, completionToken),
   );
   await db.batch(statements);
   const replayed = await loadReplay(db, assistantMessageId, input.ownerPrincipalId);
@@ -300,17 +368,24 @@ export async function failTurn(
   db: OperationsDatabase,
   input: { assistantMessageId: string; ownerPrincipalId: string; errorCode: string; now: number },
 ): Promise<void> {
-  await db
+  const result = await db
     .prepare(
       `UPDATE messages SET status = 'failed', error_code = ?, updated_at = ?
-       WHERE id = ? AND status = 'pending'`,
+       WHERE id = ? AND status = 'pending'
+         AND conversation_id IN (
+           SELECT id FROM conversations WHERE owner_principal_id = ?
+         )`,
     )
     .bind(
       input.errorCode,
       input.now,
       parseBoundedId(input.assistantMessageId, "message id"),
+      parseBoundedId(input.ownerPrincipalId, "principal id"),
     )
     .run();
+  if ((result.meta?.changes ?? 0) !== 1) {
+    throw new ConversationStoreError("FORBIDDEN");
+  }
 }
 
 export async function loadReplay(
@@ -446,7 +521,7 @@ export async function persistThenRelease<T>(input: {
   return result;
 }
 
-async function assertConversationOwner(
+export async function assertConversationOwner(
   db: OperationsDatabase,
   conversationId: string,
   ownerPrincipalId: string,

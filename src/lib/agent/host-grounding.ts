@@ -1,4 +1,7 @@
-import { INSUFFICIENT_EVIDENCE_ANSWER } from "../answer/contract";
+import {
+  INSUFFICIENT_EVIDENCE_ANSWER,
+  textSupportedByPassages,
+} from "../answer/contract";
 
 export const SEARCH_KNOWLEDGE_TOOL = "search_knowledge";
 
@@ -43,6 +46,8 @@ export type EvidenceIdentity = {
   chunkId: string;
   documentId: string;
   version: string | null;
+  section: string;
+  text: string;
 };
 
 export type TurnEvidenceLedger = {
@@ -94,7 +99,21 @@ export function markersValidForLedger(text: string, ledger: TurnEvidenceLedger):
     return true;
   }
   const size = ledger.identities.length;
-  return citedMarkerIndexes(text).every((n) => n >= 1 && n <= size);
+  return text
+    .split(/\n\s*\n/u)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean)
+    .every((paragraph) => {
+      const markers = citedMarkerIndexes(paragraph);
+      if (markers.length === 0 || !markers.every((n) => n >= 1 && n <= size)) {
+        return false;
+      }
+      const cited = [...new Set(markers)].map((marker) => ledger.identities[marker - 1]);
+      return textSupportedByPassages(
+        paragraph.replace(MARKER_RE, "").trim(),
+        cited.flatMap((item) => [item.section, item.text]),
+      );
+    });
 }
 
 export function ingestSearchPayload(ledger: TurnEvidenceLedger, payload: unknown): void {
@@ -233,7 +252,15 @@ export function enforceBrainGrounding(
 }
 
 function addIdentity(ledger: TurnEvidenceLedger, identity: EvidenceIdentity): void {
-  if (!identity.chunkId || ledger.byChunkId.has(identity.chunkId)) {
+  if (!identity.chunkId) {
+    return;
+  }
+  const existing = ledger.byChunkId.get(identity.chunkId);
+  if (existing) {
+    if (!existing.text && identity.text) {
+      existing.text = identity.text;
+      existing.section = identity.section;
+    }
     return;
   }
   ledger.byChunkId.set(identity.chunkId, identity);
@@ -258,7 +285,14 @@ function identityFromHit(hit: unknown): EvidenceIdentity | null {
   if (!documentId && typeof hit.document_id === "string") {
     documentId = hit.document_id;
   }
-  return { chunkId: chunkId.trim(), documentId, version };
+  return {
+    chunkId: chunkId.trim(),
+    documentId,
+    version,
+    section:
+      typeof citation.section_heading === "string" ? citation.section_heading : "",
+    text: typeof hit.content === "string" ? hit.content : "",
+  };
 }
 
 function identityFromCitation(citation: unknown): EvidenceIdentity | null {
@@ -274,6 +308,9 @@ function identityFromCitation(citation: unknown): EvidenceIdentity | null {
     documentId: typeof citation.document_id === "string" ? citation.document_id : "",
     version:
       typeof citation.version === "string" && citation.version.trim() ? citation.version : null,
+    section:
+      typeof citation.section_heading === "string" ? citation.section_heading : "",
+    text: "",
   };
 }
 

@@ -57,7 +57,7 @@ Burooj must not be deleted until all retirement gates in the master plan pass an
 
 ## Development
 
-The current application uses npm and Node.js 20 or newer.
+The current application uses npm and Node.js 22.19 or newer.
 
 ```bash
 npm install

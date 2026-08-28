@@ -48,7 +48,20 @@ const fixtures = [
   }),
   JSON.stringify({
     answerType: "grounded",
-    paragraphs: [{ text: "Both windows apply.", citations: ["[1, 2]"] }],
+    paragraphs: [
+      {
+        text: "Opened products may be returned. Final-sale bundles are not eligible for standard returns.",
+        citations: ["[1, 2]"],
+      },
+    ],
+  }),
+  JSON.stringify({
+    answerType: "grounded",
+    paragraphs: [{ text: "The policy includes a 42 percent benefit.", citations: ["[1]"] }],
+  }),
+  JSON.stringify({
+    answerType: "insufficient_evidence",
+    paragraphs: [{ text: "The policy definitely allows 60 days.", citations: ["[1]"] }],
   }),
   "not json",
   "```json\n" +
@@ -60,7 +73,7 @@ const fixtures = [
 ];
 
 describe("Convex shadow parity", () => {
-  it("matches the live Convex parser on shared fixtures without changing Convex", () => {
+  it("matches the live Convex parser on shared fixtures", () => {
     const evidence = addCitationLabels(retrievalResults);
     const targetEvidence = target.addCitationLabels(retrievalResults);
     for (const raw of fixtures) {

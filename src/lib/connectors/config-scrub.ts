@@ -8,7 +8,10 @@ const SECRET_KEYS = new Set([
   "secret",
   "authorization",
   "access_token",
+  "accesstoken",
   "refresh_token",
+  "refreshtoken",
+  "clientsecret",
   "bearer",
 ]);
 
@@ -24,10 +27,11 @@ function isSecretKey(name: string): boolean {
   if (lower === "secret_binding") {
     return false;
   }
-  if (SECRET_KEYS.has(lower)) {
+  const compact = lower.replace(/[^a-z0-9]/g, "");
+  if (SECRET_KEYS.has(lower) || SECRET_KEYS.has(compact)) {
     return true;
   }
-  return lower.endsWith("_token") || lower.endsWith("_secret");
+  return ["token", "secret", "apikey", "password"].some((suffix) => compact.endsWith(suffix));
 }
 
 function sanitizeValue(value: unknown, path: string): unknown {

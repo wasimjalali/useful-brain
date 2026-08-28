@@ -20,7 +20,7 @@ function brainAgent(tools: string[] = [SEARCH_KNOWLEDGE_TOOL]) {
 function hit(chunkId: string, documentId = "doc-1", version: string | null = "v1") {
   return {
     chunk_id: chunkId,
-    content: `body of ${chunkId}`,
+    content: "Leave accrues monthly.",
     score: 0.9,
     citation: {
       source_name: "Policy",
@@ -89,12 +89,46 @@ describe("host grounding finalizer", () => {
   });
 
   it("passes a supported answer with a valid marker", () => {
-    const found = hit("chunk-a");
+    const found = {
+      ...hit("chunk-a"),
+      content: "Leave accrues monthly.",
+    };
     const messages = turnWithSearch(searchResult({ hits: [found], citations: [found.citation] }));
     const prose = "Leave accrues monthly.[1]";
     expect(
       enforceBrainGrounding(brainAgent(), { finalResponse: prose, messages }),
     ).toBe(prose);
+  });
+
+  it("rejects an invented claim even when it cites an in-range marker", () => {
+    const found = {
+      ...hit("chunk-a"),
+      content: "Employees accrue 1.5 days of leave per month.",
+    };
+    const messages = turnWithSearch(searchResult({ hits: [found], citations: [found.citation] }));
+    expect(
+      enforceBrainGrounding(brainAgent(), {
+        finalResponse: "Employees accrue 20 days of leave per month.[1]",
+        messages,
+      }),
+    ).toBe(BRAIN_INVALID_CITATION);
+  });
+
+  it("rejects citation-free prose and an uncited paragraph after successful retrieval", () => {
+    const found = hit("chunk-a");
+    const messages = turnWithSearch(searchResult({ hits: [found], citations: [found.citation] }));
+    expect(
+      enforceBrainGrounding(brainAgent(), {
+        finalResponse: "Leave accrues monthly.",
+        messages,
+      }),
+    ).toBe(BRAIN_INVALID_CITATION);
+    expect(
+      enforceBrainGrounding(brainAgent(), {
+        finalResponse: "Leave accrues monthly.[1]\n\nIt also carries over automatically.",
+        messages,
+      }),
+    ).toBe(BRAIN_INVALID_CITATION);
   });
 
   it("leaves a non-brain profile unchanged", () => {
@@ -128,8 +162,8 @@ describe("host grounding finalizer", () => {
   });
 
   it("merges two successful searches and rejects an unknown marker", () => {
-    const hitA = hit("chunk-a");
-    const hitB = hit("chunk-b", "doc-2");
+    const hitA = { ...hit("chunk-a"), content: "Alpha policy applies." };
+    const hitB = { ...hit("chunk-b", "doc-2"), content: "Beta policy applies." };
     const messages: TranscriptMessage[] = [
       { role: "user", content: "multi hop?" },
       {
@@ -147,7 +181,7 @@ describe("host grounding finalizer", () => {
     ];
     const ledger = buildTurnLedger(messages);
     expect(ledger.identities.map((item) => item.chunkId)).toEqual(["chunk-a", "chunk-b"]);
-    expect(markersValidForLedger("A.[1] B.[2]", ledger)).toBe(true);
+    expect(markersValidForLedger("Alpha policy applies.[1] Beta policy applies.[2]", ledger)).toBe(true);
     expect(markersValidForLedger("C.[3]", ledger)).toBe(false);
   });
 
