@@ -16,6 +16,7 @@ import type { ApprovalBinding } from "../../../src/lib/agent/policy";
 import { ConversationRunLock } from "./conversation-lock";
 import { ApprovalWorkflow } from "./approval-workflow";
 import {
+  enqueueRecoverableApprovalResumes,
   parseApprovalResumeMessage,
   resumeApprovedAgentRun,
 } from "./approval-resume";
@@ -337,6 +338,16 @@ const brainWorker = {
         message.retry();
       }
     }
+  },
+  async scheduled(_controller: unknown, env: BrainEnv): Promise<void> {
+    assertWorkerStartup(env);
+    if (!env.APPROVAL_RESUME_QUEUE) {
+      return;
+    }
+    await enqueueRecoverableApprovalResumes(
+      env.OPERATIONS_DB as OperationsDatabase,
+      env.APPROVAL_RESUME_QUEUE,
+    );
   },
 };
 

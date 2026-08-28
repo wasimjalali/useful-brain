@@ -91,6 +91,9 @@
       "class_name": "ApprovalWorkflow"
     }
   ],
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  },
   "env": {
     "development": {
       "workers_dev": false,
@@ -152,7 +155,10 @@
           "binding": "APPROVAL_WORKFLOW",
           "class_name": "ApprovalWorkflow"
         }
-      ]
+      ],
+      "triggers": {
+        "crons": ["*/5 * * * *"]
+      }
     },
     "staging": {
       "workers_dev": false,
@@ -218,7 +224,10 @@
           "binding": "APPROVAL_WORKFLOW",
           "class_name": "ApprovalWorkflow"
         }
-      ]
+      ],
+      "triggers": {
+        "crons": ["*/5 * * * *"]
+      }
     },
     "production": {
       "workers_dev": false,
@@ -280,7 +289,10 @@
           "binding": "APPROVAL_WORKFLOW",
           "class_name": "ApprovalWorkflow"
         }
-      ]
+      ],
+      "triggers": {
+        "crons": []
+      }
     }
   }
 }

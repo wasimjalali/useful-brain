@@ -16,6 +16,7 @@ import {
 } from "../../../src/lib/store/agent-runs";
 import { createPendingTurn } from "../../../src/lib/store/conversations";
 import {
+  enqueueRecoverableApprovalResumes,
   listRecoverableApprovalResumes,
   parseApprovalResumeMessage,
   replayRecoverableApprovalResumes,
@@ -215,5 +216,36 @@ describe("approval resume queue", () => {
       "SELECT COUNT(*) AS count FROM synthetic_mutating_effects WHERE idempotency_key = ?",
     ).bind(binding.idempotencyKey).first<{ count: number }>();
     expect(effect?.count).toBe(1);
+  });
+
+  it("re-enqueues identifier-only recoveries from the scheduled handler", async () => {
+    const { runId, binding } = await approvedRun("sched");
+    const sent: Array<{ runId: string; idempotencyKey: string }> = [];
+    const enqueued = await enqueueRecoverableApprovalResumes(env.OPERATIONS_DB, {
+      async send(message) {
+        sent.push(message);
+      },
+    });
+    expect(enqueued.enqueued).toBeGreaterThanOrEqual(1);
+    expect(sent).toContainEqual({ runId, idempotencyKey: binding.idempotencyKey });
+    for (const message of sent) {
+      expect(Object.keys(message)).toEqual(["runId", "idempotencyKey"]);
+    }
+    const ctx = createExecutionContext();
+    await worker.scheduled(
+      { scheduledTime: Date.now(), cron: "*/5 * * * *", noRetry() {} },
+      env,
+      ctx,
+    );
+    const batch = createMessageBatch("useful-brain-approval-resume-development", [{
+      id: "resume-msg-sched",
+      timestamp: new Date(),
+      attempts: 1,
+      body: { runId, idempotencyKey: binding.idempotencyKey },
+    }]);
+    await worker.queue(batch, env, ctx);
+    expect((await getQueueResult(batch, ctx)).explicitAcks).toEqual(["resume-msg-sched"]);
+    const remaining = await listRecoverableApprovalResumes(env.OPERATIONS_DB);
+    expect(remaining.some((message) => message.runId === runId)).toBe(false);
   });
 });

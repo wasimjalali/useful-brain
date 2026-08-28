@@ -169,3 +169,13 @@ export async function replayRecoverableApprovalResumes(
   }
   return { enqueued: messages.length };
 }
+
+export async function enqueueRecoverableApprovalResumes(
+  db: OperationsDatabase,
+  queue: { send(message: ApprovalResumeMessage): Promise<unknown> },
+  limit = 20,
+): Promise<{ enqueued: number }> {
+  return replayRecoverableApprovalResumes(db, async (message) => {
+    await queue.send(message);
+  }, limit);
+}

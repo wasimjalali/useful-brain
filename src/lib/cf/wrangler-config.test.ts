@@ -83,6 +83,22 @@ describe("protected Worker configuration", () => {
     }
   });
 
+  it("schedules bounded approval-resume reconciliation on loopback and staging only", () => {
+    const config = readJsonc("workers/brain/wrangler.jsonc");
+    const source = readFileSync(path.join(process.cwd(), "workers/brain/src/index.ts"), "utf8");
+    expect(source).toMatch(/async scheduled\(/);
+    expect(source).toMatch(/enqueueRecoverableApprovalResumes/);
+    const inspect = (target: Record<string, unknown>, crons: string[]) => {
+      const triggers = target.triggers as { crons?: string[] };
+      expect(triggers.crons).toEqual(crons);
+    };
+    inspect(config, ["*/5 * * * *"]);
+    const environments = config.env as Record<string, Record<string, unknown>>;
+    inspect(environments.development, ["*/5 * * * *"]);
+    inspect(environments.staging, ["*/5 * * * *"]);
+    inspect(environments.production, []);
+  });
+
   it("exposes only staging Web on workers.dev and keeps loopback off that URL", () => {
     const config = readJsonc("wrangler.jsonc");
     expectInternalWorker(config);
