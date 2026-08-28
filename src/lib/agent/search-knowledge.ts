@@ -9,7 +9,8 @@ import {
   createLedger,
   type TurnEvidenceLedger,
 } from "./host-grounding";
-import { BudgetTracker } from "./budgets";
+import { AGENT_BUDGETS, BudgetTracker } from "./budgets";
+import { awaitWithDeadline, toolDeadlineSignal } from "./deadlines";
 import { policyGateway, type PolicyPrincipal } from "./policy";
 
 const SearchParams = Type.Object({
@@ -47,12 +48,20 @@ export function createSearchKnowledgeTool(input: {
         };
       }
       try {
-        const response = await input.pipeline.search({
-          query: params.query,
-          principal: input.principal,
-          topK: 3,
-          candidateLimit: 24,
-        });
+        const remainingWall = Math.max(0, AGENT_BUDGETS.wallTimeMs - (Date.now() - input.budgets.startedAt));
+        const deadline = toolDeadlineSignal(
+          Math.min(AGENT_BUDGETS.readToolTimeoutMs, remainingWall),
+          signal,
+        );
+        const response = await awaitWithDeadline(
+          input.pipeline.search({
+            query: params.query,
+            principal: input.principal,
+            topK: 3,
+            candidateLimit: 24,
+          }),
+          deadline,
+        );
         const ledger = input.ledger ?? createLedger();
         const hits = response.hits.map((hit) => {
           const label = appendSearchHit(ledger, {

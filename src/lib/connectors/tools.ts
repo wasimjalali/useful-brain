@@ -4,6 +4,7 @@ import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 
 import { IdempotentExecutor, mutatingIdempotencyKey } from "../agent/approvals";
 import { AGENT_BUDGETS } from "../agent/budgets";
+import { awaitWithDeadline, toolDeadlineSignal } from "../agent/deadlines";
 import { normalizeToolArguments, policyGateway, type ApprovalBinding, type PolicyPrincipal } from "../agent/policy";
 import { fetchAllowlistedSource } from "./http-allowlist";
 import { ConnectorRegistry, ConnectorRegistryError } from "./registry";
@@ -26,6 +27,16 @@ const SinkParams = Type.Object({
 const PluginParams = Type.Object({
   text: Type.String({ minLength: 1 }),
 });
+
+function toolErrorMessage(error: unknown, fallback: string): string {
+  if (typeof error === "object" && error !== null && "name" in error && error.name === "AbortError") {
+    return "aborted";
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return fallback;
+}
 
 function untrusted(payload: unknown) {
   return {
@@ -103,10 +114,12 @@ export function createHttpReadTool(input: {
       }
       try {
         const connector = input.registry.assertUsable("http-docs", "http.read");
+        const deadline = toolDeadlineSignal(AGENT_BUDGETS.readToolTimeoutMs, signal);
         const response = await fetchAllowlistedSource(
           params.url,
           { origins: connector.originAllowlist ?? [] },
           input.fetchImpl,
+          deadline,
         );
         const text = await readBoundedText(response, AGENT_BUDGETS.maxRawExternalBytes);
         return {
@@ -114,7 +127,7 @@ export function createHttpReadTool(input: {
           details: { status: response.status },
         };
       } catch (error) {
-        const message = error instanceof Error ? error.message : "http read failed";
+        const message = toolErrorMessage(error, "http read failed");
         return { ...untrusted({ error: message }), details: {} };
       }
     },
@@ -147,10 +160,14 @@ export function createMcpLookupTool(input: {
       }
       try {
         input.registry.assertUsable("mcp-northwind", "mcp.read");
-        const result = await input.client.callTool({
-          name: "northwind_lookup",
-          arguments: { ticketId: params.ticketId },
-        });
+        const deadline = toolDeadlineSignal(AGENT_BUDGETS.readToolTimeoutMs, signal);
+        const result = await awaitWithDeadline(
+          input.client.callTool({
+            name: "northwind_lookup",
+            arguments: { ticketId: params.ticketId },
+          }),
+          deadline,
+        );
         const text = toolText(result, AGENT_BUDGETS.maxRawExternalBytes);
         return {
           content: [{ type: "text", text: frameMcpResult(text) }],
@@ -208,10 +225,14 @@ export function createMcpCreateTicketTool(input: {
       try {
         input.registry.assertUsable("mcp-northwind", "mcp.write");
         const created = await input.executor.run(idempotencyKey, async () => {
-          const result = await input.client.callTool({
-            name: "create_ticket",
-            arguments: { title: params.title },
-          });
+          const deadline = toolDeadlineSignal(AGENT_BUDGETS.readToolTimeoutMs, signal);
+          const result = await awaitWithDeadline(
+            input.client.callTool({
+              name: "create_ticket",
+              arguments: { title: params.title },
+            }),
+            deadline,
+          );
           return toolText(result, AGENT_BUDGETS.maxRawExternalBytes);
         });
         return {

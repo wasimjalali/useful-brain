@@ -33,9 +33,10 @@ export async function fetchAllowlistedSource(
   raw: string,
   allowlist: HttpAllowlist,
   fetchImpl: typeof fetch = fetch,
+  signal?: AbortSignal,
 ): Promise<Response> {
   const url = assertAllowlistedHttpUrl(raw, allowlist);
-  const response = await fetchImpl(url.toString(), { redirect: "manual" });
+  const response = await fetchImpl(url.toString(), { redirect: "manual", signal });
   if (response.status >= 300 && response.status < 400) {
     throw new HttpAllowlistError(
       "HTTP source redirects are not followed until Worker address pinning is proved",

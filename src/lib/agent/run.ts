@@ -19,6 +19,8 @@ import {
   type ApprovalBinding,
 } from "./policy";
 import { AGENT_BUDGETS, BudgetExceededError, BudgetTracker } from "./budgets";
+import { toolDeadlineSignal } from "./deadlines";
+import { redactToolResultForStorage } from "./redact-tool-result";
 import {
   BRAIN_KNOWLEDGE_UNAVAILABLE,
   BRAIN_MUST_RETRIEVE,
@@ -104,7 +106,7 @@ export function toolCallsFromMessages(messages: AgentMessage[]): RecordedToolCal
       tool: message.toolName,
       argumentFingerprint: argumentFingerprint(argsByCallId.get(message.toolCallId) ?? {}),
       normalizedArguments: normalizeToolArguments(argsByCallId.get(message.toolCallId) ?? {}),
-      redactedResult: text.replace(/^UNTRUSTED_EVIDENCE\n/, "").slice(0, AGENT_BUDGETS.maxRedactedToolResultBytes),
+      redactedResult: redactToolResultForStorage(text),
       status: pending ? "pending_approval" : message.isError ? "error" : denied ? "denied" : "ok",
     });
   }
@@ -163,7 +165,10 @@ export async function runKnowledgeAgent(input: {
       messages: input.priorMessages ?? [],
     },
     streamFn: (nextModel, context, streamOptions) =>
-      faux.provider.streamSimple(nextModel, context, streamOptions),
+      faux.provider.streamSimple(nextModel, context, {
+        ...streamOptions,
+        signal: toolDeadlineSignal(AGENT_BUDGETS.modelTimeoutMs, streamOptions?.signal),
+      }),
     toolExecution: "sequential",
     beforeToolCall: async (context, signal) => {
       signal?.throwIfAborted();
@@ -226,10 +231,15 @@ export async function runKnowledgeAgent(input: {
     },
     afterToolCall: async (context, signal) => {
       signal?.throwIfAborted();
-      const redacted = JSON.stringify(context.result.details ?? {}).slice(
-        0,
-        AGENT_BUDGETS.maxRedactedToolResultBytes,
-      );
+      try {
+        budgets.assertWithinWallTime();
+      } catch (error) {
+        if (error instanceof BudgetExceededError) {
+          return { terminate: true };
+        }
+        throw error;
+      }
+      const redacted = redactToolResultForStorage(JSON.stringify(context.result.details ?? {}));
       return {
         details: { ...context.result.details, redacted },
       };

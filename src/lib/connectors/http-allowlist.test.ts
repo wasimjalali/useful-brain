@@ -22,4 +22,23 @@ describe("HTTP allowlist connector", () => {
       }),
     ).rejects.toThrow(/redirects are not followed/);
   });
+
+  it("cancels a hung fetch through the read-tool abort signal", async () => {
+    await expect(
+      fetchAllowlistedSource(
+        "https://docs.example.com/a.md",
+        allowlist,
+        (_url, init) =>
+          new Promise((_, reject) => {
+            const abort = () => reject(new DOMException("The operation was aborted.", "AbortError"));
+            if (init?.signal?.aborted) {
+              abort();
+              return;
+            }
+            init?.signal?.addEventListener("abort", abort, { once: true });
+          }),
+        AbortSignal.timeout(20),
+      ),
+    ).rejects.toMatchObject({ name: "AbortError" });
+  }, 1000);
 });

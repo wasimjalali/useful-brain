@@ -51,6 +51,32 @@ describe("Phase 6 connectors, MCP and plugins", () => {
     }
   });
 
+  it("aborts a hung allowlisted HTTP read through the agent abort signal", async () => {
+    const registry = seedSyntheticConnectors();
+    const tool = createHttpReadTool({
+      registry,
+      principal,
+      conversationId: "c-1",
+      fetchImpl: (_url, init) =>
+        new Promise((_, reject) => {
+          const abort = () => reject(new DOMException("The operation was aborted.", "AbortError"));
+          if (init?.signal?.aborted) {
+            abort();
+            return;
+          }
+          init?.signal?.addEventListener("abort", abort, { once: true });
+        }),
+    });
+    const result = await tool.execute(
+      "t1",
+      { url: "https://docs.example.com/returns.md" },
+      AbortSignal.timeout(20),
+    );
+    if (result.content[0]?.type === "text") {
+      expect(result.content[0].text).toContain("aborted");
+    }
+  }, 1000);
+
   it("does not follow off-allowlist HTTP and records the failure as untrusted data", async () => {
     const registry = seedSyntheticConnectors();
     const tool = createHttpReadTool({

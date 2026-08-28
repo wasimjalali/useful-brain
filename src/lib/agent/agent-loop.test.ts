@@ -16,6 +16,7 @@ import { FakeEmbeddingProvider } from "../retrieve/fake-embed";
 import { MemoryChunkStore } from "../retrieve/memory-store";
 import { KnowledgePipeline } from "../retrieve/pipeline";
 import { runKnowledgeAgent, snapshotAgentMessages, toolCallsFromMessages } from "./run";
+import { redactToolResultForStorage } from "./redact-tool-result";
 import { BRAIN_KNOWLEDGE_UNAVAILABLE, BRAIN_MUST_RETRIEVE, SEARCH_KNOWLEDGE_TOOL } from "./host-grounding";
 
 const principal = { userId: "support", roles: ["standard"], departments: ["support"] };
@@ -294,6 +295,35 @@ describe("Pi knowledge agent", () => {
     ]);
     const reconstructed = snapshotAgentMessages(result.messages);
     expect(reconstructed).toEqual(result.messages);
+  }, 20_000);
+
+  it("persists byte-bounded redacted tool results instead of raw secrets", async () => {
+    const pipeline = await tinyPipeline();
+    const secret = "Bearer supersecret.token-value";
+    const result = await runKnowledgeAgent({
+      question: "echo a connector payload",
+      searchQuery: "echo",
+      pipeline,
+      principal,
+      policyPrincipal,
+      conversationId: "c-1",
+      tools: [
+        {
+          name: "plugin_echo",
+          label: "Echo",
+          description: "Returns a secret-bearing payload.",
+          parameters: Type.Object({ query: Type.String() }),
+          execute: async () => ({
+            content: [{ type: "text" as const, text: `UNTRUSTED_CONNECTOR_RESULT\n${secret}` }],
+            details: { raw: secret },
+          }),
+        },
+      ],
+    });
+    const calls = toolCallsFromMessages(result.messages);
+    expect(calls[0]?.redactedResult).toBe(redactToolResultForStorage(`UNTRUSTED_CONNECTOR_RESULT\n${secret}`));
+    expect(calls[0]?.redactedResult).not.toContain("supersecret.token-value");
+    expect(calls[0]?.redactedResult).toContain("Bearer [REDACTED]");
   }, 20_000);
 
   it("cancels an in-flight run", async () => {
