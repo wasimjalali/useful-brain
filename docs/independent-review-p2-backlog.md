@@ -4,7 +4,7 @@ Status: repaired on `grok/phase-7a-p2-repairs`. Owner: Grok 4.6 xhigh. Sources: 
 
 These findings were real correctness or durability bugs, but none was a confirmed P0/P1 or high/critical security blocker for the synthetic Phase 7A release candidate. Historical findings below are preserved. Each item now records its regression, fix and verification. Phase 7B stays closed.
 
-Local proof for this repair (2026-08-28, Node `v22.22.2`): `npx tsc --noEmit` exit 0; `npm run typecheck:workers` exit 0; `npm run lint` exit 0; Node Vitest 80 files / 396 tests passed; Brain workerd 10 files / 41 tests passed; Ingestion workerd 4 files / 11 tests passed; `npm run build` Next 16.3.3 exit 0; `npm run build:cf` OpenNext 1.20.3 exit 0; wrangler 4.126.0 `--dry-run --env staging` web gzip 1608.07 KiB (`IDENTITY_MODE=disabled`, `LOOPBACK_RUNTIME=false`), brain gzip 15.09 KiB, ingestion gzip 9.68 KiB; `npm audit --omit=dev --audit-level=high` 0 vulnerabilities.
+Local proof for this repair (2026-08-28, Node `v22.22.2`): `npx tsc --noEmit` exit 0; `npm run typecheck:workers` exit 0; `npm run lint` exit 0; Node Vitest 80 files / 399 tests passed; Brain workerd 10 files / 45 tests passed; Ingestion workerd 4 files / 11 tests passed; `npm run build` Next 16.3.3 exit 0; `npm run build:cf` OpenNext 1.20.3 exit 0; wrangler 4.126.0 `--dry-run --env staging` web gzip 1608.06 KiB (`IDENTITY_MODE=disabled`, `LOOPBACK_RUNTIME=false`), brain gzip 15.19 KiB, ingestion gzip 9.68 KiB; `npm audit --omit=dev --audit-level=high` 0 vulnerabilities.
 
 ## P2-1: total tool-call budget misses non-search tools
 
@@ -217,9 +217,44 @@ Independent GPT-5.6 Sol xhigh review of PR #14 (Cursor Task `bc-ec42973e-79b3-52
 - Regression: `workers/brain/test/conversations-d1.test.ts` reused request ID with a different question throws and leaves the original user content.
 - Verification: Brain workerd conversation tests passed.
 
+### P2-23: JSON string-leaf credentials bypassed redaction
+
+- Location: `src/lib/agent/redact-tool-result.ts` `redactJsonSecrets`.
+- Cause: parseable JSON walked only sensitive keys. `{"message":"Authorization: Bearer supersecret.token"}` kept the token because `message` is not a secret key.
+- Repair: JSON string leaves also run through plaintext Bearer/Basic/Cookie/assignment redaction. Sensitive keys still replace the whole value with `[REDACTED]`.
+- Regression: `src/lib/agent/redact-tool-result.test.ts` credential embedded under `message`.
+
+### P2-24: failed parent-linked assistants did not reserve their user
+
+- Location: `src/lib/store/conversations.ts` `pairCompletedHistoryTurns`.
+- Cause: only completed parent-linked assistants reserved their user IDs. A failed or pending linked assistant left that user available for a later null-parent fallback pair.
+- Repair: any assistant with `parent_user_message_id` reserves that user, regardless of status. Completed pairing is still completed-only.
+- Regression: Node `src/lib/store/conversations.test.ts` failed linked assistant plus completed null-parent assistant.
+
+### P2-25: prior-run tokens counted against the current execution budget
+
+- Location: `src/lib/agent/run.ts` `assistantTokenTotals`.
+- Cause: totals summed every assistant in `state.messages`, including `priorMessages` from earlier runs.
+- Repair: `shouldStopAfterTurn` counts `context.newMessages`. The post-idle finalizer uses `currentRunAssistantTokens` sliced from the prior-message count.
+- Regression: `src/lib/agent/agent-loop.test.ts` prior usage at the cap plus a follow-up Pi run.
+
+### P2-26: concurrent `/approvals/start` was not insert-or-load
+
+- Location: `src/lib/store/agent-runs.ts` `upsertApproval`; `workers/brain/src/index.ts` `/approvals/start`.
+- Cause: two starts could both observe no approval, derive different expiries, then hit a unique constraint or expiry mismatch.
+- Repair: pending upserts `INSERT ... ON CONFLICT DO NOTHING`, then return the persisted winner binding. The route uses that binding for the Workflow and response. Identity still mismatches on principal/conversation/tool/fingerprint/run.
+- Regression: Brain `approval-start.test.ts` concurrent starts share one binding; `agent-runs.test.ts` concurrent upserts with different expiries return the same row.
+
+### P2-27: request-ID replay skipped unverifiable payloads
+
+- Location: `src/lib/store/conversations.ts` `createPendingTurn`.
+- Cause: a duplicate assistant without a claim skipped payload comparison. A claim with null `payload_digest` accepted any question.
+- Repair: replay always binds the incoming question to the stored digest, or to the SHA-256 of the stored user message when the digest is missing. Unverifiable duplicates fail closed.
+- Regression: Brain `conversations-d1.test.ts` null digest and deleted-claim fixtures reject a different question and replay the original.
+
 ## Adversarial review of remaining Phase 1–7A (after the eight repairs)
 
-Confirmed in-plan defects from the Grok pass: none beyond the original eight. Confirmed in-plan defects from the independent Sol xhigh passes: P2-9 through P2-22 above, now repaired.
+Confirmed in-plan defects from the Grok pass: none beyond the original eight. Confirmed in-plan defects from the independent Sol xhigh passes: P2-9 through P2-27 above, now repaired.
 
 Rejected false positives:
 
