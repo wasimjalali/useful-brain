@@ -4,6 +4,7 @@ import type { SqlExecutor } from "./corpus-d1";
 import {
   loadSeedDocumentsFromGeneration,
   mergeSeedDocuments,
+  seedNorthwindCorpus,
   type SeedDocumentInput,
 } from "./corpus-seed";
 
@@ -26,6 +27,61 @@ describe("corpus seed merge", () => {
     );
     expect(merged.map((document) => document.documentId).sort()).toEqual(["nw_a", "nw_b", "nw_c"]);
     expect(merged.find((document) => document.documentId === "nw_b")?.body).toBe("B2");
+  });
+
+  it("does not call Workers AI when Vectorize upsert is unavailable", async () => {
+    const states = new Map<string, string>();
+    const db = {
+      prepare(sql: string) {
+        const statement = {
+          values: [] as unknown[],
+          bind(...values: unknown[]) {
+            statement.values = values;
+            return statement;
+          },
+          async run() {
+            if (sql.includes("INSERT INTO corpus_generations")) {
+              states.set(String(statement.values[0]), "draft");
+            }
+            if (sql.includes("UPDATE corpus_generations SET state")) {
+              const next = statement.values[0];
+              const id = statement.values[statement.values.length - 1];
+              if (typeof next === "string" && typeof id === "string") {
+                states.set(id, next);
+              }
+            }
+            return { meta: { changes: 1 } };
+          },
+          async first() {
+            if (sql.includes("SELECT id, state FROM corpus_generations")) {
+              const id = String(statement.values[0]);
+              return { id, state: states.get(id) ?? "draft" };
+            }
+            return null;
+          },
+          async all() {
+            return { results: [] };
+          },
+        };
+        return statement;
+      },
+      async batch() {
+        return [];
+      },
+    } as unknown as SqlExecutor;
+
+    const result = await seedNorthwindCorpus({
+      db,
+      documents: [publicDoc("nw_a", "# Hello\n\nWorld.")],
+      ai: {
+        run: async () => {
+          throw new Error("Workers AI should not run without Vectorize");
+        },
+      },
+      now: 1,
+    });
+    expect(result.vectorize).toBe("skipped");
+    expect(result.chunkCount).toBeGreaterThan(0);
   });
 
   it("reconstructs seed documents from stored chunks and ACL columns", async () => {

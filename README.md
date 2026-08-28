@@ -53,7 +53,7 @@ Local UI with Brain connected:
 npm run preview:cf
 ```
 
-That command builds OpenNext and runs `wrangler dev` with the web and Brain configs so the `BRAIN` service binding is live on `127.0.0.1`.
+That command builds OpenNext, applies local D1 migrations, and runs `wrangler dev` with the web and Brain configs so the `BRAIN` service binding is live on `127.0.0.1`.
 
 ## Burooj migration source
 

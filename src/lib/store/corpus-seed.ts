@@ -121,13 +121,13 @@ export async function seedNorthwindCorpus(input: {
       title: document.title,
       source_name: document.sourceName,
     });
+    const chunkWrites: Array<ReturnType<SqlExecutor["prepare"]>> = [];
     for (const chunk of chunks) {
       const storedChunkId = `${chunk.chunkId}--${generationId}`;
       const vectorId = await vectorIdForChunk(storedChunkId);
       const chunkDigest = await contentDigest(chunk.content);
-      await input.db
-        .prepare(UPSERT_CHUNK_SQL)
-        .bind(
+      chunkWrites.push(
+        input.db.prepare(UPSERT_CHUNK_SQL).bind(
           storedChunkId,
           document.documentId,
           versionId,
@@ -145,17 +145,23 @@ export async function seedNorthwindCorpus(input: {
           JSON.stringify(document.allowedDepartments),
           metadata,
           now,
-        )
-        .run();
+        ),
+      );
       expected[vectorId] = storedChunkId;
       embedTexts.push(chunk.content);
       pending.push({ chunkId: storedChunkId, vectorId, aclGroup });
+      if (chunkWrites.length >= UPSERT_BATCH) {
+        await input.db.batch(chunkWrites.splice(0, chunkWrites.length));
+      }
+    }
+    if (chunkWrites.length > 0) {
+      await input.db.batch(chunkWrites);
     }
   }
 
   let vectorizeStatus: "upserted" | "skipped" = "skipped";
   const mutationIds: string[] = [];
-  if (input.ai && pending.length > 0) {
+  if (input.ai && input.vectorize?.upsert && pending.length > 0) {
     try {
       for (let index = 0; index < pending.length; index += EMBED_BATCH) {
         const slice = embedTexts.slice(index, index + EMBED_BATCH);

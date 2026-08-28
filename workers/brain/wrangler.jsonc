@@ -34,12 +34,6 @@
       "migrations_dir": "../../migrations/operations"
     }
   ],
-  "vectorize": [
-    {
-      "binding": "VECTORIZE",
-      "index_name": "useful-brain-development"
-    }
-  ],
   "ai": {
     "binding": "AI",
     "remote": true
@@ -121,7 +115,6 @@
           "migrations_dir": "../../migrations/operations"
         }
       ],
-      "vectorize": [{ "binding": "VECTORIZE", "index_name": "useful-brain-development" }],
       "ai": { "binding": "AI", "remote": true },
       "queues": {
         "producers": [

@@ -127,10 +127,18 @@ describe("protected Worker configuration", () => {
   it("uses remote Workers AI in development and a deployed AI binding elsewhere", () => {
     const config = readJsonc("workers/brain/wrangler.jsonc");
     expect(config.ai).toEqual({ binding: "AI", remote: true });
+    expect(config.vectorize).toBeUndefined();
     const environments = config.env as Record<string, Record<string, unknown>>;
     expect(environments.development.ai).toEqual({ binding: "AI", remote: true });
+    expect(environments.development.vectorize).toBeUndefined();
     expect(environments.staging.ai).toEqual({ binding: "AI" });
+    expect(environments.staging.vectorize).toEqual([
+      { binding: "VECTORIZE", index_name: "useful-brain-staging" },
+    ]);
     expect(environments.production.ai).toEqual({ binding: "AI" });
+    expect(environments.production.vectorize).toEqual([
+      { binding: "VECTORIZE", index_name: "useful-brain-production" },
+    ]);
   });
 
   it("web health route probes Brain over the Service Binding without identity headers", () => {
@@ -168,5 +176,16 @@ describe("protected Worker configuration", () => {
         expect(vars.RESOURCES_PROVISIONED).toBe("false");
       }
     }
+  });
+
+  it("applies local D1 migrations before the Cloudflare preview", () => {
+    const pkg = JSON.parse(readFileSync(path.join(process.cwd(), "package.json"), "utf8")) as {
+      scripts: Record<string, string>;
+    };
+    expect(pkg.scripts["db:local"]).toMatch(/useful-brain-corpus-development/);
+    expect(pkg.scripts["db:local"]).toMatch(/useful-brain-operations-development/);
+    expect(pkg.scripts["db:local"]).toMatch(/--persist-to \.wrangler\/state/);
+    expect(pkg.scripts["preview:cf"]).toMatch(/npm run db:local/);
+    expect(pkg.scripts["preview:cf"]).toMatch(/--persist-to \.wrangler\/state/);
   });
 });
