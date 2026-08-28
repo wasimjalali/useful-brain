@@ -9,7 +9,7 @@ describe("persisted tool-result redaction", () => {
       redactToolResultForStorage(
         "UNTRUSTED_CONNECTOR_RESULT\nAuthorization: Bearer supersecret.token authorization=also-secret",
       ),
-    ).toBe("Authorization: Bearer [REDACTED] authorization=[REDACTED]");
+    ).toBe("Authorization: [REDACTED] authorization=[REDACTED]");
     expect(redactToolResultForStorage('UNTRUSTED_EVIDENCE\n{"api_key":"sk-live-aaaa"}')).toBe(
       '{"api_key":"[REDACTED]"}',
     );
@@ -17,7 +17,7 @@ describe("persisted tool-result redaction", () => {
       redactToolResultForStorage(
         "Cookie: session=portfolio-secret\nAuthorization: Basic dXNlcjpwYXNz",
       ),
-    ).toBe("Cookie: [REDACTED]\nAuthorization: Basic [REDACTED]");
+    ).toBe("Cookie: [REDACTED]\nAuthorization: [REDACTED]");
     expect(
       redactToolResultForStorage(
         '{"Authorization":"Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==","Cookie":"session=portfolio-secret"}',
@@ -35,7 +35,22 @@ describe("persisted tool-result redaction", () => {
     ).toBe('{"Authorization":"[REDACTED]","nested":{"password":"[REDACTED]"}}');
     expect(
       redactToolResultForStorage('{"message":"Authorization: Bearer supersecret.token"}'),
-    ).toBe('{"message":"Authorization: Bearer [REDACTED]"}');
+    ).toBe('{"message":"Authorization: [REDACTED]"}');
+    expect(
+      redactToolResultForStorage("Authorization: Bearer abc~opaque-secret"),
+    ).toBe("Authorization: [REDACTED]");
+    expect(redactToolResultForStorage("Authorization: Token opaque-secret")).toBe(
+      "Authorization: [REDACTED]",
+    );
+    expect(redactToolResultForStorage("Authorization: ApiKey top-secret")).toBe(
+      "Authorization: [REDACTED]",
+    );
+    expect(redactToolResultForStorage("password: correct horse battery")).toBe(
+      "password=[REDACTED]",
+    );
+    expect(
+      redactToolResultForStorage('{"message":"password: correct horse battery"}'),
+    ).toBe('{"message":"password=[REDACTED]"}');
   });
 
   it("bounds storage by UTF-8 bytes rather than JS string length", () => {

@@ -1,15 +1,16 @@
 import { AGENT_BUDGETS } from "./budgets";
 
 const UNTRUSTED_PREFIXES = ["UNTRUSTED_EVIDENCE\n", "UNTRUSTED_CONNECTOR_RESULT\n"];
-const BEARER_RE = /\bBearer\s+[A-Za-z0-9._\-+=/]+/gi;
-const BASIC_RE = /\bAuthorization:\s*Basic\s+[A-Za-z0-9+/=]+/gi;
+const AUTHORIZATION_PREFIX_RE = /\bAuthorization:\s+/gi;
+const AUTHORIZATION_VALUE_END_RE =
+  /\s+\b(?:authorization|cookie|set-cookie|api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|password|secret)\b["']?\s*[:=]|[\r\n,"'}]/i;
+const BEARER_RE = /\bBearer\s+[^\s\r\n,"'}]+/gi;
 const COOKIE_RE = /\b(?:Set-)?Cookie:\s*[^\r\n]+/gi;
-const JSON_AUTH_SCHEME_RE =
-  /(["']authorization["']\s*:\s*["'])(Bearer|Basic|Token)\s+([^"']+)(["'])/gi;
+const JSON_AUTH_RE = /(["']authorization["']\s*:\s*["'])([^"']+)(["'])/gi;
 const JSON_COOKIE_RE = /(["'](?:set-cookie|cookie)["']\s*:\s*["'])([^"']+)(["'])/gi;
 const SECRET_ASSIGNMENT_RE =
-  /\b(api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|password|secret)\b["']?\s*[:=]\s*["']?[^\s"',}]+/gi;
-const AUTHORIZATION_EQUALS_RE = /\bauthorization\b["']?\s*=\s*["']?[^\s"',}]+/gi;
+  /\b(api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|password|secret)\b["']?\s*[:=]\s*["']?[^\r\n,"'}]+/gi;
+const AUTHORIZATION_EQUALS_RE = /\bauthorization\b["']?\s*=\s*["']?[^\r\n,"'}]+/gi;
 const SECRET_JSON_KEY_RE =
   /^(authorization|cookie|set-cookie|api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|password|secret)$/i;
 
@@ -61,14 +62,29 @@ export function redactJsonSecrets(value: unknown): unknown {
   return value;
 }
 
+function redactAuthorizationHeaders(text: string): string {
+  AUTHORIZATION_PREFIX_RE.lastIndex = 0;
+  let result = "";
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = AUTHORIZATION_PREFIX_RE.exec(text))) {
+    const valueStart = match.index + match[0].length;
+    const boundary = text.slice(valueStart).search(AUTHORIZATION_VALUE_END_RE);
+    const valueEnd = boundary === -1 ? text.length : valueStart + boundary;
+    result += `${text.slice(lastIndex, match.index)}Authorization: [REDACTED]`;
+    lastIndex = valueEnd;
+    AUTHORIZATION_PREFIX_RE.lastIndex = valueEnd;
+  }
+  return result + text.slice(lastIndex);
+}
+
 function redactPlainTextSecrets(text: string): string {
-  return text
+  return redactAuthorizationHeaders(text)
     .replace(BEARER_RE, "Bearer [REDACTED]")
-    .replace(BASIC_RE, "Authorization: Basic [REDACTED]")
     .replace(COOKIE_RE, (header) =>
       header.toLowerCase().startsWith("set-cookie:") ? "Set-Cookie: [REDACTED]" : "Cookie: [REDACTED]",
     )
-    .replace(JSON_AUTH_SCHEME_RE, "$1$2 [REDACTED]$4")
+    .replace(JSON_AUTH_RE, "$1[REDACTED]$3")
     .replace(JSON_COOKIE_RE, "$1[REDACTED]$3")
     .replace(SECRET_ASSIGNMENT_RE, "$1=[REDACTED]")
     .replace(AUTHORIZATION_EQUALS_RE, "authorization=[REDACTED]");
