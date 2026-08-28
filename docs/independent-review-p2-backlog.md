@@ -4,7 +4,7 @@ Status: repaired on `grok/phase-7a-p2-repairs`. Owner: Grok 4.6 xhigh. Sources: 
 
 These findings were real correctness or durability bugs, but none was a confirmed P0/P1 or high/critical security blocker for the synthetic Phase 7A release candidate. Historical findings below are preserved. Each item now records its regression, fix and verification. Phase 7B stays closed.
 
-Local proof for this repair (2026-08-28, Node `v22.22.2`): `npx tsc --noEmit` exit 0; `npm run typecheck:workers` exit 0; `npm run lint` exit 0; Node Vitest 80 files / 399 tests passed; Brain workerd 10 files / 45 tests passed; Ingestion workerd 4 files / 11 tests passed; `npm run build` Next 16.3.3 exit 0; `npm run build:cf` OpenNext 1.20.3 exit 0; wrangler 4.126.0 `--dry-run --env staging` web gzip 1608.07 KiB (`IDENTITY_MODE=disabled`, `LOOPBACK_RUNTIME=false`), brain gzip 15.19 KiB, ingestion gzip 9.68 KiB; `npm audit --omit=dev --audit-level=high` 0 vulnerabilities.
+Local proof for this repair (2026-08-28, Node `v22.22.2`): `npx tsc --noEmit` exit 0; `npm run typecheck:workers` exit 0; `npm run lint` exit 0; Node Vitest 80 files / 399 tests passed; Brain workerd 10 files / 45 tests passed; Ingestion workerd 4 files / 11 tests passed; `npm run build` Next 16.3.3 exit 0; `npm run build:cf` OpenNext 1.20.3 exit 0; wrangler 4.126.0 `--dry-run --env staging` web gzip 1608.06 KiB (`IDENTITY_MODE=disabled`, `LOOPBACK_RUNTIME=false`), brain gzip 15.19 KiB, ingestion gzip 9.68 KiB; `npm audit --omit=dev --audit-level=high` 0 vulnerabilities.
 
 ## P2-1: total tool-call budget misses non-search tools
 
@@ -259,9 +259,16 @@ Independent GPT-5.6 Sol xhigh review of PR #14 (Cursor Task `bc-ec42973e-79b3-52
 - Repair: `Authorization:` headers redact the complete scheme and credentials until a later secret assignment or JSON/line boundary. Leftover `Bearer` tokens use a delimiter-safe alphabet. Secret assignments take the rest of the value through that same boundary.
 - Regression: `src/lib/agent/redact-tool-result.test.ts` `abc~opaque-secret`, `Token`, `ApiKey`, and `password: correct horse battery` in plaintext and JSON string leaves.
 
+### P2-29: Digest, zero-OWS, and common JSON credential keys still leaked
+
+- Location: `src/lib/agent/redact-tool-result.ts`.
+- Cause: Authorization values stopped at quotes or commas, so Digest parameters leaked. `Authorization:` required whitespace, so `Authorization:ApiKey` bypassed. Parsed JSON keys omitted `token`, `X-API-Key`, and `Proxy-Authorization`.
+- Repair: `Authorization` / `Proxy-Authorization` redact through the line or JSON string-leaf end, with optional OWS after `:`. JSON keys match header names plus token / api-key / private-key / secret suffixes. Leftover `Bearer` tokens still match through whitespace.
+- Regression: Digest quoted parameters, `Authorization:ApiKey`, leftover `Bearer abc~`, `Proxy-Authorization`, and JSON `token` / `X-API-Key` / `Proxy-Authorization` keys.
+
 ## Adversarial review of remaining Phase 1–7A (after the eight repairs)
 
-Confirmed in-plan defects from the Grok pass: none beyond the original eight. Confirmed in-plan defects from the independent Sol xhigh passes: P2-9 through P2-28 above, now repaired.
+Confirmed in-plan defects from the Grok pass: none beyond the original eight. Confirmed in-plan defects from the independent Sol xhigh passes: P2-9 through P2-29 above, now repaired.
 
 Rejected false positives:
 
