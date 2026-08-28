@@ -8,7 +8,7 @@ import {
   fauxToolCall,
 } from "@earendil-works/pi-ai/providers/faux";
 
-import { BudgetExceededError, BudgetTracker } from "./budgets";
+import { AGENT_BUDGETS, BudgetExceededError, BudgetTracker } from "./budgets";
 import { approvalsMatch, argumentFingerprint, policyGateway, toolPolicy } from "./policy";
 import { IdempotentExecutor, MemoryIdempotencyStore, approvalFromAttempt, mutatingIdempotencyKey, resumeAfterApproval } from "./approvals";
 import { createDeleteRecordsTool, createDraftTool } from "./mutating-tools";
@@ -228,6 +228,15 @@ describe("budgets", () => {
     expect(budgets.toolCalls).toBe(4);
     expect(budgets.searchKnowledgeCalls).toBe(4);
     expect(() => budgets.noteToolCall("search_knowledge")).toThrow(/search_knowledge budget exhausted/);
+  });
+
+  it("stops when interactive wall time is exhausted", () => {
+    const budgets = new BudgetTracker();
+    expect(budgets.remainingWallTimeMs(budgets.startedAt + 89_000)).toBe(1_000);
+    expect(budgets.remainingWallTimeMs(budgets.startedAt + AGENT_BUDGETS.wallTimeMs + 1)).toBe(0);
+    expect(() => budgets.assertWithinWallTime(budgets.startedAt + AGENT_BUDGETS.wallTimeMs + 1)).toThrow(
+      /wall time budget exhausted/,
+    );
   });
 });
 

@@ -13,6 +13,11 @@ describe("persisted tool-result redaction", () => {
     expect(redactToolResultForStorage('UNTRUSTED_EVIDENCE\n{"api_key":"sk-live-aaaa"}')).toBe(
       '{"api_key=[REDACTED]"}',
     );
+    expect(
+      redactToolResultForStorage(
+        "Cookie: session=portfolio-secret\nAuthorization: Basic dXNlcjpwYXNz",
+      ),
+    ).toBe("Cookie: [REDACTED]\nAuthorization: Basic [REDACTED]");
   });
 
   it("bounds storage by UTF-8 bytes rather than JS string length", () => {

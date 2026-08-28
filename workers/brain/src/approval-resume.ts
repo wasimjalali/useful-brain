@@ -1,6 +1,6 @@
 import { parseBoundedId, parseMutatingIdempotencyKey } from "../../../src/lib/cf/bounded-id";
 import { argumentFingerprint, policyGateway } from "../../../src/lib/agent/policy";
-import { loadAgentReplay } from "../../../src/lib/store/agent-runs";
+import { expireApproval, loadAgentReplay } from "../../../src/lib/store/agent-runs";
 import type { OperationsDatabase } from "../../../src/lib/store/conversations";
 
 export type ApprovalResumeMessage = {
@@ -48,7 +48,7 @@ export async function resumeApprovedAgentRun(
   db: OperationsDatabase,
   payload: ApprovalResumeMessage,
   now = Date.now(),
-): Promise<{ resumed: boolean; duplicate?: boolean }> {
+): Promise<{ resumed: boolean; duplicate?: boolean; expired?: boolean }> {
   const { runId, idempotencyKey } = parseApprovalResumeMessage(payload);
   const run = await loadAgentReplay(db, runId);
   if (!run) {
@@ -59,6 +59,9 @@ export async function resumeApprovedAgentRun(
       throw new Error("completed run does not match the resume key");
     }
     return { resumed: false, duplicate: true };
+  }
+  if (run.status === "failed" && run.approval?.status === "expired") {
+    return { resumed: false, expired: true };
   }
   if (run.status !== "pending_approval" || !run.approval) {
     throw new Error("agent run is not pending an approval");
@@ -82,6 +85,14 @@ export async function resumeApprovedAgentRun(
     argumentFingerprint(args) !== run.approval.argumentFingerprint
   ) {
     throw new Error("pending tool call does not match its approval");
+  }
+  if (now > run.approval.expiresAt) {
+    await expireApproval(db, {
+      runId,
+      storedBinding: run.approval,
+      now,
+    });
+    return { resumed: false, expired: true };
   }
   const policy = policyGateway({
     tool: call.tool,
@@ -145,10 +156,11 @@ export async function listRecoverableApprovalResumes(
        WHERE a.status = 'approved'
          AND r.status = 'pending_approval'
          AND a.run_id IS NOT NULL
+         AND a.expires_at >= ?
        ORDER BY a.created_at ASC
        LIMIT ?`,
     )
-    .bind(bounded)
+    .bind(Date.now(), bounded)
     .all<{ run_id: string; idempotency_key: string }>();
   return rows.results.map((row) =>
     parseApprovalResumeMessage({
@@ -156,6 +168,52 @@ export async function listRecoverableApprovalResumes(
       idempotencyKey: row.idempotency_key,
     }),
   );
+}
+
+export async function expireOverdueApprovalResumes(
+  db: OperationsDatabase,
+  now = Date.now(),
+  limit = 20,
+): Promise<number> {
+  const bounded = Math.max(1, Math.min(limit, 20));
+  const rows = await db
+    .prepare(
+      `SELECT a.run_id AS run_id, a.principal_id AS principal_id, a.conversation_id AS conversation_id,
+              a.tool AS tool, a.argument_fingerprint AS argument_fingerprint,
+              a.idempotency_key AS idempotency_key, a.expires_at AS expires_at
+       FROM approvals a
+       JOIN agent_runs r ON r.id = a.run_id
+       WHERE a.status = 'approved'
+         AND r.status = 'pending_approval'
+         AND a.expires_at < ?
+       ORDER BY a.created_at ASC
+       LIMIT ?`,
+    )
+    .bind(now, bounded)
+    .all<{
+      run_id: string;
+      principal_id: string;
+      conversation_id: string;
+      tool: string;
+      argument_fingerprint: string;
+      idempotency_key: string;
+      expires_at: number;
+    }>();
+  for (const row of rows.results) {
+    await expireApproval(db, {
+      runId: row.run_id,
+      storedBinding: {
+        principalId: row.principal_id,
+        conversationId: row.conversation_id,
+        tool: row.tool,
+        argumentFingerprint: row.argument_fingerprint,
+        idempotencyKey: row.idempotency_key,
+        expiresAt: row.expires_at,
+      },
+      now,
+    });
+  }
+  return rows.results.length;
 }
 
 export async function replayRecoverableApprovalResumes(
@@ -175,6 +233,7 @@ export async function enqueueRecoverableApprovalResumes(
   queue: { send(message: ApprovalResumeMessage): Promise<unknown> },
   limit = 20,
 ): Promise<{ enqueued: number }> {
+  await expireOverdueApprovalResumes(db, Date.now(), limit);
   return replayRecoverableApprovalResumes(db, async (message) => {
     await queue.send(message);
   }, limit);

@@ -20,6 +20,7 @@ import {
   listRecoverableApprovalResumes,
   parseApprovalResumeMessage,
   replayRecoverableApprovalResumes,
+  resumeApprovedAgentRun,
 } from "../src/approval-resume";
 import worker from "../src";
 import { seedPrincipals } from "./seed";
@@ -27,6 +28,7 @@ import { seedPrincipals } from "./seed";
 async function approvedRun(
   suffix: string,
   tool: "create_draft" | "mcp_create_ticket" = "create_draft",
+  expiresAt = Date.now() + 60_000,
 ): Promise<{
   runId: string;
   binding: ApprovalBinding;
@@ -66,7 +68,7 @@ async function approvedRun(
     tool,
     argumentFingerprint: argumentFingerprint({ title: "alpha" }),
     idempotencyKey: `resume-${suffix}`,
-    expiresAt: Date.now() + 60_000,
+    expiresAt,
   };
   await upsertApproval(env.OPERATIONS_DB, runId, binding, "pending", Date.now());
   expect(
@@ -247,5 +249,45 @@ describe("approval resume queue", () => {
     expect((await getQueueResult(batch, ctx)).explicitAcks).toEqual(["resume-msg-sched"]);
     const remaining = await listRecoverableApprovalResumes(env.OPERATIONS_DB);
     expect(remaining.some((message) => message.runId === runId)).toBe(false);
+  });
+
+  it("terminates an approved resume delivered after expiry without retrying", async () => {
+    const expiresAt = Date.now() + 30_000;
+    const { runId, binding } = await approvedRun("late", "create_draft", expiresAt);
+    const first = await resumeApprovedAgentRun(
+      env.OPERATIONS_DB,
+      { runId, idempotencyKey: binding.idempotencyKey },
+      expiresAt + 1,
+    );
+    expect(first).toEqual({ resumed: false, expired: true });
+    const listed = await listRecoverableApprovalResumes(env.OPERATIONS_DB);
+    expect(listed.some((message) => message.runId === runId)).toBe(false);
+    const second = await resumeApprovedAgentRun(
+      env.OPERATIONS_DB,
+      { runId, idempotencyKey: binding.idempotencyKey },
+      expiresAt + 2,
+    );
+    expect(second).toEqual({ resumed: false, expired: true });
+    const batch = createMessageBatch("useful-brain-approval-resume-development", [{
+      id: "resume-msg-late",
+      timestamp: new Date(),
+      attempts: 1,
+      body: { runId, idempotencyKey: binding.idempotencyKey },
+    }]);
+    const ctx = createExecutionContext();
+    await worker.queue(batch, env, ctx);
+    expect((await getQueueResult(batch, ctx)).explicitAcks).toEqual(["resume-msg-late"]);
+    const effect = await env.OPERATIONS_DB.prepare(
+      "SELECT COUNT(*) AS count FROM synthetic_mutating_effects WHERE idempotency_key = ?",
+    ).bind(binding.idempotencyKey).first<{ count: number }>();
+    expect(effect?.count).toBe(0);
+    const run = await env.OPERATIONS_DB.prepare(
+      "SELECT status FROM agent_runs WHERE id = ?",
+    ).bind(runId).first<{ status: string }>();
+    expect(run?.status).toBe("failed");
+    const approval = await env.OPERATIONS_DB.prepare(
+      "SELECT status FROM approvals WHERE idempotency_key = ?",
+    ).bind(binding.idempotencyKey).first<{ status: string }>();
+    expect(approval?.status).toBe("expired");
   });
 });

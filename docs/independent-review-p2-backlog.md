@@ -4,7 +4,7 @@ Status: repaired on `grok/phase-7a-p2-repairs`. Owner: Grok 4.6 xhigh. Sources: 
 
 These findings were real correctness or durability bugs, but none was a confirmed P0/P1 or high/critical security blocker for the synthetic Phase 7A release candidate. Historical findings below are preserved. Each item now records its regression, fix and verification. Phase 7B stays closed.
 
-Local proof for this repair (2026-08-28, Node `v22.22.2`): `npx tsc --noEmit` exit 0; `npm run typecheck:workers` exit 0; `npm run lint` exit 0; Node Vitest 80 files / 391 tests passed; Brain workerd 9 files / 35 tests passed; Ingestion workerd 4 files / 11 tests passed; `npm run build` Next 16.3.3 exit 0; `npm run build:cf` OpenNext 1.20.3 exit 0; wrangler 4.126.0 `--dry-run --env staging` web gzip 1608.06 KiB (`IDENTITY_MODE=disabled`, `LOOPBACK_RUNTIME=false`), brain gzip 14.01 KiB, ingestion gzip 9.68 KiB; `npm audit --omit=dev --audit-level=high` 0 vulnerabilities.
+Local proof for this repair (2026-08-28, Node `v22.22.2`): `npx tsc --noEmit` exit 0; `npm run typecheck:workers` exit 0; `npm run lint` exit 0; Node Vitest 80 files / 392 tests passed; Brain workerd 9 files / 36 tests passed; Ingestion workerd 4 files / 11 tests passed; `npm run build` Next 16.3.3 exit 0; `npm run build:cf` OpenNext 1.20.3 exit 0; wrangler 4.126.0 `--dry-run --env staging` web gzip 1608.06 KiB (`IDENTITY_MODE=disabled`, `LOOPBACK_RUNTIME=false`), brain gzip 14.01 KiB, ingestion gzip 9.68 KiB; `npm audit --omit=dev --audit-level=high` 0 vulnerabilities.
 
 ## P2-1: total tool-call budget misses non-search tools
 
@@ -133,6 +133,30 @@ Independent GPT-5.6 Sol xhigh review of PR #14 (Cursor Task `bc-ec42973e-79b3-52
 - Repair: operations migration `0007_parent_user_message.sql`. `materializeClaimedTurn` stores `parent_user_message_id` on the assistant row. Replay and bounded history join on that parent. Local workerd only until `0007` is applied to staging operations D1.
 - Regression: `workers/brain/test/conversations-d1.test.ts` concurrent same-timestamp turns.
 - Verification: Brain workerd conversation tests passed.
+
+### P2-13: expired approved resumes looped forever
+
+- Location: `workers/brain/src/approval-resume.ts`; `src/lib/store/agent-runs.ts` `expireApproval`.
+- Cause: a resume delivered after `expiresAt` failed policy and retried. `expireApproval` only terminalized `pending` rows, so `approved` + `pending_approval` stayed recoverable and the five-minute cron re-enqueued them.
+- Repair: resume past expiry calls `expireApproval` for approved rows, returns `{ expired: true }` so the queue acks, and `enqueueRecoverableApprovalResumes` expires overdue rows before listing. A second resume is a no-op.
+- Regression: `workers/brain/test/approval-resume.test.ts` late delivery: no effect, run `failed`, approval `expired`, queue ack.
+- Verification: Brain approval-resume tests passed.
+
+### P2-14: interactive wall time was not a run deadline
+
+- Location: `src/lib/agent/run.ts`; `src/lib/agent/budgets.ts`.
+- Cause: each model call had a 60s timeout and tools had 10s, but nothing capped the whole run at 90s. Two 59s model calls plus a 9s read could finish around 127s.
+- Repair: `remainingWallTimeMs` caps the model stream. `shouldStopAfterTurn` and the post-idle finalizer check wall time. `AbortSignal.timeout(wallTimeMs)` aborts the agent.
+- Regression: `src/lib/agent/agent-loop.test.ts` wall-time unit test.
+- Verification: focused Node Vitest passed.
+
+### P2-15: persisted redaction missed Cookie and Basic credentials
+
+- Location: `src/lib/agent/redact-tool-result.ts`.
+- Cause: Bearer and selected assignments were scrubbed; `Cookie` / `Set-Cookie` headers and `Authorization: Basic` remained in `tool_calls.redacted_result`.
+- Repair: those headers are replaced with `[REDACTED]` before UTF-8 bounding.
+- Regression: `src/lib/agent/redact-tool-result.test.ts`.
+- Verification: focused Node Vitest passed.
 
 ## Adversarial review of remaining Phase 1–7A (after the eight repairs)
 

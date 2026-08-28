@@ -371,14 +371,17 @@ export async function expireApproval(
   ) {
     return { resume: false, reason: "approval record does not match the agent run" };
   }
-  if (row.status !== "pending") {
+  if (row.status === "rejected" || row.status === "expired") {
     return { resume: false, reason: `approval is ${row.status}` };
+  }
+  if (row.status === "approved" && input.now <= row.expires_at) {
+    return { resume: false, reason: "approval is approved" };
   }
   await db.batch([
     db
       .prepare(
         `UPDATE approvals SET status = 'expired'
-         WHERE idempotency_key = ? AND status = 'pending'`,
+         WHERE idempotency_key = ? AND status IN ('pending', 'approved')`,
       )
       .bind(key),
     db

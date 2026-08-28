@@ -30,6 +30,10 @@ export class BudgetTracker {
   outputTokens = 0;
   readonly startedAt = Date.now();
 
+  remainingWallTimeMs(now = Date.now()): number {
+    return Math.max(0, AGENT_BUDGETS.wallTimeMs - (now - this.startedAt));
+  }
+
   assertWithinWallTime(now = Date.now()): void {
     if (now - this.startedAt > AGENT_BUDGETS.wallTimeMs) {
       throw new BudgetExceededError("WALL_TIME", "interactive wall time budget exhausted");

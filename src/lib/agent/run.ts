@@ -167,7 +167,10 @@ export async function runKnowledgeAgent(input: {
     streamFn: (nextModel, context, streamOptions) =>
       faux.provider.streamSimple(nextModel, context, {
         ...streamOptions,
-        signal: toolDeadlineSignal(AGENT_BUDGETS.modelTimeoutMs, streamOptions?.signal),
+        signal: toolDeadlineSignal(
+          Math.min(AGENT_BUDGETS.modelTimeoutMs, budgets.remainingWallTimeMs()),
+          streamOptions?.signal,
+        ),
       }),
     toolExecution: "sequential",
     beforeToolCall: async (context, signal) => {
@@ -220,6 +223,7 @@ export async function runKnowledgeAgent(input: {
     },
     shouldStopAfterTurn: async () => {
       try {
+        budgets.assertWithinWallTime();
         budgets.noteTurn();
         return false;
       } catch (error) {
@@ -247,8 +251,10 @@ export async function runKnowledgeAgent(input: {
   });
 
   const pending = agent.prompt(input.question);
+  const abortNow = () => agent.abort();
+  const wall = AbortSignal.timeout(AGENT_BUDGETS.wallTimeMs);
+  wall.addEventListener("abort", abortNow, { once: true });
   if (input.abort) {
-    const abortNow = () => agent.abort();
     if (input.abort.signal.aborted) {
       abortNow();
     } else {
@@ -259,6 +265,15 @@ export async function runKnowledgeAgent(input: {
   await agent.waitForIdle();
 
   let budgetErrorMessage: string | undefined;
+  try {
+    budgets.assertWithinWallTime();
+  } catch (error) {
+    if (error instanceof BudgetExceededError) {
+      budgetErrorMessage = error.message;
+    } else {
+      throw error;
+    }
+  }
   try {
     for (const message of agent.state.messages) {
       if (message.role === "assistant") {
@@ -280,7 +295,7 @@ export async function runKnowledgeAgent(input: {
     {
       finalResponse: typeof lastAssistant?.content === "string" ? lastAssistant.content : BRAIN_MUST_RETRIEVE,
       messages: transcript,
-      interrupted: Boolean(input.abort?.signal.aborted),
+      interrupted: Boolean(input.abort?.signal.aborted) || wall.aborted,
       failed: Boolean(agent.state.errorMessage),
     },
   );
@@ -295,7 +310,8 @@ export async function runKnowledgeAgent(input: {
     aborted:
       Boolean(agent.state.errorMessage) ||
       Boolean(budgetErrorMessage) ||
-      input.abort?.signal.aborted === true,
+      input.abort?.signal.aborted === true ||
+      wall.aborted,
     pendingApproval,
     pendingApprovalBinding,
     model: agent.state.model.id,

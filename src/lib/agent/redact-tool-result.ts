@@ -2,6 +2,8 @@ import { AGENT_BUDGETS } from "./budgets";
 
 const UNTRUSTED_PREFIXES = ["UNTRUSTED_EVIDENCE\n", "UNTRUSTED_CONNECTOR_RESULT\n"];
 const BEARER_RE = /\bBearer\s+[A-Za-z0-9._\-+=/]+/gi;
+const BASIC_RE = /\bAuthorization:\s*Basic\s+[A-Za-z0-9+/=]+/gi;
+const COOKIE_RE = /\b(?:Set-)?Cookie:\s*[^\r\n]+/gi;
 const SECRET_ASSIGNMENT_RE =
   /\b(api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|password|secret)\b["']?\s*[:=]\s*["']?[^\s"',}]+/gi;
 const AUTHORIZATION_EQUALS_RE = /\bauthorization\b["']?\s*=\s*["']?[^\s"',}]+/gi;
@@ -49,6 +51,10 @@ export function redactToolResultForStorage(
   }
   const scrubbed = stripped
     .replace(BEARER_RE, "Bearer [REDACTED]")
+    .replace(BASIC_RE, "Authorization: Basic [REDACTED]")
+    .replace(COOKIE_RE, (header) =>
+      header.toLowerCase().startsWith("set-cookie:") ? "Set-Cookie: [REDACTED]" : "Cookie: [REDACTED]",
+    )
     .replace(SECRET_ASSIGNMENT_RE, "$1=[REDACTED]")
     .replace(AUTHORIZATION_EQUALS_RE, "authorization=[REDACTED]");
   return boundUtf8Bytes(scrubbed, maxBytes);

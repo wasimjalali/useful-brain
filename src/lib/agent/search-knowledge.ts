@@ -48,7 +48,7 @@ export function createSearchKnowledgeTool(input: {
         };
       }
       try {
-        const remainingWall = Math.max(0, AGENT_BUDGETS.wallTimeMs - (Date.now() - input.budgets.startedAt));
+        const remainingWall = input.budgets.remainingWallTimeMs();
         const deadline = toolDeadlineSignal(
           Math.min(AGENT_BUDGETS.readToolTimeoutMs, remainingWall),
           signal,
