@@ -6,6 +6,7 @@ import {
   completeTurn,
   createPendingTurn,
   failTurn,
+  loadBoundedHistory,
   loadReplay,
   persistThenRelease,
 } from "../../../src/lib/store/conversations";
@@ -302,5 +303,81 @@ describe("operations conversation snapshots", () => {
     expect(users?.count).toBe(1);
     expect(assistants?.count).toBe(1);
     expect(orphans?.count).toBe(0);
+  });
+
+  it("replays and bounds history by parent user message when timestamps collide", async () => {
+    await seedPrincipals();
+    const seed = await createPendingTurn(env.OPERATIONS_DB, {
+      ownerPrincipalId: "principal-alice",
+      requestId: "req-hist-seed",
+      question: "seed question",
+      now: 90,
+    });
+    const complete = (
+      pending: { assistantMessageId: string },
+      requestId: string,
+      text: string,
+      now: number,
+    ) =>
+      completeTurn(env.OPERATIONS_DB, {
+        ownerPrincipalId: "principal-alice",
+        assistantMessageId: pending.assistantMessageId,
+        requestId,
+        rawModelJson: JSON.stringify({
+          answerType: "grounded",
+          paragraphs: [{ text, citations: ["[1]"] }],
+        }),
+        evidence: addCitationLabels([
+          {
+            rank: 1,
+            score: 0.9,
+            chunkId: `chunk-${requestId}`,
+            source: `${requestId}.md`,
+            section: "Body",
+            text,
+            tokenEstimate: 4,
+          },
+        ]),
+        answerModel: "test-model",
+        embeddingModel: "fake-embed",
+        embeddingDimensions: 8,
+        promptVersion: PROMPT_VERSION,
+        retrievalConfigVersion: "fake-provider",
+        corpusGenerationId: "gen-1",
+        now,
+      });
+    await complete(seed, "req-hist-seed", "Seed answer is stored first.", 91);
+    const [one, two] = await Promise.all([
+      createPendingTurn(env.OPERATIONS_DB, {
+        ownerPrincipalId: "principal-alice",
+        conversationId: seed.conversationId,
+        requestId: "req-hist-a",
+        question: "question one",
+        now: 100,
+      }),
+      createPendingTurn(env.OPERATIONS_DB, {
+        ownerPrincipalId: "principal-alice",
+        conversationId: seed.conversationId,
+        requestId: "req-hist-b",
+        question: "question two",
+        now: 100,
+      }),
+    ]);
+    await complete(one, "req-hist-a", "Answer from turn one.", 110);
+    await complete(two, "req-hist-b", "Answer from turn two.", 111);
+    const replayOne = await loadReplay(env.OPERATIONS_DB, one.assistantMessageId, "principal-alice");
+    const replayTwo = await loadReplay(env.OPERATIONS_DB, two.assistantMessageId, "principal-alice");
+    expect(replayOne?.question).toBe("question one");
+    expect(replayOne?.answer).toContain("Answer from turn one.");
+    expect(replayTwo?.question).toBe("question two");
+    expect(replayTwo?.answer).toContain("Answer from turn two.");
+    const history = await loadBoundedHistory(
+      env.OPERATIONS_DB,
+      seed.conversationId,
+      "principal-alice",
+    );
+    expect(history.find((turn) => turn.question === "question one")?.answer).toContain("Answer from turn one.");
+    expect(history.find((turn) => turn.question === "question two")?.answer).toContain("Answer from turn two.");
+    expect(history.find((turn) => turn.question === "question two")?.answer).not.toContain("Answer from turn one.");
   });
 });

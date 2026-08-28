@@ -106,6 +106,7 @@ type MessageRow = {
   id: string;
   conversation_id: string;
   request_id: string | null;
+  parent_user_message_id: string | null;
   role: "user" | "assistant";
   content: string;
   status: "pending" | "completed" | "failed";
@@ -179,21 +180,22 @@ async function materializeClaimedTurn(
       ),
     db
       .prepare(
-        `INSERT INTO messages (id, conversation_id, request_id, role, content, status, created_at, updated_at)
-         VALUES (?, ?, NULL, 'user', ?, 'completed', ?, ?)
+        `INSERT INTO messages (id, conversation_id, request_id, parent_user_message_id, role, content, status, created_at, updated_at)
+         VALUES (?, ?, NULL, NULL, 'user', ?, 'completed', ?, ?)
          ON CONFLICT(id) DO NOTHING`,
       )
       .bind(claim.user_message_id, claim.conversation_id, input.question, input.now, input.now),
     db
       .prepare(
-        `INSERT INTO messages (id, conversation_id, request_id, role, content, status, created_at, updated_at)
-         VALUES (?, ?, ?, 'assistant', '', 'pending', ?, ?)
+        `INSERT INTO messages (id, conversation_id, request_id, parent_user_message_id, role, content, status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'assistant', '', 'pending', ?, ?)
          ON CONFLICT(id) DO NOTHING`,
       )
       .bind(
         claim.assistant_message_id,
         claim.conversation_id,
         claim.request_id,
+        claim.user_message_id,
         input.now + 1,
         input.now + 1,
       ),
@@ -217,7 +219,7 @@ export async function createPendingTurn(
   const requestId = parseBoundedId(input.requestId, "request id");
   const duplicate = await db
     .prepare(
-      `SELECT id, conversation_id, status FROM messages WHERE request_id = ?`,
+      `SELECT id, conversation_id, status FROM messages WHERE request_id = ? AND role = 'assistant'`,
     )
     .bind(requestId)
     .first<{ id: string; conversation_id: string; status: string }>();
@@ -283,7 +285,7 @@ export async function createPendingTurn(
     }
   }
   const materialized = await db
-    .prepare(`SELECT id, conversation_id FROM messages WHERE request_id = ?`)
+    .prepare(`SELECT id, conversation_id FROM messages WHERE request_id = ? AND role = 'assistant'`)
     .bind(requestId)
     .first<{ id: string; conversation_id: string }>();
   if (materialized) {
@@ -496,7 +498,7 @@ export async function loadReplay(
 ): Promise<ReplayedTurn | null> {
   const message = await db
     .prepare(
-      `SELECT m.id, m.conversation_id, m.request_id, m.role, m.content, m.status, m.answer_type,
+      `SELECT m.id, m.conversation_id, m.request_id, m.parent_user_message_id, m.role, m.content, m.status, m.answer_type,
               m.answer_model, m.embedding_model, m.embedding_dimensions, m.structured_paragraphs_json,
               m.prompt_version, m.retrieval_config_version, m.corpus_generation_id, m.created_at
        FROM messages m
@@ -512,14 +514,22 @@ export async function loadReplay(
     return null;
   }
 
-  const prior = await db
-    .prepare(
-      `SELECT role, content FROM messages
-       WHERE conversation_id = ? AND created_at < ?
-       ORDER BY created_at DESC LIMIT 1`,
-    )
-    .bind(message.conversation_id, message.created_at)
-    .first<{ role: string; content: string }>();
+  const prior = message.parent_user_message_id
+    ? await db
+        .prepare(
+          `SELECT role, content FROM messages
+           WHERE id = ? AND conversation_id = ? AND role = 'user'`,
+        )
+        .bind(message.parent_user_message_id, message.conversation_id)
+        .first<{ role: string; content: string }>()
+    : await db
+        .prepare(
+          `SELECT role, content FROM messages
+           WHERE conversation_id = ? AND created_at < ?
+           ORDER BY created_at DESC, id DESC LIMIT 1`,
+        )
+        .bind(message.conversation_id, message.created_at)
+        .first<{ role: string; content: string }>();
   if (!prior || prior.role !== "user") {
     throw new ConversationStoreError("assistant turn is missing its question");
   }
@@ -591,22 +601,28 @@ export async function loadBoundedHistory(
   );
   const rows = await db
     .prepare(
-      `SELECT role, content, status FROM messages
-       WHERE conversation_id = ? ORDER BY created_at ASC`,
+      `SELECT id, role, content, status, parent_user_message_id FROM messages
+       WHERE conversation_id = ? ORDER BY created_at ASC, id ASC`,
     )
     .bind(conversationId)
-    .all<{ role: string; content: string; status: string }>();
+    .all<{
+      id: string;
+      role: string;
+      content: string;
+      status: string;
+      parent_user_message_id: string | null;
+    }>();
+  const byId = new Map(rows.results.map((row) => [row.id, row]));
   const turns: StoredHistoryTurn[] = [];
-  for (let index = 0; index < rows.results.length - 1; index += 1) {
-    const user = rows.results[index];
-    const assistant = rows.results[index + 1];
-    if (user.role !== "user" || assistant.role !== "assistant") {
+  for (const row of rows.results) {
+    if (row.role !== "assistant" || row.status !== "completed") {
       continue;
     }
-    if (assistant.status === "completed") {
-      turns.push({ question: user.content, answer: assistant.content });
+    const parent = row.parent_user_message_id ? byId.get(row.parent_user_message_id) : undefined;
+    if (!parent || parent.role !== "user") {
+      continue;
     }
-    index += 1;
+    turns.push({ question: parent.content, answer: row.content });
   }
   return trimStoredHistory(turns);
 }
