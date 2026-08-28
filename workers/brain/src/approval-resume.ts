@@ -107,40 +107,96 @@ export async function resumeApprovedAgentRun(
     throw new Error(policy.action === "deny" ? policy.reason : "approval is still pending");
   }
 
-  const resultJson = JSON.stringify({ resumed: true, tool: call.tool });
+  return commitApprovedResumeWrites(db, {
+    runId,
+    idempotencyKey,
+    tool: call.tool,
+    toolCallId: call.id,
+    args,
+    now,
+  });
+}
+
+const STILL_APPROVED_RESUME = `EXISTS (
+  SELECT 1 FROM agent_runs r
+  JOIN approvals a ON a.run_id = r.id
+  WHERE r.id = ?
+    AND r.status = 'pending_approval'
+    AND a.status = 'approved'
+    AND a.idempotency_key = ?
+    AND a.expires_at >= ?
+)`;
+
+export async function commitApprovedResumeWrites(
+  db: OperationsDatabase,
+  input: {
+    runId: string;
+    idempotencyKey: string;
+    tool: string;
+    toolCallId: string;
+    args: Record<string, unknown>;
+    now: number;
+  },
+): Promise<{ resumed: boolean; duplicate?: boolean; expired?: boolean }> {
+  const { runId, idempotencyKey, tool, toolCallId, args, now } = input;
+  const resultJson = JSON.stringify({ resumed: true, tool });
+  const argsJson = JSON.stringify(args);
   await db.batch([
     db
       .prepare(
         `INSERT INTO synthetic_mutating_effects (
            idempotency_key, tool, normalized_arguments_json, created_at
-         ) VALUES (?, ?, ?, ?)
+         ) SELECT ?, ?, ?, ?
+         WHERE ${STILL_APPROVED_RESUME}
          ON CONFLICT(idempotency_key) DO NOTHING`,
       )
-      .bind(idempotencyKey, call.tool, JSON.stringify(args), now),
+      .bind(idempotencyKey, tool, argsJson, now, runId, idempotencyKey, now),
     db
       .prepare(
         `INSERT INTO idempotent_effects (
            idempotency_key, status, result_json, created_at, updated_at
-         ) VALUES (?, 'completed', ?, ?, ?)
+         ) SELECT ?, 'completed', ?, ?, ?
+         WHERE ${STILL_APPROVED_RESUME}
          ON CONFLICT(idempotency_key) DO UPDATE SET
            status = 'completed', result_json = excluded.result_json,
-           updated_at = excluded.updated_at`,
+           updated_at = excluded.updated_at
+         WHERE ${STILL_APPROVED_RESUME}`,
       )
-      .bind(idempotencyKey, resultJson, now, now),
+      .bind(
+        idempotencyKey,
+        resultJson,
+        now,
+        now,
+        runId,
+        idempotencyKey,
+        now,
+        runId,
+        idempotencyKey,
+        now,
+      ),
     db
       .prepare(
         `UPDATE tool_calls SET status = 'ok', redacted_result = ?
-         WHERE id = ? AND run_id = ? AND status = 'pending_approval'`,
+         WHERE id = ? AND run_id = ? AND status = 'pending_approval'
+           AND ${STILL_APPROVED_RESUME}`,
       )
-      .bind(resultJson, call.id, runId),
+      .bind(resultJson, toolCallId, runId, runId, idempotencyKey, now),
     db
       .prepare(
         `UPDATE agent_runs SET status = 'completed', updated_at = ?
-         WHERE id = ? AND status = 'pending_approval'`,
+         WHERE id = ? AND status = 'pending_approval'
+           AND ${STILL_APPROVED_RESUME}`,
       )
-      .bind(now, runId),
+      .bind(now, runId, runId, idempotencyKey, now),
   ]);
-  return { resumed: true };
+  const after = await loadAgentReplay(db, runId);
+  if (after?.status === "completed") {
+    return { resumed: true };
+  }
+  if (after?.status === "failed" && after.approval?.status === "expired") {
+    return { resumed: false, expired: true };
+  }
+  throw new Error("approved resume could not complete");
 }
 
 export async function listRecoverableApprovalResumes(

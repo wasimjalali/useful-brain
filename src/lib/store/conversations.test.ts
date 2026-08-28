@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { addCitationLabels, PROMPT_VERSION } from "../answer/contract";
 import {
   deriveServerConversationTitle,
+  pairCompletedHistoryTurns,
   persistThenRelease,
   trimStoredHistory,
 } from "./conversations";
@@ -21,6 +22,44 @@ describe("conversation helpers", () => {
       answer: `Answer ${index}`,
     }));
     expect(trimStoredHistory(history, 3, 10_000)).toEqual(history.slice(-3));
+  });
+
+  it("pairs legacy null-parent assistants sequentially without dropping them", () => {
+    expect(
+      pairCompletedHistoryTurns([
+        {
+          id: "u-legacy",
+          role: "user",
+          content: "legacy question",
+          status: "completed",
+          parent_user_message_id: null,
+        },
+        {
+          id: "a-legacy",
+          role: "assistant",
+          content: "legacy answer",
+          status: "completed",
+          parent_user_message_id: null,
+        },
+        {
+          id: "u-linked",
+          role: "user",
+          content: "linked question",
+          status: "completed",
+          parent_user_message_id: null,
+        },
+        {
+          id: "a-linked",
+          role: "assistant",
+          content: "linked answer",
+          status: "completed",
+          parent_user_message_id: "u-linked",
+        },
+      ]),
+    ).toEqual([
+      { question: "legacy question", answer: "legacy answer" },
+      { question: "linked question", answer: "linked answer" },
+    ]);
   });
 
   it("persists durable state before releasing the run lock", async () => {

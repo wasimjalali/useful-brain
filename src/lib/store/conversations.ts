@@ -13,6 +13,49 @@ export const MAX_HISTORY_CHARS = 6000;
 
 export type StoredHistoryTurn = { question: string; answer: string };
 
+export type HistoryMessageRow = {
+  id: string;
+  role: string;
+  content: string;
+  status: string;
+  parent_user_message_id: string | null;
+};
+
+export function pairCompletedHistoryTurns(rows: HistoryMessageRow[]): StoredHistoryTurn[] {
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  const usedUserIds = new Set<string>();
+  const pendingUsers: HistoryMessageRow[] = [];
+  const turns: StoredHistoryTurn[] = [];
+  for (const row of rows) {
+    if (row.role === "user") {
+      pendingUsers.push(row);
+      continue;
+    }
+    if (row.role !== "assistant" || row.status !== "completed") {
+      continue;
+    }
+    if (row.parent_user_message_id) {
+      const parent = byId.get(row.parent_user_message_id);
+      if (!parent || parent.role !== "user" || usedUserIds.has(parent.id)) {
+        continue;
+      }
+      usedUserIds.add(parent.id);
+      turns.push({ question: parent.content, answer: row.content });
+      continue;
+    }
+    while (pendingUsers.length > 0 && usedUserIds.has(pendingUsers[0].id)) {
+      pendingUsers.shift();
+    }
+    const user = pendingUsers.shift();
+    if (!user) {
+      continue;
+    }
+    usedUserIds.add(user.id);
+    turns.push({ question: user.content, answer: row.content });
+  }
+  return turns;
+}
+
 export type OperationsStatement = {
   bind(...values: unknown[]): OperationsStatement;
   run(): Promise<{ meta?: { changes?: number } }>;
@@ -605,26 +648,8 @@ export async function loadBoundedHistory(
        WHERE conversation_id = ? ORDER BY created_at ASC, id ASC`,
     )
     .bind(conversationId)
-    .all<{
-      id: string;
-      role: string;
-      content: string;
-      status: string;
-      parent_user_message_id: string | null;
-    }>();
-  const byId = new Map(rows.results.map((row) => [row.id, row]));
-  const turns: StoredHistoryTurn[] = [];
-  for (const row of rows.results) {
-    if (row.role !== "assistant" || row.status !== "completed") {
-      continue;
-    }
-    const parent = row.parent_user_message_id ? byId.get(row.parent_user_message_id) : undefined;
-    if (!parent || parent.role !== "user") {
-      continue;
-    }
-    turns.push({ question: parent.content, answer: row.content });
-  }
-  return trimStoredHistory(turns);
+    .all<HistoryMessageRow>();
+  return trimStoredHistory(pairCompletedHistoryTurns(rows.results));
 }
 
 export async function persistThenRelease<T>(input: {

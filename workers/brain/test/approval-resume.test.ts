@@ -12,10 +12,12 @@ import {
   completeAgentRun,
   createAgentRun,
   decideApproval,
+  expireApproval,
   upsertApproval,
 } from "../../../src/lib/store/agent-runs";
 import { createPendingTurn } from "../../../src/lib/store/conversations";
 import {
+  commitApprovedResumeWrites,
   enqueueRecoverableApprovalResumes,
   listRecoverableApprovalResumes,
   parseApprovalResumeMessage,
@@ -289,5 +291,40 @@ describe("approval resume queue", () => {
       "SELECT status FROM approvals WHERE idempotency_key = ?",
     ).bind(binding.idempotencyKey).first<{ status: string }>();
     expect(approval?.status).toBe("expired");
+  });
+
+  it("does not insert an effect when expiry commits before the resume write", async () => {
+    const expiresAt = Date.now() + 45_000;
+    const { runId, binding } = await approvedRun("race", "create_draft", expiresAt);
+    const call = await env.OPERATIONS_DB.prepare(
+      "SELECT id, tool FROM tool_calls WHERE run_id = ?",
+    )
+      .bind(runId)
+      .first<{ id: string; tool: string }>();
+    expect(call).toMatchObject({ tool: "create_draft" });
+    await expireApproval(env.OPERATIONS_DB, {
+      runId,
+      storedBinding: binding,
+      now: expiresAt + 1,
+    });
+    const result = await commitApprovedResumeWrites(env.OPERATIONS_DB, {
+      runId,
+      idempotencyKey: binding.idempotencyKey,
+      tool: call!.tool,
+      toolCallId: call!.id,
+      args: { title: "alpha" },
+      now: expiresAt - 1,
+    });
+    expect(result).toEqual({ resumed: false, expired: true });
+    const effect = await env.OPERATIONS_DB.prepare(
+      "SELECT COUNT(*) AS count FROM synthetic_mutating_effects WHERE idempotency_key = ?",
+    )
+      .bind(binding.idempotencyKey)
+      .first<{ count: number }>();
+    expect(effect?.count).toBe(0);
+    const run = await env.OPERATIONS_DB.prepare("SELECT status FROM agent_runs WHERE id = ?")
+      .bind(runId)
+      .first<{ status: string }>();
+    expect(run?.status).toBe("failed");
   });
 });

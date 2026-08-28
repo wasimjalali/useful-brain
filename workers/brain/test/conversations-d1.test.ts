@@ -380,4 +380,71 @@ describe("operations conversation snapshots", () => {
     expect(history.find((turn) => turn.question === "question two")?.answer).toContain("Answer from turn two.");
     expect(history.find((turn) => turn.question === "question two")?.answer).not.toContain("Answer from turn one.");
   });
+
+  it("includes pre-migration completed turns that have no parent user message", async () => {
+    await seedPrincipals();
+    const seed = await createPendingTurn(env.OPERATIONS_DB, {
+      ownerPrincipalId: "principal-alice",
+      requestId: "req-hist-parented",
+      question: "parented question",
+      now: 120,
+    });
+    await completeTurn(env.OPERATIONS_DB, {
+      ownerPrincipalId: "principal-alice",
+      assistantMessageId: seed.assistantMessageId,
+      requestId: "req-hist-parented",
+      rawModelJson: JSON.stringify({
+        answerType: "grounded",
+        paragraphs: [{ text: "Parented answer is stored.", citations: ["[1]"] }],
+      }),
+      evidence: addCitationLabels([
+        {
+          rank: 1,
+          score: 0.9,
+          chunkId: "chunk-parented",
+          source: "parented.md",
+          section: "Body",
+          text: "Parented answer is stored.",
+          tokenEstimate: 4,
+        },
+      ]),
+      answerModel: "test-model",
+      embeddingModel: "fake-embed",
+      embeddingDimensions: 8,
+      promptVersion: PROMPT_VERSION,
+      retrievalConfigVersion: "fake-provider",
+      corpusGenerationId: "gen-1",
+      now: 121,
+    });
+    await env.OPERATIONS_DB.batch([
+      env.OPERATIONS_DB.prepare(
+        `INSERT INTO messages (
+           id, conversation_id, request_id, parent_user_message_id, role, content, status, created_at, updated_at
+         ) VALUES (?, ?, NULL, NULL, 'user', ?, 'completed', ?, ?)`,
+      ).bind("msg-legacy-user", seed.conversationId, "legacy question", 130, 130),
+      env.OPERATIONS_DB.prepare(
+        `INSERT INTO messages (
+           id, conversation_id, request_id, parent_user_message_id, role, content, status,
+           answer_type, created_at, updated_at
+         ) VALUES (?, ?, NULL, NULL, 'assistant', ?, 'completed', 'grounded', ?, ?)`,
+      ).bind(
+        "msg-legacy-assistant",
+        seed.conversationId,
+        "Legacy answer is stored without a parent.",
+        131,
+        131,
+      ),
+    ]);
+    const history = await loadBoundedHistory(
+      env.OPERATIONS_DB,
+      seed.conversationId,
+      "principal-alice",
+    );
+    expect(history.find((turn) => turn.question === "parented question")?.answer).toContain(
+      "Parented answer is stored.",
+    );
+    expect(history.find((turn) => turn.question === "legacy question")?.answer).toBe(
+      "Legacy answer is stored without a parent.",
+    );
+  });
 });

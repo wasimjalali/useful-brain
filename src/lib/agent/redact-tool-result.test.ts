@@ -18,6 +18,16 @@ describe("persisted tool-result redaction", () => {
         "Cookie: session=portfolio-secret\nAuthorization: Basic dXNlcjpwYXNz",
       ),
     ).toBe("Cookie: [REDACTED]\nAuthorization: Basic [REDACTED]");
+    expect(
+      redactToolResultForStorage(
+        '{"Authorization":"Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==","Cookie":"session=portfolio-secret"}',
+      ),
+    ).toBe('{"Authorization":"Basic [REDACTED]","Cookie":"[REDACTED]"}');
+    expect(
+      redactToolResultForStorage(
+        '{"authorization": "Bearer supersecret.token", "Set-Cookie": "sid=abc"}',
+      ),
+    ).toBe('{"authorization": "Bearer [REDACTED]", "Set-Cookie": "[REDACTED]"}');
   });
 
   it("bounds storage by UTF-8 bytes rather than JS string length", () => {
