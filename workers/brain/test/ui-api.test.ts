@@ -104,7 +104,13 @@ describe("Brain UI APIs", () => {
       documents: [],
       chunks: [],
       embeddingStorageStatus: { corpusStatus: "not_started" },
+      retrievalMode: "keyword",
     });
+  });
+
+  it("rejects corpus re-indexing without a corpus database", async () => {
+    const response = await authed("/knowledge/reindex", { method: "POST" });
+    expect(response.status).toBe(400);
   });
 
   it("rejects corpus seed without a corpus database", async () => {

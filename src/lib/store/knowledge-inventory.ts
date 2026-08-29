@@ -24,6 +24,7 @@ export type KnowledgeInventory = {
   documents: KnowledgeDocument[];
   chunks: DocumentChunk[];
   embeddingStorageStatus: EmbeddingStorageStatus;
+  retrievalMode: "hybrid" | "keyword";
 };
 
 function fileName(path: string): string {
@@ -31,14 +32,17 @@ function fileName(path: string): string {
   return parts[parts.length - 1] || path;
 }
 
-export async function loadKnowledgeInventory(db: SqlExecutor): Promise<KnowledgeInventory> {
+export async function loadKnowledgeInventory(
+  db: SqlExecutor,
+  retrievalMode: KnowledgeInventory["retrievalMode"],
+): Promise<KnowledgeInventory> {
   const activeId = await activeGenerationId(db);
   const ready = await db
     .prepare(
       `SELECT id FROM corpus_generations WHERE state = 'ready' ORDER BY updated_at DESC LIMIT 1`,
     )
     .first<{ id: string }>();
-  const generationId = activeId ?? ready?.id ?? null;
+  const generationId = ready?.id ?? activeId ?? null;
   if (!generationId) {
     return {
       documents: [],
@@ -47,6 +51,7 @@ export async function loadKnowledgeInventory(db: SqlExecutor): Promise<Knowledge
         ...emptyEmbeddingStorageStatus,
         corpusStatus: "not_started",
       },
+      retrievalMode,
     };
   }
   const generation = await getGeneration(db, generationId);
@@ -68,7 +73,12 @@ export async function loadKnowledgeInventory(db: SqlExecutor): Promise<Knowledge
     .bind(generationId)
     .all<ChunkRow>();
   const storedDocuments = await db
-    .prepare(`SELECT COUNT(*) AS n FROM documents d JOIN chunks c ON c.document_id = d.id WHERE c.generation_id = ?`)
+    .prepare(
+      `SELECT COUNT(DISTINCT d.id) AS n
+       FROM documents d
+       JOIN chunks c ON c.document_id = d.id
+       WHERE c.generation_id = ?`,
+    )
     .bind(generationId)
     .first<CountRow>();
   const storedChunks = await db
@@ -109,5 +119,6 @@ export async function loadKnowledgeInventory(db: SqlExecutor): Promise<Knowledge
       corpusStatus:
         generation?.state === "active" ? "active" : generation?.state === "ready" ? "ready" : "processing",
     },
+    retrievalMode,
   };
 }

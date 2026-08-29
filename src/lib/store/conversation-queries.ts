@@ -26,6 +26,8 @@ type AssistantRow = {
   structured_paragraphs_json: string | null;
   error_code: string | null;
   parent_user_message_id: string | null;
+  corpus_generation_id: string | null;
+  retrieval_config_version: string | null;
   created_at: number;
 };
 
@@ -89,7 +91,8 @@ export async function loadConversationForUi(
   const assistants = await db
     .prepare(
       `SELECT id, content, status, answer_type, answer_model, embedding_model, embedding_dimensions,
-              structured_paragraphs_json, error_code, parent_user_message_id, created_at
+              structured_paragraphs_json, error_code, parent_user_message_id, corpus_generation_id,
+              retrieval_config_version, created_at
        FROM messages WHERE conversation_id = ? AND role = 'assistant' ORDER BY created_at ASC, id ASC`,
     )
     .bind(conversationId)
@@ -163,6 +166,8 @@ export async function loadConversationForUi(
         },
         conversationId,
         assistantMessageId: assistant.id,
+        corpusGenerationId: assistant.corpus_generation_id,
+        retrievalConfigVersion: assistant.retrieval_config_version,
       },
       error: null,
     });

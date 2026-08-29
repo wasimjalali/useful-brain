@@ -7,7 +7,9 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useRouter } from "next/navigation";
 
+import type { WorkspaceIdentity } from "@/app/actions";
 import type { DocumentChunk, KnowledgeDocument } from "@/lib/rag/types";
 import type { GroundedAnswerResponse } from "@/lib/rag/grounded-answer";
 import type { EmbeddingStorageStatus } from "@/lib/rag/storage-records";
@@ -15,6 +17,7 @@ import type { ActionResult } from "@/lib/rag/app-errors";
 import { runEvalsAction } from "@/app/eval-actions";
 import { EvaluationsWorkspace } from "@/components/evaluations/evaluations-workspace";
 import { KnowledgeWorkspace } from "@/components/knowledge/knowledge-workspace";
+import { SettingsWorkspace } from "@/components/settings/settings-workspace";
 import {
   buildEvidenceItems as buildChatEvidenceItems,
   ChatWorkspace,
@@ -40,6 +43,8 @@ import {
   type Conversation,
 } from "@/lib/rag/chat-history";
 import type { EvalRunResult } from "@/lib/eval/manual-eval-set";
+import { isRetrievalReady } from "@/lib/rag/workspace-status";
+import type { KnowledgeInventory } from "@/lib/store/knowledge-inventory";
 
 type AskAction = (input: {
   question: string;
@@ -56,9 +61,6 @@ type RagVisibilityDashboardProps = {
   embeddingStorageStatus: EmbeddingStorageStatus;
   initialConversations?: Conversation[];
   initialEvalRuns?: EvalRunResult[];
-  loadConversationAction?: (
-    conversationId: string,
-  ) => Promise<ActionResult<Conversation>>;
   deleteConversationAction?: (
     conversationId: string,
   ) => Promise<ActionResult<null>>;
@@ -66,6 +68,13 @@ type RagVisibilityDashboardProps = {
   importLegacyConversationsAction?: (
     conversations: Conversation[],
   ) => Promise<ActionResult<null>>;
+  identity?: WorkspaceIdentity | null;
+  initialAddDocument?: boolean;
+  initialConversation?: Conversation | null;
+  initialView?: WorkspaceView;
+  reindexAction?: () => Promise<void>;
+  retrievalMode?: KnowledgeInventory["retrievalMode"];
+  workspaceError?: string | null;
 };
 
 export function RagVisibilityDashboard({
@@ -77,12 +86,19 @@ export function RagVisibilityDashboard({
   embeddingStorageStatus,
   initialConversations = [],
   initialEvalRuns = [],
-  loadConversationAction,
   deleteConversationAction,
   promoteCorpusAction,
   importLegacyConversationsAction,
+  identity = null,
+  initialAddDocument = false,
+  initialConversation = null,
+  initialView = "chat",
+  reindexAction,
+  retrievalMode = "keyword",
+  workspaceError = null,
 }: RagVisibilityDashboardProps) {
-  const [activeView, setActiveView] = useState<WorkspaceView>("chat");
+  const router = useRouter();
+  const [activeView, setActiveView] = useState<WorkspaceView>(initialView);
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [selectedChunk, setSelectedChunk] = useState<EvidenceItem | null>(null);
   const [focusToken, setFocusToken] = useState(0);
@@ -91,15 +107,16 @@ export function RagVisibilityDashboard({
 
   // Conversation state lives here so the sources panel (a sibling of the chat)
   // can read the active turn's evidence.
-  const [turns, setTurns] = useState<ChatTurn[]>([]);
+  const [turns, setTurns] = useState<ChatTurn[]>(initialConversation?.turns ?? []);
   const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
   const [activeTurnId, setActiveTurnId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>(
     initialConversations,
   );
+  const [conversationError, setConversationError] = useState<string | null>(null);
   const [activeConversationId, setActiveConversationId] = useState<
     string | null
-  >(null);
+  >(initialConversation?.id ?? null);
   // Bumped on New chat / switching chats so an in-flight answer from an
   // abandoned conversation is dropped instead of landing in the current one.
   const conversationRef = useRef(0);
@@ -119,7 +136,7 @@ export function RagVisibilityDashboard({
     });
   }, [importLegacyConversationsAction]);
 
-  const retrievalReady = embeddingStorageStatus.embeddedChunks > 0;
+  const retrievalReady = isRetrievalReady(embeddingStorageStatus);
 
   const activeAnswer = useMemo(
     () => turns.find((turn) => turn.id === activeTurnId)?.answer ?? null,
@@ -200,6 +217,7 @@ export function RagVisibilityDashboard({
       if (backendConversationId) {
         setActiveConversationId(backendConversationId);
         upsertConversationSummary(backendConversationId, nextTurns);
+        router.replace(`/chat/${backendConversationId}`);
       }
     } catch {
       if (conversationRef.current !== guardToken) {
@@ -233,34 +251,21 @@ export function RagVisibilityDashboard({
     setFocusId(null);
     setFocusText(null);
     setSelectedChunk(null);
+    router.push("/chat");
   }
 
-  async function selectConversation(id: string) {
-    const conversation = conversations.find((item) => item.id === id);
-    if (!conversation) {
-      return;
-    }
-    conversationRef.current += 1;
-    if (loadConversationAction) {
-      const result = await loadConversationAction(id);
-      if (!result.ok) return;
-      setTurns(result.data.turns);
-    } else {
-      setTurns(conversation.turns);
-    }
-    setActiveConversationId(id);
-    setPendingQuestion(null);
-    setActiveTurnId(null);
-    setSourcesOpen(false);
-    setFocusId(null);
-    setFocusText(null);
-    setSelectedChunk(null);
+  function selectConversation(id: string) {
+    router.push(`/chat/${id}`);
   }
 
   async function deleteConversation(id: string) {
+    setConversationError(null);
     if (deleteConversationAction) {
       const result = await deleteConversationAction(id);
-      if (!result.ok) return;
+      if (!result.ok) {
+        setConversationError(result.error.message);
+        return;
+      }
     }
     setConversations((current) => {
       return current.filter((conversation) => conversation.id !== id);
@@ -274,7 +279,9 @@ export function RagVisibilityDashboard({
       setSourcesOpen(false);
       setFocusId(null);
       setFocusText(null);
+      router.push("/chat");
     }
+    router.refresh();
   }
 
   function openSources(turnId: string) {
@@ -317,6 +324,13 @@ export function RagVisibilityDashboard({
   function selectWorkspaceView(view: WorkspaceView) {
     setActiveView(view);
     setSourcesOpen(false);
+    const href = {
+      chat: "/chat",
+      knowledge: "/knowledge",
+      evaluations: "/evaluations",
+      settings: "/settings",
+    }[view];
+    router.push(href);
   }
 
   return (
@@ -348,9 +362,11 @@ export function RagVisibilityDashboard({
           activeConversationId={activeConversationId}
           activeView={activeView}
           conversations={conversations}
+          conversationError={conversationError}
           documentsCount={documents.length}
           embeddedChunks={embeddingStorageStatus.embeddedChunks}
           onDeleteConversation={deleteConversation}
+          onNewChat={startNewChat}
           onSelectConversation={selectConversation}
           onSelectView={selectWorkspaceView}
           retrievalReady={retrievalReady}
@@ -358,13 +374,16 @@ export function RagVisibilityDashboard({
       }
       onSelectView={selectWorkspaceView}
     >
-      {activeView === "chat" ? (
+      {workspaceError ? (
+        <WorkspaceLoadError message={workspaceError} />
+      ) : activeView === "chat" ? (
         <ChatWorkspace
           askDisabled={!retrievalReady}
           canReset={turns.length > 0 || pendingQuestion !== null}
           focusedEvidenceId={focusId}
           onFocusEvidence={focusEvidence}
           onNewChat={startNewChat}
+          onOpenKnowledge={() => selectWorkspaceView("knowledge")}
           onOpenSources={openSources}
           onSubmit={submitQuestion}
           pendingQuestion={pendingQuestion}
@@ -380,8 +399,10 @@ export function RagVisibilityDashboard({
               documents={documents}
               embedAction={embedAction}
               embeddingStorageStatus={embeddingStorageStatus}
+              initialAddOpen={initialAddDocument}
               promoteAction={promoteCorpusAction}
-              indexActionLabel="Build corpus version"
+              reindexAction={reindexAction}
+              retrievalMode={retrievalMode}
             />
           ) : null}
           {activeView === "evaluations" ? (
@@ -389,7 +410,14 @@ export function RagVisibilityDashboard({
               history={initialEvalRuns.slice(1)}
               initialRun={initialEvalRuns[0] ?? null}
               runAction={runEvalsAction}
-              runLabel="Run evals"
+              runLabel="Run evaluations"
+            />
+          ) : null}
+          {activeView === "settings" ? (
+            <SettingsWorkspace
+              identity={identity}
+              retrievalMode={retrievalMode}
+              status={embeddingStorageStatus}
             />
           ) : null}
         </ScrollView>
@@ -403,6 +431,24 @@ export function RagVisibilityDashboard({
         />
       ) : null}
     </WorkspaceShell>
+  );
+}
+
+function WorkspaceLoadError({ message }: { message: string }) {
+  return (
+    <div className="grid h-full place-items-center px-5">
+      <div className="empty-state max-w-md" role="alert">
+        <h1 className="text-lg font-semibold text-ink">Workspace unavailable</h1>
+        <p>{message}</p>
+        <button
+          className="btn btn-primary min-h-10 px-4 text-sm"
+          onClick={() => window.location.reload()}
+          type="button"
+        >
+          Reload workspace
+        </button>
+      </div>
+    </div>
   );
 }
 

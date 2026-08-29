@@ -265,16 +265,12 @@ export function mergeSeedDocuments(
 }
 
 export async function latestReadyOrActiveGenerationId(db: SqlExecutor): Promise<string | null> {
-  const activeId = await activeGenerationId(db);
-  if (activeId) {
-    return activeId;
-  }
   const ready = await db
     .prepare(
       `SELECT id FROM corpus_generations WHERE state = 'ready' ORDER BY updated_at DESC LIMIT 1`,
     )
     .first<{ id: string }>();
-  return ready?.id ?? null;
+  return ready?.id ?? activeGenerationId(db);
 }
 
 export async function loadSeedDocumentsFromGeneration(

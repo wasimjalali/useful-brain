@@ -5,6 +5,8 @@ import {
   ChatIcon,
   EvaluationsIcon,
   KnowledgeIcon,
+  NewChatIcon,
+  SettingsIcon,
   TrashIcon,
 } from "@/components/icons";
 import { DEFAULT_USEFUL_BRAIN_CONFIG } from "@/lib/useful-brain-config";
@@ -30,16 +32,19 @@ const NAV_ITEMS: NavItem[] = [
     label: DEFAULT_USEFUL_BRAIN_CONFIG.evaluationsLabel,
     icon: EvaluationsIcon,
   },
+  { id: "settings", label: "Settings", icon: SettingsIcon },
 ];
 
 export function WorkspaceNav({
   activeConversationId = null,
   activeView,
   conversations = [],
+  conversationError = null,
   documentsCount = 0,
   embeddedChunks = 0,
   mobile = false,
   onDeleteConversation = () => {},
+  onNewChat = () => {},
   onSelectConversation = () => {},
   onSelectView,
   retrievalReady = true,
@@ -47,10 +52,12 @@ export function WorkspaceNav({
   activeConversationId?: string | null;
   activeView: WorkspaceView;
   conversations?: Conversation[];
+  conversationError?: string | null;
   documentsCount?: number;
   embeddedChunks?: number;
   mobile?: boolean;
   onDeleteConversation?: (id: string) => void;
+  onNewChat?: () => void;
   onSelectConversation?: (id: string) => void;
   onSelectView: (view: WorkspaceView) => void;
   retrievalReady?: boolean;
@@ -85,13 +92,32 @@ export function WorkspaceNav({
         })}
       </nav>
 
-      {conversations.length > 0 ? (
-        <ChatHistoryList
-          activeConversationId={activeConversationId}
-          conversations={conversations}
-          onDelete={onDeleteConversation}
-          onSelect={onSelectConversation}
-        />
+      {activeView === "chat" ? (
+        <div className="flex min-h-0 flex-1 flex-col gap-3">
+          <button
+            className="btn btn-primary min-h-10 w-full px-3 text-sm"
+            onClick={onNewChat}
+            type="button"
+          >
+            <NewChatIcon className="size-4" />
+            New chat
+          </button>
+          {conversations.length > 0 ? (
+            <ChatHistoryList
+              activeConversationId={activeConversationId}
+              conversations={conversations}
+              onDelete={onDeleteConversation}
+              onSelect={onSelectConversation}
+            />
+          ) : (
+            <p className="px-2 text-xs leading-5 text-ink-faint">Conversations will appear here.</p>
+          )}
+          {conversationError ? (
+            <p className="px-2 text-xs leading-5 text-danger" role="alert">
+              {conversationError}
+            </p>
+          ) : null}
+        </div>
       ) : null}
 
       <div className="mt-auto flex flex-col gap-3 px-1">
@@ -108,7 +134,7 @@ export function WorkspaceNav({
         </div>
         <div className="grid grid-cols-2 gap-2">
           <RailStat label="Documents" value={documentsCount.toString()} />
-          <RailStat label="Vectors" value={embeddedChunks.toString()} />
+          <RailStat label="Chunks" value={embeddedChunks.toString()} />
         </div>
         <p className="px-1 text-xs leading-5 text-ink-faint">
           Synthetic support documents only. No customer data.

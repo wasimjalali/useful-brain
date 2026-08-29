@@ -56,15 +56,15 @@ export function ChatComposer({
             onKeyDown={handleKeyDown}
             placeholder={
               disabled
-                ? "Promote a corpus to start"
-                : "Ask about support policies…"
+                ? "Promote a generation to start"
+                : "Ask the knowledge base…"
             }
             rows={1}
             value={value}
           />
           <div className="flex items-center justify-between gap-3 px-1.5 pb-0.5">
             <span className="hidden text-xs text-ink-faint sm:inline">
-              Grounded in synthetic docs. Enter to send.
+              Enter to send · Shift+Enter for a new line
             </span>
             <span className="text-xs text-ink-faint sm:hidden">Enter to send</span>
             <button

@@ -484,11 +484,15 @@ const brainWorker = {
                 readyVersionId: null,
                 corpusStatus: "not_started",
               },
+              retrievalMode: env.VECTORIZE ? "hybrid" : "keyword",
             },
             requestId,
           );
         }
-        const inventory = await loadKnowledgeInventory(env.CORPUS_DB as SqlExecutor);
+        const inventory = await loadKnowledgeInventory(
+          env.CORPUS_DB as SqlExecutor,
+          env.VECTORIZE ? "hybrid" : "keyword",
+        );
         writeOperationalLog({
           requestId,
           principalKind: principal.kind,
@@ -537,6 +541,41 @@ const brainWorker = {
           durationMs: Date.now() - started,
         });
         return json(seeded, requestId);
+      }
+
+      if (path === "/knowledge/reindex" && request.method === "POST") {
+        operation = "knowledge-reindex";
+        requireOperator(principal.roles);
+        if (!env.CORPUS_DB) {
+          throw new WorkerValidationError();
+        }
+        const sourceGenerationId = await latestReadyOrActiveGenerationId(
+          env.CORPUS_DB as SqlExecutor,
+        );
+        if (!sourceGenerationId) {
+          throw new WorkerValidationError();
+        }
+        const documents = await loadSeedDocumentsFromGeneration(
+          env.CORPUS_DB as SqlExecutor,
+          sourceGenerationId,
+        );
+        if (documents.length === 0) {
+          throw new WorkerValidationError();
+        }
+        const reindexed = await seedNorthwindCorpus({
+          db: env.CORPUS_DB as SqlExecutor,
+          documents,
+          ai: env.AI,
+          vectorize: env.VECTORIZE,
+        });
+        writeOperationalLog({
+          requestId,
+          principalKind: principal.kind,
+          operation,
+          status: "ok",
+          durationMs: Date.now() - started,
+        });
+        return json(reindexed, requestId);
       }
 
       if (path === "/knowledge/promote" && request.method === "POST") {

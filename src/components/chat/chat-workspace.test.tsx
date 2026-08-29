@@ -186,7 +186,7 @@ describe("ChatWorkspace", () => {
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: "Sources: 1 cited of 5 retrieved",
+        name: "Evidence: 1 cited of 5 retrieved",
       }),
     );
 

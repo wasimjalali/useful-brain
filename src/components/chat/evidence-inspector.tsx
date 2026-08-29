@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { ArrowRightIcon, CloseIcon, SourceIcon } from "@/components/icons";
 import { Dialog } from "@/components/ui/dialog";
+import { formatRetrievalScore } from "@/lib/rag/retrieval";
 
 export type EvidenceTab = "cited" | "retrieved";
 
@@ -18,6 +19,11 @@ export type EvidenceItem = {
   scoreLabel: string;
   rankLabel: string;
   tokenEstimate: number;
+  generationId?: string;
+  vectorScore?: number | null;
+  keywordScore?: number | null;
+  fusedScore?: number | null;
+  rerankScore?: number | null;
 };
 
 export function normalizeForEvidenceMatch(value: string) {
@@ -117,18 +123,18 @@ function EvidenceInspectorPanel({
 
   return (
     <aside
-      aria-label="Sources"
+      aria-label="Evidence"
       className="panel-in fixed inset-y-0 right-0 z-40 flex w-[86%] max-w-[360px] flex-col border-l border-border bg-surface shadow-pop lg:static lg:z-auto lg:w-[360px] lg:shadow-none"
     >
       <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-3.5">
         <div>
-          <p className="text-sm font-semibold text-ink">Sources</p>
+          <p className="text-sm font-semibold text-ink">Evidence</p>
           <p className="text-xs text-ink-muted">
             {citedItems.length} cited of {retrievedItems.length} retrieved
           </p>
         </div>
         <button
-          aria-label="Close sources"
+          aria-label="Close evidence"
           className="icon-btn size-10"
           onClick={onClose}
           ref={closeRef}
@@ -156,7 +162,7 @@ function EvidenceInspectorPanel({
           <span className="grid size-10 place-items-center rounded-xl bg-sunken text-ink-faint">
             <SourceIcon className="size-5" />
           </span>
-          <p className="text-sm font-medium text-ink">No {activeTab} sources</p>
+          <p className="text-sm font-medium text-ink">No {activeTab} evidence</p>
           <p className="text-xs leading-5 text-ink-faint">
             Cited chunks stay separate from the wider retrieval set.
           </p>
@@ -236,6 +242,12 @@ function EvidenceCardBody({ item }: { item: EvidenceItem }) {
       </p>
       <p className="mt-0.5 text-xs text-ink-muted">{item.section}</p>
       <p className="mt-2 line-clamp-3 text-xs leading-5 text-ink-muted">{item.text}</p>
+      <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 border-t border-border pt-2.5 font-mono text-[10px] text-ink-faint">
+        <EvidenceMetric label="Keyword" value={item.keywordScore} />
+        <EvidenceMetric label="Vector" value={item.vectorScore} />
+        <EvidenceMetric label="Fused" value={item.fusedScore} />
+        <EvidenceMetric label="Rerank" value={item.rerankScore} />
+      </dl>
     </>
   );
 }
@@ -277,13 +289,19 @@ export function EvidenceChunkDialog({
         </button>
       </div>
 
-      <dl className="grid grid-cols-3 gap-3 border-b border-border px-5 py-4">
-        <StatCell label="Score" value={item.scoreLabel.replace("Score ", "")} />
+      <dl className="grid grid-cols-2 gap-x-5 gap-y-3 border-b border-border px-5 py-4 sm:grid-cols-3">
         <StatCell label="Rank" value={item.rankLabel.replace("Rank ", "#")} />
+        <StatCell label="Keyword" value={formatEvidenceScore(item.keywordScore)} />
+        <StatCell label="Vector" value={formatEvidenceScore(item.vectorScore)} />
+        <StatCell label="Fused" value={formatEvidenceScore(item.fusedScore)} />
+        <StatCell label="Rerank" value={formatEvidenceScore(item.rerankScore)} />
         <StatCell label="Tokens" value={`~${item.tokenEstimate}`} />
       </dl>
 
       <div className="max-h-[50vh] overflow-y-auto px-5 py-4">
+        <p className="mb-1 font-mono text-xs text-ink-faint">
+          Generation {item.generationId ?? "Unavailable"}
+        </p>
         <p className="mb-2 font-mono text-xs text-ink-faint">{item.id}</p>
         {match ? (
           <p className="whitespace-pre-wrap text-sm leading-7 text-ink">
@@ -301,11 +319,32 @@ export function EvidenceChunkDialog({
 
 function StatCell({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-border bg-canvas px-3 py-2.5">
+    <div>
       <dt className="text-[11px] font-medium text-ink-faint">{label}</dt>
       <dd className="tnum mt-1 truncate text-sm font-semibold text-ink">{value}</dd>
     </div>
   );
+}
+
+function EvidenceMetric({
+  label,
+  value,
+}: {
+  label: string;
+  value?: number | null;
+}) {
+  return (
+    <div className="flex justify-between gap-2">
+      <dt>{label}</dt>
+      <dd className="tnum text-ink-muted">{formatEvidenceScore(value)}</dd>
+    </div>
+  );
+}
+
+function formatEvidenceScore(value?: number | null) {
+  return value === null || value === undefined
+    ? "Unavailable"
+    : formatRetrievalScore(value);
 }
 
 function findEvidenceSentenceMatch(text: string, focusText: string | null) {

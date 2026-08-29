@@ -1,30 +1,27 @@
 @import "tailwindcss";
 
-/* ------------------------------------------------------------------ *
- * Useful Brain design tokens (light theme). Named by role, not by hue, so a
- * dark theme can be derived later without renaming. Neutrals carry a
- * slight cool bias toward the royal-blue accent so they read chosen.
- * ------------------------------------------------------------------ */
+/* Useful Brain role-named tokens. */
 :root {
-  --canvas: #f2f5f9;
-  --surface: #ffffff;
-  --sunken: #eef2f7;
+  --canvas: #f4f4f1;
+  --surface: #fbfbf9;
+  --sunken: #eceeeb;
 
-  --ink: #0e1b2b;
-  --ink-muted: #566372;
-  --ink-faint: #5f6b79;
+  --ink: #18211f;
+  --ink-muted: #56625e;
+  --ink-faint: #727d79;
 
-  --brand: #102a43;
-  --brand-ink: #e9f0fb;
+  --brand: #18302c;
+  --brand-ink: #edf4f1;
 
-  --accent: #2f6fed;
-  --accent-strong: #1f5ede;
-  --accent-soft: #e7f0fe;
-  --accent-deep: #16448f;
-  --accent-on-dark: #6fa4ff;
+  --accent: #176b62;
+  --accent-strong: #10574f;
+  --accent-soft: #e2efeb;
+  --accent-deep: #0d514a;
+  --accent-on-dark: #8fd3c8;
+  --accent-ink: #ffffff;
 
-  --border: #e3e8ef;
-  --border-strong: #cfd8e3;
+  --border: #d8ddd9;
+  --border-strong: #bec8c3;
 
   --success: #0f6f56;
   --success-soft: #e4f4ee;
@@ -35,12 +32,10 @@
 
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 
-  --shadow-sm: 0 1px 2px rgba(16, 42, 67, 0.06);
-  --shadow-card: 0 1px 0 rgba(16, 42, 67, 0.03),
-    0 12px 28px -18px rgba(16, 42, 67, 0.22);
-  --shadow-raise: 0 1px 0 rgba(16, 42, 67, 0.04),
-    0 18px 40px -22px rgba(16, 42, 67, 0.26);
-  --shadow-pop: 0 24px 52px -24px rgba(16, 42, 67, 0.32);
+  --shadow-sm: 0 1px 2px rgba(24, 33, 31, 0.06);
+  --shadow-card: 0 10px 24px -20px rgba(24, 33, 31, 0.32);
+  --shadow-raise: 0 16px 32px -24px rgba(24, 33, 31, 0.4);
+  --shadow-pop: 0 24px 52px -24px rgba(24, 33, 31, 0.42);
 }
 
 @theme inline {
@@ -60,6 +55,7 @@
   --color-accent-soft: var(--accent-soft);
   --color-accent-deep: var(--accent-deep);
   --color-accent-on-dark: var(--accent-on-dark);
+  --color-accent-ink: var(--accent-ink);
 
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
@@ -140,7 +136,7 @@ body {
 }
 .btn-primary {
   background-color: var(--accent);
-  color: #fff;
+  color: var(--accent-ink);
   box-shadow: var(--shadow-sm);
 }
 .btn-primary:not(:disabled):hover {
@@ -187,7 +183,7 @@ body {
 .field-input:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(47, 111, 237, 0.15);
+  box-shadow: 0 0 0 3px rgba(23, 107, 98, 0.15);
 }
 
 /* Left navigation item */
@@ -359,6 +355,102 @@ body {
   background: var(--accent-soft);
   color: var(--ink);
   padding: 1px 2px;
+}
+
+.first-run-panel {
+  display: flex;
+  min-height: 280px;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 32px;
+  border: 1px solid var(--border-strong);
+  border-radius: 16px;
+  background: var(--surface);
+  padding: 28px;
+}
+
+.corpus-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  border-block: 1px solid var(--border);
+  padding-block: 18px;
+}
+
+.section-label {
+  color: var(--ink-faint);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.settings-section {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 28px;
+}
+
+.settings-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.settings-list {
+  margin-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.settings-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.65fr) minmax(0, 1.35fr);
+  gap: 20px;
+  align-items: center;
+  min-height: 48px;
+  border-bottom: 1px solid var(--border);
+  padding-block: 10px;
+  font-size: 13px;
+}
+.settings-row dt {
+  color: var(--ink-muted);
+}
+.settings-row dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: 16px;
+  background: var(--surface);
+  padding: 24px;
+}
+.empty-state p {
+  color: var(--ink-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+@media (min-width: 768px) {
+  .corpus-summary {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 479px) {
+  .settings-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
 }
 
 /* Skeleton, entrances */

@@ -2,12 +2,14 @@
 
 import { useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
+import { useRouter } from "next/navigation";
 
 import { CloseIcon, LayersIcon, PlusIcon, UploadIcon } from "@/components/icons";
 import { Dialog } from "@/components/ui/dialog";
 import { StatusLabel, type StatusTone } from "@/components/ui/status-label";
 import type { DocumentChunk, KnowledgeDocument } from "@/lib/rag/types";
 import type { EmbeddingStorageStatus } from "@/lib/rag/storage-records";
+import type { KnowledgeInventory } from "@/lib/store/knowledge-inventory";
 
 export type DocumentStatus =
   | "active"
@@ -22,8 +24,10 @@ export type KnowledgeWorkspaceProps = {
   addDocumentAction: (formData: FormData) => Promise<void>;
   embedAction: () => Promise<void>;
   embeddingStorageStatus: EmbeddingStorageStatus;
-  indexActionLabel?: string;
+  initialAddOpen?: boolean;
   promoteAction?: (versionId: string) => Promise<void>;
+  reindexAction?: () => Promise<void>;
+  retrievalMode?: KnowledgeInventory["retrievalMode"];
 };
 
 type DocumentInventoryItem = {
@@ -56,10 +60,13 @@ export function KnowledgeWorkspace({
   documents,
   embedAction,
   embeddingStorageStatus,
-  indexActionLabel = "Refresh indexing",
+  initialAddOpen = false,
   promoteAction,
+  reindexAction,
+  retrievalMode = "keyword",
 }: KnowledgeWorkspaceProps) {
-  const [addOpen, setAddOpen] = useState(false);
+  const router = useRouter();
+  const [addOpen, setAddOpen] = useState(initialAddOpen);
   const [selectedDocument, setSelectedDocument] =
     useState<DocumentInventoryItem | null>(null);
   const [query, setQuery] = useState("");
@@ -70,6 +77,7 @@ export function KnowledgeWorkspace({
   const [isEmbedding, setIsEmbedding] = useState(false);
   const [embedError, setEmbedError] = useState<string | null>(null);
   const [isPromoting, setIsPromoting] = useState(false);
+  const [isReindexing, setIsReindexing] = useState(false);
 
   const inventory = useMemo(() => {
     const chunksBySource = new Map<string, DocumentChunk[]>();
@@ -87,14 +95,14 @@ export function KnowledgeWorkspace({
         status: getDocumentStatus({
           chunkCount: documentChunks.length,
           embeddingStorageStatus,
-          isEmbedding,
+          isEmbedding: isEmbedding || isReindexing,
           totalChunkCount: chunks.length,
         }),
-        sectionCount: countSections(document.text),
+        sectionCount: new Set(documentChunks.map((chunk) => chunk.section)).size,
         wordCount: countWords(document.text),
       };
     });
-  }, [chunks, documents, embeddingStorageStatus, isEmbedding]);
+  }, [chunks, documents, embeddingStorageStatus, isEmbedding, isReindexing]);
 
   const visibleDocuments = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase();
@@ -130,9 +138,10 @@ export function KnowledgeWorkspace({
     setIsEmbedding(true);
     try {
       await embedAction();
+      router.refresh();
     } catch (caught) {
       setEmbedError(
-        caught instanceof Error ? caught.message : "Embedding failed.",
+        caught instanceof Error ? caught.message : "Indexing failed.",
       );
     } finally {
       setIsEmbedding(false);
@@ -146,6 +155,7 @@ export function KnowledgeWorkspace({
     setIsPromoting(true);
     try {
       await promoteAction(readyVersionId);
+      router.refresh();
     } catch (caught) {
       setEmbedError(
         caught instanceof Error ? caught.message : "Corpus promotion failed.",
@@ -155,29 +165,96 @@ export function KnowledgeWorkspace({
     }
   }
 
+  async function handleReindex() {
+    if (!reindexAction) return;
+    setEmbedError(null);
+    setIsReindexing(true);
+    try {
+      await reindexAction();
+      router.refresh();
+    } catch (caught) {
+      setEmbedError(caught instanceof Error ? caught.message : "Re-indexing failed.");
+    } finally {
+      setIsReindexing(false);
+    }
+  }
+
+  function closeAddDocument() {
+    setAddOpen(false);
+    router.refresh();
+    if (initialAddOpen) {
+      router.push("/knowledge");
+    }
+  }
+
+  const firstRun =
+    documents.length === 0 && embeddingStorageStatus.corpusStatus === "not_started";
+
+  if (firstRun) {
+    return (
+      <div className="flex flex-col gap-6">
+        <header className="border-b border-border pb-5">
+          <h1 className="text-2xl font-semibold tracking-[-0.02em] text-ink">Knowledge base</h1>
+        </header>
+        <section className="first-run-panel" aria-labelledby="first-run-heading">
+          <div>
+            <p className="section-label">Setup needed</p>
+            <h2 className="mt-2 text-xl font-semibold text-ink" id="first-run-heading">
+              Add the first documents
+            </h2>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-ink-muted">
+              Chat stays unavailable until a ready generation is promoted.
+            </p>
+          </div>
+          {embedError ? <p className="text-sm font-medium text-danger" role="alert">{embedError}</p> : null}
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button
+              className="btn btn-primary min-h-11 px-4 text-sm"
+              disabled={isEmbedding}
+              onClick={handleEmbed}
+              type="button"
+            >
+              <LayersIcon className="size-4" />
+              {isEmbedding ? "Seeding Northwind" : "Seed Northwind corpus"}
+            </button>
+            <button
+              className="btn btn-secondary min-h-11 px-4 text-sm"
+              onClick={() => setAddOpen(true)}
+              type="button"
+            >
+              <UploadIcon className="size-4" />
+              Upload document
+            </button>
+          </div>
+        </section>
+        {addOpen ? <AddDocumentDialog action={addDocumentAction} onClose={closeAddDocument} /> : null}
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-[-0.01em] text-ink">
-            Knowledge base
-          </h1>
-          <p className="mt-1 max-w-2xl text-sm text-ink-muted">
-            Review document coverage, chunking and indexing readiness before the copilot uses a source.
-          </p>
-        </div>
+        <h1 className="text-2xl font-semibold tracking-[-0.02em] text-ink">Knowledge base</h1>
         <button
           className="btn btn-primary min-h-10 shrink-0 px-3.5 text-sm"
           onClick={() => setAddOpen(true)}
           type="button"
         >
           <PlusIcon className="size-4" />
-          Add document
+          Upload document
         </button>
       </header>
 
+      <CorpusSummary
+        documents={documents.length}
+        chunks={chunks.length}
+        retrievalMode={retrievalMode}
+        status={embeddingStorageStatus}
+      />
+
       <section aria-labelledby="document-inventory-heading" className="flex flex-col gap-4">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h2 className="text-base font-semibold text-ink" id="document-inventory-heading">
               Document inventory
@@ -188,7 +265,30 @@ export function KnowledgeWorkspace({
               <span className="tnum">{activeCount}</span> active sources.
             </p>
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <div className="flex flex-col gap-2 sm:flex-row">
+            {reindexAction ? <button
+              className="btn btn-secondary min-h-10 px-3.5 text-sm"
+              disabled={isReindexing || isPromoting}
+              onClick={handleReindex}
+              type="button"
+            >
+              <LayersIcon className="size-4" />
+              {isReindexing ? "Re-indexing" : "Re-index knowledge base"}
+            </button> : null}
+            {embeddingStorageStatus.readyVersionId && promoteAction ? (
+              <button
+                className="btn btn-primary min-h-10 px-3.5 text-sm"
+                disabled={isPromoting || isEmbedding}
+                onClick={handlePromote}
+                type="button"
+              >
+                <UploadIcon className="size-4" />
+                {isPromoting ? "Promoting" : "Promote ready corpus"}
+              </button>
+            ) : null}
+          </div>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-3">
             <label className="flex min-w-52 flex-col gap-1.5 text-[13px] font-medium text-ink-muted">
               Search documents
               <input
@@ -231,27 +331,6 @@ export function KnowledgeWorkspace({
                 <option value="chunks">Most chunks</option>
               </select>
             </label>
-            <button
-              className="btn btn-secondary min-h-10 px-3.5 text-sm"
-              disabled={isEmbedding}
-              onClick={handleEmbed}
-              type="button"
-            >
-              <LayersIcon className="size-4" />
-              {isEmbedding ? "Indexing" : indexActionLabel}
-            </button>
-            {embeddingStorageStatus.readyVersionId && promoteAction ? (
-              <button
-                className="btn btn-primary min-h-10 px-3.5 text-sm"
-                disabled={isPromoting || isEmbedding}
-                onClick={handlePromote}
-                type="button"
-              >
-                <UploadIcon className="size-4" />
-                {isPromoting ? "Promoting" : "Promote corpus"}
-              </button>
-            ) : null}
-          </div>
         </div>
 
         {embedError ? (
@@ -271,14 +350,9 @@ export function KnowledgeWorkspace({
       </section>
 
       <section aria-labelledby="recent-chunks-heading" className="flex flex-col gap-3">
-        <div>
-          <h2 className="text-base font-semibold text-ink" id="recent-chunks-heading">
-            Chunk preview
-          </h2>
-          <p className="mt-1 text-sm text-ink-muted">
-            Inspect the retrieval units created from the current document inventory.
-          </p>
-        </div>
+        <h2 className="text-base font-semibold text-ink" id="recent-chunks-heading">
+          Chunk preview
+        </h2>
         {chunks.length > 0 ? (
           <div className="overflow-hidden rounded-xl border border-border bg-surface">
             {chunks.slice(0, 5).map((chunk) => (
@@ -307,7 +381,7 @@ export function KnowledgeWorkspace({
       {addOpen ? (
         <AddDocumentDialog
           action={addDocumentAction}
-          onClose={() => setAddOpen(false)}
+          onClose={closeAddDocument}
         />
       ) : null}
 
@@ -317,6 +391,55 @@ export function KnowledgeWorkspace({
           onClose={() => setSelectedDocument(null)}
         />
       ) : null}
+    </div>
+  );
+}
+
+function CorpusSummary({
+  chunks,
+  documents,
+  retrievalMode,
+  status,
+}: {
+  chunks: number;
+  documents: number;
+  retrievalMode: KnowledgeInventory["retrievalMode"];
+  status: EmbeddingStorageStatus;
+}) {
+  const statusLabel = status.readyVersionId
+    ? "Ready to promote"
+    : status.corpusStatus === "active"
+      ? "Active"
+      : status.corpusStatus === "failed"
+        ? "Failed"
+        : "Building";
+  return (
+    <section className="corpus-summary" aria-label="Corpus status">
+      <div>
+        <p className="section-label">Generation status</p>
+        <p className="mt-1 text-lg font-semibold text-ink">{statusLabel}</p>
+      </div>
+      <SummaryMetric label="Documents" value={documents.toLocaleString("en-US")} />
+      <SummaryMetric label="Chunks" value={chunks.toLocaleString("en-US")} />
+      <SummaryMetric
+        label="Retrieval"
+        value={retrievalMode === "hybrid" ? "Hybrid" : "Keyword only"}
+      />
+      <div className="min-w-0 md:col-span-2 xl:col-span-1">
+        <p className="section-label">Generation</p>
+        <p className="mt-1 truncate font-mono text-xs text-ink-muted">
+          {status.readyVersionId ?? status.activeVersionId ?? "None"}
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function SummaryMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="section-label">{label}</p>
+      <p className="tnum mt-1 text-lg font-semibold text-ink">{value}</p>
     </div>
   );
 }
@@ -537,10 +660,10 @@ function AddDocumentDialog({
   }
 
   return (
-    <Dialog ariaLabel="Add document" maxWidth="max-w-lg" onClose={onClose}>
+    <Dialog ariaLabel="Upload document" maxWidth="max-w-lg" onClose={onClose}>
       <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-4">
         <div>
-          <h2 className="text-base font-semibold text-ink">Add a synthetic document</h2>
+          <h2 className="text-base font-semibold text-ink">Upload document</h2>
           <p className="mt-0.5 text-xs text-ink-muted">
             Upload a Markdown, text or PDF file, or paste text with {" "}
             <code className="font-mono">## Heading</code> lines.
@@ -630,7 +753,7 @@ function AddDocumentSubmit() {
   return (
     <button className="btn btn-primary h-10 px-4 text-sm" disabled={pending} type="submit">
       <PlusIcon className="size-4" />
-      Add document
+      Upload document
     </button>
   );
 }
@@ -673,13 +796,13 @@ function getDocumentStatus({
 
 function ingestionNote(status: DocumentStatus) {
   if (status === "active") {
-    return "All chunks are embedded and available to retrieval.";
+    return "All chunks are indexed and available to retrieval.";
   }
   if (status === "processing") {
     return "The current indexing run is in progress. This document is not ready for retrieval.";
   }
   if (status === "ready") {
-    return "All chunks are embedded in a draft. Promote it to make retrieval use this version.";
+    return "All chunks are indexed in a draft. Promote it to make retrieval use this version.";
   }
   if (status === "failed") {
     return "The latest indexing run failed. This document is not ready for retrieval.";
@@ -702,10 +825,6 @@ function chunkStateLabel(status: DocumentStatus, chunkCount: number) {
     return `${count} not indexed`;
   }
   return `${count} waiting for indexing`;
-}
-
-function countSections(markdown: string) {
-  return markdown.split(/\r?\n/).filter((line) => line.startsWith("## ")).length;
 }
 
 function countWords(text: string) {

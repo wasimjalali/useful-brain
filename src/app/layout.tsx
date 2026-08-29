@@ -20,7 +20,7 @@ const jetBrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "Useful Brain",
   description:
-    "Company knowledge and actions grounded in evidence your team can inspect.",
+    "Private company knowledge grounded in evidence the operator can inspect.",
 };
 
 export default function RootLayout({
