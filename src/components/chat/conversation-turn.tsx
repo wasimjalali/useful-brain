@@ -107,16 +107,16 @@ export function ConversationTurn({
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          {grounded && citedItems.length > 0 ? (
+          {evidence.length > 0 ? (
             <button
-              aria-label={`Sources: ${citedItems.length} cited of ${evidence.length} retrieved`}
+              aria-label={`Evidence: ${citedItems.length} cited of ${evidence.length} retrieved`}
               className="source-trigger min-h-10 px-3 text-xs font-medium"
               onClick={onOpenSources}
               type="button"
             >
               <SourceIcon className="size-3.5" />
-              Sources
-              <span className="tnum text-accent-deep">{citedItems.length}</span>
+              Evidence
+              <span className="tnum text-accent-deep">{evidence.length}</span>
             </button>
           ) : null}
           <AnswerActionButton
@@ -196,6 +196,11 @@ function buildEvidenceItems(answer: GroundedAnswerResponse): EvidenceItem[] {
     scoreLabel: "",
     rankLabel: "",
     tokenEstimate: result.tokenEstimate,
+    generationId: answer.corpusGenerationId ?? "Unknown",
+    vectorScore: result.vectorScore ?? null,
+    keywordScore: result.keywordScore ?? null,
+    fusedScore: result.fusedScore ?? null,
+    rerankScore: result.rerankScore ?? null,
   }));
 }
 

@@ -37,6 +37,37 @@ const embeddingStorageStatus = {
 } as const;
 
 describe("KnowledgeWorkspace", () => {
+  it("shows an honest first-run state for an empty corpus", () => {
+    render(
+      <KnowledgeWorkspace
+        addDocumentAction={async () => {}}
+        chunks={[]}
+        documents={[]}
+        embedAction={async () => {}}
+        embeddingStorageStatus={{
+          storedDocuments: 0,
+          storedChunks: 0,
+          embeddedChunks: 0,
+          lastRunStatus: "not_started",
+          lastRunMessage: null,
+          lastEmbeddedAt: null,
+          activeVersionId: null,
+          readyVersionId: null,
+          corpusStatus: "not_started",
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Setup needed")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Seed Northwind corpus" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Upload document" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("table", { name: "Knowledge documents" })).toBeNull();
+  });
+
   it("filters documents by title, source and status", () => {
     render(
       <KnowledgeWorkspace
@@ -158,7 +189,8 @@ describe("KnowledgeWorkspace", () => {
         addDocumentAction={async () => {}}
         chunks={chunks}
         documents={documents}
-        embedAction={() =>
+        embedAction={async () => {}}
+        reindexAction={() =>
           new Promise<void>((resolve) => {
             resolveEmbedding = resolve;
           })
@@ -167,7 +199,7 @@ describe("KnowledgeWorkspace", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Refresh indexing" }));
+    fireEvent.click(screen.getByRole("button", { name: "Re-index knowledge base" }));
 
     const table = screen.getByRole("table", { name: "Knowledge documents" });
     await waitFor(() => {
@@ -256,7 +288,7 @@ describe("KnowledgeWorkspace", () => {
     );
 
     expect(screen.getAllByText("Ready to promote").length).toBeGreaterThan(0);
-    fireEvent.click(screen.getByRole("button", { name: "Promote corpus" }));
+    fireEvent.click(screen.getByRole("button", { name: "Promote ready corpus" }));
     await waitFor(() => {
       expect(promoteAction).toHaveBeenCalledWith("version-1");
     });

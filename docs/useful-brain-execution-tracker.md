@@ -1,6 +1,6 @@
 # Useful Brain implementation execution tracker
 
-Status: Phase 7A is merged on `main` ([PR #13](https://github.com/wasimjalali/useful-brain/pull/13), P2 repairs [PR #14](https://github.com/wasimjalali/useful-brain/pull/14)). Local Cloudflare UI cutover is on `grok/cloudflare-ui-cutover`. Product boundary: local portfolio agent — no billing, public signup or required Cloudflare Access. Commercial Phase 7B (real company data, production resource set) stays closed.
+Status: Phase 7A is merged on `main` ([PR #13](https://github.com/wasimjalali/useful-brain/pull/13), P2 repairs [PR #14](https://github.com/wasimjalali/useful-brain/pull/14)). The Cloudflare backend and initial UI cutover are merged through PR #15. The operator UI rebuild is on `codex/rebuild-operator-ui`. Product boundary: local portfolio agent, with no billing, public signup or required Cloudflare Access. Commercial Phase 7B (real company data, production resource set) stays closed.
 
 Architecture authority: `docs/useful-brain-master-plan.md`
 
@@ -368,6 +368,17 @@ Authorized separately from commercial Phase 7B. Loopback + existing staging skel
 - [x] Brain wrangler dry-run after Pi chat path: **882.95 KiB / gzip 165.15 KiB** (development and staging).
 - [x] Independent review: Gemini 3.7 Flash high. Verdict approve; no P0/P1 or high/critical findings. Non-blocking P2s left unchanged (legacy localStorage key name, empty-corpus preview, fail-closed tool-argument parse).
 - [x] Local Burooj sibling deleted 2026-08-28 after archive verify (SHA-256 `2e8733d7884f963ab02e5633646515131c33af870f75e9ffa332679f587dcaf8`, `git bundle verify` ok). GitHub `wasimjalali/burooj` deletion is blocked on the `delete_repo` scope (`gh auth refresh -h github.com -s delete_repo`). Archive retained at gitignored `.archives/burooj-630ba08dc7cad6aa71942d6842ce6d8d55a26873.bundle`.
+
+### Operator UI rebuild (Wasim 2026-08-29)
+
+- [x] Audit the Brain and ingestion surfaces against every operator journey. Empty D1 preview fallback, missing routes, unused identity, hidden errors and local keyword-only retrieval labeling were confirmed.
+- [x] Replace the single dashboard route with `/chat`, `/chat/[id]`, `/knowledge`, `/knowledge/new`, `/evaluations` and `/settings`. Root now redirects to setup until an active generation exists.
+- [x] Keep conversations server-owned with routed reopen and delete behavior. Preserve exact stored evidence snapshots.
+- [x] Make knowledge updates explicit: seed or upload creates a ready generation, re-index creates a new ready generation and only Promote changes the active generation.
+- [x] Add operator identity, locked model IDs, retrieval mode and active or ready corpus state to Settings.
+- [x] Keep fail-closed answers visible while allowing the retrieved evidence set to be inspected, including generation and available retrieval-stage scores.
+- [x] Remove the Northwind preview fallback. Empty or unavailable Brain state is never presented as a live corpus.
+- [ ] Gemini 3.7 Flash high independent review remains the merge gate for this pass.
 
 ### Phase 7B: production launch and retirement
 

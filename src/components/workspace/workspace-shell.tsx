@@ -13,7 +13,7 @@ import {
 import { UsefulBrainLogo } from "@/components/useful-brain-logo";
 import { DEFAULT_USEFUL_BRAIN_CONFIG } from "@/lib/useful-brain-config";
 
-export type WorkspaceView = "chat" | "knowledge" | "evaluations";
+export type WorkspaceView = "chat" | "knowledge" | "evaluations" | "settings";
 
 export type WorkspaceShellProps = {
   activeView: WorkspaceView;

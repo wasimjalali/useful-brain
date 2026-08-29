@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { SqlExecutor } from "./corpus-d1";
 import {
+  latestReadyOrActiveGenerationId,
   loadSeedDocumentsFromGeneration,
   mergeSeedDocuments,
   seedNorthwindCorpus,
@@ -20,6 +21,23 @@ const publicDoc = (id: string, body: string): SeedDocumentInput => ({
 });
 
 describe("corpus seed merge", () => {
+  it("uses the newest ready generation as the base for consecutive updates", async () => {
+    const db = {
+      prepare(sql: string) {
+        return {
+          async first() {
+            if (sql.includes("state = 'ready'")) {
+              return { id: "g-ready" };
+            }
+            throw new Error("The active generation should not replace a ready draft.");
+          },
+        };
+      },
+    } as unknown as SqlExecutor;
+
+    await expect(latestReadyOrActiveGenerationId(db)).resolves.toBe("g-ready");
+  });
+
   it("keeps existing documents and lets incoming ids replace", () => {
     const merged = mergeSeedDocuments(
       [publicDoc("nw_a", "A"), publicDoc("nw_b", "B")],

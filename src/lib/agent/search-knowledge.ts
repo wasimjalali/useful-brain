@@ -69,14 +69,19 @@ export function createSearchKnowledgeTool(input: {
         );
         const ledger = input.ledger ?? createLedger();
         const hits = response.hits.map((hit) => {
-        const label = appendSearchHit(ledger, {
-          chunkId: hit.chunkId,
-          documentId: hit.citation.documentId,
-          version: null,
-          section: hit.citation.sectionHeading,
-          text: hit.content,
-          source: fileName(hit.citation.sourcePath || hit.citation.sourceName),
-        });
+          const label = appendSearchHit(ledger, {
+            chunkId: hit.chunkId,
+            documentId: hit.citation.documentId,
+            version: null,
+            section: hit.citation.sectionHeading,
+            text: hit.content,
+            source: fileName(hit.citation.sourcePath || hit.citation.sourceName),
+            score: hit.score,
+            vectorScore: response.trace.vectorScores[hit.chunkId] ?? null,
+            keywordScore: response.trace.keywordScores[hit.chunkId] ?? null,
+            fusedScore: response.trace.fusedScores[hit.chunkId] ?? null,
+            rerankScore: response.trace.rerankScores[hit.chunkId] ?? hit.score,
+          });
           return {
             chunk_id: hit.chunkId,
             content: hit.content,

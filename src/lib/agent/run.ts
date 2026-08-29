@@ -378,7 +378,7 @@ export function evidenceFromLedger(ledger: TurnEvidenceLedger): CitedRetrievalRe
     .sort((left, right) => left[0] - right[0])
     .map(([label, identity]) => ({
       rank: label,
-      score: 0,
+      score: identity.score ?? identity.rerankScore ?? identity.fusedScore ?? 0,
       chunkId: identity.chunkId,
       source: identity.source ?? identity.documentId,
       section: identity.section,
@@ -386,5 +386,9 @@ export function evidenceFromLedger(ledger: TurnEvidenceLedger): CitedRetrievalRe
       tokenEstimate: Math.max(1, Math.ceil(identity.text.length / 4)),
       citationLabel: `[${label}]`,
       documentId: identity.documentId,
+      vectorScore: identity.vectorScore ?? null,
+      keywordScore: identity.keywordScore ?? null,
+      fusedScore: identity.fusedScore ?? null,
+      rerankScore: identity.rerankScore ?? identity.score ?? null,
     }));
 }

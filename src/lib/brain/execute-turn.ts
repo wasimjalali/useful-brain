@@ -268,6 +268,8 @@ function replayToResponse(replay: {
   answerModel: string;
   structuredAnswer: GroundedAnswerResponse["structuredAnswer"];
   retrieval: GroundedAnswerResponse["retrieval"];
+  corpusGenerationId?: string | null;
+  retrievalConfigVersion?: string | null;
 }): GroundedAnswerResponse {
   return {
     question: replay.question,
@@ -277,6 +279,8 @@ function replayToResponse(replay: {
     retrieval: replay.retrieval,
     conversationId: replay.conversationId,
     assistantMessageId: replay.assistantMessageId,
+    corpusGenerationId: replay.corpusGenerationId,
+    retrievalConfigVersion: replay.retrievalConfigVersion,
   };
 }
 

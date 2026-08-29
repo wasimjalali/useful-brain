@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 
 import { brainJson } from "@/lib/cf/brain-client";
-import { chunkDocuments } from "@/lib/rag/chunk";
 import {
   actionFailure,
   actionSuccess,
@@ -24,6 +23,17 @@ import type { KnowledgeInventory } from "@/lib/store/knowledge-inventory";
 
 const MAX_QUESTION_LENGTH = 2000;
 
+export type WorkspaceIdentity = {
+  id: string;
+  kind: "user" | "service_token";
+  roles: string[];
+  departments: string[];
+};
+
+function revalidateWorkspace() {
+  revalidatePath("/", "layout");
+}
+
 export async function embedSyntheticDocumentsAction() {
   try {
     await brainJson("/knowledge/seed", {
@@ -38,17 +48,30 @@ export async function embedSyntheticDocumentsAction() {
       inProgress
         ? {
             code: "RATE_LIMITED",
-            message: "An embedding run is already in progress. Try again in a moment.",
+            message: "An indexing run is already in progress. Try again in a moment.",
             retryable: true,
           }
         : {
             code: "PROVIDER_TEMPORARY",
-            message: "Embedding failed. Check the model connection and try again.",
+            message: "Indexing failed. Check the model connection and try again.",
             retryable: true,
           },
     );
   }
-  revalidatePath("/");
+  revalidateWorkspace();
+}
+
+export async function reindexKnowledgeAction() {
+  try {
+    await brainJson("/knowledge/reindex", { method: "POST", json: {} });
+  } catch (error) {
+    throwPublicAppError(error, {
+      code: "PROVIDER_TEMPORARY",
+      message: "The knowledge base could not be re-indexed.",
+      retryable: true,
+    });
+  }
+  revalidateWorkspace();
 }
 
 export async function promoteCorpusVersionAction(versionId: string) {
@@ -61,7 +84,7 @@ export async function promoteCorpusVersionAction(versionId: string) {
       retryable: true,
     });
   }
-  revalidatePath("/");
+  revalidateWorkspace();
 }
 
 export async function askGroundedQuestion(input: {
@@ -179,7 +202,7 @@ export async function addSyntheticDocumentAction(formData: FormData) {
     );
   }
 
-  revalidatePath("/");
+  revalidateWorkspace();
 }
 
 export async function loadWorkspaceSnapshot(): Promise<{
@@ -188,30 +211,39 @@ export async function loadWorkspaceSnapshot(): Promise<{
   embeddingStorageStatus: EmbeddingStorageStatus;
   conversations: Conversation[];
   evalRuns: EvalRunResult[];
+  identity: WorkspaceIdentity | null;
+  retrievalMode: KnowledgeInventory["retrievalMode"];
+  error: string | null;
 }> {
-  const northwind = previewNorthwindDocuments();
   try {
-    const [inventory, conversations, evalRuns] = await Promise.all([
+    const [inventory, conversations, evalRuns, identity] = await Promise.all([
       brainJson<KnowledgeInventory>("/knowledge"),
       brainJson<Array<Pick<Conversation, "id" | "title" | "createdAt" | "updatedAt">>>(
         "/conversations",
       ),
       brainJson<EvalRunResult[]>("/evaluations"),
+      brainJson<WorkspaceIdentity>("/whoami"),
     ]);
     return {
-      documents: inventory.documents.length > 0 ? inventory.documents : northwind.documents,
-      chunks: inventory.chunks.length > 0 ? inventory.chunks : northwind.chunks,
+      documents: inventory.documents,
+      chunks: inventory.chunks,
       embeddingStorageStatus: inventory.embeddingStorageStatus,
       conversations: conversations.map((conversation) => ({ ...conversation, turns: [] })),
       evalRuns,
+      identity,
+      retrievalMode: inventory.retrievalMode,
+      error: null,
     };
   } catch {
     return {
-      documents: northwind.documents,
-      chunks: northwind.chunks,
+      documents: [],
+      chunks: [],
       embeddingStorageStatus: emptyEmbeddingStorageStatus,
       conversations: [],
       evalRuns: [],
+      identity: null,
+      retrievalMode: "keyword",
+      error: "Useful Brain could not load the operator workspace.",
     };
   }
 }
@@ -249,15 +281,6 @@ function seedDocumentFromUpload(title: string, body: string): SeedDocumentInput 
       allowed_departments: [],
     },
   };
-}
-
-function previewNorthwindDocuments(): { documents: KnowledgeDocument[]; chunks: DocumentChunk[] } {
-  const knowledge = northwindSeedDocuments().map((document) => ({
-    source: document.sourcePath.split("/").pop() ?? document.documentId,
-    title: document.title,
-    text: document.body,
-  }));
-  return { documents: knowledge, chunks: chunkDocuments(knowledge) };
 }
 
 function throwPublicAppError(error: unknown, fallback: PublicAppError): never {

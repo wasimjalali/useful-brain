@@ -2,8 +2,8 @@ type MarkTone = "dark" | "light";
 
 /**
  * The constellation mark: a query node linked to the sources it retrieves,
- * the literal shape of vector search. "dark" renders for a navy tile,
- * "light" renders navy-on-white for inline use.
+ * the literal shape of retrieval. "dark" renders on the brand tile and
+ * "light" renders on a light surface.
  */
 export function UsefulBrainMark({
   tone = "dark",
@@ -12,9 +12,9 @@ export function UsefulBrainMark({
   tone?: MarkTone;
   className?: string;
 }) {
-  const node = tone === "dark" ? "#ffffff" : "#102a43";
-  const focal = tone === "dark" ? "#6fa4ff" : "#2f6fed";
-  const line = tone === "dark" ? "#6fa4ff" : "#2f6fed";
+  const node = tone === "dark" ? "var(--brand-ink)" : "var(--brand)";
+  const focal = tone === "dark" ? "var(--accent-on-dark)" : "var(--accent)";
+  const line = focal;
 
   return (
     <svg
@@ -39,7 +39,7 @@ export function UsefulBrainMark({
   );
 }
 
-/** Mark on a navy tile plus the wordmark. Used in the sidebar and header. */
+/** Mark on a brand tile plus the wordmark. Used in the sidebar and header. */
 export function UsefulBrainLogo({ compact = false }: { compact?: boolean }) {
   return (
     <div className="flex items-center gap-3">

@@ -7,6 +7,11 @@ export type CitedRetrievalResult = {
   text: string;
   tokenEstimate: number;
   citationLabel: string;
+  documentId?: string | null;
+  vectorScore?: number | null;
+  keywordScore?: number | null;
+  fusedScore?: number | null;
+  rerankScore?: number | null;
 };
 
 export type GroundedAnswerParagraph = {
@@ -31,4 +36,6 @@ export type GroundedAnswerResponse = {
   };
   conversationId?: string;
   assistantMessageId?: string;
+  corpusGenerationId?: string | null;
+  retrievalConfigVersion?: string | null;
 };

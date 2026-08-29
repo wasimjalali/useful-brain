@@ -32,6 +32,7 @@ type ChatWorkspaceProps = {
     matchedSentence: string,
   ) => void;
   onNewChat: () => void;
+  onOpenKnowledge?: () => void;
   onOpenSources: (turnId: string) => void;
   onSubmit: (value: string) => void;
   pendingQuestion: string | null;
@@ -45,6 +46,7 @@ export function ChatWorkspace({
   focusedEvidenceId,
   onFocusEvidence,
   onNewChat,
+  onOpenKnowledge = () => {},
   onOpenSources,
   onSubmit,
   pendingQuestion,
@@ -71,7 +73,7 @@ export function ChatWorkspace({
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center justify-between gap-3 border-b border-border bg-surface px-4 py-2.5 sm:px-6">
-        <h1 className="text-sm font-semibold text-ink">Support chat</h1>
+        <h1 className="text-sm font-semibold text-ink">Chat</h1>
         <button
           className="btn btn-secondary min-h-10 px-3 text-sm"
           disabled={!canReset}
@@ -86,7 +88,7 @@ export function ChatWorkspace({
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
           {!ready ? (
-            <SetupNotice />
+            <SetupNotice onOpenKnowledge={onOpenKnowledge} />
           ) : !hasConversation ? (
             <ChatWelcome onRunQuestion={send} />
           ) : (
@@ -178,7 +180,7 @@ function ChatWelcome({ onRunQuestion }: { onRunQuestion: (value: string) => void
 function UserMessage({ text }: { text: string }) {
   return (
     <div className="msg-in flex justify-end">
-      <div className="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-accent px-4 py-2.5 text-[15px] leading-6 text-white shadow-sm">
+      <div className="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-accent px-4 py-2.5 text-[15px] leading-6 text-accent-ink shadow-sm">
         {text}
       </div>
     </div>
@@ -196,25 +198,25 @@ function ThinkingIndicator() {
           aria-hidden="true"
           className="size-4 animate-spin rounded-full border-2 border-accent/30 border-t-accent"
         />
-        <span className="text-sm text-ink-muted">Looking for relevant support evidence.</span>
+        <span className="text-sm text-ink-muted">Retrieving evidence and checking citations.</span>
       </div>
     </div>
   );
 }
 
-function SetupNotice() {
+function SetupNotice({ onOpenKnowledge }: { onOpenKnowledge: () => void }) {
   return (
     <div className="rise rounded-2xl border border-dashed border-border-strong bg-surface p-6 text-center">
       <span className="mx-auto grid size-11 place-items-center rounded-xl bg-warning-soft text-warning">
         <LayersIcon className="size-6" />
       </span>
-      <h2 className="mt-4 text-lg font-semibold text-ink">
-        Store and embed chunks before answer generation.
-      </h2>
+      <h2 className="mt-4 text-lg font-semibold text-ink">Set up the knowledge base</h2>
       <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-muted">
-        The corpus has not been embedded yet. Open {DEFAULT_USEFUL_BRAIN_CONFIG.knowledgeLabel}
-        {" "}and run the embed step, then return to ask questions.
+        Chat becomes available after a ready generation is promoted.
       </p>
+      <button className="btn btn-primary mt-4 min-h-10 px-4 text-sm" onClick={onOpenKnowledge} type="button">
+        Open {DEFAULT_USEFUL_BRAIN_CONFIG.knowledgeLabel}
+      </button>
     </div>
   );
 }
@@ -264,6 +266,11 @@ export function buildEvidenceItems(
     scoreLabel: `Score ${formatRetrievalScore(result.score)}`,
     rankLabel: `Rank ${result.rank}`,
     tokenEstimate: result.tokenEstimate,
+    generationId: groundedAnswer.corpusGenerationId ?? "Unknown",
+    vectorScore: result.vectorScore ?? null,
+    keywordScore: result.keywordScore ?? null,
+    fusedScore: result.fusedScore ?? null,
+    rerankScore: result.rerankScore ?? null,
   }));
 }
 

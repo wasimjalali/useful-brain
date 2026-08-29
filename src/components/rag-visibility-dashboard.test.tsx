@@ -67,6 +67,9 @@ const embeddingStorageStatus = {
   lastRunStatus: "failed",
   lastRunMessage: "1 chunk returned 3 dimensions.",
   lastEmbeddedAt: 1782920000000,
+  activeVersionId: "g-active",
+  readyVersionId: null,
+  corpusStatus: "active",
 } as const;
 
 const groundedAnswer: GroundedAnswerResponse = {
@@ -208,6 +211,7 @@ const baseProps = {
   embedAction: async () => {},
   askAction: async () => successfulAnswer(groundedAnswer),
   embeddingStorageStatus,
+  reindexAction: async () => {},
 };
 
 // Type a question into the composer and submit it, the way the user does.
@@ -323,7 +327,7 @@ describe("RagVisibilityDashboard", () => {
     expect(screen.getByText("Ready")).toHaveClass("text-success");
   });
 
-  it("renders the three production workspace views and drops the learning-only ones", () => {
+  it("renders the four operator workspace views", () => {
     render(<RagVisibilityDashboard {...baseProps} />);
 
     expect(
@@ -336,18 +340,17 @@ describe("RagVisibilityDashboard", () => {
     expect(
       screen.getByRole("button", { name: "Evaluations" }),
     ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Settings" })).toBeInTheDocument();
 
-    // The Retrieval explainer and Settings diagnostics views were removed.
     expect(screen.queryByRole("button", { name: "Retrieval" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Settings" })).toBeNull();
   });
 
-  it("keeps the support chat heading visible and accessible with the same name", () => {
+  it("uses the product chat heading", () => {
     render(<RagVisibilityDashboard {...baseProps} />);
 
     expect(
-      screen.getByRole("heading", { name: "Support chat" }),
-    ).toHaveTextContent("Support chat");
+      screen.getByRole("heading", { name: "Chat" }),
+    ).toHaveTextContent("Chat");
     expect(screen.queryByRole("heading", { name: "Support agent" })).toBeNull();
   });
 
@@ -373,7 +376,7 @@ describe("RagVisibilityDashboard", () => {
     expect(screen.getByText("return_policy__chunk_001")).toBeInTheDocument();
     expect(screen.getAllByText("Opened Products").length).toBeGreaterThan(0);
     expect(
-      screen.getByRole("button", { name: "Build corpus version" }),
+      screen.getByRole("button", { name: "Re-index knowledge base" }),
     ).toBeInTheDocument();
   });
 
@@ -381,7 +384,7 @@ describe("RagVisibilityDashboard", () => {
     render(<RagVisibilityDashboard {...baseProps} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Knowledge base" }));
-    fireEvent.click(screen.getByRole("button", { name: "Add document" }));
+    fireEvent.click(screen.getByRole("button", { name: "Upload document" }));
 
     expect(screen.getByText("Click to upload a file")).toBeInTheDocument();
     // The dialog renders through a portal to document.body, not the container.
@@ -395,7 +398,7 @@ describe("RagVisibilityDashboard", () => {
     render(<RagVisibilityDashboard {...baseProps} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Evaluations" }));
-    expect(screen.getByRole("button", { name: "Run evals" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Run evaluations" })).toBeInTheDocument();
     expect(screen.getByText(/No run yet/)).toBeInTheDocument();
   });
 
@@ -403,12 +406,18 @@ describe("RagVisibilityDashboard", () => {
     render(
       <RagVisibilityDashboard
         {...baseProps}
-        embeddingStorageStatus={{ ...embeddingStorageStatus, embeddedChunks: 0 }}
+        embeddingStorageStatus={{
+          ...embeddingStorageStatus,
+          activeVersionId: null,
+          corpusStatus: "ready",
+          embeddedChunks: 0,
+          readyVersionId: "g-ready",
+        }}
       />,
     );
 
     expect(
-      screen.getByText("Store and embed chunks before answer generation."),
+      screen.getByText("Chat becomes available after a ready generation is promoted."),
     ).toBeInTheDocument();
   });
 
@@ -432,8 +441,7 @@ describe("RagVisibilityDashboard", () => {
     expect(screen.getAllByText("[1]").length).toBeGreaterThan(0);
     expect(screen.getAllByText("[2]").length).toBeGreaterThan(0);
 
-    // Cited chunks live in the on-demand sources panel.
-    fireEvent.click(screen.getByRole("button", { name: /Sources/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Evidence/ }));
     expect(screen.getAllByText("Score 0.812").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Score 0.612").length).toBeGreaterThan(0);
     expect(screen.getAllByText("return_policy.md").length).toBeGreaterThan(0);
@@ -502,7 +510,7 @@ describe("RagVisibilityDashboard", () => {
     await screen.findByText("Returns need the original order number.");
 
     const sourceTriggers = screen.getAllByRole("button", {
-      name: "Sources: 1 cited of 1 retrieved",
+      name: "Evidence: 1 cited of 1 retrieved",
     });
     fireEvent.click(sourceTriggers[sourceTriggers.length - 1]);
     fireEvent.click(
@@ -525,7 +533,7 @@ describe("RagVisibilityDashboard", () => {
     askQuestion("Can customers return opened products?");
     await screen.findByText("Opened products may be returned within 30 days.");
 
-    fireEvent.click(screen.getByRole("button", { name: "New chat" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "New chat" })[0]);
 
     expect(
       screen.getByRole("heading", { name: "Ask a grounded question" }),
@@ -551,8 +559,7 @@ describe("RagVisibilityDashboard", () => {
       ),
     ).toBeInTheDocument();
     expect(screen.getByText("insufficient evidence")).toBeInTheDocument();
-    // A refusal never offers a Sources control.
-    expect(screen.queryByRole("button", { name: /Sources/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Evidence/ })).toBeNull();
   });
 
   it("shows an answer error state", async () => {

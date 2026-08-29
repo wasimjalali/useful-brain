@@ -49,6 +49,11 @@ export type EvidenceIdentity = {
   section: string;
   text: string;
   source?: string;
+  score?: number;
+  vectorScore?: number | null;
+  keywordScore?: number | null;
+  fusedScore?: number | null;
+  rerankScore?: number | null;
 };
 
 export type TurnEvidenceLedger = {

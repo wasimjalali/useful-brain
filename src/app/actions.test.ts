@@ -176,7 +176,7 @@ describe("addSyntheticDocumentAction", () => {
         ],
       },
     });
-    expect(revalidatePath).toHaveBeenCalledWith("/");
+    expect(revalidatePath).toHaveBeenCalledWith("/", "layout");
   });
 
   it("surfaces a clear error when Brain seed fails", async () => {
@@ -310,5 +310,70 @@ describe("askGroundedQuestion", () => {
       },
     });
     expect(brainJson).not.toHaveBeenCalled();
+  });
+});
+
+describe("workspace actions", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    brainJson.mockReset();
+    revalidatePath.mockReset();
+  });
+
+  it("keeps an empty corpus empty and loads operator identity", async () => {
+    brainJson.mockImplementation(async (path: string) => {
+      if (path === "/knowledge") {
+        return {
+          documents: [],
+          chunks: [],
+          embeddingStorageStatus: {
+            storedDocuments: 0,
+            storedChunks: 0,
+            embeddedChunks: 0,
+            lastRunStatus: "not_started",
+            lastRunMessage: null,
+            lastEmbeddedAt: null,
+            activeVersionId: null,
+            readyVersionId: null,
+            corpusStatus: "not_started",
+          },
+          retrievalMode: "keyword",
+        };
+      }
+      if (path === "/conversations" || path === "/evaluations") {
+        return [];
+      }
+      if (path === "/whoami") {
+        return {
+          id: "principal-dev",
+          kind: "user",
+          roles: ["operator"],
+          departments: ["support"],
+        };
+      }
+      throw new Error(`Unexpected path: ${path}`);
+    });
+    const { loadWorkspaceSnapshot } = await import("./actions");
+
+    const snapshot = await loadWorkspaceSnapshot();
+
+    expect(snapshot.documents).toEqual([]);
+    expect(snapshot.chunks).toEqual([]);
+    expect(snapshot.identity?.id).toBe("principal-dev");
+    expect(snapshot.retrievalMode).toBe("keyword");
+    expect(snapshot.error).toBeNull();
+  });
+
+  it("requests a new ready generation when re-indexing", async () => {
+    brainJson.mockResolvedValue({ generationId: "g-ready" });
+    const { reindexKnowledgeAction } = await import("./actions");
+
+    await reindexKnowledgeAction();
+
+    expect(brainJson).toHaveBeenCalledWith("/knowledge/reindex", {
+      method: "POST",
+      json: {},
+    });
+    expect(revalidatePath).toHaveBeenCalledWith("/", "layout");
   });
 });
