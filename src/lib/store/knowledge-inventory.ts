@@ -92,6 +92,7 @@ export async function loadKnowledgeInventory(
     textByDocument.set(chunk.document_id, list);
   }
   const knowledgeDocuments: KnowledgeDocument[] = documents.results.map((row) => ({
+    id: row.id,
     source: fileName(row.path),
     title: fileName(row.path).replace(/\.md$/i, "").replace(/-/g, " "),
     text: (textByDocument.get(row.id) ?? []).join("\n\n"),

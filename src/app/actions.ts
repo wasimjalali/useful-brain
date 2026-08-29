@@ -130,6 +130,25 @@ export async function askGroundedQuestion(input: {
   }
 }
 
+export async function cancelGroundedQuestionAction(
+  requestId: string,
+): Promise<ActionResult<{ conversationId: string }>> {
+  try {
+    return actionSuccess(
+      await brainJson<{ conversationId: string }>("/cancel", {
+        method: "POST",
+        json: { requestId },
+      }),
+    );
+  } catch (error) {
+    return actionFailure(error, {
+      code: "INTERNAL_ERROR",
+      message: "The answer could not be stopped.",
+      retryable: true,
+    });
+  }
+}
+
 export async function loadConversationAction(conversationId: string) {
   try {
     return actionSuccess(
@@ -152,6 +171,22 @@ export async function deleteConversationAction(conversationId: string) {
     return actionFailure(error, {
       code: "INTERNAL_ERROR",
       message: "The conversation could not be deleted.",
+      retryable: true,
+    });
+  }
+}
+
+export async function deleteKnowledgeDocumentAction(documentId: string) {
+  try {
+    await brainJson(`/knowledge/documents/${encodeURIComponent(documentId)}`, {
+      method: "DELETE",
+    });
+    revalidateWorkspace();
+    return actionSuccess(null);
+  } catch (error) {
+    return actionFailure(error, {
+      code: "INTERNAL_ERROR",
+      message: "The document could not be deleted.",
       retryable: true,
     });
   }

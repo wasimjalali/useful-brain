@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { CloseIcon, LayersIcon, PlusIcon, UploadIcon } from "@/components/icons";
 import { Dialog } from "@/components/ui/dialog";
 import { StatusLabel, type StatusTone } from "@/components/ui/status-label";
+import type { ActionResult } from "@/lib/rag/app-errors";
 import type { DocumentChunk, KnowledgeDocument } from "@/lib/rag/types";
 import type { EmbeddingStorageStatus } from "@/lib/rag/storage-records";
 import type { KnowledgeInventory } from "@/lib/store/knowledge-inventory";
@@ -21,6 +22,7 @@ export type DocumentStatus =
 export type KnowledgeWorkspaceProps = {
   documents: KnowledgeDocument[];
   chunks: DocumentChunk[];
+  deleteDocumentAction?: (documentId: string) => Promise<ActionResult<null>>;
   addDocumentAction: (formData: FormData) => Promise<void>;
   embedAction: () => Promise<void>;
   embeddingStorageStatus: EmbeddingStorageStatus;
@@ -57,6 +59,7 @@ const STATUS_TONE: Record<DocumentStatus, StatusTone> = {
 export function KnowledgeWorkspace({
   addDocumentAction,
   chunks,
+  deleteDocumentAction,
   documents,
   embedAction,
   embeddingStorageStatus,
@@ -387,6 +390,8 @@ export function KnowledgeWorkspace({
 
       {selectedDocument ? (
         <DocumentDetailDialog
+          canDelete={documents.length > 1}
+          deleteAction={deleteDocumentAction}
           item={selectedDocument}
           onClose={() => setSelectedDocument(null)}
         />
@@ -553,12 +558,39 @@ function DocumentRows({
 }
 
 function DocumentDetailDialog({
+  canDelete,
+  deleteAction,
   item,
   onClose,
 }: {
+  canDelete: boolean;
+  deleteAction?: (documentId: string) => Promise<ActionResult<null>>;
   item: DocumentInventoryItem;
   onClose: () => void;
 }) {
+  const router = useRouter();
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function handleDelete() {
+    if (!deleteAction || !item.document.id || deleting || !canDelete) return;
+    setDeleteError(null);
+    setDeleting(true);
+    try {
+      const result = await deleteAction(item.document.id);
+      if (!result.ok) {
+        setDeleteError(result.error.message);
+        return;
+      }
+      onClose();
+      router.refresh();
+    } catch (caught) {
+      setDeleteError(caught instanceof Error ? caught.message : "The document could not be deleted.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <Dialog ariaLabel={`${item.document.title} details`} maxWidth="max-w-2xl" onClose={onClose}>
       <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
@@ -600,6 +632,25 @@ function DocumentDetailDialog({
             <p className="mt-2 text-sm text-ink-muted">No chunks are available for this document yet.</p>
           )}
         </div>
+        {deleteAction && item.document.id ? (
+          <div className="border-t border-border pt-4">
+            <p className="text-sm text-ink-muted">
+              Deletion creates a ready generation. Retrieval changes only after promotion.
+            </p>
+            {deleteError ? <p className="mt-2 text-sm text-danger" role="alert">{deleteError}</p> : null}
+            <button
+              className="btn btn-secondary mt-3 min-h-10 px-3.5 text-sm text-danger"
+              disabled={deleting || !canDelete}
+              onClick={handleDelete}
+              type="button"
+            >
+              {deleting ? "Deleting document" : "Delete document"}
+            </button>
+            {!canDelete ? (
+              <p className="mt-2 text-xs text-ink-faint">At least one document must remain.</p>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </Dialog>
   );

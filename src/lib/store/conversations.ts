@@ -121,6 +121,36 @@ export class ConversationStoreError extends Error {
   }
 }
 
+export async function loadOwnedTurnHandleByRequestId(
+  db: OperationsDatabase,
+  requestIdInput: string,
+  ownerPrincipalIdInput: string,
+): Promise<{
+  conversationId: string;
+  runId: string;
+  status: "pending" | "completed" | "failed";
+} | null> {
+  const requestId = parseBoundedId(requestIdInput, "request id");
+  const ownerPrincipalId = parseBoundedId(ownerPrincipalIdInput, "principal id");
+  const row = await db
+    .prepare(
+      `SELECT m.conversation_id, m.id, m.status
+       FROM messages m
+       JOIN conversations c ON c.id = m.conversation_id
+       WHERE m.request_id = ? AND m.role = 'assistant' AND c.owner_principal_id = ?`,
+    )
+    .bind(requestId, ownerPrincipalId)
+    .first<{ conversation_id: string; id: string; status: string }>();
+  if (!row || !["pending", "completed", "failed"].includes(row.status)) {
+    return null;
+  }
+  return {
+    conversationId: row.conversation_id,
+    runId: row.id,
+    status: row.status as "pending" | "completed" | "failed",
+  };
+}
+
 export function deriveServerConversationTitle(question: string) {
   const normalized = question.trim().replace(/\s+/g, " ");
   if (!normalized) {

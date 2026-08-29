@@ -52,18 +52,24 @@ type AskAction = (input: {
   requestId: string;
 }) => Promise<ActionResult<GroundedAnswerResponse>>;
 
+type CancelAction = (
+  requestId: string,
+) => Promise<ActionResult<{ conversationId: string }>>;
+
 type RagVisibilityDashboardProps = {
   documents: KnowledgeDocument[];
   chunks: DocumentChunk[];
   addDocumentAction: (formData: FormData) => Promise<void>;
   embedAction: () => Promise<void>;
   askAction: AskAction;
+  cancelAction?: CancelAction;
   embeddingStorageStatus: EmbeddingStorageStatus;
   initialConversations?: Conversation[];
   initialEvalRuns?: EvalRunResult[];
   deleteConversationAction?: (
     conversationId: string,
   ) => Promise<ActionResult<null>>;
+  deleteDocumentAction?: (documentId: string) => Promise<ActionResult<null>>;
   promoteCorpusAction?: (versionId: string) => Promise<void>;
   importLegacyConversationsAction?: (
     conversations: Conversation[],
@@ -83,10 +89,12 @@ export function RagVisibilityDashboard({
   addDocumentAction,
   embedAction,
   askAction,
+  cancelAction,
   embeddingStorageStatus,
   initialConversations = [],
   initialEvalRuns = [],
   deleteConversationAction,
+  deleteDocumentAction,
   promoteCorpusAction,
   importLegacyConversationsAction,
   identity = null,
@@ -109,6 +117,9 @@ export function RagVisibilityDashboard({
   // can read the active turn's evidence.
   const [turns, setTurns] = useState<ChatTurn[]>(initialConversation?.turns ?? []);
   const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
+  const [pendingRequestId, setPendingRequestId] = useState<string | null>(null);
+  const [isStopping, setIsStopping] = useState(false);
+  const [stopError, setStopError] = useState<string | null>(null);
   const [activeTurnId, setActiveTurnId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>(
     initialConversations,
@@ -121,6 +132,7 @@ export function RagVisibilityDashboard({
   // abandoned conversation is dropped instead of landing in the current one.
   const conversationRef = useRef(0);
   const turnSeq = useRef(0);
+  const stoppedConversationRouteRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!importLegacyConversationsAction) return;
@@ -178,28 +190,35 @@ export function RagVisibilityDashboard({
 
     const guardToken = conversationRef.current;
     const priorTurns = turns;
+    const requestId = createId();
 
+    stoppedConversationRouteRef.current = null;
+    setStopError(null);
     setPendingQuestion(question);
+    setPendingRequestId(requestId);
     try {
       const result = await askAction({
         question,
         conversationId: activeConversationId,
-        requestId: createId(),
+        requestId,
       });
       if (conversationRef.current !== guardToken) {
+        finishStoppedConversationRoute();
         return;
       }
       turnSeq.current += 1;
 
       if (!result.ok) {
+        const cancelled = result.error.code === "CANCELLED";
         const nextTurns = [
           ...priorTurns,
           {
             id: `turn_${turnSeq.current}`,
             question,
             answer: null,
-            error: result.error.message,
+            error: cancelled ? null : result.error.message,
             errorRetryable: result.error.retryable,
+            cancelled,
           },
         ];
         setTurns(nextTurns);
@@ -221,6 +240,7 @@ export function RagVisibilityDashboard({
       }
     } catch {
       if (conversationRef.current !== guardToken) {
+        finishStoppedConversationRoute();
         return;
       }
       turnSeq.current += 1;
@@ -237,14 +257,67 @@ export function RagVisibilityDashboard({
     } finally {
       if (conversationRef.current === guardToken) {
         setPendingQuestion(null);
+        setPendingRequestId(null);
       }
     }
   }
 
+  async function stopQuestion() {
+    if (!cancelAction || !pendingRequestId || !pendingQuestion || isStopping) {
+      return;
+    }
+    setStopError(null);
+    setIsStopping(true);
+    const question = pendingQuestion;
+    let result: Awaited<ReturnType<CancelAction>>;
+    try {
+      result = await cancelAction(pendingRequestId);
+    } catch {
+      setStopError("The answer could not be stopped.");
+      setIsStopping(false);
+      return;
+    }
+    if (!result.ok) {
+      setStopError(result.error.message);
+      setIsStopping(false);
+      return;
+    }
+    conversationRef.current += 1;
+    turnSeq.current += 1;
+    const nextTurns = [
+      ...turns,
+      {
+        id: `turn_${turnSeq.current}`,
+        question,
+        answer: null,
+        error: null,
+        cancelled: true,
+      },
+    ];
+    setTurns(nextTurns);
+    setPendingQuestion(null);
+    setPendingRequestId(null);
+    setIsStopping(false);
+    setActiveConversationId(result.data.conversationId);
+    upsertConversationSummary(result.data.conversationId, nextTurns);
+    stoppedConversationRouteRef.current = result.data.conversationId;
+  }
+
+  function finishStoppedConversationRoute() {
+    const conversationId = stoppedConversationRouteRef.current;
+    if (!conversationId) return;
+    stoppedConversationRouteRef.current = null;
+    router.replace(`/chat/${conversationId}`);
+  }
+
   function startNewChat() {
     conversationRef.current += 1;
+    stoppedConversationRouteRef.current = null;
     setTurns([]);
     setPendingQuestion(null);
+    setPendingRequestId(null);
+    setStopError(null);
+    setIsStopping(false);
     setActiveTurnId(null);
     setActiveConversationId(null);
     setSourcesOpen(false);
@@ -255,6 +328,7 @@ export function RagVisibilityDashboard({
   }
 
   function selectConversation(id: string) {
+    stoppedConversationRouteRef.current = null;
     router.push(`/chat/${id}`);
   }
 
@@ -275,6 +349,9 @@ export function RagVisibilityDashboard({
       setTurns([]);
       setActiveConversationId(null);
       setPendingQuestion(null);
+      setPendingRequestId(null);
+      setStopError(null);
+      setIsStopping(false);
       setActiveTurnId(null);
       setSourcesOpen(false);
       setFocusId(null);
@@ -322,6 +399,7 @@ export function RagVisibilityDashboard({
   }, [selectedChunk]);
 
   function selectWorkspaceView(view: WorkspaceView) {
+    stoppedConversationRouteRef.current = null;
     setActiveView(view);
     setSourcesOpen(false);
     const href = {
@@ -385,9 +463,12 @@ export function RagVisibilityDashboard({
           onNewChat={startNewChat}
           onOpenKnowledge={() => selectWorkspaceView("knowledge")}
           onOpenSources={openSources}
+          onStop={cancelAction ? stopQuestion : undefined}
           onSubmit={submitQuestion}
           pendingQuestion={pendingQuestion}
           ready={retrievalReady}
+          stopError={stopError}
+          stopping={isStopping}
           turns={turns}
         />
       ) : (
@@ -396,6 +477,7 @@ export function RagVisibilityDashboard({
             <KnowledgeWorkspace
               addDocumentAction={addDocumentAction}
               chunks={chunks}
+              deleteDocumentAction={deleteDocumentAction}
               documents={documents}
               embedAction={embedAction}
               embeddingStorageStatus={embeddingStorageStatus}

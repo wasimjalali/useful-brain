@@ -5,6 +5,7 @@ import { IdentityConfigError } from "../auth/identity-mode";
 import {
   toPublicWorkerError,
   WorkerBusyError,
+  WorkerCancelledError,
   WorkerValidationError,
   workerErrorResponse,
 } from "./worker-errors";
@@ -57,6 +58,16 @@ describe("worker error contracts", () => {
     });
     const response = workerErrorResponse(new WorkerBusyError(), "req-busy");
     expect(response.status).toBe(429);
+  });
+
+  it("maps an operator stop to a non-retryable cancellation", () => {
+    expect(toPublicWorkerError(new WorkerCancelledError(), "req-stop")).toEqual({
+      code: "CANCELLED",
+      message: "The answer was stopped.",
+      retryable: false,
+      requestId: "req-stop",
+    });
+    expect(workerErrorResponse(new WorkerCancelledError(), "req-stop").status).toBe(409);
   });
 
   it("does not put hosts, ports or JWKS URLs in the JSON body", async () => {

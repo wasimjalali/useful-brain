@@ -65,6 +65,8 @@ export async function brainJson<T>(
     const record = payload && typeof payload === "object" ? (payload as { code?: string; message?: string }) : {};
     const code = record.code === "RATE_LIMITED"
       ? "RATE_LIMITED"
+      : record.code === "CANCELLED"
+        ? "CANCELLED"
       : record.code === "VALIDATION_FAILED"
         ? "VALIDATION_FAILED"
         : record.code === "FORBIDDEN"

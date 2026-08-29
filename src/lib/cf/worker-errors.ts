@@ -27,13 +27,21 @@ export class WorkerBusyError extends Error {
   }
 }
 
+export class WorkerCancelledError extends Error {
+  constructor() {
+    super("The answer was stopped.");
+    this.name = "WorkerCancelledError";
+  }
+}
+
 export type WorkerErrorCode =
   | "AUTH_REQUIRED"
   | "FORBIDDEN"
   | "UNAVAILABLE"
   | "VALIDATION_FAILED"
   | "INTERNAL_ERROR"
-  | "RATE_LIMITED";
+  | "RATE_LIMITED"
+  | "CANCELLED";
 
 export type PublicWorkerError = {
   code: WorkerErrorCode;
@@ -58,6 +66,14 @@ export function toPublicWorkerError(error: unknown, requestId: string): PublicWo
       code: "RATE_LIMITED",
       message: "An answer is already in progress.",
       retryable: true,
+      requestId,
+    };
+  }
+  if (error instanceof WorkerCancelledError) {
+    return {
+      code: "CANCELLED",
+      message: "The answer was stopped.",
+      retryable: false,
       requestId,
     };
   }
@@ -124,6 +140,8 @@ export function workerErrorResponse(error: unknown, requestId: string): Response
           ? 400
           : body.code === "RATE_LIMITED"
             ? 429
+            : body.code === "CANCELLED"
+              ? 409
           : 500;
   return Response.json(body, {
     status: body.code === "FORBIDDEN" ? 403 : status,

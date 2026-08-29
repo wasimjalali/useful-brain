@@ -5,6 +5,7 @@ import {
   latestReadyOrActiveGenerationId,
   loadSeedDocumentsFromGeneration,
   mergeSeedDocuments,
+  removeSeedDocument,
   seedNorthwindCorpus,
   type SeedDocumentInput,
 } from "./corpus-seed";
@@ -45,6 +46,14 @@ describe("corpus seed merge", () => {
     );
     expect(merged.map((document) => document.documentId).sort()).toEqual(["nw_a", "nw_b", "nw_c"]);
     expect(merged.find((document) => document.documentId === "nw_b")?.body).toBe("B2");
+  });
+
+  it("removes only the selected document from a corpus rebuild", () => {
+    const remaining = removeSeedDocument(
+      [publicDoc("nw_a", "A"), publicDoc("nw_b", "B")],
+      "nw_a",
+    );
+    expect(remaining.map((document) => document.documentId)).toEqual(["nw_b"]);
   });
 
   it("does not call Workers AI when Vectorize upsert is unavailable", async () => {

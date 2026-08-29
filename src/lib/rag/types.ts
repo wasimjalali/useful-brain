@@ -1,4 +1,5 @@
 export type KnowledgeDocument = {
+  id?: string;
   source: string;
   title: string;
   text: string;

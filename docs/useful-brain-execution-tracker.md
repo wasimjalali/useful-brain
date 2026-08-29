@@ -1,6 +1,6 @@
 # Useful Brain implementation execution tracker
 
-Status: Phase 7A is merged on `main` ([PR #13](https://github.com/wasimjalali/useful-brain/pull/13), P2 repairs [PR #14](https://github.com/wasimjalali/useful-brain/pull/14)). The Cloudflare backend and initial UI cutover are merged through PR #15. The operator UI rebuild is on `codex/rebuild-operator-ui`. Product boundary: local portfolio agent, with no billing, public signup or required Cloudflare Access. Commercial Phase 7B (real company data, production resource set) stays closed.
+Status: Phase 7A is merged on `main` ([PR #13](https://github.com/wasimjalali/useful-brain/pull/13), P2 repairs [PR #14](https://github.com/wasimjalali/useful-brain/pull/14)). The Cloudflare backend and initial UI cutover are merged through PR #15. The operator UI rebuild is merged in [PR #16](https://github.com/wasimjalali/useful-brain/pull/16). Product boundary: local portfolio agent, with no billing, public signup or required Cloudflare Access. Commercial Phase 7B (real company data, production resource set) stays closed.
 
 Architecture authority: `docs/useful-brain-master-plan.md`
 
@@ -378,7 +378,10 @@ Authorized separately from commercial Phase 7B. Loopback + existing staging skel
 - [x] Add operator identity, locked model IDs, retrieval mode and active or ready corpus state to Settings.
 - [x] Keep fail-closed answers visible while allowing the retrieved evidence set to be inspected, including generation and available retrieval-stage scores.
 - [x] Remove the Northwind preview fallback. Empty or unavailable Brain state is never presented as a live corpus.
-- [ ] Gemini 3.7 Flash high independent review remains the merge gate for this pass.
+- [x] Propagate operator cancellation from the UI request ID through Brain, the conversation Durable Object and Pi abort. Cancelled turns are stored as failed with `CANCELLED`, never as completed answers.
+- [x] Delete a document by rebuilding the latest ready or active corpus without it. The rebuilt generation stays ready until the operator explicitly promotes it.
+- [x] Wasim waived the Gemini review for this pass on 2026-08-29 and authorized Codex self-review instead.
+- [ ] Direct browser-to-R2 signed upload remains credential-dependent. Do not add scoped R2 access keys or a signing service until Wasim supplies that external bootstrap.
 
 ### Phase 7B: production launch and retirement
 

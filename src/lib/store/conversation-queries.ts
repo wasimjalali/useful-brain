@@ -108,13 +108,15 @@ export async function loadConversationForUi(
       continue;
     }
     if (assistant.status === "failed") {
+      const cancelled = assistant.error_code === "CANCELLED";
       turns.push({
         id: assistant.id,
         question,
         answer: null,
-        error: "The previous answer could not be completed.",
+        error: cancelled ? null : "The previous answer could not be completed.",
         errorRetryable:
           assistant.error_code === "RATE_LIMITED" || assistant.error_code === "PROVIDER_TEMPORARY",
+        cancelled,
       });
       continue;
     }

@@ -1,7 +1,9 @@
 import {
   addSyntheticDocumentAction,
   askGroundedQuestion,
+  cancelGroundedQuestionAction,
   deleteConversationAction,
+  deleteKnowledgeDocumentAction,
   embedSyntheticDocumentsAction,
   importLegacyConversationsAction,
   loadConversationAction,
@@ -35,8 +37,10 @@ export async function WorkspacePage({
     <RagVisibilityDashboard
       addDocumentAction={addSyntheticDocumentAction}
       askAction={askGroundedQuestion}
+      cancelAction={cancelGroundedQuestionAction}
       chunks={snapshot.chunks}
       deleteConversationAction={deleteConversationAction}
+      deleteDocumentAction={deleteKnowledgeDocumentAction}
       documents={snapshot.documents}
       embedAction={embedSyntheticDocumentsAction}
       embeddingStorageStatus={snapshot.embeddingStorageStatus}
