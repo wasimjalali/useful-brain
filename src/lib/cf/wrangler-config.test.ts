@@ -191,5 +191,15 @@ describe("protected Worker configuration", () => {
     expect(pkg.scripts["db:local"]).toMatch(/--persist-to \.wrangler\/state/);
     expect(pkg.scripts["preview:cf"]).toMatch(/npm run db:local/);
     expect(pkg.scripts["preview:cf"]).toMatch(/--persist-to \.wrangler\/state/);
+    expect(pkg.scripts["eval:northwind"]).toMatch(/live-northwind-eval/);
+  });
+
+  it("starts Cloud Agent terminals on Brain, not a Convex Next.js server", () => {
+    const env = JSON.parse(
+      readFileSync(path.join(process.cwd(), ".cursor/environment.json"), "utf8"),
+    ) as { terminals: Array<{ name: string; command: string; description: string }> };
+    expect(env.terminals.map((terminal) => terminal.name)).toEqual(["brain", "web"]);
+    expect(env.terminals[0]?.command).toMatch(/brain-dev\.sh/);
+    expect(JSON.stringify(env)).not.toMatch(/Convex/i);
   });
 });
