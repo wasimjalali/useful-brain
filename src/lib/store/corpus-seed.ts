@@ -186,10 +186,14 @@ export async function seedNorthwindCorpus(input: {
             mutationIds.push(result.mutationId);
           }
         }
+        if (mutationIds.length === 0) {
+          throw new Error("Vectorize returned no mutation identifier for the seeded generation");
+        }
         vectorizeStatus = "upserted";
       }
-    } catch {
-      vectorizeStatus = "skipped";
+    } catch (error) {
+      await ensureGenerationState(input.db, generationId, "failed", now);
+      throw error;
     }
   }
 

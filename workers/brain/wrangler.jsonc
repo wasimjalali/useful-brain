@@ -34,6 +34,13 @@
       "migrations_dir": "../../migrations/operations"
     }
   ],
+  "vectorize": [
+    {
+      "binding": "VECTORIZE",
+      "index_name": "useful-brain-development",
+      "remote": true
+    }
+  ],
   "ai": {
     "binding": "AI",
     "remote": true
@@ -113,6 +120,13 @@
           "database_name": "useful-brain-operations-development",
           "database_id": "00000000-0000-4000-8000-000000000002",
           "migrations_dir": "../../migrations/operations"
+        }
+      ],
+      "vectorize": [
+        {
+          "binding": "VECTORIZE",
+          "index_name": "useful-brain-development",
+          "remote": true
         }
       ],
       "ai": { "binding": "AI", "remote": true },

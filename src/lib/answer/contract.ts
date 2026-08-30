@@ -17,6 +17,10 @@ export type RetrievalResultForAnswer = {
   text: string;
   tokenEstimate: number;
   documentId?: string | null;
+  vectorScore?: number | null;
+  keywordScore?: number | null;
+  fusedScore?: number | null;
+  rerankScore?: number | null;
 };
 
 export type CitedRetrievalResult = RetrievalResultForAnswer & {
