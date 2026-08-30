@@ -40,3 +40,5 @@ spikes/**/.npmrc
 # Personal AI-tooling config (not needed by users)
 .codex/
 .archives/
+
+eval-output/

@@ -3,12 +3,18 @@
   "install": "bash .cursor/install.sh",
   "terminals": [
     {
+      "name": "brain",
+      "command": "bash .cursor/brain-dev.sh",
+      "description": "Cloudflare Brain Worker on 127.0.0.1:8788 (local D1, Workers AI remote). Requires Wrangler login. Live Northwind eval: npm run eval:northwind -- --live http://127.0.0.1:8788"
+    },
+    {
       "name": "web",
       "command": "bash .cursor/dev.sh",
-      "description": "Next.js dev server for the current Convex-backed app on http://localhost:3000"
+      "description": "Next.js App Router on http://localhost:3000. Does not bind Brain. Full UI+Brain is npm run preview:cf"
     }
   ],
   "ports": [
+    { "name": "brain", "port": 8788 },
     { "name": "web", "port": 3000 }
   ]
 }
