@@ -130,6 +130,10 @@ describe("operations conversation snapshots", () => {
         text: "Opened products may be returned within 30 days.",
         tokenEstimate: 12,
         documentId: "return_policy",
+        vectorScore: 0.84,
+        keywordScore: 0.73,
+        fusedScore: 0.81,
+        rerankScore: 0.91,
       },
     ]);
     const completed = await completeTurn(env.OPERATIONS_DB, {
@@ -161,6 +165,23 @@ describe("operations conversation snapshots", () => {
     expect(replayed?.retrieval.results[0]?.chunkId).toBe("return_policy__chunk_002");
     expect(replayed?.retrieval.results[0]?.text).toContain("Opened products may be returned");
     expect(replayed?.retrieval.results[0]?.citationLabel).toBe("[1]");
+    expect(replayed?.retrieval.results[0]).toMatchObject({
+      vectorScore: 0.84,
+      keywordScore: 0.73,
+      fusedScore: 0.81,
+      rerankScore: 0.91,
+    });
+    const conversation = await loadConversationForUi(
+      env.OPERATIONS_DB,
+      pending.conversationId,
+      "principal-alice",
+    );
+    expect(conversation.turns[0]?.answer?.retrieval.results[0]).toMatchObject({
+      vectorScore: 0.84,
+      keywordScore: 0.73,
+      fusedScore: 0.81,
+      rerankScore: 0.91,
+    });
     expect(replayed?.corpusGenerationId).toBe("gen-1");
     expect(replayed?.structuredAnswer.answerType).toBe("grounded");
     expect(replayed?.promptVersion).toBe(PROMPT_VERSION);

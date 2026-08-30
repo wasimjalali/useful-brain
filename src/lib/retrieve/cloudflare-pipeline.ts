@@ -68,7 +68,7 @@ export class CloudflareKnowledgePipeline {
   constructor(
     private readonly input: {
       db: CorpusSql;
-      vectorize: VectorizeIndex;
+      vectorize: VectorizeIndex | null;
       ai: WorkersAiRunner;
       reranker: Reranker;
       generationId: string;
@@ -91,39 +91,44 @@ export class CloudflareKnowledgePipeline {
     const generationId = this.input.generationId;
     const shapes = await loadAclShapes(this.input.db, generationId);
     const aclKeys = await enumerateAllowedAclGroups(acl, shapes);
-    const queryEmbedding = await embedWithWorkersAi(this.input.ai, EMBEDDING_MODEL, {
-      kind: "query",
-      text: query,
-    }).catch(() => [] as number[][]);
-    const vectorHits: Array<{ chunkId: string; score: number }> = [];
-    if (queryEmbedding[0] && aclKeys.length > 0) {
-      try {
-        const vectorQuery = await buildVectorizeQuery({ generationId, aclGroupKeys: aclKeys });
-        const vectorResult = await this.input.vectorize.query(queryEmbedding[0], {
-          topK: fetchLimit,
-          namespace: vectorQuery.namespace,
-          filter: vectorQuery.filter,
-          returnMetadata: "indexed",
-        });
-        for (const match of vectorResult.matches ?? []) {
-          vectorHits.push({ chunkId: match.id, score: match.score });
-        }
-      } catch {
-        vectorHits.length = 0;
+    const queryEmbedding = this.input.vectorize
+      ? await embedWithWorkersAi(this.input.ai, EMBEDDING_MODEL, {
+          kind: "query",
+          text: query,
+        })
+      : [];
+    const vectorMatches: Array<{ vectorId: string; score: number }> = [];
+    if (this.input.vectorize && queryEmbedding[0] && aclKeys.length > 0) {
+      const vectorQuery = await buildVectorizeQuery({ generationId, aclGroupKeys: aclKeys });
+      const vectorResult = await this.input.vectorize.query(queryEmbedding[0], {
+        topK: fetchLimit,
+        namespace: vectorQuery.namespace,
+        filter: vectorQuery.filter,
+        returnMetadata: "indexed",
+      });
+      for (const match of vectorResult.matches ?? []) {
+        vectorMatches.push({ vectorId: match.id, score: match.score });
       }
     }
+    const vectorChunkIds = await loadVectorChunkIds(
+      this.input.db,
+      generationId,
+      vectorMatches.map((match) => match.vectorId),
+    );
+    const vectorHits = vectorMatches.map((match) => {
+      const chunkId = vectorChunkIds[match.vectorId];
+      if (!chunkId) {
+        throw new Error("Vectorize returned an ID absent from the active D1 generation");
+      }
+      return { chunkId, score: match.score };
+    });
     const { sql, params } = aclSqlAndParams(acl);
-    let keywordHits: Array<{ chunkId: string; score: number }> = [];
-    try {
-      const match = fts5MatchQuery(query);
-      const rows = await this.input.db
-        .prepare(keywordSearchSql(sql))
-        .bind(match, generationId, ...params, ftsCandidateFetchLimit(Math.min(fetchLimit, fingerprint.keywordCandidates)))
-        .all<{ chunk_id: string }>();
-      keywordHits = rows.results.map((row) => ({ chunkId: row.chunk_id, score: 0 }));
-    } catch {
-      keywordHits = [];
-    }
+    const match = fts5MatchQuery(query);
+    const rows = await this.input.db
+      .prepare(keywordSearchSql(sql))
+      .bind(match, generationId, ...params, ftsCandidateFetchLimit(Math.min(fetchLimit, fingerprint.keywordCandidates)))
+      .all<{ chunk_id: string }>();
+    const keywordHits = rows.results.map((row) => ({ chunkId: row.chunk_id, score: 0 }));
     const candidateIds = [...new Set([...vectorHits, ...keywordHits].map((hit) => hit.chunkId))].sort();
     const loaded = await loadChunks(this.input.db, candidateIds);
     const { allowed } = filterChunks(input.principal, loaded);
@@ -148,9 +153,7 @@ export class CloudflareKnowledgePipeline {
         ? (fingerprint.literalKeywordWeight ?? fingerprint.keywordWeight)
         : fingerprint.keywordWeight,
     });
-    const reranked = await rerankMerged(query, merged, this.input.reranker, fingerprint).catch(() =>
-      merged.map((item) => ({ ...item, rerankScore: item.mergedScore })),
-    );
+    const reranked = await rerankMerged(query, merged, this.input.reranker, fingerprint);
     const final = reranked.slice(0, topK);
     const byDocument = groupByDocument(allowed);
     const hits: SearchHit[] = final.map((item) => {
@@ -231,6 +234,25 @@ export async function loadChunks(db: CorpusSql, chunkIds: string[]): Promise<Chu
     .bind(...chunkIds)
     .all<ChunkRow>();
   return rows.results.map(rowToChunk);
+}
+
+async function loadVectorChunkIds(
+  db: CorpusSql,
+  generationId: string,
+  vectorIds: string[],
+): Promise<Record<string, string>> {
+  if (vectorIds.length === 0) {
+    return {};
+  }
+  const placeholders = vectorIds.map(() => "?").join(",");
+  const rows = await db
+    .prepare(
+      `SELECT vector_id, chunk_id FROM chunks
+       WHERE generation_id = ? AND vector_id IN (${placeholders})`,
+    )
+    .bind(generationId, ...vectorIds)
+    .all<{ vector_id: string; chunk_id: string }>();
+  return Object.fromEntries(rows.results.map((row) => [row.vector_id, row.chunk_id]));
 }
 
 function rowToChunk(row: ChunkRow): ChunkRecord {

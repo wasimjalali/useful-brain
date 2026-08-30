@@ -19,6 +19,7 @@ describe("D1 migrations", () => {
     expect(operationsFiles).toContain("0007_parent_user_message.sql");
     expect(operationsFiles).toContain("0008_request_payload_digest.sql");
     expect(operationsFiles).toContain("0009_eval_runs.sql");
+    expect(operationsFiles).toContain("0010_evidence_scores.sql");
     const corpusSql = readFileSync(path.join(root, "corpus", "0001_init.sql"), "utf8");
     const operationsSql = readFileSync(path.join(root, "operations", "0001_init.sql"), "utf8");
     expect(corpusSql).not.toEqual(operationsSql);
@@ -74,6 +75,15 @@ describe("D1 migrations", () => {
     );
     expect(evalSql).toMatch(/CREATE TABLE eval_runs/);
     expect(evalSql).not.toMatch(/INSERT\s+OR\s+REPLACE/i);
+    const evidenceScoresSql = readFileSync(
+      path.join(process.cwd(), "migrations/operations/0010_evidence_scores.sql"),
+      "utf8",
+    );
+    expect(evidenceScoresSql).toMatch(/ADD COLUMN vector_score REAL/);
+    expect(evidenceScoresSql).toMatch(/ADD COLUMN keyword_score REAL/);
+    expect(evidenceScoresSql).toMatch(/ADD COLUMN fused_score REAL/);
+    expect(evidenceScoresSql).toMatch(/ADD COLUMN rerank_score REAL/);
+    expect(evidenceScoresSql).not.toMatch(/INSERT\s+OR\s+REPLACE/i);
 
     for (const directory of ["corpus", "operations"]) {
       for (const file of readdirSync(path.join(root, directory))) {

@@ -41,6 +41,10 @@ type EvidenceRow = {
   token_estimate: number;
   citation_label: string;
   document_id: string | null;
+  vector_score: number | null;
+  keyword_score: number | null;
+  fused_score: number | null;
+  rerank_score: number | null;
 };
 
 export async function listRecentConversations(
@@ -125,7 +129,8 @@ export async function loadConversationForUi(
     }
     const evidence = await db
       .prepare(
-        `SELECT rank, score, chunk_id, source, section, text, token_estimate, citation_label, document_id
+        `SELECT rank, score, chunk_id, source, section, text, token_estimate, citation_label, document_id,
+                vector_score, keyword_score, fused_score, rerank_score
          FROM evidence_snapshots WHERE message_id = ? ORDER BY rank ASC`,
       )
       .bind(assistant.id)
@@ -164,6 +169,10 @@ export async function loadConversationForUi(
             tokenEstimate: item.token_estimate,
             citationLabel: item.citation_label,
             documentId: item.document_id,
+            vectorScore: item.vector_score,
+            keywordScore: item.keyword_score,
+            fusedScore: item.fused_score,
+            rerankScore: item.rerank_score,
           })),
         },
         conversationId,

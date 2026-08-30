@@ -31,4 +31,20 @@ describe("WorkersAiReranker", () => {
     });
     expect(await reranker.rerank("refund window", ["first", "second"])).toEqual([0.9, 0.2]);
   });
+
+  it("accepts the direct Workers AI binding response", async () => {
+    const reranker = new WorkersAiReranker({
+      run: async () => ({
+        response: [
+          { id: 1, score: 0.02 },
+          { id: 0, score: 0.98 },
+        ],
+      }),
+    });
+
+    expect(await reranker.rerank("refund window", ["refund policy", "parental leave"])).toEqual([
+      0.98,
+      0.02,
+    ]);
+  });
 });
