@@ -238,9 +238,7 @@ async function knowledgePipeline(
   }
   return new CloudflareKnowledgePipeline({
     db: input.corpus,
-    vectorize: input.vectorize ?? {
-      query: async () => ({ matches: [] }),
-    },
+    vectorize: input.vectorize ?? null,
     ai: input.ai ?? { run: async () => ({ data: [] }) },
     reranker: input.ai ? new WorkersAiReranker(input.ai) : new FakeReranker(),
     generationId,

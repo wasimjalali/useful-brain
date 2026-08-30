@@ -77,13 +77,14 @@ export function parseWorkersAiRerankResponse(payload: unknown, passageCount: num
   const body = payload as {
     success?: boolean;
     errors?: Array<{ message?: string }>;
+    response?: unknown;
     result?: { response?: unknown };
   };
   if (body.success === false) {
     const detail = (body.errors ?? []).map((error) => error.message ?? "unknown error").join("; ");
     throw new RerankError(`workers_ai rejected the rerank: ${detail || "unknown error"}`);
   }
-  const entries = body.result?.response;
+  const entries = Array.isArray(body.response) ? body.response : body.result?.response;
   if (!Array.isArray(entries)) {
     throw new RerankError("workers_ai rerank response missing result.response[]");
   }

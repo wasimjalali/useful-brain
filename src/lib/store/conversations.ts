@@ -212,6 +212,10 @@ type EvidenceRow = {
   token_estimate: number;
   citation_label: string;
   document_id: string | null;
+  vector_score: number | null;
+  keyword_score: number | null;
+  fused_score: number | null;
+  rerank_score: number | null;
 };
 
 function isUniqueConstraintError(error: unknown): boolean {
@@ -597,8 +601,9 @@ export async function completeTurn(
         .prepare(
           `INSERT INTO evidence_snapshots (
              message_id, rank, score, chunk_id, source, section, text, token_estimate,
-             citation_label, document_id, generation_id
-           ) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+             citation_label, document_id, generation_id, vector_score, keyword_score,
+             fused_score, rerank_score
+           ) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
            WHERE EXISTS (
              SELECT 1 FROM messages WHERE id = ? AND completion_token = ?
            )
@@ -616,6 +621,10 @@ export async function completeTurn(
           item.citationLabel,
           item.documentId ?? null,
           input.corpusGenerationId,
+          item.vectorScore ?? null,
+          item.keywordScore ?? null,
+          item.fusedScore ?? null,
+          item.rerankScore ?? null,
           assistantMessageId,
           completionToken,
         ),
@@ -708,7 +717,8 @@ export async function loadReplay(
 
   const evidence = await db
     .prepare(
-      `SELECT rank, score, chunk_id, source, section, text, token_estimate, citation_label, document_id
+      `SELECT rank, score, chunk_id, source, section, text, token_estimate, citation_label, document_id,
+              vector_score, keyword_score, fused_score, rerank_score
        FROM evidence_snapshots WHERE message_id = ? ORDER BY rank ASC`,
     )
     .bind(message.id)
@@ -753,6 +763,10 @@ export async function loadReplay(
         tokenEstimate: item.token_estimate,
         citationLabel: item.citation_label,
         documentId: item.document_id,
+        vectorScore: item.vector_score,
+        keywordScore: item.keyword_score,
+        fusedScore: item.fused_score,
+        rerankScore: item.rerank_score,
       })),
     },
     promptVersion: message.prompt_version,

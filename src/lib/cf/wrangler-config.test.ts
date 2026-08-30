@@ -124,13 +124,17 @@ describe("protected Worker configuration", () => {
     expect(source).not.toMatch(/x-useful-brain-principal/);
   });
 
-  it("uses remote Workers AI in development and a deployed AI binding elsewhere", () => {
+  it("uses remote Workers AI and Vectorize in development and deployed bindings elsewhere", () => {
     const config = readJsonc("workers/brain/wrangler.jsonc");
     expect(config.ai).toEqual({ binding: "AI", remote: true });
-    expect(config.vectorize).toBeUndefined();
+    expect(config.vectorize).toEqual([
+      { binding: "VECTORIZE", index_name: "useful-brain-development", remote: true },
+    ]);
     const environments = config.env as Record<string, Record<string, unknown>>;
     expect(environments.development.ai).toEqual({ binding: "AI", remote: true });
-    expect(environments.development.vectorize).toBeUndefined();
+    expect(environments.development.vectorize).toEqual([
+      { binding: "VECTORIZE", index_name: "useful-brain-development", remote: true },
+    ]);
     expect(environments.staging.ai).toEqual({ binding: "AI" });
     expect(environments.staging.vectorize).toEqual([
       { binding: "VECTORIZE", index_name: "useful-brain-staging" },
