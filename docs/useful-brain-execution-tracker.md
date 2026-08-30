@@ -383,6 +383,22 @@ Authorized separately from commercial Phase 7B. Loopback + existing staging skel
 - [x] Wasim waived the Gemini review for this pass on 2026-08-29 and authorized Codex self-review instead.
 - [ ] Direct browser-to-R2 signed upload remains credential-dependent. Do not add scoped R2 access keys or a signing service until Wasim supplies that external bootstrap.
 
+### Northwind live-eval repair pass (Wasim 2026-08-30)
+
+Product decision: stay a Cloudflare web application, no macOS packaging, no Access login. "Better auth" means fixing local operator identity and live eval identity.
+
+- [x] Identity split. The loopback operator holds a declared operator-read role list (`LOOPBACK_ROLES` in `src/lib/store/loopback-principal.ts`) so role-scoped Northwind documents enter live retrieval; private-owner documents stay ownership-gated. `POST /turns` accepts `assumePrincipal` only in loopback identity mode, fails closed (403 outside loopback, 400 on malformed shape), scopes retrieval only (never storage ownership or tool policy) and echoes the applied principal. Evidence: `src/lib/auth/worker-identity.ts`, `workers/brain/test/assume-principal.test.ts`.
+- [x] The eval harness sends each question's principal, fails closed when Brain does not echo it, and scores permission questions live instead of skipping. Evidence: `src/lib/eval/live-northwind-eval.ts`, `src/lib/eval/score-northwind-answer.ts`.
+- [x] Citation completion. Gold-blind, deterministic: a paragraph gains the label of every current-turn evidence item whose text contains one of its claim sentences, in the product answer path, before model repair. Recorded semantics change: a citation now names every retrieved document that states the sentence, not only the one the model picked. Evidence: `addSupportedCitations` in `src/lib/answer/contract.ts`, `completeProseCitations` in `src/lib/agent/host-grounding.ts`.
+- [x] Abstention polarity. A short, marker-free model refusal is honored instead of routed through citation repair; refusals with retrieved evidence carry a recorded `refusalReason`; identifier lookups (ERR-7702, 7.3(b)) get one strict exact-quote retry that can never replace a valid grounded answer. Evidence: `modelSignalsInsufficientEvidence`, `src/lib/agent/run.ts` review-regression tests.
+- [x] Vector-channel accounting. Embedding or Vectorize transport failures degrade retrieval to keyword-only with a recorded trace flag, response count and UI label; fail-closed ACL and contract errors (`AclTooWide`, missing namespace or `acl_group` filter) still propagate. Evidence: `src/lib/retrieve/cloudflare-pipeline.ts` and tests.
+- [x] Retrieval profile recorded: `topK` joined the retrieval fingerprint; the live search tool returns up to eight chunks per the master plan. Prompt version bumped to `grounded-answer.v4`.
+- [x] Harness reliability: seed treats `readyVersionId` as success and polls through client timeouts; checkpoints are versioned and generation-bound; live summary records retrieved recall, gold-retrieved-but-uncited counts, vector-degraded turns and hybrid-baseline comparability.
+- [x] Adversarial review: three parallel reviewers (security, logic, eval honesty). All confirmed critical and high findings fixed with regression tests; accepted low-severity items are documented in the PR.
+- [x] Eval evidence (2026-08-31, isolated `.wrangler/state-eval`, generation `g-8ee33d45`, hybrid, zero degraded turns): retrieval layer unchanged at recall@3 0.912 / MRR 0.825 / nDCG 0.837 / 0 ACL leaks; live layer 95/120 (79.2%) with all 120 scored and zero skips, versus 77/107 (72%) with 13 permission skips before. Factual 59/70, trap 17/17, permission 10/13 (zero forbidden-document retrievals), unanswerable 9/10, multi-hop 0/10. Retrieved-evidence recall 0.979.
+- [ ] Multi-hop completeness remains open: the second gold document is retrieved but not cited by GLM 5.3 Flash; the all-documents scoring rule stays locked. Next iteration needs query decomposition or structured per-entity coverage, not scorer changes.
+- [ ] Twin-citation misses remain on q001, q004, q024, q026, q028: the model quotes the neighbor document when the exact sentence exists only there.
+
 ### Phase 7B: production launch and retirement
 
 Requires one final explicit Wasim approval. Do not start. This is not a commercial launch and must not add billing, public signup or required Cloudflare Access.

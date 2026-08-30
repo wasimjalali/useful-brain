@@ -1,6 +1,11 @@
 import { AccessJwtUnavailable, AccessJwtVerifier } from "../../../src/lib/auth/access-jwt";
 import type { DirectoryRecord } from "../../../src/lib/auth/principal";
-import { authenticateWorkerRequest } from "../../../src/lib/auth/worker-identity";
+import {
+  AssumedPrincipalForbidden,
+  AssumedPrincipalInvalid,
+  authenticateWorkerRequest,
+  parseAssumedPrincipal,
+} from "../../../src/lib/auth/worker-identity";
 import { parseBoundedId } from "../../../src/lib/cf/bounded-id";
 import { writeOperationalLog } from "../../../src/lib/cf/operational-log";
 import { resolveRequestId, withRequestId } from "../../../src/lib/cf/request-id";
@@ -448,6 +453,7 @@ const brainWorker = {
           conversationId?: string;
           requestId?: string;
           persistConversation?: boolean;
+          assumePrincipal?: unknown;
         };
         try {
           body = (await request.json()) as typeof body;
@@ -458,12 +464,25 @@ const brainWorker = {
         if (!question || question.length > 2000) {
           throw new WorkerValidationError();
         }
+        let assumedPrincipal;
+        try {
+          assumedPrincipal = parseAssumedPrincipal(identityMode, body.assumePrincipal);
+        } catch (error) {
+          if (error instanceof AssumedPrincipalForbidden) {
+            throw new WorkerForbiddenError();
+          }
+          if (error instanceof AssumedPrincipalInvalid) {
+            throw new WorkerValidationError();
+          }
+          throw error;
+        }
         const turnRequestId = parseBoundedId(body.requestId ?? requestId, "request id");
         const conversationId = body.conversationId
           ? parseBoundedId(body.conversationId, "conversation id")
           : undefined;
         const answer = await executeTurn({
           ...turnDeps(env, principal),
+          assumedPrincipal,
           question,
           conversationId,
           requestId: turnRequestId,

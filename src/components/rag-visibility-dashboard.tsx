@@ -5,6 +5,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
@@ -43,13 +44,38 @@ import {
   type Conversation,
 } from "@/lib/rag/chat-history";
 import type { EvalRunResult } from "@/lib/eval/manual-eval-set";
+import { NORTHWIND_PRINCIPALS } from "@/lib/eval/northwind-principals";
 import { isRetrievalReady } from "@/lib/rag/workspace-status";
 import type { KnowledgeInventory } from "@/lib/store/knowledge-inventory";
+
+const ASSUMED_PRINCIPAL_STORAGE_KEY = "useful-brain.assumed-principal";
+const ASSUMED_PRINCIPAL_EVENT = "useful-brain:assumed-principal";
+
+function loadStoredAssumedPrincipal(): string | null {
+  try {
+    const stored = window.localStorage.getItem(ASSUMED_PRINCIPAL_STORAGE_KEY);
+    return stored && NORTHWIND_PRINCIPALS.some((principal) => principal.key === stored)
+      ? stored
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function subscribeToAssumedPrincipal(callback: () => void) {
+  window.addEventListener("storage", callback);
+  window.addEventListener(ASSUMED_PRINCIPAL_EVENT, callback);
+  return () => {
+    window.removeEventListener("storage", callback);
+    window.removeEventListener(ASSUMED_PRINCIPAL_EVENT, callback);
+  };
+}
 
 type AskAction = (input: {
   question: string;
   conversationId: string | null;
   requestId: string;
+  assumePrincipal?: { userId: string; roles: string[]; departments: string[] } | null;
 }) => Promise<ActionResult<GroundedAnswerResponse>>;
 
 type CancelAction = (
@@ -107,6 +133,11 @@ export function RagVisibilityDashboard({
 }: RagVisibilityDashboardProps) {
   const router = useRouter();
   const [activeView, setActiveView] = useState<WorkspaceView>(initialView);
+  const assumedPrincipalKey = useSyncExternalStore(
+    subscribeToAssumedPrincipal,
+    loadStoredAssumedPrincipal,
+    () => null,
+  );
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [selectedChunk, setSelectedChunk] = useState<EvidenceItem | null>(null);
   const [focusToken, setFocusToken] = useState(0);
@@ -147,6 +178,19 @@ export function RagVisibilityDashboard({
       window.location.reload();
     });
   }, [importLegacyConversationsAction]);
+
+  function assumePrincipal(key: string | null) {
+    try {
+      if (key) {
+        window.localStorage.setItem(ASSUMED_PRINCIPAL_STORAGE_KEY, key);
+      } else {
+        window.localStorage.removeItem(ASSUMED_PRINCIPAL_STORAGE_KEY);
+      }
+    } catch {
+      // Without storage the selection cannot apply; the select re-reads it.
+    }
+    window.dispatchEvent(new Event(ASSUMED_PRINCIPAL_EVENT));
+  }
 
   const retrievalReady = isRetrievalReady(embeddingStorageStatus);
 
@@ -196,11 +240,21 @@ export function RagVisibilityDashboard({
     setStopError(null);
     setPendingQuestion(question);
     setPendingRequestId(requestId);
+    const assumed = NORTHWIND_PRINCIPALS.find(
+      (candidate) => candidate.key === assumedPrincipalKey,
+    );
     try {
       const result = await askAction({
         question,
         conversationId: activeConversationId,
         requestId,
+        assumePrincipal: assumed
+          ? {
+              userId: assumed.userId,
+              roles: assumed.roles,
+              departments: assumed.departments,
+            }
+          : null,
       });
       if (conversationRef.current !== guardToken) {
         finishStoppedConversationRoute();
@@ -497,7 +551,9 @@ export function RagVisibilityDashboard({
           ) : null}
           {activeView === "settings" ? (
             <SettingsWorkspace
+              assumedPrincipalKey={assumedPrincipalKey}
               identity={identity}
+              onAssumePrincipal={assumePrincipal}
               retrievalMode={retrievalMode}
               status={embeddingStorageStatus}
             />

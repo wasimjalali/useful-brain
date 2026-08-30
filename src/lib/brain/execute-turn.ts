@@ -54,6 +54,13 @@ export type ExecuteTurnInput = {
   ai?: WorkersAiRunner;
   lockFor(conversationId: string): ConversationLockStub;
   principal: DirectoryRecord;
+  /**
+   * Loopback-only retrieval principal override for ACL demos and evals.
+   * Scopes retrieval authorization only; storage ownership and tool policy
+   * stay with the authenticated operator principal. The Brain route fails
+   * closed on this field outside loopback identity mode.
+   */
+  assumedPrincipal?: Principal;
   question: string;
   conversationId?: string;
   requestId: string;
@@ -64,7 +71,7 @@ export type ExecuteTurnInput = {
 export async function executeTurn(input: ExecuteTurnInput): Promise<GroundedAnswerResponse> {
   const now = input.now ?? Date.now();
   const persist = input.persistConversation !== false;
-  const retrievalPrincipal: Principal = {
+  const retrievalPrincipal: Principal = input.assumedPrincipal ?? {
     userId: input.principal.id,
     roles: input.principal.roles,
     departments: input.principal.departments,
@@ -82,7 +89,11 @@ export async function executeTurn(input: ExecuteTurnInput): Promise<GroundedAnsw
       conversationId: input.conversationId ?? "eval-ephemeral",
       runtime,
     });
-    return responseFromAgent(input.question, result.finalResponse, result.evidence, result.model);
+    return withTurnDiagnostics(
+      responseFromAgent(input.question, result.finalResponse, result.evidence, result.model),
+      result,
+      input.assumedPrincipal,
+    );
   }
 
   let pending: { conversationId: string; assistantMessageId: string; duplicate: boolean };
@@ -101,6 +112,10 @@ export async function executeTurn(input: ExecuteTurnInput): Promise<GroundedAnsw
   if (pending.duplicate) {
     const completed = await loadReplay(input.operations, pending.assistantMessageId, input.principal.id);
     if (completed) {
+      // A replayed turn never echoes assumedPrincipal: the stored answer may
+      // have been produced under a different retrieval scope, and a caller
+      // that requires the confirmation must treat the missing echo as
+      // unconfirmed identity.
       return replayToResponse(completed);
     }
     throw new WorkerBusyError();
@@ -141,11 +156,16 @@ export async function executeTurn(input: ExecuteTurnInput): Promise<GroundedAnsw
   });
 
   try {
-    const history = await loadBoundedHistory(
-      input.operations,
-      pending.conversationId,
-      input.principal.id,
-    );
+    // A turn scoped to an assumed principal never receives prior answers in
+    // its model context: earlier turns may have been retrieved under a
+    // different principal's ACL scope.
+    const history = input.assumedPrincipal
+      ? []
+      : await loadBoundedHistory(
+          input.operations,
+          pending.conversationId,
+          input.principal.id,
+        );
     const result = await runKnowledgeAgent({
       question: input.question,
       pipeline,
@@ -182,7 +202,7 @@ export async function executeTurn(input: ExecuteTurnInput): Promise<GroundedAnsw
         }),
       release: () => lock.release(pending.assistantMessageId),
     });
-    return replayToResponse(completed);
+    return withTurnDiagnostics(replayToResponse(completed), result, input.assumedPrincipal);
   } catch (error) {
     const cancelled = await lock.cancelled().catch(() => false);
     const failure = cancelled ? new WorkerCancelledError() : error;
@@ -306,6 +326,29 @@ function historyToAgentMessages(history: StoredHistoryTurn[], modelId: string): 
     });
   }
   return messages;
+}
+
+function withTurnDiagnostics(
+  response: GroundedAnswerResponse,
+  result: { vectorDegradedCount: number; refusalReason?: string },
+  assumedPrincipal: Principal | undefined,
+): GroundedAnswerResponse {
+  return {
+    ...response,
+    ...(result.vectorDegradedCount > 0
+      ? { vectorDegradedCount: result.vectorDegradedCount }
+      : {}),
+    ...(result.refusalReason ? { refusalReason: result.refusalReason } : {}),
+    ...(assumedPrincipal
+      ? {
+          assumedPrincipal: {
+            userId: assumedPrincipal.userId,
+            roles: [...assumedPrincipal.roles],
+            departments: [...assumedPrincipal.departments],
+          },
+        }
+      : {}),
+  };
 }
 
 function responseFromAgent(

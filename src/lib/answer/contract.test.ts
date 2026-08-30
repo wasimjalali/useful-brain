@@ -74,22 +74,22 @@ describe("grounded answer contract", () => {
     });
   });
 
-  it("falls back when citations were not retrieved", () => {
+  it("falls back when citations were not retrieved and the claim is not verbatim evidence", () => {
     const parsed = parseStructuredGroundedAnswer(
       JSON.stringify({
         answerType: "grounded",
-        paragraphs: [{ text: "Opened products may be returned.", citations: ["[9]"] }],
+        paragraphs: [{ text: "Opened products may be returned after 90 days.", citations: ["[9]"] }],
       }),
       addCitationLabels(retrievalResults),
     );
     expect(parsed).toEqual(buildInsufficientEvidenceAnswer());
   });
 
-  it("falls back when grounded paragraphs omit citations", () => {
+  it("falls back when an uncited paragraph is not verbatim evidence", () => {
     const parsed = parseStructuredGroundedAnswer(
       JSON.stringify({
         answerType: "grounded",
-        paragraphs: [{ text: "Opened products may be returned.", citations: [] }],
+        paragraphs: [{ text: "Gift cards may be returned at any store.", citations: [] }],
       }),
       addCitationLabels(retrievalResults),
     );
@@ -225,5 +225,112 @@ describe("grounded answer contract", () => {
     expect(INSUFFICIENT_EVIDENCE_ANSWER).toBe(
       "I do not have enough retrieved evidence to answer that question.",
     );
+  });
+});
+
+describe("citation completion", () => {
+  const twinEvidence = addCitationLabels([
+    {
+      rank: 1,
+      score: 0.7,
+      chunkId: "handbook__chunk_001",
+      source: "employee_handbook.md",
+      section: "Benefits Summary",
+      text: "Employees receive 10 sick days each year.",
+      tokenEstimate: 12,
+      documentId: "nw_hr_employee_handbook",
+    },
+    {
+      rank: 2,
+      score: 0.6,
+      chunkId: "leave__chunk_003",
+      source: "leave_policy.md",
+      section: "Sick Leave",
+      text: "Employees receive 10 sick days each year. A doctor's note is required from the third consecutive sick day.",
+      tokenEstimate: 30,
+      documentId: "nw_hr_leave_policy",
+    },
+  ]);
+
+  it("adds every evidence label whose text contains a cited paragraph's claim", () => {
+    // q004 shape: the model cites only the umbrella handbook while the
+    // specific policy chunk contains the same sentence.
+    const parsed = parseStructuredGroundedAnswer(
+      JSON.stringify({
+        answerType: "grounded",
+        paragraphs: [
+          { text: "Employees receive 10 sick days each year.", citations: ["[1]"] },
+        ],
+      }),
+      twinEvidence,
+    );
+    expect(parsed.paragraphs[0].citations).toEqual(["[1]", "[2]"]);
+  });
+
+  it("completes a multi-hop paragraph whose second sentence was retrieved but uncited", () => {
+    // q087/q090 shape: both facts written, only one label cited.
+    const parsed = parseStructuredGroundedAnswer(
+      JSON.stringify({
+        answerType: "grounded",
+        paragraphs: [
+          {
+            text: "Employees receive 10 sick days each year. A doctor's note is required from the third consecutive sick day.",
+            citations: ["[1]"],
+          },
+        ],
+      }),
+      twinEvidence,
+    );
+    expect(parsed.paragraphs[0].citations).toEqual(["[1]", "[2]"]);
+  });
+
+  it("does not add labels whose evidence does not contain any claim", () => {
+    const parsed = parseStructuredGroundedAnswer(
+      JSON.stringify({
+        answerType: "grounded",
+        paragraphs: [
+          { text: "A doctor's note is required from the third consecutive sick day.", citations: ["[2]"] },
+        ],
+      }),
+      twinEvidence,
+    );
+    expect(parsed.paragraphs[0].citations).toEqual(["[2]"]);
+  });
+
+  it("cites a verbatim uncited paragraph instead of refusing the answer", () => {
+    const parsed = parseStructuredGroundedAnswer(
+      JSON.stringify({
+        answerType: "grounded",
+        paragraphs: [
+          {
+            text: "A doctor's note is required from the third consecutive sick day.",
+            citations: [],
+          },
+        ],
+      }),
+      twinEvidence,
+    );
+    expect(parsed).toEqual({
+      answerType: "grounded",
+      paragraphs: [
+        {
+          text: "A doctor's note is required from the third consecutive sick day.",
+          citations: ["[2]"],
+        },
+      ],
+    });
+  });
+
+  it("still refuses an unsupported paragraph after completion", () => {
+    const parsed = parseStructuredGroundedAnswer(
+      JSON.stringify({
+        answerType: "grounded",
+        paragraphs: [
+          { text: "Employees receive 45 sick days each year.", citations: ["[1]"] },
+        ],
+      }),
+      twinEvidence,
+    );
+    expect(parsed).toEqual(buildInsufficientEvidenceAnswer());
   });
 });

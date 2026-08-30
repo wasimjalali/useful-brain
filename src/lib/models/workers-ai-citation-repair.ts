@@ -10,7 +10,7 @@ import { CHAT_MODEL_ID } from "./selection";
 export function createWorkersAiCitationRepair(
   ai: WorkersAiChatRunner,
 ): GroundedAnswerRepair {
-  return async ({ question, evidence, signal }) => {
+  return async ({ question, evidence, signal, strictTokens }) => {
     signal?.throwIfAborted();
     const response = await ai.run(CHAT_MODEL_ID, {
       messages: citationRepairMessages(question, evidence),
@@ -19,13 +19,21 @@ export function createWorkersAiCitationRepair(
       max_completion_tokens: 512,
     });
     signal?.throwIfAborted();
-    return validatedRepairText(response, evidence) ?? selectExactExtract(question, evidence);
+    const validated = validatedRepairText(response, evidence, strictTokens);
+    if (strictTokens && strictTokens.length > 0) {
+      // Strict mode: only a model-selected quote containing an asked token
+      // is accepted; the lexical-overlap fallback stays off so a refusal is
+      // never overturned by mere word overlap.
+      return validated;
+    }
+    return validated ?? selectExactExtract(question, evidence);
   };
 }
 
 function validatedRepairText(
   response: unknown,
   evidence: CitedRetrievalResult[],
+  strictTokens?: string[],
 ): string | null {
   const message = parseWorkersAiChatMessage(response, CHAT_MODEL_ID);
   const raw = message.content
@@ -36,7 +44,16 @@ function validatedRepairText(
   if (!raw) {
     return null;
   }
-  return parseExactQuotes(raw, evidence);
+  const parsed = parseExactQuotes(raw, evidence);
+  if (
+    parsed &&
+    strictTokens &&
+    strictTokens.length > 0 &&
+    !strictTokens.some((token) => parsed.toLowerCase().includes(token.toLowerCase()))
+  ) {
+    return null;
+  }
+  return parsed;
 }
 
 function citationRepairMessages(

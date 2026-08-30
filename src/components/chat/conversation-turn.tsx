@@ -70,6 +70,12 @@ export function ConversationTurn({
           {!grounded ? (
             <StatusLabel tone="warning">insufficient evidence</StatusLabel>
           ) : null}
+          {(answer.vectorDegradedCount ?? 0) > 0 ? (
+            <StatusLabel tone="warning">keyword-only retrieval</StatusLabel>
+          ) : null}
+          {answer.assumedPrincipal ? (
+            <StatusLabel tone="neutral">as {answer.assumedPrincipal.userId}</StatusLabel>
+          ) : null}
         </div>
 
         <div className="flex flex-col gap-3.5 text-[15px] leading-7 text-ink">

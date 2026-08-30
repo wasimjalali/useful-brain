@@ -1,17 +1,22 @@
 import { SettingsIcon, UserIcon } from "@/components/icons";
 import { StatusLabel } from "@/components/ui/status-label";
 import type { WorkspaceIdentity } from "@/app/actions";
+import { NORTHWIND_PRINCIPALS } from "@/lib/eval/northwind-principals";
 import { SELECTED_MODELS } from "@/lib/models/selection";
 import type { EmbeddingStorageStatus } from "@/lib/rag/storage-records";
 import { isRetrievalReady } from "@/lib/rag/workspace-status";
 import type { KnowledgeInventory } from "@/lib/store/knowledge-inventory";
 
 export function SettingsWorkspace({
+  assumedPrincipalKey = null,
   identity,
+  onAssumePrincipal,
   retrievalMode,
   status,
 }: {
+  assumedPrincipalKey?: string | null;
   identity: WorkspaceIdentity | null;
+  onAssumePrincipal?: (key: string | null) => void;
   retrievalMode: KnowledgeInventory["retrievalMode"];
   status: EmbeddingStorageStatus;
 }) {
@@ -37,6 +42,30 @@ export function SettingsWorkspace({
             value={identity?.departments.join(", ") || "None"}
           />
           <SettingsRow label="Runtime" value="Loopback operator on 127.0.0.1" />
+          {onAssumePrincipal ? (
+            <div className="settings-row">
+              <dt>
+                <label htmlFor="assume-principal">Assume principal</label>
+              </dt>
+              <dd>
+                <select
+                  className="field-input min-h-10 px-3 text-sm text-ink outline-none"
+                  id="assume-principal"
+                  onChange={(event) =>
+                    onAssumePrincipal(event.target.value === "" ? null : event.target.value)
+                  }
+                  value={assumedPrincipalKey ?? ""}
+                >
+                  <option value="">Operator</option>
+                  {NORTHWIND_PRINCIPALS.map((principal) => (
+                    <option key={principal.key} value={principal.key}>
+                      {principal.userId} ({[...principal.roles, ...principal.departments].join(", ")})
+                    </option>
+                  ))}
+                </select>
+              </dd>
+            </div>
+          ) : null}
         </dl>
       </section>
 

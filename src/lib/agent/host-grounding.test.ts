@@ -7,10 +7,13 @@ import {
   BRAIN_NOT_ENOUGH_EVIDENCE,
   SEARCH_KNOWLEDGE_TOOL,
   buildTurnLedger,
+  completeProseCitations,
   createLedger,
   enforceBrainGrounding,
+  ingestSearchPayload,
   knowledgeToolsPresent,
   markersValidForLedger,
+  modelSignalsInsufficientEvidence,
   type TranscriptMessage,
 } from "./host-grounding";
 import { BudgetTracker } from "./budgets";
@@ -351,5 +354,96 @@ describe("host grounding finalizer", () => {
         rewriteTranscript: false,
       }),
     ).toBe(BRAIN_INVALID_CITATION);
+  });
+});
+
+describe("modelSignalsInsufficientEvidence", () => {
+  it("detects host strings and model-authored refusals", () => {
+    expect(modelSignalsInsufficientEvidence(BRAIN_NOT_ENOUGH_EVIDENCE)).toBe(true);
+    expect(
+      modelSignalsInsufficientEvidence(
+        "The retrieved documents do not contain any information about an employee stock purchase plan.",
+      ),
+    ).toBe(true);
+    expect(
+      modelSignalsInsufficientEvidence("There is not enough evidence to answer this."),
+    ).toBe(true);
+    expect(
+      modelSignalsInsufficientEvidence("I don't have enough information about a childcare stipend."),
+    ).toBe(true);
+    expect(
+      modelSignalsInsufficientEvidence("The evidence does not mention moonlighting."),
+    ).toBe(true);
+  });
+
+  it("does not flag grounded answers", () => {
+    expect(modelSignalsInsufficientEvidence("Employees accrue 1.5 days of leave per month.[1]")).toBe(
+      false,
+    );
+    expect(modelSignalsInsufficientEvidence("")).toBe(false);
+    expect(modelSignalsInsufficientEvidence(null)).toBe(false);
+    expect(
+      modelSignalsInsufficientEvidence("Disputes open more than 30 days move to ESC-3.[2]"),
+    ).toBe(false);
+  });
+});
+
+describe("completeProseCitations", () => {
+  function twinLedger() {
+    const ledger = createLedger();
+    ingestSearchPayload(ledger, {
+      hits: [
+        {
+          chunk_id: "chunk-a",
+          content: "Billing disputes open more than 30 days move to ESC-3.",
+          label: "[1]",
+          citation: {
+            chunk_id: "chunk-a",
+            document_id: "nw_finance_invoicing_payment",
+            section_heading: "Billing Disputes",
+            label: "[1]",
+          },
+        },
+        {
+          chunk_id: "chunk-b",
+          content: "ESC-3 complaints are owned by the VP of Support.",
+          label: "[2]",
+          citation: {
+            chunk_id: "chunk-b",
+            document_id: "nw_support_complaint_escalation",
+            section_heading: "ESC-3: VP Support",
+            label: "[2]",
+          },
+        },
+      ],
+      citations: [],
+    });
+    return ledger;
+  }
+
+  it("appends the marker for a retrieved-but-uncited second hop", () => {
+    // q087/q090/q116 shape: both facts written verbatim, one label cited.
+    const ledger = twinLedger();
+    const completed = completeProseCitations(
+      "Billing disputes open more than 30 days move to ESC-3.[1] ESC-3 complaints are owned by the VP of Support.",
+      ledger,
+    );
+    expect(completed).toBe(
+      "Billing disputes open more than 30 days move to ESC-3.[1] ESC-3 complaints are owned by the VP of Support.[2]",
+    );
+    expect(markersValidForLedger(completed, ledger)).toBe(true);
+  });
+
+  it("leaves prose unchanged when no ledger text contains a sentence", () => {
+    const ledger = twinLedger();
+    const prose = "The refund window is 90 days for annual plans.[1]";
+    expect(completeProseCitations(prose, ledger)).toBe(prose);
+  });
+
+  it("adds nothing on a label conflict", () => {
+    const ledger = twinLedger();
+    ledger.labelConflict = true;
+    const prose = "ESC-3 complaints are owned by the VP of Support.";
+    expect(completeProseCitations(prose, ledger)).toBe(prose);
   });
 });

@@ -64,6 +64,8 @@ export type TurnEvidenceLedger = {
   emptyOrInsufficient: boolean;
   searchError: boolean;
   labelConflict: boolean;
+  /** Searches this turn whose vector channel failed and ran keyword-only. */
+  vectorDegradedCount: number;
 };
 
 export function createLedger(): TurnEvidenceLedger {
@@ -75,6 +77,7 @@ export function createLedger(): TurnEvidenceLedger {
     emptyOrInsufficient: false,
     searchError: false,
     labelConflict: false,
+    vectorDegradedCount: 0,
   };
 }
 
@@ -129,6 +132,89 @@ export function markersValidForLedger(text: string, ledger: TurnEvidenceLedger):
         cited.flatMap((item) => [item?.section ?? "", item?.text ?? ""]),
       );
     });
+}
+
+const INSUFFICIENT_SIGNAL_RES = [
+  /\b(?:i|we)\s+(?:do not|don't|cannot|can't)\s+(?:have|find)\b[^.]{0,80}\b(?:evidence|information|documentation)\b/iu,
+  /\b(?:not?|insufficient|lacking)\s+enough\s+(?:retrieved\s+)?(?:evidence|information)\b/iu,
+  /\b(?:retrieved\s+)?(?:evidence|documents?)\s+do(?:es)?\s+not\s+(?:answer|state|mention|cover|address|support|include|contain|specify)\b/iu,
+  /\bno\s+retrieved\s+(?:evidence|information|documents?)\b/iu,
+  /\binsufficient[_\s]evidence\b/iu,
+];
+
+const MAX_REFUSAL_LENGTH = 240;
+
+/**
+ * Detect a model-authored refusal that did not use the exact host string.
+ * The host honors an intended abstention instead of routing it through
+ * citation repair, which could otherwise turn a refusal into a grounded
+ * answer built from a lexically similar but off-topic evidence span.
+ *
+ * Anchored to the whole response: a refusal is short and carries no
+ * citation markers. Grounded prose that quotes a negative-sounding policy
+ * sentence ("This document does not cover contractor travel.[1]") must
+ * never match, so any marker or long draft disqualifies the text.
+ */
+export function modelSignalsInsufficientEvidence(text: string | null | undefined): boolean {
+  if (!text) {
+    return false;
+  }
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return false;
+  }
+  if (HOST_STRINGS.has(trimmed)) {
+    return true;
+  }
+  if (citedMarkerIndexes(trimmed).length > 0 || trimmed.length > MAX_REFUSAL_LENGTH) {
+    return false;
+  }
+  return INSUFFICIENT_SIGNAL_RES.some((pattern) => pattern.test(trimmed));
+}
+
+/**
+ * Append the marker of every ledger identity whose text contains one of a
+ * paragraph's claim sentences. Only labels from the current-turn ledger are
+ * ever added, so the must-retrieve and citation-validity contracts hold.
+ */
+export function completeProseCitations(text: string, ledger: TurnEvidenceLedger): string {
+  if (!text || ledger.labelConflict || ledger.byLabel.size === 0) {
+    return text;
+  }
+  const markerMatcher = new RegExp(MARKER_RE.source, "g");
+  return text
+    .split(/\n\s*\n/u)
+    .map((paragraph) => {
+      const trimmed = paragraph.trim();
+      if (!trimmed) {
+        return paragraph;
+      }
+      const cited = new Set(citedMarkerIndexes(trimmed));
+      const sentences = trimmed
+        .replace(markerMatcher, "")
+        .split(/(?<=[.!?])\s+/u)
+        .map((sentence) => sentence.trim())
+        .filter(Boolean);
+      const additions: number[] = [];
+      for (const [label, identity] of [...ledger.byLabel.entries()].sort((a, b) => a[0] - b[0])) {
+        if (cited.has(label)) {
+          continue;
+        }
+        if (
+          sentences.some((sentence) =>
+            textSupportedByPassages(sentence, [identity.section, identity.text]),
+          )
+        ) {
+          cited.add(label);
+          additions.push(label);
+        }
+      }
+      if (additions.length === 0) {
+        return paragraph;
+      }
+      return `${paragraph.trimEnd()}${additions.map((label) => `[${label}]`).join("")}`;
+    })
+    .join("\n\n");
 }
 
 export function appendSearchHit(ledger: TurnEvidenceLedger, identity: EvidenceIdentity): string {

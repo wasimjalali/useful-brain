@@ -14,6 +14,8 @@ export type NorthwindAnswerForEval = {
       documentId?: string | null;
     }>;
   };
+  vectorDegradedCount?: number;
+  refusalReason?: string;
 };
 
 export type NorthwindAnswerScore = {
@@ -26,6 +28,13 @@ export type NorthwindAnswerScore = {
   citedDocumentIds: string[];
   retrievedDocumentIds: string[];
   sectionHit: boolean | null;
+  /** Fraction of expected documents present in retrievedEvidence; null for abstention categories. */
+  liveRecall: number | null;
+  /** Expected documents that were retrieved this turn but never cited. */
+  goldRetrievedUncited: string[];
+  /** Searches this turn whose vector channel degraded to keyword-only. */
+  vectorDegradedCount: number;
+  refusalReason?: string;
 };
 
 const LOOPBACK_SKIP =
@@ -86,6 +95,15 @@ export function scoreNorthwindAnswer(
     question.expectedSections.length === 0
       ? null
       : question.expectedSections.some((section) => citedSections.has(section));
+  const abstention = ABSTENTION_CATEGORIES.has(question.category);
+  const liveRecall =
+    abstention || question.expectedDocumentIds.length === 0
+      ? null
+      : question.expectedDocumentIds.filter((id) => retrieved.includes(id)).length /
+        question.expectedDocumentIds.length;
+  const goldRetrievedUncited = abstention
+    ? []
+    : question.expectedDocumentIds.filter((id) => retrieved.includes(id) && !cited.includes(id));
   const base = {
     questionId: question.questionId,
     category: question.category,
@@ -93,6 +111,10 @@ export function scoreNorthwindAnswer(
     citedDocumentIds: cited,
     retrievedDocumentIds: retrieved,
     sectionHit,
+    liveRecall,
+    goldRetrievedUncited,
+    vectorDegradedCount: answer.vectorDegradedCount ?? 0,
+    ...(answer.refusalReason ? { refusalReason: answer.refusalReason } : {}),
   };
 
   if (question.category === "permission" && options.liveLoopback) {

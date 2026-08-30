@@ -126,6 +126,62 @@ describe("scoreNorthwindAnswer", () => {
     expect(outcome.skipReason).toMatch(/loopback/i);
   });
 
+  it("scores permission questions when the question principal was applied live", () => {
+    const outcome = scoreNorthwindAnswer(
+      question({
+        questionId: "q074",
+        category: "permission",
+        expectedDocumentIds: [],
+        expectedSections: [],
+        forbiddenDocumentIds: ["nw_hr_termination_offboarding"],
+      }),
+      answer({
+        structuredAnswer: {
+          answerType: "insufficient_evidence",
+          paragraphs: [{ text: "Not enough evidence.", citations: [] }],
+        },
+        retrieval: {
+          results: [
+            {
+              source: "Equipment Return",
+              citationLabel: "[1]",
+              documentId: "nw_operations_equipment_return",
+            },
+          ],
+        },
+      }),
+    );
+    expect(outcome.status).toBe("pass");
+  });
+
+  it("records live recall, uncited gold and vector degradation", () => {
+    const outcome = scoreNorthwindAnswer(
+      question({
+        questionId: "q090",
+        category: "multi_hop",
+        expectedDocumentIds: ["nw_support_refund_policy", "nw_support_dsar_process"],
+        expectedSections: [],
+      }),
+      answer({
+        structuredAnswer: {
+          answerType: "grounded",
+          paragraphs: [{ text: "Refunds take 14 days.", citations: ["[1]"] }],
+        },
+        retrieval: {
+          results: [
+            { source: "Refunds", citationLabel: "[1]", documentId: "nw_support_refund_policy" },
+            { source: "DSAR", citationLabel: "[2]", documentId: "nw_support_dsar_process" },
+          ],
+        },
+        vectorDegradedCount: 1,
+      }),
+    );
+    expect(outcome.status).toBe("fail");
+    expect(outcome.liveRecall).toBe(1);
+    expect(outcome.goldRetrievedUncited).toEqual(["nw_support_dsar_process"]);
+    expect(outcome.vectorDegradedCount).toBe(1);
+  });
+
   it("fails permission when forbidden documents leak into retrieval", () => {
     const outcome = scoreNorthwindAnswer(
       question({

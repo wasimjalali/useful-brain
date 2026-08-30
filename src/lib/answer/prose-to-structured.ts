@@ -6,6 +6,7 @@ import {
   citedMarkerIndexes,
 } from "../agent/host-grounding";
 import {
+  addSupportedCitations,
   buildInsufficientEvidenceAnswer,
   type CitedRetrievalResult,
   type StructuredGroundedAnswer,
@@ -40,18 +41,21 @@ export function structuredAnswerFromGroundedProse(
     return asJson;
   }
   const valid = new Set(evidence.map((item) => item.citationLabel));
-  const paragraphs = trimmed
-    .split(/\n\s*\n/u)
-    .map((paragraph) => paragraph.trim())
-    .filter(Boolean)
-    .map((paragraph) => {
-      const citations = [...new Set(citedMarkerIndexes(paragraph))]
-        .map((label) => `[${label}]`)
-        .filter((label) => valid.has(label));
-      const cleaned = paragraph.replace(MARKER_RE, "").replace(/\s+/g, " ").trim();
-      return { text: cleaned, citations };
-    })
-    .filter((paragraph) => paragraph.text.length > 0 && paragraph.citations.length > 0);
+  const paragraphs = addSupportedCitations(
+    trimmed
+      .split(/\n\s*\n/u)
+      .map((paragraph) => paragraph.trim())
+      .filter(Boolean)
+      .map((paragraph) => {
+        const citations = [...new Set(citedMarkerIndexes(paragraph))]
+          .map((label) => `[${label}]`)
+          .filter((label) => valid.has(label));
+        const cleaned = paragraph.replace(MARKER_RE, "").replace(/\s+/g, " ").trim();
+        return { text: cleaned, citations };
+      })
+      .filter((paragraph) => paragraph.text.length > 0),
+    evidence,
+  ).filter((paragraph) => paragraph.citations.length > 0);
   if (paragraphs.length === 0) {
     return buildInsufficientEvidenceAnswer();
   }

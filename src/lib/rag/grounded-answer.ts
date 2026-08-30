@@ -38,4 +38,10 @@ export type GroundedAnswerResponse = {
   assistantMessageId?: string;
   corpusGenerationId?: string | null;
   retrievalConfigVersion?: string | null;
+  /** Searches this turn whose vector channel failed and ran keyword-only. */
+  vectorDegradedCount?: number;
+  /** Why an insufficient-evidence answer was kept despite retrieved evidence. */
+  refusalReason?: string;
+  /** Loopback-only retrieval principal this turn was scoped to, when assumed. */
+  assumedPrincipal?: { userId: string; roles: string[]; departments: string[] };
 };

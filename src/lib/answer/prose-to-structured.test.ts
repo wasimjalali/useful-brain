@@ -44,4 +44,25 @@ describe("structuredAnswerFromGroundedProse", () => {
     });
     expect(structuredAnswerFromGroundedProse(raw, evidence).answerType).toBe("grounded");
   });
+
+  it("completes citations for every evidence item that states the copied sentence", () => {
+    const twinEvidence = addCitationLabels([
+      evidence[0],
+      {
+        rank: 2,
+        score: 0.8,
+        chunkId: "handbook__body__004",
+        source: "employee-handbook.md",
+        section: "Time Off",
+        text: "Employees accrue 1.5 days of leave per month. See the leave policy for details.",
+        tokenEstimate: 20,
+      },
+    ]);
+    expect(
+      structuredAnswerFromGroundedProse(
+        "Employees accrue 1.5 days of leave per month.[1]",
+        twinEvidence,
+      ).paragraphs[0].citations,
+    ).toEqual(["[1]", "[2]"]);
+  });
 });

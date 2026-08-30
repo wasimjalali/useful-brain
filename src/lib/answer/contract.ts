@@ -1,7 +1,7 @@
 export const INSUFFICIENT_EVIDENCE_ANSWER =
   "I do not have enough retrieved evidence to answer that question.";
 
-export const PROMPT_VERSION = "grounded-answer.v3";
+export const PROMPT_VERSION = "grounded-answer.v4";
 
 export type ChatMessage = {
   role: "system" | "user" | "assistant";
@@ -156,7 +156,10 @@ export function parseStructuredGroundedAnswer(
     }
 
     const validCitationLabels = new Set(evidence.map((result) => result.citationLabel));
-    const normalizedParagraphs = normalizeParagraphs(paragraphs, validCitationLabels);
+    const normalizedParagraphs = addSupportedCitations(
+      normalizeParagraphs(paragraphs, validCitationLabels),
+      evidence,
+    );
 
     if (answerType === "insufficient_evidence") {
       return buildInsufficientEvidenceAnswer();
@@ -196,16 +199,56 @@ function paragraphSupportedByCitations(
 
 export function textSupportedByPassages(text: string, passages: string[]): boolean {
   const supportPassages = passages.map(normalizeSupportText).filter(Boolean);
-  const claims = text
-    .split(/(?<=[.!?])\s+/u)
-    .map(normalizeSupportText)
-    .filter(Boolean);
+  const claims = claimSentences(text);
   return (
     claims.length > 0 &&
     claims.every(
       (claim) => claim.split(" ").length >= 3 && supportPassages.some((passage) => passage.includes(claim)),
     )
   );
+}
+
+function claimSentences(text: string): string[] {
+  return text
+    .split(/(?<=[.!?])\s+/u)
+    .map(normalizeSupportText)
+    .filter(Boolean);
+}
+
+/**
+ * Add the label of every evidence item whose own text contains one of the
+ * paragraph's claim sentences. Labels are only ever added for evidence
+ * retrieved in the current run, so citation validity is preserved; this
+ * repairs answers that copied a sentence from evidence without citing every
+ * document that states it.
+ */
+export function addSupportedCitations(
+  paragraphs: GroundedAnswerParagraph[],
+  evidence: CitedRetrievalResult[],
+): GroundedAnswerParagraph[] {
+  return paragraphs.map((paragraph) => {
+    const claims = claimSentences(paragraph.text).filter(
+      (claim) => claim.split(" ").length >= 3,
+    );
+    if (claims.length === 0) {
+      return paragraph;
+    }
+    const cited = new Set(paragraph.citations);
+    const citations = [...paragraph.citations];
+    for (const item of evidence) {
+      if (cited.has(item.citationLabel)) {
+        continue;
+      }
+      const passages = [item.section, item.text].map(normalizeSupportText).filter(Boolean);
+      if (claims.some((claim) => passages.some((passage) => passage.includes(claim)))) {
+        cited.add(item.citationLabel);
+        citations.push(item.citationLabel);
+      }
+    }
+    return citations.length === paragraph.citations.length
+      ? paragraph
+      : { ...paragraph, citations };
+  });
 }
 
 function normalizeSupportText(text: string): string {

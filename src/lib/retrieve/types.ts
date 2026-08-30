@@ -55,6 +55,8 @@ export type RetrievalTrace = {
   fusedScores: Record<string, number>;
   rerankScores: Record<string, number>;
   fingerprint: string;
+  /** Set when the vector channel failed and this response is keyword-only. */
+  vectorChannelError?: boolean;
 };
 
 export type SearchResponse = {

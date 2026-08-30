@@ -91,23 +91,36 @@ export class CloudflareKnowledgePipeline {
     const generationId = this.input.generationId;
     const shapes = await loadAclShapes(this.input.db, generationId);
     const aclKeys = await enumerateAllowedAclGroups(acl, shapes);
-    const queryEmbedding = this.input.vectorize
-      ? await embedWithWorkersAi(this.input.ai, EMBEDDING_MODEL, {
+    // The vector channel degrades to keyword-only on embedding or Vectorize
+    // transport failures. The degradation is recorded on the trace, never
+    // hidden: one Vectorize internal error must not blank out the keyword
+    // channel that still finds exact-token matches under the same ACL
+    // constraints. Fail-closed policy errors (missing namespace or ACL
+    // filter, over-wide serialized filter) are raised before the try and
+    // always propagate.
+    let vectorChannelError = false;
+    const vectorMatches: Array<{ vectorId: string; score: number }> = [];
+    if (this.input.vectorize && aclKeys.length > 0) {
+      const vectorQuery = await buildVectorizeQuery({ generationId, aclGroupKeys: aclKeys });
+      try {
+        const queryEmbedding = await embedWithWorkersAi(this.input.ai, EMBEDDING_MODEL, {
           kind: "query",
           text: query,
-        })
-      : [];
-    const vectorMatches: Array<{ vectorId: string; score: number }> = [];
-    if (this.input.vectorize && queryEmbedding[0] && aclKeys.length > 0) {
-      const vectorQuery = await buildVectorizeQuery({ generationId, aclGroupKeys: aclKeys });
-      const vectorResult = await this.input.vectorize.query(queryEmbedding[0], {
-        topK: fetchLimit,
-        namespace: vectorQuery.namespace,
-        filter: vectorQuery.filter,
-        returnMetadata: "indexed",
-      });
-      for (const match of vectorResult.matches ?? []) {
-        vectorMatches.push({ vectorId: match.id, score: match.score });
+        });
+        if (queryEmbedding[0]) {
+          const vectorResult = await this.input.vectorize.query(queryEmbedding[0], {
+            topK: fetchLimit,
+            namespace: vectorQuery.namespace,
+            filter: vectorQuery.filter,
+            returnMetadata: "indexed",
+          });
+          for (const match of vectorResult.matches ?? []) {
+            vectorMatches.push({ vectorId: match.id, score: match.score });
+          }
+        }
+      } catch {
+        vectorChannelError = true;
+        vectorMatches.length = 0;
       }
     }
     const vectorChunkIds = await loadVectorChunkIds(
@@ -192,6 +205,7 @@ export class CloudflareKnowledgePipeline {
           final.flatMap((item) => (item.rerankScore === null ? [] : [[item.chunk.chunkId, item.rerankScore]])),
         ),
         fingerprint: fingerprintId(fingerprint),
+        ...(vectorChannelError ? { vectorChannelError: true } : {}),
       },
     };
   }

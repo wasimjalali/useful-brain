@@ -24,7 +24,12 @@ const LIVE_CHECKPOINT = path.join(EVAL_OUTPUT_DIR, "live-checkpoint.json");
 const LIVE_SUMMARY = path.join(EVAL_OUTPUT_DIR, "live-summary.json");
 const FINDINGS = path.join(EVAL_OUTPUT_DIR, "findings.json");
 
+// Bumped when scoring semantics change so a resume never mixes rows scored
+// under different identity or metric rules.
+const HARNESS_VERSION = 2;
+
 type LiveCheckpoint = {
+  harnessVersion?: number;
   brainUrl: string;
   generationId: string | null;
   results: NorthwindAnswerScore[];
@@ -103,27 +108,78 @@ function toEvalAnswer(response: GroundedAnswerResponse): NorthwindAnswerForEval 
         documentId: result.documentId,
       })),
     },
+    vectorDegradedCount: response.vectorDegradedCount,
+    refusalReason: response.refusalReason,
   };
 }
 
+const SEED_TIMEOUT_MS = 600_000;
+const SEED_POLL_INTERVAL_MS = 10_000;
+const SEED_POLL_DEADLINE_MS = 900_000;
+
+type KnowledgeStatus = {
+  embeddingStorageStatus?: { activeVersionId?: string | null; readyVersionId?: string | null };
+};
+
+async function knowledgeStatus(brainUrl: string): Promise<KnowledgeStatus> {
+  return brainJson<KnowledgeStatus>(brainUrl, "/knowledge");
+}
+
+async function promoteGeneration(brainUrl: string, generationId: string): Promise<string> {
+  await brainJson(brainUrl, "/knowledge/promote", {
+    method: "POST",
+    body: JSON.stringify({ generationId }),
+  });
+  return generationId;
+}
+
+/**
+ * A seed run that outlives the HTTP client is still a success: the worker
+ * finishes the generation and reports it as readyVersionId. Never reseed on
+ * a timeout; poll for the ready generation and promote it instead.
+ */
 async function ensureSeeded(brainUrl: string): Promise<string> {
-  const inventory = await brainJson<{
-    embeddingStorageStatus?: { activeVersionId?: string | null; readyVersionId?: string | null };
-  }>(brainUrl, "/knowledge");
+  const inventory = await knowledgeStatus(brainUrl);
   const active = inventory.embeddingStorageStatus?.activeVersionId;
   if (active) {
     return active;
   }
+  const ready = inventory.embeddingStorageStatus?.readyVersionId;
+  if (ready) {
+    return promoteGeneration(brainUrl, ready);
+  }
   const { northwindSeedDocuments } = await import("./northwind-seed");
-  const seeded = await brainJson<{ generationId: string }>(brainUrl, "/knowledge/seed", {
-    method: "POST",
-    body: JSON.stringify({ documents: northwindSeedDocuments() }),
-  });
-  await brainJson(brainUrl, "/knowledge/promote", {
-    method: "POST",
-    body: JSON.stringify({ generationId: seeded.generationId }),
-  });
-  return seeded.generationId;
+  try {
+    const response = await fetch(`${brainUrl}/knowledge/seed`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ documents: northwindSeedDocuments() }),
+      signal: AbortSignal.timeout(SEED_TIMEOUT_MS),
+    });
+    if (response.ok) {
+      const seeded = (await response.json()) as { generationId: string };
+      return promoteGeneration(brainUrl, seeded.generationId);
+    }
+    process.stderr.write(`seed returned ${response.status}; polling for a ready generation\n`);
+  } catch (error) {
+    process.stderr.write(
+      `seed request failed (${error instanceof Error ? error.message : String(error)}); polling for a ready generation\n`,
+    );
+  }
+  const deadline = Date.now() + SEED_POLL_DEADLINE_MS;
+  while (Date.now() < deadline) {
+    await sleep(SEED_POLL_INTERVAL_MS);
+    const polled = await knowledgeStatus(brainUrl).catch(() => null);
+    const readyId = polled?.embeddingStorageStatus?.readyVersionId;
+    if (readyId) {
+      return promoteGeneration(brainUrl, readyId);
+    }
+    const activeId = polled?.embeddingStorageStatus?.activeVersionId;
+    if (activeId) {
+      return activeId;
+    }
+  }
+  throw new Error("seed did not produce a ready generation before the polling deadline");
 }
 
 async function runLiveLayer(
@@ -136,7 +192,11 @@ async function runLiveLayer(
   if (resume) {
     try {
       const previous = JSON.parse(readFileSync(LIVE_CHECKPOINT, "utf8")) as LiveCheckpoint;
-      if (previous.brainUrl === brainUrl) {
+      if (
+        previous.brainUrl === brainUrl &&
+        previous.harnessVersion === HARNESS_VERSION &&
+        previous.generationId === generationId
+      ) {
         results = previous.results;
       }
     } catch {
@@ -152,11 +212,34 @@ async function runLiveLayer(
     const requestId = `eval-live-${question.questionId}-${Date.now()}`;
     const response = await brainJson<GroundedAnswerResponse>(brainUrl, "/turns", {
       method: "POST",
-      body: JSON.stringify({ question: question.query, requestId }),
+      body: JSON.stringify({
+        question: question.query,
+        requestId,
+        persistConversation: false,
+        assumePrincipal: {
+          userId: question.principal.userId,
+          roles: question.principal.roles,
+          departments: question.principal.departments,
+        },
+      }),
     });
-    const scored = scoreNorthwindAnswer(question, toEvalAnswer(response), { liveLoopback: true });
+    if (response.assumedPrincipal?.userId !== question.principal.userId) {
+      // Fail closed: never score a turn whose retrieval identity was not
+      // confirmed to be the question's principal.
+      throw new Error(
+        `${question.questionId}: Brain did not confirm the assumed principal (got ${
+          response.assumedPrincipal?.userId ?? "none"
+        })`,
+      );
+    }
+    const scored = scoreNorthwindAnswer(question, toEvalAnswer(response));
     results.push(scored);
-    writeJson(LIVE_CHECKPOINT, { brainUrl, generationId, results } satisfies LiveCheckpoint);
+    writeJson(LIVE_CHECKPOINT, {
+      harnessVersion: HARNESS_VERSION,
+      brainUrl,
+      generationId,
+      results,
+    } satisfies LiveCheckpoint);
     await sleep(250);
   }
   return { generationId, results };
@@ -165,6 +248,23 @@ async function runLiveLayer(
 function summarize(retrieval: RetrievalEvalReport, live: NorthwindAnswerScore[] | null) {
   const liveCounted = live?.filter((result) => result.status !== "skipped") ?? [];
   const livePassed = liveCounted.filter((result) => result.status === "pass").length;
+  const liveByCategory: Record<string, { scored: number; passed: number }> = {};
+  for (const result of liveCounted) {
+    const bucket = (liveByCategory[result.category] ??= { scored: 0, passed: 0 });
+    bucket.scored += 1;
+    if (result.status === "pass") {
+      bucket.passed += 1;
+    }
+  }
+  const recallRows = liveCounted.filter((result) => result.liveRecall !== null);
+  const vectorDegradedTurns = liveCounted.filter(
+    (result) => result.vectorDegradedCount > 0,
+  ).length;
+  if (vectorDegradedTurns > 0) {
+    process.stderr.write(
+      `warning: ${vectorDegradedTurns} live turns ran keyword-only after vector-channel errors; this summary is not comparable to a hybrid baseline\n`,
+    );
+  }
   return {
     retrieval: {
       recallAtK: retrieval.recallAtK,
@@ -183,6 +283,21 @@ function summarize(retrieval: RetrievalEvalReport, live: NorthwindAnswerScore[] 
           failed: liveCounted.length - livePassed,
           skipped: live.filter((result) => result.status === "skipped").length,
           passRate: liveCounted.length === 0 ? 0 : livePassed / liveCounted.length,
+          byCategory: liveByCategory,
+          retrievedRecall:
+            recallRows.length === 0
+              ? null
+              : recallRows.reduce((sum, result) => sum + (result.liveRecall ?? 0), 0) /
+                recallRows.length,
+          goldRetrievedUncitedCount: liveCounted.filter(
+            (result) => result.goldRetrievedUncited.length > 0,
+          ).length,
+          vectorDegradedTurns,
+          // Only a fully hybrid run may be compared with a hybrid baseline.
+          hybridBaselineComparable: vectorDegradedTurns === 0,
+          refusedWithEvidence: liveCounted.filter(
+            (result) => result.refusalReason === "model_abstained_with_evidence",
+          ).length,
         }
       : null,
     failures: [

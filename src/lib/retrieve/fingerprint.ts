@@ -9,6 +9,9 @@ export const REAL_STACK_FINGERPRINT = {
   rerankCandidates: 20,
   reranker: "@cf/baai/bge-reranker-base",
   relevanceFloor: 0.05,
+  // The approved retrieval profile returns up to eight chunks. Raised from
+  // the interim 3 through the 2026-08-30 Northwind eval pass.
+  topK: 8,
   parentExpansion: "off",
   conflictDetection: "off",
   ftsMatchStrategy: "stopword-or-v1",
@@ -25,6 +28,7 @@ export const FAKE_PROVIDER_FINGERPRINT = {
   rerankCandidates: 20,
   reranker: "none",
   relevanceFloor: 0,
+  topK: 3,
   parentExpansion: "off",
   conflictDetection: "off",
   ftsMatchStrategy: "stopword-or-v1",
@@ -41,6 +45,7 @@ export const FAKE_RERANK_FINGERPRINT = {
   rerankCandidates: 20,
   reranker: "fake",
   relevanceFloor: 0,
+  topK: 3,
   parentExpansion: "off",
   conflictDetection: "off",
   ftsMatchStrategy: "stopword-or-v1",
@@ -59,6 +64,7 @@ export type RetrievalFingerprint = {
   rerankCandidates: number;
   reranker: string;
   relevanceFloor: number;
+  topK: number;
   parentExpansion: "off";
   conflictDetection: "off";
   ftsMatchStrategy: "stopword-or-v1";
@@ -74,6 +80,7 @@ export function fingerprintId(fingerprint: RetrievalFingerprint): string {
     `rr${fingerprint.rerankCandidates}`,
     fingerprint.reranker,
     `floor${fingerprint.relevanceFloor}`,
+    `top${fingerprint.topK}`,
     `fts-${fingerprint.ftsMatchStrategy}`,
   ].join("|");
 }
