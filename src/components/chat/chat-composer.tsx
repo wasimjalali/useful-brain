@@ -8,7 +8,9 @@ type ChatComposerProps = {
   disabled: boolean;
   onChange: (value: string) => void;
   onSend: () => void;
+  onStop?: () => void;
   pending: boolean;
+  stopping?: boolean;
   value: string;
 };
 
@@ -16,7 +18,9 @@ export function ChatComposer({
   disabled,
   onChange,
   onSend,
+  onStop,
   pending,
+  stopping = false,
   value,
 }: ChatComposerProps) {
   function submit() {
@@ -67,21 +71,25 @@ export function ChatComposer({
               Enter to send · Shift+Enter for a new line
             </span>
             <span className="text-xs text-ink-faint sm:hidden">Enter to send</span>
-            <button
-              aria-label="Generate answer"
-              className="btn btn-primary size-10 shrink-0 rounded-full p-0"
-              disabled={disabled || pending || value.trim().length === 0}
-              type="submit"
-            >
-              {pending ? (
-                <span
-                  aria-hidden="true"
-                  className="size-4 animate-spin rounded-full border-2 border-white/40 border-t-white"
-                />
-              ) : (
+            {pending && onStop ? (
+              <button
+                className="btn btn-secondary min-h-10 shrink-0 px-3 text-sm"
+                disabled={stopping}
+                onClick={onStop}
+                type="button"
+              >
+                {stopping ? "Stopping" : "Stop generating"}
+              </button>
+            ) : (
+              <button
+                aria-label="Generate answer"
+                className="btn btn-primary size-10 shrink-0 rounded-full p-0"
+                disabled={disabled || pending || value.trim().length === 0}
+                type="submit"
+              >
                 <SendIcon className="size-[18px]" />
-              )}
-            </button>
+              </button>
+            )}
           </div>
         </div>
       </form>

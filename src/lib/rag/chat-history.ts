@@ -7,6 +7,7 @@ export type ChatTurn = {
   answer: GroundedAnswerResponse | null;
   error: string | null;
   errorRetryable?: boolean;
+  cancelled?: boolean;
 };
 
 // A saved conversation. The full turns (including retrieval evidence) are kept

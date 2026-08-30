@@ -20,6 +20,8 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm ci
+        env:
+          RCLONE_EXECUTABLE: /usr/bin/true
       - run: npx tsc --noEmit
       - run: npm run typecheck:workers
       - run: npm run lint

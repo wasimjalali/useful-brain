@@ -3,6 +3,7 @@ import { env } from "cloudflare:workers";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { createBrainServiceRequest } from "../../../src/lib/cf/service-binding-identity";
+import { createPendingTurn } from "../../../src/lib/store/conversations";
 import worker from "../src";
 import { generateSigning, jwksResponse, signToken } from "./jwt";
 import { seedPrincipals } from "./seed";
@@ -60,6 +61,53 @@ async function authed(
 }
 
 describe("Brain UI APIs", () => {
+  it("cancels the caller's pending turn by request id", async () => {
+    const pending = await createPendingTurn(env.OPERATIONS_DB, {
+      ownerPrincipalId: "principal-alice",
+      requestId: "turn-ui-cancel",
+      question: "Stop this answer",
+      now: 2,
+    });
+    const stub = env.CONVERSATION.getByName(pending.conversationId);
+    expect(await stub.acquire(pending.assistantMessageId)).toMatchObject({ ok: true });
+
+    const response = await authed("/cancel", {
+      method: "POST",
+      json: { requestId: "turn-ui-cancel" },
+    });
+
+    expect(response.status).toBe(200);
+    expect(await stub.cancelled()).toBe(true);
+    const stored = await env.OPERATIONS_DB.prepare(
+      `SELECT status, error_code FROM messages WHERE id = ?`,
+    )
+      .bind(pending.assistantMessageId)
+      .first<{ status: string; error_code: string }>();
+    expect(stored).toEqual({ status: "failed", error_code: "CANCELLED" });
+  });
+
+  it("claims cancellation before the conversation lock is acquired", async () => {
+    const pending = await createPendingTurn(env.OPERATIONS_DB, {
+      ownerPrincipalId: "principal-alice",
+      requestId: "turn-ui-cancel-before-lock",
+      question: "Stop before the run starts",
+      now: 3,
+    });
+
+    const response = await authed("/cancel", {
+      method: "POST",
+      json: { requestId: "turn-ui-cancel-before-lock" },
+    });
+
+    expect(response.status).toBe(200);
+    const stored = await env.OPERATIONS_DB.prepare(
+      `SELECT status, error_code FROM messages WHERE id = ?`,
+    )
+      .bind(pending.assistantMessageId)
+      .first<{ status: string; error_code: string }>();
+    expect(stored).toEqual({ status: "failed", error_code: "CANCELLED" });
+  });
+
   it("persists a turn with insufficient evidence when no corpus is bound", async () => {
     const response = await authed("/turns", {
       method: "POST",

@@ -13,7 +13,13 @@ import {
   serverOwnedApprovalBinding,
   upsertApproval,
 } from "../../../src/lib/store/agent-runs";
-import { assertConversationOwner, ConversationStoreError, type OperationsDatabase } from "../../../src/lib/store/conversations";
+import {
+  assertConversationOwner,
+  ConversationStoreError,
+  failTurn,
+  loadOwnedTurnHandleByRequestId,
+  type OperationsDatabase,
+} from "../../../src/lib/store/conversations";
 import {
   LOAD_PRINCIPAL_SQL,
   type PrincipalDirectoryRow,
@@ -32,6 +38,7 @@ import {
   latestReadyOrActiveGenerationId,
   loadSeedDocumentsFromGeneration,
   mergeSeedDocuments,
+  removeSeedDocument,
   seedNorthwindCorpus,
   type SeedDocumentInput,
 } from "../../../src/lib/store/corpus-seed";
@@ -348,7 +355,69 @@ const brainWorker = {
         return json({ ok: true, workflowId }, requestId);
       }
 
-      if ((path === "/lock" || path === "/unlock" || path === "/cancel") && request.method === "POST") {
+      if (path === "/cancel" && request.method === "POST") {
+        operation = "cancel";
+        let body: { conversationId?: string; requestId?: string; runId?: string };
+        try {
+          body = (await request.json()) as typeof body;
+        } catch {
+          throw new WorkerValidationError();
+        }
+        let conversationId: string;
+        let runId: string;
+        let cancellationClaimed = false;
+        if (body.requestId) {
+          const handle = await loadOwnedTurnHandleByRequestId(
+            env.OPERATIONS_DB as OperationsDatabase,
+            body.requestId,
+            principal.id,
+          );
+          if (!handle) {
+            throw new WorkerForbiddenError();
+          }
+          if (handle.status !== "pending") {
+            throw new WorkerValidationError("The answer is no longer in progress.");
+          }
+          conversationId = handle.conversationId;
+          runId = handle.runId;
+          try {
+            await failTurn(env.OPERATIONS_DB as OperationsDatabase, {
+              assistantMessageId: runId,
+              ownerPrincipalId: principal.id,
+              errorCode: "CANCELLED",
+              now: Date.now(),
+            });
+            cancellationClaimed = true;
+          } catch (error) {
+            if (error instanceof ConversationStoreError) {
+              throw new WorkerValidationError("The answer is no longer in progress.");
+            }
+            throw error;
+          }
+        } else {
+          conversationId = parseBoundedId(body.conversationId, "conversation id");
+          runId = parseBoundedId(body.runId, "run id");
+          await requireConversationOwner(env, conversationId, principal.id);
+        }
+        const stub = env.CONVERSATION.getByName(conversationId);
+        const durableResult = await stub.cancel(runId).catch(() => ({ ok: false as const, status: 409 as const }));
+        const result = cancellationClaimed ? { ok: true as const, runId } : durableResult;
+        writeOperationalLog({
+          requestId,
+          principalKind: principal.kind,
+          operation,
+          status: result.ok ? "ok" : "error",
+          durationMs: Date.now() - started,
+          errorCode: result.ok ? undefined : "VALIDATION_FAILED",
+        });
+        return json(
+          { ...result, conversationId },
+          requestId,
+          result.ok ? 200 : result.status,
+        );
+      }
+
+      if ((path === "/lock" || path === "/unlock") && request.method === "POST") {
         operation = path.slice(1);
         let body: { conversationId?: string; runId?: string };
         try {
@@ -360,11 +429,7 @@ const brainWorker = {
         const runId = parseBoundedId(body.runId, "run id");
         await requireConversationOwner(env, conversationId, principal.id);
         const stub = env.CONVERSATION.getByName(conversationId);
-        const result = await (path === "/lock"
-          ? stub.acquire(runId)
-          : path === "/cancel"
-            ? stub.cancel(runId)
-            : stub.release(runId));
+        const result = await (path === "/lock" ? stub.acquire(runId) : stub.release(runId));
         writeOperationalLog({
           requestId,
           principalKind: principal.kind,
@@ -576,6 +641,44 @@ const brainWorker = {
           durationMs: Date.now() - started,
         });
         return json(reindexed, requestId);
+      }
+
+      const deleteDocumentMatch = path.match(/^\/knowledge\/documents\/([^/]+)$/);
+      if (deleteDocumentMatch && request.method === "DELETE") {
+        operation = "knowledge-delete-document";
+        requireOperator(principal.roles);
+        if (!env.CORPUS_DB) {
+          throw new WorkerValidationError();
+        }
+        const documentId = parseBoundedId(deleteDocumentMatch[1], "document id");
+        const sourceGenerationId = await latestReadyOrActiveGenerationId(
+          env.CORPUS_DB as SqlExecutor,
+        );
+        if (!sourceGenerationId) {
+          throw new WorkerValidationError();
+        }
+        const documents = await loadSeedDocumentsFromGeneration(
+          env.CORPUS_DB as SqlExecutor,
+          sourceGenerationId,
+        );
+        const remaining = removeSeedDocument(documents, documentId);
+        if (remaining.length === documents.length || remaining.length === 0) {
+          throw new WorkerValidationError();
+        }
+        const rebuilt = await seedNorthwindCorpus({
+          db: env.CORPUS_DB as SqlExecutor,
+          documents: remaining,
+          ai: env.AI,
+          vectorize: env.VECTORIZE,
+        });
+        writeOperationalLog({
+          requestId,
+          principalKind: principal.kind,
+          operation,
+          status: "ok",
+          durationMs: Date.now() - started,
+        });
+        return json({ ...rebuilt, deletedDocumentId: documentId }, requestId);
       }
 
       if (path === "/knowledge/promote" && request.method === "POST") {

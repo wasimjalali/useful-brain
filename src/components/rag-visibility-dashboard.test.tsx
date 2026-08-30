@@ -394,6 +394,27 @@ describe("RagVisibilityDashboard", () => {
     expect(fileInput?.getAttribute("accept")).toContain(".md");
   });
 
+  it("creates a deletion draft for the selected document", async () => {
+    const deleteDocumentAction = vi.fn(async () => actionSuccess(null));
+    render(
+      <RagVisibilityDashboard
+        {...baseProps}
+        deleteDocumentAction={deleteDocumentAction}
+        documents={[
+          { ...documents[0], id: "nw_return_policy" },
+          { id: "nw_shipping", source: "shipping.md", title: "Shipping", text: "Shipping" },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Knowledge base" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "View Return Policy" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Delete document" }));
+
+    expect(deleteDocumentAction).toHaveBeenCalledWith("nw_return_policy");
+    expect(await screen.findByRole("heading", { name: "Knowledge base" })).toBeInTheDocument();
+  });
+
   it("exposes a live eval runner instead of static passing checks", () => {
     render(<RagVisibilityDashboard {...baseProps} />);
 
@@ -451,6 +472,29 @@ describe("RagVisibilityDashboard", () => {
         "Customers can return opened products within the policy window.",
       ).length,
     ).toBeGreaterThan(0);
+  });
+
+  it("stops an in-flight answer by its request id", async () => {
+    const askAction = vi.fn(
+      () => new Promise<ReturnType<typeof successfulAnswer>>(() => undefined),
+    );
+    const cancelAction = vi.fn(async () =>
+      actionSuccess({ conversationId: "conversation-cancelled" }),
+    );
+    render(
+      <RagVisibilityDashboard
+        {...baseProps}
+        askAction={askAction}
+        cancelAction={cancelAction}
+      />,
+    );
+
+    askQuestion("Can customers return opened products?");
+    fireEvent.click(await screen.findByRole("button", { name: "Stop generating" }));
+
+    expect(await screen.findByText("Generation stopped.")).toBeInTheDocument();
+    expect(cancelAction).toHaveBeenCalledWith(expect.any(String));
+    expect(screen.getByRole("button", { name: "Retry question" })).toBeInTheDocument();
   });
 
   it("keeps conversation context server-owned for follow-up questions", async () => {

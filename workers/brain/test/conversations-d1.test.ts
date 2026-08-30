@@ -2,17 +2,115 @@ import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
 import { addCitationLabels, PROMPT_VERSION } from "../../../src/lib/answer/contract";
+import { executeTurn } from "../../../src/lib/brain/execute-turn";
+import { WorkerCancelledError } from "../../../src/lib/cf/worker-errors";
+import { loadConversationForUi } from "../../../src/lib/store/conversation-queries";
 import {
   completeTurn,
   createPendingTurn,
   failTurn,
   loadBoundedHistory,
+  loadOwnedTurnHandleByRequestId,
   loadReplay,
   persistThenRelease,
 } from "../../../src/lib/store/conversations";
 import { seedPrincipals } from "./seed";
 
 describe("operations conversation snapshots", () => {
+  it("fails a cancelled run without persisting a model answer", async () => {
+    await seedPrincipals();
+    let cancelled = false;
+    let released = false;
+    const turn = executeTurn({
+      operations: env.OPERATIONS_DB,
+      principal: {
+        id: "principal-alice",
+        subject: "alice@karkoai.com",
+        kind: "user",
+        roles: ["operator"],
+        departments: ["engineering"],
+      },
+      question: "Stop this answer",
+      requestId: "req-cancel-execution",
+      lockFor: () => ({
+        acquire: async (runId) => ({ ok: true, runId }),
+        cancelled: async () => cancelled,
+        release: async () => {
+          released = true;
+          return { ok: true };
+        },
+      }),
+      ai: {
+        run: async () => {
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return {
+            choices: [
+              {
+                finish_reason: "stop",
+                message: { content: "This answer must not be stored." },
+              },
+            ],
+          };
+        },
+      },
+    });
+    const rejected = expect(turn).rejects.toBeInstanceOf(WorkerCancelledError);
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    cancelled = true;
+    await rejected;
+
+    expect(released).toBe(true);
+    const stored = await env.OPERATIONS_DB.prepare(
+      `SELECT conversation_id, status, error_code, content
+       FROM messages WHERE request_id = ? AND role = 'assistant'`,
+    )
+      .bind("req-cancel-execution")
+      .first<{
+        conversation_id: string;
+        status: string;
+        error_code: string;
+        content: string;
+      }>();
+    expect(stored).toMatchObject({ status: "failed", error_code: "CANCELLED", content: "" });
+    if (!stored) {
+      throw new Error("cancelled assistant message was not stored");
+    }
+    const conversation = await loadConversationForUi(
+      env.OPERATIONS_DB,
+      stored.conversation_id,
+      "principal-alice",
+    );
+    expect(conversation.turns[0]).toMatchObject({ cancelled: true, error: null });
+  });
+
+  it("resolves a pending run only for its conversation owner", async () => {
+    await seedPrincipals();
+    const pending = await createPendingTurn(env.OPERATIONS_DB, {
+      ownerPrincipalId: "principal-alice",
+      requestId: "req-cancel-handle",
+      question: "Stop this answer",
+      now: 5,
+    });
+    await expect(
+      loadOwnedTurnHandleByRequestId(
+        env.OPERATIONS_DB,
+        "req-cancel-handle",
+        "principal-alice",
+      ),
+    ).resolves.toEqual({
+      conversationId: pending.conversationId,
+      runId: pending.assistantMessageId,
+      status: "pending",
+    });
+    await expect(
+      loadOwnedTurnHandleByRequestId(
+        env.OPERATIONS_DB,
+        "req-cancel-handle",
+        "principal-bot",
+      ),
+    ).resolves.toBeNull();
+  });
+
   it("replays a completed turn from the stored evidence snapshot", async () => {
     await seedPrincipals();
     const pending = await createPendingTurn(env.OPERATIONS_DB, {

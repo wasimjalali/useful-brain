@@ -264,6 +264,13 @@ export function mergeSeedDocuments(
   return [...byId.values()];
 }
 
+export function removeSeedDocument(
+  existing: SeedDocumentInput[],
+  documentId: string,
+): SeedDocumentInput[] {
+  return existing.filter((document) => document.documentId !== documentId);
+}
+
 export async function latestReadyOrActiveGenerationId(db: SqlExecutor): Promise<string | null> {
   const ready = await db
     .prepare(

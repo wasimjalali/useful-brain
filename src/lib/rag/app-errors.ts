@@ -6,7 +6,8 @@ export type AppErrorCode =
   | "PROVIDER_TEMPORARY"
   | "INVALID_MODEL_RESPONSE"
   | "VALIDATION_FAILED"
-  | "INTERNAL_ERROR";
+  | "INTERNAL_ERROR"
+  | "CANCELLED";
 
 export type PublicAppError = {
   code: AppErrorCode;

@@ -34,9 +34,12 @@ type ChatWorkspaceProps = {
   onNewChat: () => void;
   onOpenKnowledge?: () => void;
   onOpenSources: (turnId: string) => void;
+  onStop?: () => void;
   onSubmit: (value: string) => void;
   pendingQuestion: string | null;
   ready: boolean;
+  stopError?: string | null;
+  stopping?: boolean;
   turns: ChatTurn[];
 };
 
@@ -48,9 +51,12 @@ export function ChatWorkspace({
   onNewChat,
   onOpenKnowledge = () => {},
   onOpenSources,
+  onStop,
   onSubmit,
   pendingQuestion,
   ready,
+  stopError = null,
+  stopping = false,
   turns,
 }: ChatWorkspaceProps) {
   const [question, setQuestion] = useState("");
@@ -99,7 +105,9 @@ export function ChatWorkspace({
                   <div className="flex flex-col gap-6" key={turn.id}>
                     <UserMessage text={turn.question} />
                     <div aria-live={isLast ? "polite" : undefined}>
-                      {turn.error ? (
+                      {turn.cancelled ? (
+                        <StoppedMessage onRetry={() => send(turn.question)} />
+                      ) : turn.error ? (
                         <ErrorMessage
                           message={turn.error}
                           onRetry={
@@ -126,7 +134,7 @@ export function ChatWorkspace({
               {pendingQuestion ? (
                 <div className="flex flex-col gap-6">
                   <UserMessage text={pendingQuestion} />
-                  <ThinkingIndicator />
+                  <ThinkingIndicator error={stopError} />
                 </div>
               ) : null}
               <div aria-hidden="true" ref={bottomRef} />
@@ -139,7 +147,9 @@ export function ChatWorkspace({
         disabled={askDisabled}
         onChange={setQuestion}
         onSend={() => send()}
+        onStop={onStop}
         pending={pendingQuestion !== null}
+        stopping={stopping}
         value={question}
       />
     </div>
@@ -187,19 +197,37 @@ function UserMessage({ text }: { text: string }) {
   );
 }
 
-function ThinkingIndicator() {
+function ThinkingIndicator({ error }: { error: string | null }) {
   return (
     <div className="msg-in flex gap-3" role="status">
       <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-brand shadow-sm">
         <UsefulBrainMark className="size-5" tone="dark" />
       </span>
-      <div className="flex items-center gap-2.5 pt-1.5">
-        <span
-          aria-hidden="true"
-          className="size-4 animate-spin rounded-full border-2 border-accent/30 border-t-accent"
-        />
-        <span className="text-sm text-ink-muted">Retrieving evidence and checking citations.</span>
+      <div className="pt-1.5">
+        <div className="flex items-center gap-2.5">
+          <span
+            aria-hidden="true"
+            className="size-4 animate-spin rounded-full border-2 border-accent/30 border-t-accent"
+          />
+          <span className="text-sm text-ink-muted">Retrieving evidence and checking citations.</span>
+        </div>
+        {error ? <p className="mt-2 text-sm text-danger" role="alert">{error}</p> : null}
       </div>
+    </div>
+  );
+}
+
+function StoppedMessage({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="rounded-xl border border-border bg-surface px-4 py-3">
+      <p className="text-sm text-ink-muted">Generation stopped.</p>
+      <button
+        className="mt-2 text-sm font-semibold text-accent-deep underline-offset-4 hover:underline"
+        onClick={onRetry}
+        type="button"
+      >
+        Retry question
+      </button>
     </div>
   );
 }

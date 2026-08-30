@@ -9,7 +9,12 @@ import {
   runKnowledgeAgent,
   type AgentRuntime,
 } from "../agent/run";
-import { WorkerBusyError, WorkerForbiddenError, WorkerValidationError } from "../cf/worker-errors";
+import {
+  WorkerBusyError,
+  WorkerCancelledError,
+  WorkerForbiddenError,
+  WorkerValidationError,
+} from "../cf/worker-errors";
 import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL } from "../embeddings/instructions";
 import type { WorkersAiRunner } from "../embeddings/workers-ai-embed";
 import { glm53FlashModel } from "../models/glm-5-3-flash";
@@ -28,6 +33,7 @@ import {
   createPendingTurn,
   failTurn,
   loadBoundedHistory,
+  loadOwnedTurnHandleByRequestId,
   loadReplay,
   persistThenRelease,
   type OperationsDatabase,
@@ -36,6 +42,7 @@ import {
 
 export type ConversationLockStub = {
   acquire(runId: string): Promise<{ ok: boolean; status?: number; runId?: string }>;
+  cancelled(): Promise<boolean>;
   release(runId: string): Promise<{ ok: boolean }>;
 };
 
@@ -110,6 +117,28 @@ export async function executeTurn(input: ExecuteTurnInput): Promise<GroundedAnsw
     throw new WorkerBusyError();
   }
 
+  const claimedTurn = await loadOwnedTurnHandleByRequestId(
+    input.operations,
+    input.requestId,
+    input.principal.id,
+  );
+  if (!claimedTurn || claimedTurn.status !== "pending") {
+    await lock.release(pending.assistantMessageId).catch(() => undefined);
+    throw new WorkerCancelledError();
+  }
+
+  const runAbort = new AbortController();
+  const cancellationWatchStop = new AbortController();
+  let cancellationWatchError: unknown;
+  const cancellationWatch = watchCancellation(
+    lock,
+    runAbort,
+    cancellationWatchStop.signal,
+  ).catch((error) => {
+    cancellationWatchError = error;
+    runAbort.abort();
+  });
+
   try {
     const history = await loadBoundedHistory(
       input.operations,
@@ -123,8 +152,15 @@ export async function executeTurn(input: ExecuteTurnInput): Promise<GroundedAnsw
       policyPrincipal,
       conversationId: pending.conversationId,
       priorMessages: historyToAgentMessages(history, resultModelId(runtime)),
+      abort: runAbort,
       runtime,
     });
+    if (cancellationWatchError) {
+      throw cancellationWatchError;
+    }
+    if (runAbort.signal.aborted || (await lock.cancelled())) {
+      throw new WorkerCancelledError();
+    }
     const rawModelJson = structuredJsonFromGroundedProse(result.finalResponse, result.evidence);
     const corpusGenerationId = (await activeGenerationIdFor(input)) ?? "none";
     const completed = await persistThenRelease({
@@ -147,15 +183,46 @@ export async function executeTurn(input: ExecuteTurnInput): Promise<GroundedAnsw
     });
     return replayToResponse(completed);
   } catch (error) {
+    const cancelled = await lock.cancelled().catch(() => false);
+    const failure = cancelled ? new WorkerCancelledError() : error;
     await failTurn(input.operations, {
       assistantMessageId: pending.assistantMessageId,
       ownerPrincipalId: input.principal.id,
-      errorCode: "INTERNAL_ERROR",
+      errorCode: failure instanceof WorkerCancelledError ? "CANCELLED" : "INTERNAL_ERROR",
       now: Date.now(),
     }).catch(() => undefined);
     await lock.release(pending.assistantMessageId).catch(() => undefined);
-    throw mapStoreError(error);
+    throw mapStoreError(failure);
+  } finally {
+    cancellationWatchStop.abort();
+    await cancellationWatch;
   }
+}
+
+async function watchCancellation(
+  lock: ConversationLockStub,
+  runAbort: AbortController,
+  stop: AbortSignal,
+): Promise<void> {
+  while (!stop.aborted && !runAbort.signal.aborted) {
+    if (await lock.cancelled()) {
+      runAbort.abort();
+      return;
+    }
+    await waitForCancellationPoll(stop);
+  }
+}
+
+function waitForCancellationPoll(stop: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(finish, 250);
+    stop.addEventListener("abort", finish, { once: true });
+    function finish() {
+      clearTimeout(timer);
+      stop.removeEventListener("abort", finish);
+      resolve();
+    }
+  });
 }
 
 async function knowledgePipeline(
