@@ -19,6 +19,7 @@ import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL } from "../embeddings/instruction
 import type { WorkersAiRunner } from "../embeddings/workers-ai-embed";
 import { glm53FlashModel } from "../models/glm-5-3-flash";
 import { createWorkersAiChatStream } from "../models/workers-ai-chat";
+import { createWorkersAiCitationRepair } from "../models/workers-ai-citation-repair";
 import { CHAT_MODEL_ID } from "../models/selection";
 import type { GroundedAnswerResponse } from "../rag/grounded-answer";
 import { CloudflareKnowledgePipeline, type CorpusSql, type VectorizeIndex } from "../retrieve/cloudflare-pipeline";
@@ -271,6 +272,9 @@ function liveRuntime(ai: WorkersAiRunner | undefined): AgentRuntime | undefined 
   return {
     model: glm53FlashModel(),
     stream: createWorkersAiChatStream({
+      run: (model, payload) => ai.run(model, payload),
+    }),
+    repairGroundedAnswer: createWorkersAiCitationRepair({
       run: (model, payload) => ai.run(model, payload),
     }),
     systemPrompt: LIVE_KNOWLEDGE_SYSTEM_PROMPT,

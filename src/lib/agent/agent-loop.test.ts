@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { Agent } from "@earendil-works/pi-agent-core";
 import { Type } from "typebox";
 import {
@@ -17,12 +17,17 @@ import { MemoryChunkStore } from "../retrieve/memory-store";
 import { KnowledgePipeline } from "../retrieve/pipeline";
 import {
   currentRunAssistantTokens,
+  LIVE_KNOWLEDGE_SYSTEM_PROMPT,
   runKnowledgeAgent,
   snapshotAgentMessages,
   toolCallsFromMessages,
 } from "./run";
 import { redactToolResultForStorage } from "./redact-tool-result";
-import { BRAIN_KNOWLEDGE_UNAVAILABLE, BRAIN_MUST_RETRIEVE, SEARCH_KNOWLEDGE_TOOL } from "./host-grounding";
+import {
+  BRAIN_KNOWLEDGE_UNAVAILABLE,
+  BRAIN_MUST_RETRIEVE,
+  SEARCH_KNOWLEDGE_TOOL,
+} from "./host-grounding";
 
 const principal = { userId: "support", roles: ["standard"], departments: ["support"] };
 const policyPrincipal = { id: "principal-alice" };
@@ -268,6 +273,11 @@ describe("budgets", () => {
 });
 
 describe("Pi knowledge agent", () => {
+  it("requires exact current-turn evidence spans in the live prompt", () => {
+    expect(LIVE_KNOWLEDGE_SYSTEM_PROMPT).toContain("shortest exact sentence");
+    expect(LIVE_KNOWLEDGE_SYSTEM_PROMPT).toContain("citation label from this turn");
+  });
+
   it("blocks a registered mutating tool in the host before any side effect", async () => {
     const pipeline = await tinyPipeline();
     const effects: string[] = [];
@@ -331,6 +341,45 @@ describe("Pi knowledge agent", () => {
     ]);
     const reconstructed = snapshotAgentMessages(result.messages);
     expect(reconstructed).toEqual(result.messages);
+  }, 20_000);
+
+  it("repairs a citation-free draft against the current-turn evidence", async () => {
+    const pipeline = await tinyPipeline();
+    const faux = fauxProvider({ provider: "useful-brain-citation-repair" });
+    faux.setResponses([
+      fauxAssistantMessage(
+        [fauxText("Searching."), fauxToolCall(SEARCH_KNOWLEDGE_TOOL, { query: "leave" })],
+        { stopReason: "toolUse" },
+      ),
+      fauxAssistantMessage([fauxText("Employees accrue 1.5 days of leave per month.")], {
+        stopReason: "stop",
+      }),
+    ]);
+    const repairGroundedAnswer = vi
+      .fn()
+      .mockResolvedValue("Employees accrue 1.5 days of leave per month.[1]");
+
+    const result = await runKnowledgeAgent({
+      question: "How much leave accrues each month?",
+      pipeline,
+      principal,
+      policyPrincipal,
+      conversationId: "c-repair",
+      runtime: {
+        model: { ...faux.getModel(), api: "openai-completions" },
+        stream: (model, context, options) =>
+          faux.provider.streamSimple(model, context, options),
+        repairGroundedAnswer,
+      },
+    });
+
+    expect(repairGroundedAnswer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        question: "How much leave accrues each month?",
+        evidence: [expect.objectContaining({ citationLabel: "[1]" })],
+      }),
+    );
+    expect(result.finalResponse).toBe("Employees accrue 1.5 days of leave per month.[1]");
   }, 20_000);
 
   it("does not abort a follow-up run because prior assistant usage filled the token budget", async () => {
