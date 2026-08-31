@@ -4,7 +4,7 @@ Status: Phase 7A is merged on `main` ([PR #13](https://github.com/wasimjalali/us
 
 Architecture authority: `docs/useful-brain-master-plan.md`
 
-Execution prompt: `docs/useful-brain-grok-execution-prompt.md`
+Execution prompt: `docs/useful-brain-execution-prompt.md`
 
 Standing authorization: 2026-08-26 for Phases 1–7A. Wasim 2026-08-28 authorized local UI cutover, Convex removal, Workers AI GLM 5.3 Flash, and Burooj deletion after Northwind is in this repo.
 
