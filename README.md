@@ -1,74 +1,69 @@
 # Useful Brain
 
-Useful Brain is a local portfolio knowledge and action agent. It answers from approved sources, shows the evidence behind every factual claim and takes actions only through explicit tool policy and approval boundaries. It is not a billed product and not a public SaaS.
+Useful Brain is a knowledge agent that answers questions about a company corpus and proves every answer. It retrieves only the evidence the asking principal is allowed to read, cites a verbatim source for every factual sentence and refuses when the evidence isn't there. It runs entirely on Cloudflare (Workers, D1, Vectorize, Workers AI) with a Next.js workspace UI.
 
-The product was previously named Nura RAG Copilot. The product name, package name, GitHub repository, local directory and active UI copy now use Useful Brain.
+This is a single-operator portfolio product: no billing, no public signup, no hosted demo. It runs locally on `127.0.0.1`.
 
-## Planning status
+![Chat with cited answer and the evidence inspector open](docs/images/ub-chat-evidence.png)
 
-The architecture is finalized in the [Useful Brain production master plan](./docs/useful-brain-master-plan.md). This is a local portfolio product for hiring-manager demonstration: no billing, public signup or required Cloudflare Access.
+## The eval story: 72% to 95% without touching the scorer
 
-Phases 0–7A are merged to `main`. The live UI is Cloudflare Brain (D1, Vectorize, Workers AI). GLM 5.3 Flash is the chat model. Convex has been removed. Commercial Phase 7B (real company data, production resource set) stays closed.
+The system is measured against a locked 120-question battery over a 65-document synthetic corpus (Northwind) with document-level ACLs: 70 factual, 17 trap, 13 permission, 10 unanswerable and 10 multi-hop questions. The scoring rules are harsh and were never loosened: a multi-hop answer must cite every gold document, permission and unanswerable questions must return `insufficient_evidence`, and retrieving any forbidden document is a fail regardless of the answer.
 
-## Target product
+| Run | Score | Notes |
+| --- | --- | --- |
+| Pre-repair baseline | 77/107 (72%) | 13 permission questions couldn't be scored |
+| Pass 1: honest measurement | 95/120 (79.2%) | all 120 scored, multi-hop collapsed to 0/10 |
+| Pass 2: answer-layer repair | **114/120 (95.0%)** | multi-hop 9/10, zero ACL leaks, zero forbidden retrievals |
 
-- A central knowledge base for approved documents and connected sources.
-- Source-grounded answers with visible citations and honest refusals.
-- ACL-safe hybrid retrieval, reranking and immutable evidence snapshots.
-- A Pi Agent Core runtime for read tools and controlled actions.
-- Native tools, MCP servers and plugins behind one policy and approval gateway.
-- One isolated local/staging deployment. No billing, public signup or tenant switching.
+Every gain came from the answer layer. Retrieval metrics and every scoring rule stayed locked the whole time. The full campaign write-ups live in [`evals/`](evals/):
 
-## Finalized target stack
+- [From 72% to 95%: repairing a grounded RAG agent without touching the scorer](evals/system-evals/2026-08-31-northwind-grounding-repair.md)
+- [Chat model bake-off: GLM 5.3 Flash confirmed across seven candidates](evals/model-evals/2026-08-31-chat-model-bakeoff.md)
 
-| Layer | Choice |
-| --- | --- |
-| Web application | Next.js 16 and TypeScript on Cloudflare Workers through OpenNext initially |
-| Styling | Tailwind CSS v4 with the existing role-named design tokens |
-| API and agent runtime | Cloudflare Workers with Pi Agent Core |
-| Relational data and keyword search | Cloudflare D1 and FTS5 |
-| Source files and archives | Cloudflare R2 |
-| Vector search | Cloudflare Vectorize |
-| Durable ingestion | Cloudflare Workflows and Queues |
-| Conversation coordination | Durable Objects and hibernating WebSockets |
-| Operator identity | Loopback on 127.0.0.1. Cloudflare Access JWT is optional demonstration code, not required |
-| Embeddings and reranking | Cloudflare Workers AI |
-| Model routing and telemetry | Cloudflare AI Gateway |
-| Tests | Vitest and Testing Library |
+Frozen result snapshots back both reports in [`evals/results/`](evals/results/).
 
-## Current implementation
+![Evaluations page with per-case results and evidence](docs/images/ub-evaluations.png)
 
-The working application is Next.js talking to the Brain Worker over a Service Binding:
+## What it enforces
 
-- visible vector and keyword retrieval with inline citations
-- grounded refusals when evidence is missing
-- server-owned conversations and evidence snapshots in operations D1
-- versioned corpus builds with explicit promotion
-- persisted evaluation runs
-- Workers AI chat (`@cf/zai-org/glm-5.3-flash`), embeddings (`@cf/qwen/qwen3-embedding-0.6b`), and rerank (`@cf/baai/bge-reranker-base`)
+- **ACL before everything.** Authorization filters run before fusion, reranking, prompt construction and citation. Denied chunks never reach the model, the traces or the user.
+- **Verbatim grounding.** A host-side validator only accepts answers whose every sentence is a span of retrieved evidence, cited with current-turn labels. The model can't waive this.
+- **Honest refusals.** Missing or below-floor evidence returns `insufficient_evidence` instead of a fluent guess.
+- **Replayable answers.** Conversations persist exact evidence snapshots, so an answer can be inspected after the corpus changes.
+- **Safe corpus promotion.** Versioned corpus generations with explicit promotion; a failed index build never touches the active generation.
 
-Local UI with Brain connected:
+## Architecture
 
-```bash
-npm run preview:cf
+```mermaid
+flowchart LR
+    U[Operator browser] --> W[Web Worker: Next.js on OpenNext]
+    W --> B[Brain Worker: retrieval, grounding, policy, Pi Agent Core]
+    B --> CDB[(Corpus D1: documents, ACL, FTS5)]
+    B --> ODB[(Operations D1: conversations, runs, evals)]
+    B --> V[(Vectorize: rebuildable vector projection)]
+    B --> WA[Workers AI: chat, embeddings, reranker]
+    W --> I[Ingestion Worker] --> CDB
 ```
 
-That command builds OpenNext, applies local D1 migrations, and runs `wrangler dev` with the web and Brain configs so the `BRAIN` service binding is live on `127.0.0.1`.
+Hybrid retrieval fuses D1 FTS5 keyword search with Vectorize dense search (both ACL-filtered store-side), rescores keywords over the allowed set only, then reranks with a cross-encoder and applies an eval-calibrated relevance floor. D1 is authoritative; Vectorize is a rebuildable projection with exact inventory reconciliation before any generation is promoted.
 
-## Burooj migration source
+Models (all Cloudflare-hosted, selected by measured bake-off): `@cf/zai-org/glm-5.3-flash` for chat, `@cf/qwen/qwen3-embedding-0.6b` for embeddings, `@cf/baai/bge-reranker-base` for reranking.
 
-Northwind (65 documents, 120 questions) lives in `content/northwind/`. The recoverable Burooj archive is the gitignored `.archives/burooj-630ba08dc7cad6aa71942d6842ce6d8d55a26873.bundle`. The local Burooj checkout was deleted 2026-08-28. GitHub repo deletion needs the `delete_repo` token scope.
+![Knowledge base with corpus generation status and document inventory](docs/images/ub-knowledge.png)
 
-## Development
+## Run it locally
 
-The current application uses npm and Node.js 22.19 or newer.
+Requires Node.js 22.19+ and npm.
 
 ```bash
 npm install
-npm run dev
+npm run preview:cf
 ```
 
-Verify every change with:
+That builds OpenNext, applies local D1 migrations and starts `wrangler dev` with the web and Brain Workers connected over a Service Binding. The app serves on `http://127.0.0.1:8788` (the Brain Worker takes 8787). Seed the Northwind corpus from the Knowledge base page if it's empty, then ask a question and open the evidence inspector.
+
+Verify changes with:
 
 ```bash
 npx tsc --noEmit
@@ -77,8 +72,17 @@ npm test
 npm run build
 ```
 
-For contributor, safety and migration rules, see [AGENTS.md](./AGENTS.md).
+## Repo map
+
+- `workers/brain/`: identity, conversations, retrieval, grounding and evaluations.
+- `workers/ingestion/`: corpus ingest workflows.
+- `content/northwind/`: the 65-document synthetic corpus and 120-question battery.
+- `src/`: Next.js workspace UI, retrieval helpers and the eval battery.
+- `evals/`: blog-ready eval reports and frozen result snapshots.
+- `docs/useful-brain-master-plan.md`: the full production architecture plan.
+
+Contributor, safety and migration rules are in [AGENTS.md](AGENTS.md).
 
 ## License
 
-[MIT](./LICENSE)
+[MIT](LICENSE)
