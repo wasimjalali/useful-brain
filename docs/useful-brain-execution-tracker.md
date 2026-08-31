@@ -4,7 +4,7 @@ Status: Phase 7A is merged on `main` ([PR #13](https://github.com/wasimjalali/us
 
 Architecture authority: `docs/useful-brain-master-plan.md`
 
-Execution prompt: `docs/useful-brain-grok-execution-prompt.md`
+Execution prompt: `docs/useful-brain-execution-prompt.md`
 
 Standing authorization: 2026-08-26 for Phases 1–7A. Wasim 2026-08-28 authorized local UI cutover, Convex removal, Workers AI GLM 5.3 Flash, and Burooj deletion after Northwind is in this repo.
 
@@ -35,7 +35,7 @@ Changing one of these decisions is an architecture change. Stop, write the evide
 
 ## 3. Approval boundaries
 
-Wasim granted standing authorization on 2026-08-26 for Grok 4.6 xhigh to execute Phase 1 through Phase 6 and Phase 7A without requesting ordinary phase-by-phase approval. That covers:
+Wasim granted standing authorization on 2026-08-26 for the implementation agent to execute Phase 1 through Phase 6 and Phase 7A without requesting ordinary phase-by-phase approval. That covers:
 
 1. Installing the approved packages in `AGENTS.md`.
 2. Making D1 schema and authentication changes required by the approved master plan.
@@ -49,7 +49,7 @@ Wasim granted standing authorization on 2026-08-26 for Grok 4.6 xhigh to execute
 
 This authorization does **not** cover real company data, production cutover, destructive retirement, uncovered external-provider spending or unlimited resource usage.
 
-Grok must still stop and ask Wasim before:
+The implementation agent must still stop and ask Wasim before:
 
 - installing a package outside the approved list when no package-free path exists
 - purchasing another subscription or paid add-on
@@ -191,7 +191,7 @@ Staging D1, R2, Vectorize, Queue and Workflow resources exist. `RESOURCES_PROVIS
 - [x] Access JWT Node unit tests exist, including JWKS floor, in-flight join, 256 KiB stream cancel, hostile-domain, rotation and stale-grace. Evidence: `src/lib/auth/access-jwt.test.ts`. Not a substitute for the independent stale-grace verdict.
 - [x] AI Gateway payload-off helper test. Evidence: `src/lib/cf/ai-gateway.test.ts`.
 - [x] Local Wrangler dry-run of brain and ingestion. Evidence: wrangler 4.126.0 `--dry-run --env development` and `--env staging`.
-- [x] Deploy the empty skeleton to staging. Evidence: Web `https://useful-brain-staging.karko-ai.workers.dev`; Brain `useful-brain-brain-staging` version `1256a5e6-a289-47e2-b205-8d0a8229c7c8`; Ingestion `useful-brain-ingestion-staging` version `f6833bd1-72d0-4c52-97ad-a05d2c5719e4` with workflow `useful-brain-ingestion-staging`. Brain and Ingestion public `workers.dev` URLs return Cloudflare 1042.
+- [x] Deploy the empty skeleton to staging. Evidence: web staging Worker live on its `workers.dev` URL; Brain `useful-brain-brain-staging` version `1256a5e6-a289-47e2-b205-8d0a8229c7c8`; Ingestion `useful-brain-ingestion-staging` version `f6833bd1-72d0-4c52-97ad-a05d2c5719e4` with workflow `useful-brain-ingestion-staging`. Brain and Ingestion public `workers.dev` URLs return Cloudflare 1042.
 
 ### Phase 1 exit
 
@@ -340,7 +340,7 @@ Exit: one read connector and one approved write connector pass all policy and se
 
 Authorized for continuous execution after Phase 6. Synthetic data only.
 
-- [x] Staging load tests. Evidence: eight live `GET /api/health` requests to `https://useful-brain-staging.karko-ai.workers.dev/api/health` returned 200 `ok`; `src/lib/release/modes.test.ts` measures the same synthetic load.
+- [x] Staging load tests. Evidence: eight live `GET /api/health` requests to the web staging Worker's `workers.dev` URL returned 200 `ok`; `src/lib/release/modes.test.ts` measures the same synthetic load.
 - [x] D1 and R2 restore drills. Evidence: remote `sqlite_master` on both staging D1s; `corpus_state` empty; R2 `useful-brain-sources-staging` `--jurisdiction eu` is 0 objects / 0 B EEUR. Restore of the empty bucket is re-upload from the local synthetic corpus. Do not use D1 Time Travel.
 - [x] Incident drills. Evidence: `FAIL_CLOSED_INCIDENTS` in `src/lib/release/modes.ts` and [operations runbook](runbooks/operations.md).
 - [x] Corpus rollback proof (generation pointer, not Time Travel). Evidence: `src/lib/store/generations.test.ts`, `workers/ingestion/test/generations.test.ts`, `src/lib/release/modes.test.ts`, [rollback runbook](runbooks/rollback.md).
@@ -352,8 +352,8 @@ Authorized for continuous execution after Phase 6. Synthetic data only.
 - [x] Budget and alert validation. Evidence: `GROSS_USAGE_CEILINGS_USD` $25 / $75 / $100 as infrastructure safety limits, not a customer billing product. Gross model cost $0. Idle approximately the existing $5 Workers Paid minimum.
 - [x] Burooj migration-ledger completion. Evidence: [docs/burooj-migration-ledger.md](burooj-migration-ledger.md) complete for 7A. Phase 7B deletion stays closed.
 - [x] Recoverable Burooj archive creation. Evidence: local gitignored `.archives/burooj-630ba08dc7cad6aa71942d6842ce6d8d55a26873.bundle` (~97 MB), SHA-256 `2e8733d7884f963ab02e5633646515131c33af870f75e9ffa332679f587dcaf8`, `git bundle verify` ok, `HEAD` / `refs/heads/main` `630ba08dc7cad6aa71942d6842ce6d8d55a26873`. Not committed. Do not push Burooj.
-- [x] Record independent-review P2 follow-ups for Grok 4.6 without blocking the Phase 7A PR. Evidence: [independent review P2 bug backlog](independent-review-p2-backlog.md).
-- [x] Repair the eight recorded P2 items on `grok/phase-7a-p2-repairs` with regressions, then follow-ups P2-9 through P2-30. Remaining independent review is Gemini 3.7 Flash high, not Sol. Evidence: [independent-review-p2-backlog.md](independent-review-p2-backlog.md). Phase 7B stays closed.
+- [x] Record independent-review P2 follow-ups for the implementation agent without blocking the Phase 7A PR. Evidence: [independent review P2 bug backlog](independent-review-p2-backlog.md).
+- [x] Repair the eight recorded P2 items on the P2-repairs branch with regressions, then follow-ups P2-9 through P2-30. Remaining independent review is assigned to a second model. Evidence: [independent-review-p2-backlog.md](independent-review-p2-backlog.md). Phase 7B stays closed.
 
 Exit: staging is the release candidate with restore, incident and budget evidence. No real company data. No billing, public signup or required Cloudflare Access.
 
@@ -366,7 +366,7 @@ Authorized separately from commercial Phase 7B. Loopback + existing staging skel
 - [x] Northwind eval battery and sample questions. Evidence: `src/lib/eval/manual-eval-set.ts`, `src/lib/eval/northwind.test.ts`.
 - [x] Remove Convex from the live path and `package.json`.
 - [x] Brain wrangler dry-run after Pi chat path: **882.95 KiB / gzip 165.15 KiB** (development and staging).
-- [x] Independent review: Gemini 3.7 Flash high. Verdict approve; no P0/P1 or high/critical findings. Non-blocking P2s left unchanged (legacy localStorage key name, empty-corpus preview, fail-closed tool-argument parse).
+- [x] Independent review by a second model. Verdict approve; no P0/P1 or high/critical findings. Non-blocking P2s left unchanged (legacy localStorage key name, empty-corpus preview, fail-closed tool-argument parse).
 - [x] Local Burooj sibling deleted 2026-08-28 after archive verify (SHA-256 `2e8733d7884f963ab02e5633646515131c33af870f75e9ffa332679f587dcaf8`, `git bundle verify` ok). GitHub `wasimjalali/burooj` deletion is blocked on the `delete_repo` scope (`gh auth refresh -h github.com -s delete_repo`). Archive retained at gitignored `.archives/burooj-630ba08dc7cad6aa71942d6842ce6d8d55a26873.bundle`.
 
 ### Operator UI rebuild (Wasim 2026-08-29)
@@ -380,7 +380,7 @@ Authorized separately from commercial Phase 7B. Loopback + existing staging skel
 - [x] Remove the Northwind preview fallback. Empty or unavailable Brain state is never presented as a live corpus.
 - [x] Propagate operator cancellation from the UI request ID through Brain, the conversation Durable Object and Pi abort. Cancelled turns are stored as failed with `CANCELLED`, never as completed answers.
 - [x] Delete a document by rebuilding the latest ready or active corpus without it. The rebuilt generation stays ready until the operator explicitly promotes it.
-- [x] Wasim waived the Gemini review for this pass on 2026-08-29 and authorized Codex self-review instead.
+- [x] Wasim waived the independent second-model review for this pass on 2026-08-29 and authorized a self-review instead.
 - [ ] Direct browser-to-R2 signed upload remains credential-dependent. Do not add scoped R2 access keys or a signing service until Wasim supplies that external bootstrap.
 
 ### Northwind live-eval repair pass (Wasim 2026-08-30)

@@ -12,13 +12,13 @@ The target architecture lives in `docs/useful-brain-master-plan.md`. Execute fro
 
 Phase 0 is merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10)). Phase 1 code is merged ([PR #11](https://github.com/wasimjalali/useful-brain/pull/11), follow-up `40f89d7`). Phases 2–7A are merged. Staging resources are provisioned. Operator identity is loopback on 127.0.0.1. Cloudflare Access is optional ported code, not a launch requirement.
 
-Wasim granted standing authorization on 2026-08-26 for Grok 4.6 xhigh to execute Phase 1 through Phase 6 and Phase 7A without ordinary phase-by-phase approval. On 2026-08-28 Wasim authorized the local Cloudflare UI cutover: wire Brain to the Next.js UI, remove Convex and Azure, use Workers AI GLM 5.3 Flash for chat, and delete Burooj after Northwind is in this repo. That does **not** cover real company data, a new production resource set, or commercial launch.
+Phases 1 through 7A and the local Cloudflare UI cutover (wire Brain to the Next.js UI, remove Convex and Azure, use Workers AI GLM 5.3 Flash for chat, delete Burooj after Northwind is in this repo) were executed under standing authorizations Wasim recorded on 2026-08-26 and 2026-08-28. Those authorizations do **not** cover real company data, a new production resource set, or commercial launch.
 
 Phase 7B (production launch with real company data and a production resource set) still requires one final explicit Wasim approval.
 
 Do not skip phase exit criteria or silently change the master plan. Keep historical Nura documents as historical records unless they cause active instructions to become ambiguous.
 
-The implementation model is Grok 4.6 xhigh. Independent review of remaining work is Gemini 3.7 Flash high. Do not use GPT-5.6 Sol. Neither model approves its own critical security work.
+Implementation and independent review use different models. No model approves its own critical security work.
 
 ## Current and target stacks
 
@@ -78,7 +78,7 @@ Do not introduce Convex. Do not propose or add Microsoft Foundry. Do not add Lan
 - Rewrite useful Sanad behavior in TypeScript. Do not paste the Python or unrelated Tabari framework.
 - Port the 65-document Northwind corpus, all 120 questions and named contract tests before retirement.
 - Keep a migration ledger that maps every retained behavior to its Useful Brain implementation and test.
-- Do not delete Burooj until the Northwind corpus (65 documents, 120 questions) is in this repo, the recoverable archive is verified, and Wasim confirms deletion. Wasim confirmed deletion on 2026-08-28 after those gates. Local sibling checkout deleted 2026-08-28. GitHub `wasimjalali/burooj` still needs `gh auth refresh -h github.com -s delete_repo`.
+- Do not delete Burooj until the Northwind corpus (65 documents, 120 questions) is in this repo, the recoverable archive is verified, and Wasim confirms deletion. Wasim confirmed deletion on 2026-08-28 after those gates. Local sibling checkout deleted 2026-08-28.
 
 ## Approved packages
 
@@ -102,7 +102,7 @@ Stop and batch remaining manual work only when: a change contradicts the fixed a
 - Keep changes surgical and update markdown made stale by the change.
 - Verify every completed change with `npx tsc --noEmit`, `npm run lint`, `npm test`, `npm run build`, relevant workerd tests, Wrangler dry runs, the dependency audit and security tests.
 - For Next.js and Cloudflare changes, verify current official documentation rather than relying on memory.
-- Run independent review with Gemini 3.7 Flash high. Fix every confirmed P0/P1 and every confirmed high or critical security finding. Merge automatically only when GitHub checks and independent review are green.
+- Run independent review with a second model. Fix every confirmed P0/P1 and every confirmed high or critical security finding. Merge automatically only when GitHub checks and independent review are green.
 
 ## Interface
 
