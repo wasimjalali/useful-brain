@@ -69,6 +69,9 @@ function outputPaths(model: string | undefined) {
 function parseArgs(argv: string[]) {
   const liveIndex = argv.indexOf("--live");
   const brainUrl = (liveIndex >= 0 ? argv[liveIndex + 1] : process.env.NORTHWIND_EVAL_LIVE_URL) ?? "";
+  if (liveIndex >= 0 && (!brainUrl || brainUrl.startsWith("--"))) {
+    throw new Error("--live requires a Brain URL");
+  }
   const modelIndex = argv.indexOf("--model");
   const model = modelIndex >= 0 ? argv[modelIndex + 1] : undefined;
   if (modelIndex >= 0 && (!model || model.startsWith("--"))) {
@@ -295,9 +298,14 @@ async function runLiveLayer(
         `${question.questionId}: Brain answered with ${response.answerModel}, expected ${expectedModel}`,
       );
     }
-    const responseVersion = `${response.promptVersion ?? "unreported"}|${
-      response.retrievalConfigVersion ?? "unreported"
-    }`;
+    if (!response.promptVersion || !response.retrievalConfigVersion) {
+      // Fail closed: a Brain build that does not echo its pipeline version
+      // cannot be pinned, so its rows must not be recorded as pinned.
+      throw new Error(
+        `${question.questionId}: Brain did not report its pipeline version`,
+      );
+    }
+    const responseVersion = `${response.promptVersion}|${response.retrievalConfigVersion}`;
     if (pipelineVersion === undefined) {
       pipelineVersion = responseVersion;
     } else if (pipelineVersion !== responseVersion) {

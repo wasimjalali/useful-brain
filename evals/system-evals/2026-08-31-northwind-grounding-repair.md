@@ -17,7 +17,7 @@ Useful Brain answers company questions with verbatim, cited evidence and refuses
 
 The pre-repair baseline (2026-08-30) scored 77 of 107 (72%) with all 13 permission questions skipped because the live path could not represent each question's principal.
 
-Constant throughout: retrieval layer recall@3 0.912, MRR 0.825, nDCG 0.837, zero ACL leaks, zero forbidden-document retrievals live. Frozen evidence: [`results/2026-08-31/findings.glm-5.3-flash.json`](../results/2026-08-31/findings.glm-5.3-flash.json), pre-repair baseline in [`findings.pre-fix.json`](../results/2026-08-31/findings.pre-fix.json).
+Constant throughout: the deterministic in-process retrieval suite (fake embeddings, model-independent, run as a regression guard alongside every live pass) held at recall@3 0.912, MRR 0.825, nDCG 0.837 with zero ACL leaks; it measures the retrieval code, not the live Cloudflare stack. The live-stack retrieval signal is `retrievedRecall` 0.974 in the final run, with zero forbidden-document retrievals across every pass. Frozen evidence: [`results/2026-08-31/findings.glm-5.3-flash.json`](../results/2026-08-31/findings.glm-5.3-flash.json) for the final run and [`findings.pass1.json`](../results/2026-08-31/findings.pass1.json) for Pass 1; the 2026-08-30 pre-repair baseline (77/107) is recorded in the execution tracker and has no frozen snapshot.
 
 ## The setup
 
@@ -40,7 +40,7 @@ Pass 1 fixed the measurement before the model: a loopback-only assumed-principal
 
 ## Pass 2: four failure families, four root causes
 
-**A. Multi-hop 0/10, second document retrieved but never cited.** The model retrieved both documents 98% of the time, then wrote about one. The real root cause was invisible until we logged the raw model responses: our citation-repair and coverage calls capped completion at 512 tokens, and GLM 5.3 Flash is a reasoning model. It spent the entire budget thinking, hit `finish_reason: length`, and returned empty content. Every "repair" was silently a no-op falling back to a crude lexical extractor. Fixes: disable thinking on extraction calls (they select quotes, they don't need chain-of-thought), recover the JSON object from narrated responses with balanced-brace parsing that prefers the last emitted object over mid-reasoning examples, and add a coverage pass that asks, for multi-part questions only, for the exact evidence sentence answering each still-open part. Coverage additions must re-validate against the evidence ledger before they're kept.
+**A. Multi-hop 0/10, second document retrieved but never cited.** Retrieval delivered both gold documents on nine of the ten multi-hop questions (mean gold-document recall 0.95), then the model wrote about one. The real root cause was invisible until we logged the raw model responses: our citation-repair and coverage calls capped completion at 512 tokens, and GLM 5.3 Flash is a reasoning model. It spent the entire budget thinking, hit `finish_reason: length`, and returned empty content. Every "repair" was silently a no-op falling back to a crude lexical extractor. Fixes: disable thinking on extraction calls (they select quotes, they don't need chain-of-thought), recover the JSON object from narrated responses with balanced-brace parsing that prefers the last emitted object over mid-reasoning examples, and add a coverage pass that asks, for multi-part questions only, for the exact evidence sentence answering each still-open part. Coverage additions must re-validate against the evidence ledger before they're kept.
 
 **B. Twin-document misattribution.** Six factual questions failed because the model quoted the lookalike sentence from a neighboring document (handbook vs the dedicated policy). Fixes: each search hit now leads with its document identity before the text, and the prompt prefers the dedicated policy document for the asked topic or cites both.
 
@@ -52,13 +52,13 @@ Pass 1 fixed the measurement before the model: a loopback-only assumed-principal
 
 Before committing, three parallel reviewers (security, grounding logic, eval honesty) attacked the diff. The security reviewer found a real high-severity bug: the new salvage pass ran ahead of the refusal-honoring guard, so a short refusal that happened to quote an evidence sentence could be converted into a confident grounded answer to an unanswerable question. An interim run had scored 115/120 with that bug in place. We fixed it, hardened salvage three more ways (body-text-only grounding, longest-span preference, bounded colon prefixes), tightened the multi-part trigger so narrative "and" in trap questions can't fire it, and re-ran everything. The recorded 114/120 is the honest post-fix number, one point lower than the flattering one.
 
-The eval harness also got integrity upgrades from the review: checkpoints now pin the exact answer-pipeline build and a digest of the question set, resumes fail closed on any mismatch, latency summaries carry a partial flag, and the report shows a cited-but-not-expected counter so citation broadening can't hide.
+The eval harness also got integrity upgrades from the review: checkpoints now pin the exact answer-pipeline build and a digest of the question set, resumes fail closed on any mismatch, latency summaries carry a partial flag, and the findings report a cited-but-not-expected counter so citation broadening can't hide. For the final run that counter reads 9 of 120 grounded answers citing a document outside the gold set, and gold-documents-retrieved-but-uncited dropped from 31 rows in Pass 1 to 16.
 
 ## Honest caveats
 
 - Three to five questions still churn between runs. Temperature 0 doesn't pin a reasoning model's thinking on this stack, so treat single-question flips as noise and category totals as signal.
-- Complete-answer latency (p50 ~15 to 20s, p95 ~56s) exceeds the 15s p95 production target. That's the model's reasoning phase, and it's recorded as an open item, not accepted.
-- The four remaining failures (q073, q088, q100, q105/q110 style identifier lookups) fail across every model we later tested, which points at corpus and retrieval difficulty rather than the answer layer.
+- Complete-answer latency (p50 ~15.6s, p95 ~56s) exceeds the 15s p95 production target. Most of that is the model's reasoning phase, and the final run executed alongside four other model runs on one local worker, so these numbers include contention (an earlier solo segment measured p50 ~19.6s). Recorded as an open item, not accepted.
+- Six failures remain in the final run: q028, q073, q088, q100, q105, q110. Four of them (q073, q100, q105, q110) fail for every model we later tested, which points at corpus difficulty and abstention discipline rather than model choice. The other two are honest residue of the repaired families: q028 is a twin-document misattribution (family B improved, not closed) and q088 dropped a multi-hop second citation (family A at 9/10, not 10/10).
 
 ## Reproduce
 

@@ -72,6 +72,13 @@ export function parseEvalModelOverride(
  * completions on Workers AI).
  */
 export function evalChatModel(id: string): Model<"openai-completions"> {
+  // The HTTP edge validates too; this re-assertion keeps a future caller
+  // from routing an unapproved model id into Workers AI.
+  if (!(EVAL_CHAT_MODELS as readonly string[]).includes(id)) {
+    throw new EvalModelOverrideInvalid(
+      "evalModel must be an approved Cloudflare-hosted chat model",
+    );
+  }
   const base = glm53FlashModel();
   if (id === base.id) {
     return base;

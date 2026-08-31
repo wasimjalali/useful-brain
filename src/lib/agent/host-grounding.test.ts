@@ -525,6 +525,24 @@ describe("salvageVerbatimQuotes", () => {
     );
   });
 
+  it("never salvages a long marker-free refusal narrative that quotes evidence", () => {
+    const ledger = twinLedger();
+    const draft =
+      'The retrieved documents do not mention an employee stock purchase plan anywhere in the corpus, and I checked every retrieved passage carefully before concluding this, so I cannot answer the question as asked. The closest text I found is: "Billing disputes open more than 30 days move to ESC-3."';
+    expect(salvageVerbatimQuotes(draft, ledger)).toBeNull();
+  });
+
+  it("dedupes a quoted fragment against the full sentence across paragraphs", () => {
+    const ledger = twinLedger();
+    const draft = [
+      'The rule is "more than 30 days move to ESC-3" per policy.',
+      "Billing disputes open more than 30 days move to ESC-3. [1]",
+    ].join("\n\n");
+    expect(salvageVerbatimQuotes(draft, ledger)).toBe(
+      "Billing disputes open more than 30 days move to ESC-3.[1]",
+    );
+  });
+
   it("never grounds a span on a section heading alone", () => {
     const ledger = createLedger();
     ingestSearchPayload(ledger, {

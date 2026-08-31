@@ -824,6 +824,39 @@ describe("abstention and citation discipline", () => {
     expect(result.refusalReason).toBe("model_abstained_with_evidence");
   }, 20_000);
 
+  it("keeps a long marker-free refusal a refusal even when it quotes evidence", async () => {
+    const pipeline = await tinyPipeline();
+    const faux = fauxProvider({ provider: "useful-brain-long-refusal" });
+    faux.setResponses([
+      fauxAssistantMessage(
+        [fauxText("Searching."), fauxToolCall(SEARCH_KNOWLEDGE_TOOL, { query: "stock purchase plan" })],
+        { stopReason: "toolUse" },
+      ),
+      fauxAssistantMessage(
+        [
+          fauxText(
+            'The retrieved documents do not mention an employee stock purchase plan anywhere in the corpus, and I checked every retrieved passage carefully before concluding this, so I cannot answer the question as asked. The closest text I found is: "Employees accrue 1.5 days of leave per month."',
+          ),
+        ],
+        { stopReason: "stop" },
+      ),
+    ]);
+
+    const result = await runKnowledgeAgent({
+      question: "Does the company offer a stock purchase plan?",
+      pipeline,
+      principal,
+      policyPrincipal,
+      conversationId: "c-long-refusal",
+      runtime: {
+        model: { ...faux.getModel(), api: "openai-completions" },
+        stream: (model, context, options) => faux.provider.streamSimple(model, context, options),
+      },
+    });
+
+    expect(result.finalResponse).not.toContain("1.5 days of leave");
+  }, 20_000);
+
   it("recovers an identifier lookup when citation repair cannot ground a paraphrased draft", async () => {
     const store = new MemoryChunkStore();
     const embedder = new FakeEmbeddingProvider(8);
@@ -906,6 +939,8 @@ describe("multi-part coverage pass", () => {
         "A customer received a refund and wants their data deleted. What timelines apply?",
       ),
     ).toBe(true);
+    // Two interrogative sentences are themselves a multi-part signal.
+    expect(isMultiPartQuestion("What is the refund window? Also, who approves it?")).toBe(true);
   });
 
   it("covers the unanswered second part of a multi-part question with a verbatim quote", async () => {

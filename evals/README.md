@@ -1,6 +1,6 @@
 # Evals
 
-Every eval campaign in this repo gets documented here: model evals (comparing models on a fixed task) and system evals (measuring and improving the application itself). Reports are written blog-ready so they can be published with minimal editing. Frozen result snapshots live in `results/` so every number in a report stays verifiable; raw run artifacts in `eval-output/` are gitignored and regenerable.
+Every eval campaign in this repo gets documented here: model evals (comparing models on a fixed task) and system evals (measuring and improving the application itself). Reports are written blog-ready so they can be published with minimal editing. Frozen result snapshots live in `results/` so the run-level numbers in a report stay verifiable; each report states which of its figures are backed by a snapshot and which are recorded in prose only (smoke scores, vendor prices, prior-session baselines). Raw run artifacts in `eval-output/` are gitignored and regenerable.
 
 ## Reports
 

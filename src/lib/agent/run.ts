@@ -27,12 +27,14 @@ import {
   BRAIN_KNOWLEDGE_UNAVAILABLE,
   BRAIN_MUST_RETRIEVE,
   BRAIN_NOT_ENOUGH_EVIDENCE,
+  citedMarkerIndexes,
   completeProseCitations,
   createLedger,
   enforceBrainGrounding,
   modelSignalsInsufficientEvidence,
   salvageVerbatimQuotes,
   SEARCH_KNOWLEDGE_TOOL,
+  sentenceSignalsInsufficientEvidence,
   type TranscriptMessage,
   type TurnEvidenceLedger,
 } from "./host-grounding";
@@ -115,6 +117,9 @@ const MULTI_PART_PLURAL_RE =
 export function isMultiPartQuestion(question: string): boolean {
   const sentences = question.split(/(?<=[.!?])\s+/u);
   const interrogative = sentences.filter((sentence) => sentence.includes("?"));
+  if (interrogative.length >= 2) {
+    return true;
+  }
   const targets =
     interrogative.length > 0 ? interrogative : [sentences[sentences.length - 1] ?? question];
   return targets.some(
@@ -455,11 +460,15 @@ export async function runKnowledgeAgent(input: {
   // quotes are real evidence. Salvage those spans deterministically before
   // any model-repair decision. Never salvage a model-authored refusal: a
   // refusal that quotes an off-topic evidence sentence must stay a refusal,
-  // so the abstention guard below keeps priority.
+  // so the abstention guard below keeps priority. A marker-free draft with
+  // any refusal sentence is a refusal narrative regardless of length;
+  // a marked draft may still salvage its answering paragraphs (the refusal
+  // paragraphs are skipped inside salvage itself).
   if (
     grounded === BRAIN_INVALID_CITATION &&
     evidence.length > 0 &&
-    !modelSignalsInsufficientEvidence(rawFinal)
+    !modelSignalsInsufficientEvidence(rawFinal) &&
+    !(citedMarkerIndexes(rawFinal).length === 0 && sentenceSignalsInsufficientEvidence(rawFinal))
   ) {
     const salvaged = salvageVerbatimQuotes(rawFinal, evidenceLedger);
     if (salvaged && enforce(salvaged) === salvaged) {
@@ -495,7 +504,10 @@ export async function runKnowledgeAgent(input: {
           input.abort?.signal,
         ),
       });
-      if (repaired) {
+      // enforce() passes text through unvalidated once the run counts as
+      // interrupted, so a wall timeout during the repair call must not let
+      // unvalidated prose become the answer.
+      if (repaired && !wall.aborted && !input.abort?.signal.aborted) {
         grounded = enforce(repaired);
       }
     } catch {

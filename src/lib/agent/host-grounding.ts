@@ -146,6 +146,34 @@ const INSUFFICIENT_SIGNAL_RES = [
 const MAX_REFUSAL_LENGTH = 240;
 
 /**
+ * True when any sentence of the text reads as an insufficient-evidence
+ * signal, with no length cap. Used to keep the salvage pass away from
+ * refusal narratives ("the documents do not mention X; the closest text
+ * is: ...") that quote evidence without answering.
+ */
+export function sentenceSignalsInsufficientEvidence(text: string | null | undefined): boolean {
+  if (!text) {
+    return false;
+  }
+  const stripped = text.replace(new RegExp(MARKER_RE.source, "g"), "").trim();
+  if (!stripped) {
+    return false;
+  }
+  if (HOST_STRINGS.has(stripped)) {
+    return true;
+  }
+  return stripped
+    .split(/(?<=[.!?])\s+/u)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean)
+    .some(
+      (sentence) =>
+        HOST_STRINGS.has(sentence) ||
+        INSUFFICIENT_SIGNAL_RES.some((pattern) => pattern.test(sentence)),
+    );
+}
+
+/**
  * Detect a model-authored refusal that did not use the exact host string.
  * The host honors an intended abstention instead of routing it through
  * citation repair, which could otherwise turn a refusal into a grounded
@@ -237,10 +265,16 @@ export function salvageVerbatimQuotes(
   }
   const markerMatcher = new RegExp(MARKER_RE.source, "g");
   const labelEntries = [...ledger.byLabel.entries()].sort((a, b) => a[0] - b[0]);
-  const kept: Array<{ key: string; paragraph: string }> = [];
+  const validated: Array<{ key: string; paragraph: string; order: number }> = [];
+  let order = 0;
   for (const paragraph of text.split(/\n\s*\n/u)) {
     const stripped = paragraph.replace(markerMatcher, "").trim();
     if (!stripped) {
+      continue;
+    }
+    // A paragraph that reads as a refusal must not donate quotes: its
+    // quoted spans are narrative about the corpus, not answers.
+    if (sentenceSignalsInsufficientEvidence(paragraph)) {
       continue;
     }
     const candidates: string[] = [];
@@ -264,13 +298,10 @@ export function salvageVerbatimQuotes(
         }
       }
     }
-    // Validate every candidate first, then keep longest-first so a quoted
-    // fragment can never suppress the complete sentence that contains it.
-    const validated: Array<{ key: string; paragraph: string }> = [];
     for (const candidate of candidates) {
       const clean = candidate
-        .replace(/^["“*\s]+/u, "")
-        .replace(/["”*\s]+$/u, "")
+        .replace(/^["“'‘*\s]+/u, "")
+        .replace(/["”'’*\s]+$/u, "")
         .trim();
       if (!clean || clean.split(/\s+/u).length < 3) {
         continue;
@@ -283,25 +314,29 @@ export function salvageVerbatimQuotes(
       if (labels.length === 0) {
         continue;
       }
+      order += 1;
       validated.push({
         key: normalizeSupportText(clean),
         paragraph: `${clean}${labels.map((label) => `[${label}]`).join("")}`,
+        order,
       });
     }
-    validated.sort((a, b) => b.key.length - a.key.length);
-    for (const entry of validated) {
-      if (kept.some((existing) => existing.key.includes(entry.key) || entry.key.includes(existing.key))) {
-        continue;
-      }
-      kept.push(entry);
-      if (kept.length >= SALVAGE_MAX_PARAGRAPHS) {
-        break;
-      }
+  }
+  // Dedupe longest-first across the WHOLE draft so a quoted fragment in one
+  // paragraph can never suppress the complete sentence that contains it in
+  // another, then restore draft order for readability.
+  validated.sort((a, b) => b.key.length - a.key.length);
+  const kept: Array<{ key: string; paragraph: string; order: number }> = [];
+  for (const entry of validated) {
+    if (kept.some((existing) => existing.key.includes(entry.key) || entry.key.includes(existing.key))) {
+      continue;
     }
+    kept.push(entry);
     if (kept.length >= SALVAGE_MAX_PARAGRAPHS) {
       break;
     }
   }
+  kept.sort((a, b) => a.order - b.order);
   return kept.length > 0 ? kept.map((entry) => entry.paragraph).join("\n\n") : null;
 }
 
