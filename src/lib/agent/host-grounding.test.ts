@@ -7,10 +7,14 @@ import {
   BRAIN_NOT_ENOUGH_EVIDENCE,
   SEARCH_KNOWLEDGE_TOOL,
   buildTurnLedger,
+  completeProseCitations,
   createLedger,
   enforceBrainGrounding,
+  ingestSearchPayload,
   knowledgeToolsPresent,
   markersValidForLedger,
+  modelSignalsInsufficientEvidence,
+  salvageVerbatimQuotes,
   type TranscriptMessage,
 } from "./host-grounding";
 import { BudgetTracker } from "./budgets";
@@ -351,5 +355,212 @@ describe("host grounding finalizer", () => {
         rewriteTranscript: false,
       }),
     ).toBe(BRAIN_INVALID_CITATION);
+  });
+});
+
+describe("modelSignalsInsufficientEvidence", () => {
+  it("detects host strings and model-authored refusals", () => {
+    expect(modelSignalsInsufficientEvidence(BRAIN_NOT_ENOUGH_EVIDENCE)).toBe(true);
+    expect(
+      modelSignalsInsufficientEvidence(
+        "The retrieved documents do not contain any information about an employee stock purchase plan.",
+      ),
+    ).toBe(true);
+    expect(
+      modelSignalsInsufficientEvidence("There is not enough evidence to answer this."),
+    ).toBe(true);
+    expect(
+      modelSignalsInsufficientEvidence("I don't have enough information about a childcare stipend."),
+    ).toBe(true);
+    expect(
+      modelSignalsInsufficientEvidence("The evidence does not mention moonlighting."),
+    ).toBe(true);
+  });
+
+  it("does not flag grounded answers", () => {
+    expect(modelSignalsInsufficientEvidence("Employees accrue 1.5 days of leave per month.[1]")).toBe(
+      false,
+    );
+    expect(modelSignalsInsufficientEvidence("")).toBe(false);
+    expect(modelSignalsInsufficientEvidence(null)).toBe(false);
+    expect(
+      modelSignalsInsufficientEvidence("Disputes open more than 30 days move to ESC-3.[2]"),
+    ).toBe(false);
+  });
+});
+
+function twinLedger() {
+  const ledger = createLedger();
+  ingestSearchPayload(ledger, {
+      hits: [
+        {
+          chunk_id: "chunk-a",
+          content: "Billing disputes open more than 30 days move to ESC-3.",
+          label: "[1]",
+          citation: {
+            chunk_id: "chunk-a",
+            document_id: "nw_finance_invoicing_payment",
+            section_heading: "Billing Disputes",
+            label: "[1]",
+          },
+        },
+        {
+          chunk_id: "chunk-b",
+          content: "ESC-3 complaints are owned by the VP of Support.",
+          label: "[2]",
+          citation: {
+            chunk_id: "chunk-b",
+            document_id: "nw_support_complaint_escalation",
+            section_heading: "ESC-3: VP Support",
+            label: "[2]",
+          },
+        },
+      ],
+      citations: [],
+  });
+  return ledger;
+}
+
+describe("completeProseCitations", () => {
+  it("appends the marker for a retrieved-but-uncited second hop", () => {
+    // q087/q090/q116 shape: both facts written verbatim, one label cited.
+    const ledger = twinLedger();
+    const completed = completeProseCitations(
+      "Billing disputes open more than 30 days move to ESC-3.[1] ESC-3 complaints are owned by the VP of Support.",
+      ledger,
+    );
+    expect(completed).toBe(
+      "Billing disputes open more than 30 days move to ESC-3.[1] ESC-3 complaints are owned by the VP of Support.[2]",
+    );
+    expect(markersValidForLedger(completed, ledger)).toBe(true);
+  });
+
+  it("leaves prose unchanged when no ledger text contains a sentence", () => {
+    const ledger = twinLedger();
+    const prose = "The refund window is 90 days for annual plans.[1]";
+    expect(completeProseCitations(prose, ledger)).toBe(prose);
+  });
+
+  it("adds nothing on a label conflict", () => {
+    const ledger = twinLedger();
+    ledger.labelConflict = true;
+    const prose = "ESC-3 complaints are owned by the VP of Support.";
+    expect(completeProseCitations(prose, ledger)).toBe(prose);
+  });
+});
+
+describe("salvageVerbatimQuotes", () => {
+  it("keeps quoted verbatim spans and drops labels, attributions and refusal asides", () => {
+    const ledger = twinLedger();
+    const draft = [
+      '**Dispute escalation:** "Billing disputes open more than 30 days move to ESC-3." [1] — from northwind/finance/invoicing.md, section "Billing Disputes".',
+      "**Who owns it:** I do not have enough retrieved evidence to answer that question.",
+    ].join("\n\n");
+    const salvaged = salvageVerbatimQuotes(draft, ledger);
+    expect(salvaged).toBe("Billing disputes open more than 30 days move to ESC-3.[1]");
+    expect(markersValidForLedger(salvaged ?? "", ledger)).toBe(true);
+  });
+
+  it("keeps one paragraph per verbatim part of a two-part draft", () => {
+    const ledger = twinLedger();
+    const draft = [
+      '**Part one:** "Billing disputes open more than 30 days move to ESC-3." [1] — from invoicing.md.',
+      '**Part two:** "ESC-3 complaints are owned by the VP of Support." [2] — from complaint-escalation.md.',
+    ].join("\n\n");
+    const salvaged = salvageVerbatimQuotes(draft, ledger);
+    expect(salvaged).toBe(
+      "Billing disputes open more than 30 days move to ESC-3.[1]\n\nESC-3 complaints are owned by the VP of Support.[2]",
+    );
+    expect(markersValidForLedger(salvaged ?? "", ledger)).toBe(true);
+  });
+
+  it("returns null for a pure refusal or paraphrase", () => {
+    const ledger = twinLedger();
+    expect(
+      salvageVerbatimQuotes("The retrieved documents do not cover this topic.", ledger),
+    ).toBeNull();
+    expect(
+      salvageVerbatimQuotes("Disputes older than a month escalate to the support VP.", ledger),
+    ).toBeNull();
+  });
+
+  it("salvages a bare sentence after a label prefix without quotation marks", () => {
+    const ledger = twinLedger();
+    const draft =
+      "Escalation rule: Billing disputes open more than 30 days move to ESC-3. [1]";
+    expect(salvageVerbatimQuotes(draft, ledger)).toBe(
+      "Billing disputes open more than 30 days move to ESC-3.[1]",
+    );
+  });
+
+  it("rejects an after-colon remainder whose prefix is itself a claim", () => {
+    const ledger = createLedger();
+    ingestSearchPayload(ledger, {
+      hits: [
+        {
+          chunk_id: "chunk-sla",
+          content: "Standard SLA credit: 10 percent of monthly fees applies automatically.",
+          label: "[1]",
+          citation: { chunk_id: "chunk-sla", document_id: "sla", section_heading: "Credits", label: "[1]" },
+        },
+      ],
+      citations: [],
+    });
+    // A five-word prefix carrying the actual subject must not be dropped to
+    // make the remainder validate.
+    expect(
+      salvageVerbatimQuotes(
+        "Compensation above the standard SLA credit: 10 percent of monthly fees applies automatically.",
+        ledger,
+      ),
+    ).toBeNull();
+  });
+
+  it("prefers the complete sentence over a quoted fragment inside it", () => {
+    const ledger = twinLedger();
+    const draft =
+      '"move to ESC-3" is the rule, specifically: "Billing disputes open more than 30 days move to ESC-3." [1]';
+    expect(salvageVerbatimQuotes(draft, ledger)).toBe(
+      "Billing disputes open more than 30 days move to ESC-3.[1]",
+    );
+  });
+
+  it("never salvages a long marker-free refusal narrative that quotes evidence", () => {
+    const ledger = twinLedger();
+    const draft =
+      'The retrieved documents do not mention an employee stock purchase plan anywhere in the corpus, and I checked every retrieved passage carefully before concluding this, so I cannot answer the question as asked. The closest text I found is: "Billing disputes open more than 30 days move to ESC-3."';
+    expect(salvageVerbatimQuotes(draft, ledger)).toBeNull();
+  });
+
+  it("dedupes a quoted fragment against the full sentence across paragraphs", () => {
+    const ledger = twinLedger();
+    const draft = [
+      'The rule is "more than 30 days move to ESC-3" per policy.',
+      "Billing disputes open more than 30 days move to ESC-3. [1]",
+    ].join("\n\n");
+    expect(salvageVerbatimQuotes(draft, ledger)).toBe(
+      "Billing disputes open more than 30 days move to ESC-3.[1]",
+    );
+  });
+
+  it("never grounds a span on a section heading alone", () => {
+    const ledger = createLedger();
+    ingestSearchPayload(ledger, {
+      hits: [
+        {
+          chunk_id: "chunk-heading",
+          content: "Nothing about final pay here at all.",
+          label: "[1]",
+          citation: {
+            chunk_id: "chunk-heading",
+            document_id: "offboarding",
+            section_heading: "Final Pay Timing",
+            label: "[1]",
+          },
+        },
+      ],
+      citations: [],
+    });
+    expect(salvageVerbatimQuotes("Timing question: Final Pay Timing.", ledger)).toBeNull();
   });
 });

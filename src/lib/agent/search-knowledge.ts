@@ -2,6 +2,7 @@ import { Type, type Static } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 
 import type { Principal } from "../acl/access";
+import { REAL_STACK_FINGERPRINT } from "../retrieve/fingerprint";
 import type { KnowledgePipeline } from "../retrieve/pipeline";
 import {
   SEARCH_KNOWLEDGE_TOOL,
@@ -62,12 +63,17 @@ export function createSearchKnowledgeTool(input: {
           input.pipeline.search({
             query: params.query,
             principal: input.principal,
-            topK: 3,
+            // The approved retrieval profile returns up to eight chunks;
+            // the value is recorded in the retrieval config fingerprint.
+            topK: REAL_STACK_FINGERPRINT.topK,
             candidateLimit: 24,
           }),
           deadline,
         );
         const ledger = input.ledger ?? createLedger();
+        if (response.trace.vectorChannelError) {
+          ledger.vectorDegradedCount += 1;
+        }
         const hits = response.hits.map((hit) => {
           const label = appendSearchHit(ledger, {
             chunkId: hit.chunkId,
@@ -83,10 +89,14 @@ export function createSearchKnowledgeTool(input: {
             rerankScore: response.trace.rerankScores[hit.chunkId] ?? hit.score,
           });
           return {
+            label,
+            // Document identity leads each hit so the model can tell a
+            // dedicated policy document from a handbook or neighbor.
+            document: hit.citation.sourceName,
+            section: hit.citation.sectionHeading,
             chunk_id: hit.chunkId,
             content: hit.content,
             score: hit.score,
-            label,
             citation: {
               chunk_id: hit.chunkId,
               document_id: hit.citation.documentId,

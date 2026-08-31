@@ -91,6 +91,7 @@ export async function askGroundedQuestion(input: {
   question: string;
   conversationId: string | null;
   requestId: string;
+  assumePrincipal?: { userId: string; roles: string[]; departments: string[] } | null;
 }): Promise<ActionResult<GroundedAnswerResponse>> {
   const question = input.question.trim();
 
@@ -118,6 +119,7 @@ export async function askGroundedQuestion(input: {
           question,
           conversationId: input.conversationId ?? undefined,
           requestId: input.requestId,
+          assumePrincipal: input.assumePrincipal ?? undefined,
         },
       }),
     );

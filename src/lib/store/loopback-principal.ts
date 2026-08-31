@@ -2,7 +2,25 @@ import type { OperationsDatabase } from "./conversations";
 
 export const LOOPBACK_PRINCIPAL_ID = "principal-dev";
 
-export const LOOPBACK_ROLES = ["operator", "standard"] as const;
+/**
+ * Explicit operator-read policy for the local single-operator deployment:
+ * the loopback operator loaded every document in the corpus, so it holds
+ * every role-gating role the synthetic corpus uses. This list is declared,
+ * not inferred, and applies only in loopback identity mode; startup forbids
+ * loopback on staging and workers.dev. Private-owner documents stay closed
+ * because ownership, not roles, gates them.
+ */
+export const LOOPBACK_ROLES = [
+  "operator",
+  "standard",
+  "manager",
+  "hr_manager",
+  "finance_manager",
+  "sales_manager",
+  "support_manager",
+  "director",
+  "it_admin",
+] as const;
 
 export const LOOPBACK_DEPARTMENTS = [
   "engineering",

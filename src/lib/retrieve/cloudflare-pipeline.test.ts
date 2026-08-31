@@ -76,7 +76,9 @@ describe("CloudflareKnowledgePipeline failures", () => {
     );
   });
 
-  it("does not silently downgrade hybrid retrieval when embeddings fail", async () => {
+  it("degrades to keyword-only with a recorded trace flag when embeddings fail", async () => {
+    // q100/q105 shape: one vector-channel failure must not blank out the
+    // keyword channel that still finds unique tokens under the same ACL.
     const pipeline = new CloudflareKnowledgePipeline({
       db: keywordDatabase(),
       vectorize: { query: async () => ({ matches: [] }) },
@@ -89,9 +91,72 @@ describe("CloudflareKnowledgePipeline failures", () => {
       generationId: "g-1",
     });
 
-    await expect(pipeline.search({ query: "refund window", principal })).rejects.toThrow(
-      "embedding unavailable",
-    );
+    const result = await pipeline.search({ query: "refund window", principal });
+    expect(result.trace.vectorChannelError).toBe(true);
+    expect(result.hits[0]?.chunkId).toBe(chunkRow.chunk_id);
+  });
+
+  it("degrades to keyword-only with a recorded trace flag when Vectorize errors", async () => {
+    const pipeline = new CloudflareKnowledgePipeline({
+      db: keywordDatabase(),
+      vectorize: {
+        query: async () => {
+          throw new Error("vectorize internal error");
+        },
+      },
+      ai: { run: async () => ({ data: [Array.from({ length: 1024 }, () => 0.1)] }) },
+      reranker: { rerank: async (_query, passages) => passages.map(() => 0.9) },
+      generationId: "g-1",
+    });
+
+    const result = await pipeline.search({ query: "refund window", principal });
+    expect(result.trace.vectorChannelError).toBe(true);
+    expect(result.hits[0]?.chunkId).toBe(chunkRow.chunk_id);
+  });
+
+  it("still fails closed on an over-wide serialized ACL filter instead of degrading", async () => {
+    // 70 distinct ACL shapes all readable by one role produce 70 group keys,
+    // pushing the serialized Vectorize filter past its byte ceiling.
+    const wideDb: CorpusSql = {
+      prepare(sql) {
+        return {
+          bind() {
+            return {
+              async all<T>() {
+                if (sql.includes("SELECT DISTINCT access_scope")) {
+                  return {
+                    results: Array.from({ length: 70 }, (_, index) => ({
+                      access_scope: "role",
+                      allowed_roles: JSON.stringify(["shared_role"]),
+                      allowed_departments: JSON.stringify([`dept_${index}`]),
+                      metadata: "{}",
+                    })) as T[],
+                  };
+                }
+                return { results: [] as T[] };
+              },
+              async first<T>() {
+                return null as T | null;
+              },
+            };
+          },
+        };
+      },
+    };
+    const pipeline = new CloudflareKnowledgePipeline({
+      db: wideDb,
+      vectorize: { query: async () => ({ matches: [] }) },
+      ai: { run: async () => ({ data: [Array.from({ length: 1024 }, () => 0.1)] }) },
+      reranker: { rerank: async (_query, passages) => passages.map(() => 0.9) },
+      generationId: "g-1",
+    });
+
+    await expect(
+      pipeline.search({
+        query: "refund window",
+        principal: { userId: "wide", roles: ["shared_role"], departments: [] },
+      }),
+    ).rejects.toThrow(/filter/i);
   });
 
   it("maps Vectorize IDs back to authoritative D1 chunk IDs", async () => {

@@ -17,9 +17,13 @@ import {
 } from "../cf/worker-errors";
 import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL } from "../embeddings/instructions";
 import type { WorkersAiRunner } from "../embeddings/workers-ai-embed";
+import { evalChatModel } from "../models/eval-override";
 import { glm53FlashModel } from "../models/glm-5-3-flash";
 import { createWorkersAiChatStream } from "../models/workers-ai-chat";
-import { createWorkersAiCitationRepair } from "../models/workers-ai-citation-repair";
+import {
+  createWorkersAiCitationRepair,
+  createWorkersAiCoveragePass,
+} from "../models/workers-ai-citation-repair";
 import { CHAT_MODEL_ID } from "../models/selection";
 import type { GroundedAnswerResponse } from "../rag/grounded-answer";
 import { CloudflareKnowledgePipeline, type CorpusSql, type VectorizeIndex } from "../retrieve/cloudflare-pipeline";
@@ -54,6 +58,19 @@ export type ExecuteTurnInput = {
   ai?: WorkersAiRunner;
   lockFor(conversationId: string): ConversationLockStub;
   principal: DirectoryRecord;
+  /**
+   * Loopback-only retrieval principal override for ACL demos and evals.
+   * Scopes retrieval authorization only; storage ownership and tool policy
+   * stay with the authenticated operator principal. The Brain route fails
+   * closed on this field outside loopback identity mode.
+   */
+  assumedPrincipal?: Principal;
+  /**
+   * Loopback-only chat-model override for the eval bake-off. Parsed and
+   * allowlisted by the Brain route; never changes the locked production
+   * selection.
+   */
+  evalModelOverride?: string;
   question: string;
   conversationId?: string;
   requestId: string;
@@ -64,14 +81,14 @@ export type ExecuteTurnInput = {
 export async function executeTurn(input: ExecuteTurnInput): Promise<GroundedAnswerResponse> {
   const now = input.now ?? Date.now();
   const persist = input.persistConversation !== false;
-  const retrievalPrincipal: Principal = {
+  const retrievalPrincipal: Principal = input.assumedPrincipal ?? {
     userId: input.principal.id,
     roles: input.principal.roles,
     departments: input.principal.departments,
   };
   const policyPrincipal = { id: input.principal.id };
   const pipeline = await knowledgePipeline(input);
-  const runtime = liveRuntime(input.ai);
+  const runtime = liveRuntime(input.ai, input.evalModelOverride);
 
   if (!persist) {
     const result = await runKnowledgeAgent({
@@ -82,7 +99,11 @@ export async function executeTurn(input: ExecuteTurnInput): Promise<GroundedAnsw
       conversationId: input.conversationId ?? "eval-ephemeral",
       runtime,
     });
-    return responseFromAgent(input.question, result.finalResponse, result.evidence, result.model);
+    return withTurnDiagnostics(
+      responseFromAgent(input.question, result.finalResponse, result.evidence, result.model),
+      result,
+      input.assumedPrincipal,
+    );
   }
 
   let pending: { conversationId: string; assistantMessageId: string; duplicate: boolean };
@@ -101,6 +122,10 @@ export async function executeTurn(input: ExecuteTurnInput): Promise<GroundedAnsw
   if (pending.duplicate) {
     const completed = await loadReplay(input.operations, pending.assistantMessageId, input.principal.id);
     if (completed) {
+      // A replayed turn never echoes assumedPrincipal: the stored answer may
+      // have been produced under a different retrieval scope, and a caller
+      // that requires the confirmation must treat the missing echo as
+      // unconfirmed identity.
       return replayToResponse(completed);
     }
     throw new WorkerBusyError();
@@ -141,11 +166,16 @@ export async function executeTurn(input: ExecuteTurnInput): Promise<GroundedAnsw
   });
 
   try {
-    const history = await loadBoundedHistory(
-      input.operations,
-      pending.conversationId,
-      input.principal.id,
-    );
+    // A turn scoped to an assumed principal never receives prior answers in
+    // its model context: earlier turns may have been retrieved under a
+    // different principal's ACL scope.
+    const history = input.assumedPrincipal
+      ? []
+      : await loadBoundedHistory(
+          input.operations,
+          pending.conversationId,
+          input.principal.id,
+        );
     const result = await runKnowledgeAgent({
       question: input.question,
       pipeline,
@@ -182,7 +212,7 @@ export async function executeTurn(input: ExecuteTurnInput): Promise<GroundedAnsw
         }),
       release: () => lock.release(pending.assistantMessageId),
     });
-    return replayToResponse(completed);
+    return withTurnDiagnostics(replayToResponse(completed), result, input.assumedPrincipal);
   } catch (error) {
     const cancelled = await lock.cancelled().catch(() => false);
     const failure = cancelled ? new WorkerCancelledError() : error;
@@ -263,18 +293,20 @@ function emptyPipeline(): Pick<KnowledgePipeline, "search"> {
   };
 }
 
-function liveRuntime(ai: WorkersAiRunner | undefined): AgentRuntime | undefined {
+function liveRuntime(
+  ai: WorkersAiRunner | undefined,
+  evalModelOverride?: string,
+): AgentRuntime | undefined {
   if (!ai) {
     return undefined;
   }
+  const model = evalModelOverride ? evalChatModel(evalModelOverride) : glm53FlashModel();
+  const runner = { run: (id: string, payload: Record<string, unknown>) => ai.run(id, payload) };
   return {
-    model: glm53FlashModel(),
-    stream: createWorkersAiChatStream({
-      run: (model, payload) => ai.run(model, payload),
-    }),
-    repairGroundedAnswer: createWorkersAiCitationRepair({
-      run: (model, payload) => ai.run(model, payload),
-    }),
+    model,
+    stream: createWorkersAiChatStream(runner),
+    repairGroundedAnswer: createWorkersAiCitationRepair(runner, model.id),
+    coverAnswerParts: createWorkersAiCoveragePass(runner, model.id),
     systemPrompt: LIVE_KNOWLEDGE_SYSTEM_PROMPT,
   };
 }
@@ -308,6 +340,29 @@ function historyToAgentMessages(history: StoredHistoryTurn[], modelId: string): 
   return messages;
 }
 
+function withTurnDiagnostics(
+  response: GroundedAnswerResponse,
+  result: { vectorDegradedCount: number; refusalReason?: string },
+  assumedPrincipal: Principal | undefined,
+): GroundedAnswerResponse {
+  return {
+    ...response,
+    ...(result.vectorDegradedCount > 0
+      ? { vectorDegradedCount: result.vectorDegradedCount }
+      : {}),
+    ...(result.refusalReason ? { refusalReason: result.refusalReason } : {}),
+    ...(assumedPrincipal
+      ? {
+          assumedPrincipal: {
+            userId: assumedPrincipal.userId,
+            roles: [...assumedPrincipal.roles],
+            departments: [...assumedPrincipal.departments],
+          },
+        }
+      : {}),
+  };
+}
+
 function responseFromAgent(
   question: string,
   finalResponse: string,
@@ -326,6 +381,10 @@ function responseFromAgent(
       embeddingDimensions: EMBEDDING_DIMENSIONS,
       results: evidence,
     },
+    // The ephemeral eval path pins the answer-pipeline build so a resumed
+    // eval can refuse to mix rows produced by different Brain builds.
+    promptVersion: PROMPT_VERSION,
+    retrievalConfigVersion: fingerprintId(REAL_STACK_FINGERPRINT),
   };
 }
 

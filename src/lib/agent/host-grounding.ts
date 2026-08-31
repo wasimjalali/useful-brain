@@ -1,5 +1,6 @@
 import {
   INSUFFICIENT_EVIDENCE_ANSWER,
+  normalizeSupportText,
   textSupportedByPassages,
 } from "../answer/contract";
 
@@ -64,6 +65,8 @@ export type TurnEvidenceLedger = {
   emptyOrInsufficient: boolean;
   searchError: boolean;
   labelConflict: boolean;
+  /** Searches this turn whose vector channel failed and ran keyword-only. */
+  vectorDegradedCount: number;
 };
 
 export function createLedger(): TurnEvidenceLedger {
@@ -75,6 +78,7 @@ export function createLedger(): TurnEvidenceLedger {
     emptyOrInsufficient: false,
     searchError: false,
     labelConflict: false,
+    vectorDegradedCount: 0,
   };
 }
 
@@ -129,6 +133,211 @@ export function markersValidForLedger(text: string, ledger: TurnEvidenceLedger):
         cited.flatMap((item) => [item?.section ?? "", item?.text ?? ""]),
       );
     });
+}
+
+const INSUFFICIENT_SIGNAL_RES = [
+  /\b(?:i|we)\s+(?:do not|don't|cannot|can't)\s+(?:have|find)\b[^.]{0,80}\b(?:evidence|information|documentation)\b/iu,
+  /\b(?:not?|insufficient|lacking)\s+enough\s+(?:retrieved\s+)?(?:evidence|information)\b/iu,
+  /\b(?:retrieved\s+)?(?:evidence|documents?)\s+do(?:es)?\s+not\s+(?:answer|state|mention|cover|address|support|include|contain|specify)\b/iu,
+  /\bno\s+retrieved\s+(?:evidence|information|documents?)\b/iu,
+  /\binsufficient[_\s]evidence\b/iu,
+];
+
+const MAX_REFUSAL_LENGTH = 240;
+
+/**
+ * True when any sentence of the text reads as an insufficient-evidence
+ * signal, with no length cap. Used to keep the salvage pass away from
+ * refusal narratives ("the documents do not mention X; the closest text
+ * is: ...") that quote evidence without answering.
+ */
+export function sentenceSignalsInsufficientEvidence(text: string | null | undefined): boolean {
+  if (!text) {
+    return false;
+  }
+  const stripped = text.replace(new RegExp(MARKER_RE.source, "g"), "").trim();
+  if (!stripped) {
+    return false;
+  }
+  if (HOST_STRINGS.has(stripped)) {
+    return true;
+  }
+  return stripped
+    .split(/(?<=[.!?])\s+/u)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean)
+    .some(
+      (sentence) =>
+        HOST_STRINGS.has(sentence) ||
+        INSUFFICIENT_SIGNAL_RES.some((pattern) => pattern.test(sentence)),
+    );
+}
+
+/**
+ * Detect a model-authored refusal that did not use the exact host string.
+ * The host honors an intended abstention instead of routing it through
+ * citation repair, which could otherwise turn a refusal into a grounded
+ * answer built from a lexically similar but off-topic evidence span.
+ *
+ * Anchored to the whole response: a refusal is short and carries no
+ * citation markers. Grounded prose that quotes a negative-sounding policy
+ * sentence ("This document does not cover contractor travel.[1]") must
+ * never match, so any marker or long draft disqualifies the text.
+ */
+export function modelSignalsInsufficientEvidence(text: string | null | undefined): boolean {
+  if (!text) {
+    return false;
+  }
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return false;
+  }
+  if (HOST_STRINGS.has(trimmed)) {
+    return true;
+  }
+  if (citedMarkerIndexes(trimmed).length > 0 || trimmed.length > MAX_REFUSAL_LENGTH) {
+    return false;
+  }
+  return INSUFFICIENT_SIGNAL_RES.some((pattern) => pattern.test(trimmed));
+}
+
+/**
+ * Append the marker of every ledger identity whose text contains one of a
+ * paragraph's claim sentences. Only labels from the current-turn ledger are
+ * ever added, so the must-retrieve and citation-validity contracts hold.
+ */
+export function completeProseCitations(text: string, ledger: TurnEvidenceLedger): string {
+  if (!text || ledger.labelConflict || ledger.byLabel.size === 0) {
+    return text;
+  }
+  const markerMatcher = new RegExp(MARKER_RE.source, "g");
+  return text
+    .split(/\n\s*\n/u)
+    .map((paragraph) => {
+      const trimmed = paragraph.trim();
+      if (!trimmed) {
+        return paragraph;
+      }
+      const cited = new Set(citedMarkerIndexes(trimmed));
+      const sentences = trimmed
+        .replace(markerMatcher, "")
+        .split(/(?<=[.!?])\s+/u)
+        .map((sentence) => sentence.trim())
+        .filter(Boolean);
+      const additions: number[] = [];
+      for (const [label, identity] of [...ledger.byLabel.entries()].sort((a, b) => a[0] - b[0])) {
+        if (cited.has(label)) {
+          continue;
+        }
+        if (
+          sentences.some((sentence) =>
+            textSupportedByPassages(sentence, [identity.section, identity.text]),
+          )
+        ) {
+          cited.add(label);
+          additions.push(label);
+        }
+      }
+      if (additions.length === 0) {
+        return paragraph;
+      }
+      return `${paragraph.trimEnd()}${additions.map((label) => `[${label}]`).join("")}`;
+    })
+    .join("\n\n");
+}
+
+const SALVAGE_MAX_PARAGRAPHS = 6;
+
+/**
+ * Rebuild an invalid draft from its verbatim evidence spans. Models often
+ * wrap a correctly copied sentence in a bold label, quotation marks or a
+ * source attribution ("**Part one:** \"quote\" [1] — from file.md"), which
+ * fails whole-paragraph validation. This keeps every span that copies a
+ * current-turn evidence text exactly, labels it from the ledger, and drops
+ * everything else. Returns null when no verbatim span exists.
+ */
+export function salvageVerbatimQuotes(
+  text: string,
+  ledger: TurnEvidenceLedger,
+): string | null {
+  if (!text || ledger.labelConflict || ledger.byLabel.size === 0) {
+    return null;
+  }
+  const markerMatcher = new RegExp(MARKER_RE.source, "g");
+  const labelEntries = [...ledger.byLabel.entries()].sort((a, b) => a[0] - b[0]);
+  const validated: Array<{ key: string; paragraph: string; order: number }> = [];
+  let order = 0;
+  for (const paragraph of text.split(/\n\s*\n/u)) {
+    const stripped = paragraph.replace(markerMatcher, "").trim();
+    if (!stripped) {
+      continue;
+    }
+    // A paragraph that reads as a refusal must not donate quotes: its
+    // quoted spans are narrative about the corpus, not answers.
+    if (sentenceSignalsInsufficientEvidence(paragraph)) {
+      continue;
+    }
+    const candidates: string[] = [];
+    for (const match of stripped.matchAll(/["“]([^"”]{10,})["”]/gu)) {
+      candidates.push(match[1]);
+    }
+    for (const sentence of stripped.split(/(?<=[.!?])\s+/u)) {
+      const trimmedSentence = sentence.trim();
+      if (!trimmedSentence) {
+        continue;
+      }
+      candidates.push(trimmedSentence);
+      // Accept the after-colon remainder only when the prefix reads as a
+      // short label. A long or number-bearing prefix is a claim of its own,
+      // and dropping it would change the remainder's meaning.
+      const colon = trimmedSentence.indexOf(":");
+      if (colon >= 0 && colon < trimmedSentence.length - 1) {
+        const prefix = trimmedSentence.slice(0, colon).replace(/[*"“”]+/gu, "").trim();
+        if (prefix.split(/\s+/u).length <= 4 && !/\d/u.test(prefix)) {
+          candidates.push(trimmedSentence.slice(colon + 1).trim());
+        }
+      }
+    }
+    for (const candidate of candidates) {
+      const clean = candidate
+        .replace(/^["“'‘*\s]+/u, "")
+        .replace(/["”'’*\s]+$/u, "")
+        .trim();
+      if (!clean || clean.split(/\s+/u).length < 3) {
+        continue;
+      }
+      // Support requires the evidence body text: a span that matches only a
+      // section heading is not a statement of the fact.
+      const labels = labelEntries
+        .filter(([, identity]) => textSupportedByPassages(clean, [identity.text]))
+        .map(([label]) => label);
+      if (labels.length === 0) {
+        continue;
+      }
+      order += 1;
+      validated.push({
+        key: normalizeSupportText(clean),
+        paragraph: `${clean}${labels.map((label) => `[${label}]`).join("")}`,
+        order,
+      });
+    }
+  }
+  // Dedupe longest-first across the WHOLE draft so a quoted fragment in one
+  // paragraph can never suppress the complete sentence that contains it in
+  // another, then restore draft order for readability.
+  validated.sort((a, b) => b.key.length - a.key.length);
+  const kept: Array<{ key: string; paragraph: string; order: number }> = [];
+  for (const entry of validated) {
+    if (kept.some((existing) => existing.key.includes(entry.key) || entry.key.includes(existing.key))) {
+      continue;
+    }
+    kept.push(entry);
+    if (kept.length >= SALVAGE_MAX_PARAGRAPHS) {
+      break;
+    }
+  }
+  kept.sort((a, b) => a.order - b.order);
+  return kept.length > 0 ? kept.map((entry) => entry.paragraph).join("\n\n") : null;
 }
 
 export function appendSearchHit(ledger: TurnEvidenceLedger, identity: EvidenceIdentity): string {

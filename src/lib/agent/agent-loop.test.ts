@@ -17,15 +17,19 @@ import { MemoryChunkStore } from "../retrieve/memory-store";
 import { KnowledgePipeline } from "../retrieve/pipeline";
 import {
   currentRunAssistantTokens,
+  identifierTokens,
+  isMultiPartQuestion,
   LIVE_KNOWLEDGE_SYSTEM_PROMPT,
   runKnowledgeAgent,
   snapshotAgentMessages,
   toolCallsFromMessages,
 } from "./run";
+import { createSearchKnowledgeTool } from "./search-knowledge";
 import { redactToolResultForStorage } from "./redact-tool-result";
 import {
   BRAIN_KNOWLEDGE_UNAVAILABLE,
   BRAIN_MUST_RETRIEVE,
+  BRAIN_NOT_ENOUGH_EVIDENCE,
   SEARCH_KNOWLEDGE_TOOL,
 } from "./host-grounding";
 
@@ -276,6 +280,8 @@ describe("Pi knowledge agent", () => {
   it("requires exact current-turn evidence spans in the live prompt", () => {
     expect(LIVE_KNOWLEDGE_SYSTEM_PROMPT).toContain("shortest exact sentence");
     expect(LIVE_KNOWLEDGE_SYSTEM_PROMPT).toContain("citation label from this turn");
+    expect(LIVE_KNOWLEDGE_SYSTEM_PROMPT).toContain("dedicated policy document");
+    expect(LIVE_KNOWLEDGE_SYSTEM_PROMPT).toContain("is not an answer");
   });
 
   it("blocks a registered mutating tool in the host before any side effect", async () => {
@@ -343,7 +349,39 @@ describe("Pi knowledge agent", () => {
     expect(reconstructed).toEqual(result.messages);
   }, 20_000);
 
-  it("repairs a citation-free draft against the current-turn evidence", async () => {
+  it("completes a citation-free verbatim draft without calling the repair model", async () => {
+    const pipeline = await tinyPipeline();
+    const faux = fauxProvider({ provider: "useful-brain-citation-complete" });
+    faux.setResponses([
+      fauxAssistantMessage(
+        [fauxText("Searching."), fauxToolCall(SEARCH_KNOWLEDGE_TOOL, { query: "leave" })],
+        { stopReason: "toolUse" },
+      ),
+      fauxAssistantMessage([fauxText("Employees accrue 1.5 days of leave per month.")], {
+        stopReason: "stop",
+      }),
+    ]);
+    const repairGroundedAnswer = vi.fn();
+
+    const result = await runKnowledgeAgent({
+      question: "How much leave accrues each month?",
+      pipeline,
+      principal,
+      policyPrincipal,
+      conversationId: "c-complete",
+      runtime: {
+        model: { ...faux.getModel(), api: "openai-completions" },
+        stream: (model, context, options) =>
+          faux.provider.streamSimple(model, context, options),
+        repairGroundedAnswer,
+      },
+    });
+
+    expect(repairGroundedAnswer).not.toHaveBeenCalled();
+    expect(result.finalResponse).toBe("Employees accrue 1.5 days of leave per month.[1]");
+  }, 20_000);
+
+  it("repairs a paraphrased draft against the current-turn evidence", async () => {
     const pipeline = await tinyPipeline();
     const faux = fauxProvider({ provider: "useful-brain-citation-repair" });
     faux.setResponses([
@@ -351,7 +389,7 @@ describe("Pi knowledge agent", () => {
         [fauxText("Searching."), fauxToolCall(SEARCH_KNOWLEDGE_TOOL, { query: "leave" })],
         { stopReason: "toolUse" },
       ),
-      fauxAssistantMessage([fauxText("Employees accrue 1.5 days of leave per month.")], {
+      fauxAssistantMessage([fauxText("Staff members gain 1.5 leave days every month.")], {
         stopReason: "stop",
       }),
     ]);
@@ -583,4 +621,600 @@ describe("Pi knowledge agent", () => {
     expect(budgets.toolCalls).toBe(9);
     expect(budgets.searchKnowledgeCalls).toBe(2);
   }, 20_000);
+});
+
+async function escalationPipeline() {
+  const store = new MemoryChunkStore();
+  const embedder = new FakeEmbeddingProvider(8);
+  const texts = [
+    "Billing disputes open more than 30 days move to ESC-3.",
+    "ESC-3 complaints are owned by the VP of Support.",
+  ];
+  const embeddings = await embedder.embedTexts(texts);
+  store.upsert(
+    texts.map((content, index) => ({
+      chunkId: `escalation__body__00${index}`,
+      documentId: index === 0 ? "invoicing" : "complaint-escalation",
+      title: index === 0 ? "Invoicing" : "Complaint Escalation",
+      sourceName: index === 0 ? "Invoicing" : "Complaint Escalation",
+      sourcePath: index === 0 ? "invoicing.md" : "complaint-escalation.md",
+      sectionHeading: index === 0 ? "Billing Disputes" : "ESC-3: VP Support",
+      content,
+      chunkIndex: 0,
+      charStart: 0,
+      charEnd: content.length,
+      accessScope: "public" as const,
+      allowedRoles: [],
+      allowedDepartments: [],
+      ownerUserId: "",
+      embedding: embeddings[index],
+    })),
+  );
+  return new KnowledgePipeline({ store, embedder });
+}
+
+describe("abstention and citation discipline", () => {
+  it("honors a model-authored refusal instead of repairing it into an answer", async () => {
+    const pipeline = await tinyPipeline();
+    const faux = fauxProvider({ provider: "useful-brain-abstain" });
+    faux.setResponses([
+      fauxAssistantMessage(
+        [fauxText("Searching."), fauxToolCall(SEARCH_KNOWLEDGE_TOOL, { query: "stock purchase plan" })],
+        { stopReason: "toolUse" },
+      ),
+      fauxAssistantMessage(
+        [fauxText("The retrieved documents do not contain any information about a stock purchase plan.")],
+        { stopReason: "stop" },
+      ),
+    ]);
+    const repairGroundedAnswer = vi.fn().mockResolvedValue("Employees accrue 1.5 days of leave per month.[1]");
+
+    const result = await runKnowledgeAgent({
+      question: "Does the company offer a stock purchase plan?",
+      pipeline,
+      principal,
+      policyPrincipal,
+      conversationId: "c-abstain",
+      runtime: {
+        model: { ...faux.getModel(), api: "openai-completions" },
+        stream: (model, context, options) => faux.provider.streamSimple(model, context, options),
+        repairGroundedAnswer,
+      },
+    });
+
+    expect(result.finalResponse).toBe(BRAIN_NOT_ENOUGH_EVIDENCE);
+    expect(result.refusalReason).toBe("model_abstained_with_evidence");
+    expect(repairGroundedAnswer).not.toHaveBeenCalled();
+  }, 20_000);
+
+  it("completes the citation for a verbatim second hop before any model repair", async () => {
+    const pipeline = await escalationPipeline();
+    const faux = fauxProvider({ provider: "useful-brain-second-hop" });
+    faux.setResponses([
+      fauxAssistantMessage(
+        [fauxText("Searching."), fauxToolCall(SEARCH_KNOWLEDGE_TOOL, { query: "billing dispute complaint" })],
+        { stopReason: "toolUse" },
+      ),
+      fauxAssistantMessage(
+        [
+          fauxText(
+            "Billing disputes open more than 30 days move to ESC-3.[1] ESC-3 complaints are owned by the VP of Support.",
+          ),
+        ],
+        { stopReason: "stop" },
+      ),
+    ]);
+    const repairGroundedAnswer = vi.fn();
+
+    const result = await runKnowledgeAgent({
+      question: "How do billing disputes and complaints interact?",
+      pipeline,
+      principal,
+      policyPrincipal,
+      conversationId: "c-second-hop",
+      runtime: {
+        model: { ...faux.getModel(), api: "openai-completions" },
+        stream: (model, context, options) => faux.provider.streamSimple(model, context, options),
+        repairGroundedAnswer,
+      },
+    });
+
+    expect(result.finalResponse).toContain("VP of Support.[2]");
+    expect(result.finalResponse).toContain("[1]");
+    expect(repairGroundedAnswer).not.toHaveBeenCalled();
+  }, 20_000);
+
+  it("recovers an abstained identifier lookup with a strict exact-quote retry", async () => {
+    const store = new MemoryChunkStore();
+    const embedder = new FakeEmbeddingProvider(8);
+    const text = "ERR-7702 means the export queue is stalled.";
+    const embeddings = await embedder.embedTexts([text]);
+    store.upsert([
+      {
+        chunkId: "errors__body__000",
+        documentId: "error-codes",
+        title: "Error Codes",
+        sourceName: "Error Codes",
+        sourcePath: "error-codes.md",
+        sectionHeading: "Export Errors",
+        content: text,
+        chunkIndex: 0,
+        charStart: 0,
+        charEnd: text.length,
+        accessScope: "public",
+        allowedRoles: [],
+        allowedDepartments: [],
+        ownerUserId: "",
+        embedding: embeddings[0],
+      },
+    ]);
+    const pipeline = new KnowledgePipeline({ store, embedder });
+    const faux = fauxProvider({ provider: "useful-brain-identifier" });
+    faux.setResponses([
+      fauxAssistantMessage(
+        [fauxText("Searching."), fauxToolCall(SEARCH_KNOWLEDGE_TOOL, { query: "ERR-7702" })],
+        { stopReason: "toolUse" },
+      ),
+      fauxAssistantMessage([fauxText("The evidence does not mention this error code.")], {
+        stopReason: "stop",
+      }),
+    ]);
+    const repairGroundedAnswer = vi
+      .fn()
+      .mockResolvedValue("ERR-7702 means the export queue is stalled.[1]");
+
+    const result = await runKnowledgeAgent({
+      question: "What does error code ERR-7702 indicate?",
+      pipeline,
+      principal,
+      policyPrincipal,
+      conversationId: "c-identifier",
+      runtime: {
+        model: { ...faux.getModel(), api: "openai-completions" },
+        stream: (model, context, options) => faux.provider.streamSimple(model, context, options),
+        repairGroundedAnswer,
+      },
+    });
+
+    expect(repairGroundedAnswer).toHaveBeenCalledTimes(1);
+    expect(repairGroundedAnswer).toHaveBeenCalledWith(
+      expect.objectContaining({ strictTokens: ["ERR-7702"] }),
+    );
+    expect(result.finalResponse).toBe("ERR-7702 means the export queue is stalled.[1]");
+    expect(result.refusalReason).toBeUndefined();
+  }, 20_000);
+
+  it("extracts identifier-like tokens only", () => {
+    expect(identifierTokens("What does error code ERR-7702 indicate?")).toEqual(["ERR-7702"]);
+    expect(identifierTokens("What does Clause 7.3(b) commit us to?")).toEqual(["7.3(b)"]);
+    expect(identifierTokens("A dispute open for 35 days was escalated")).toEqual([]);
+  });
+
+  it("never salvages a refusal that quotes an off-topic evidence sentence", async () => {
+    const pipeline = await tinyPipeline();
+    const faux = fauxProvider({ provider: "useful-brain-refusal-quote" });
+    faux.setResponses([
+      fauxAssistantMessage(
+        [fauxText("Searching."), fauxToolCall(SEARCH_KNOWLEDGE_TOOL, { query: "stock purchase plan" })],
+        { stopReason: "toolUse" },
+      ),
+      fauxAssistantMessage(
+        [
+          fauxText(
+            'The retrieved documents do not mention a stock purchase plan. The closest text is: "Employees accrue 1.5 days of leave per month."',
+          ),
+        ],
+        { stopReason: "stop" },
+      ),
+    ]);
+
+    const result = await runKnowledgeAgent({
+      question: "Does the company offer a stock purchase plan?",
+      pipeline,
+      principal,
+      policyPrincipal,
+      conversationId: "c-refusal-quote",
+      runtime: {
+        model: { ...faux.getModel(), api: "openai-completions" },
+        stream: (model, context, options) => faux.provider.streamSimple(model, context, options),
+      },
+    });
+
+    expect(result.finalResponse).toBe(BRAIN_NOT_ENOUGH_EVIDENCE);
+    expect(result.refusalReason).toBe("model_abstained_with_evidence");
+  }, 20_000);
+
+  it("keeps a long marker-free refusal a refusal even when it quotes evidence", async () => {
+    const pipeline = await tinyPipeline();
+    const faux = fauxProvider({ provider: "useful-brain-long-refusal" });
+    faux.setResponses([
+      fauxAssistantMessage(
+        [fauxText("Searching."), fauxToolCall(SEARCH_KNOWLEDGE_TOOL, { query: "stock purchase plan" })],
+        { stopReason: "toolUse" },
+      ),
+      fauxAssistantMessage(
+        [
+          fauxText(
+            'The retrieved documents do not mention an employee stock purchase plan anywhere in the corpus, and I checked every retrieved passage carefully before concluding this, so I cannot answer the question as asked. The closest text I found is: "Employees accrue 1.5 days of leave per month."',
+          ),
+        ],
+        { stopReason: "stop" },
+      ),
+    ]);
+
+    const result = await runKnowledgeAgent({
+      question: "Does the company offer a stock purchase plan?",
+      pipeline,
+      principal,
+      policyPrincipal,
+      conversationId: "c-long-refusal",
+      runtime: {
+        model: { ...faux.getModel(), api: "openai-completions" },
+        stream: (model, context, options) => faux.provider.streamSimple(model, context, options),
+      },
+    });
+
+    expect(result.finalResponse).not.toContain("1.5 days of leave");
+  }, 20_000);
+
+  it("recovers an identifier lookup when citation repair cannot ground a paraphrased draft", async () => {
+    const store = new MemoryChunkStore();
+    const embedder = new FakeEmbeddingProvider(8);
+    const text = "ERR-7702 means the export queue is stalled.";
+    const embeddings = await embedder.embedTexts([text]);
+    store.upsert([
+      {
+        chunkId: "errors__body__000",
+        documentId: "error-codes",
+        title: "Error Codes",
+        sourceName: "Error Codes",
+        sourcePath: "error-codes.md",
+        sectionHeading: "Export Errors",
+        content: text,
+        chunkIndex: 0,
+        charStart: 0,
+        charEnd: text.length,
+        accessScope: "public",
+        allowedRoles: [],
+        allowedDepartments: [],
+        ownerUserId: "",
+        embedding: embeddings[0],
+      },
+    ]);
+    const pipeline = new KnowledgePipeline({ store, embedder });
+    const faux = fauxProvider({ provider: "useful-brain-identifier-invalid" });
+    faux.setResponses([
+      fauxAssistantMessage(
+        [fauxText("Searching."), fauxToolCall(SEARCH_KNOWLEDGE_TOOL, { query: "ERR-7702" })],
+        { stopReason: "toolUse" },
+      ),
+      fauxAssistantMessage(
+        [fauxText("ERR-7702 signals that the export queue pipeline has become stuck.")],
+        { stopReason: "stop" },
+      ),
+    ]);
+    const repairGroundedAnswer = vi
+      .fn()
+      .mockImplementation(async ({ strictTokens }: { strictTokens?: string[] }) =>
+        strictTokens ? "ERR-7702 means the export queue is stalled.[1]" : null,
+      );
+
+    const result = await runKnowledgeAgent({
+      question: "What does error code ERR-7702 indicate?",
+      pipeline,
+      principal,
+      policyPrincipal,
+      conversationId: "c-identifier-invalid",
+      runtime: {
+        model: { ...faux.getModel(), api: "openai-completions" },
+        stream: (model, context, options) => faux.provider.streamSimple(model, context, options),
+        repairGroundedAnswer,
+      },
+    });
+
+    expect(repairGroundedAnswer).toHaveBeenCalledTimes(2);
+    expect(repairGroundedAnswer).toHaveBeenLastCalledWith(
+      expect.objectContaining({ strictTokens: ["ERR-7702"] }),
+    );
+    expect(result.finalResponse).toBe("ERR-7702 means the export queue is stalled.[1]");
+    expect(result.refusalReason).toBeUndefined();
+  }, 20_000);
+});
+
+describe("multi-part coverage pass", () => {
+  it("detects multi-part questions", () => {
+    expect(isMultiPartQuestion("What process applies and who approves it?")).toBe(true);
+    expect(isMultiPartQuestion("How do the two processes interact?")).toBe(true);
+    expect(isMultiPartQuestion("What are both numbers?")).toBe(true);
+    expect(isMultiPartQuestion("What is the refund window?")).toBe(false);
+    // Narrative "and" in the scenario must not trigger on a one-fact trap.
+    expect(
+      isMultiPartQuestion(
+        "I am an employee and my expense report was approved on Monday. When will it be paid?",
+      ),
+    ).toBe(false);
+    // A plural-set question triggers even when "and" sits in the preamble.
+    expect(
+      isMultiPartQuestion(
+        "A customer received a refund and wants their data deleted. What timelines apply?",
+      ),
+    ).toBe(true);
+    // Two interrogative sentences are themselves a multi-part signal.
+    expect(isMultiPartQuestion("What is the refund window? Also, who approves it?")).toBe(true);
+  });
+
+  it("covers the unanswered second part of a multi-part question with a verbatim quote", async () => {
+    const pipeline = await escalationPipeline();
+    const faux = fauxProvider({ provider: "useful-brain-coverage" });
+    faux.setResponses([
+      fauxAssistantMessage(
+        [fauxText("Searching."), fauxToolCall(SEARCH_KNOWLEDGE_TOOL, { query: "billing dispute complaint" })],
+        { stopReason: "toolUse" },
+      ),
+      fauxAssistantMessage(
+        [fauxText("Billing disputes open more than 30 days move to ESC-3.[1]")],
+        { stopReason: "stop" },
+      ),
+    ]);
+    const coverAnswerParts = vi
+      .fn()
+      .mockResolvedValue("ESC-3 complaints are owned by the VP of Support. [2]");
+
+    const result = await runKnowledgeAgent({
+      question: "How do billing disputes and complaints interact?",
+      pipeline,
+      principal,
+      policyPrincipal,
+      conversationId: "c-coverage",
+      runtime: {
+        model: { ...faux.getModel(), api: "openai-completions" },
+        stream: (model, context, options) => faux.provider.streamSimple(model, context, options),
+        coverAnswerParts,
+      },
+    });
+
+    expect(coverAnswerParts).toHaveBeenCalledWith(
+      expect.objectContaining({
+        question: "How do billing disputes and complaints interact?",
+        draft: "Billing disputes open more than 30 days move to ESC-3.[1]",
+        evidence: [
+          expect.objectContaining({ citationLabel: "[1]" }),
+          expect.objectContaining({ citationLabel: "[2]" }),
+        ],
+      }),
+    );
+    expect(result.finalResponse).toContain("Billing disputes open more than 30 days move to ESC-3.[1]");
+    expect(result.finalResponse).toContain("ESC-3 complaints are owned by the VP of Support. [2]");
+  }, 20_000);
+
+  it("skips the coverage pass for a single-part question", async () => {
+    const pipeline = await escalationPipeline();
+    const faux = fauxProvider({ provider: "useful-brain-coverage-single" });
+    faux.setResponses([
+      fauxAssistantMessage(
+        [fauxText("Searching."), fauxToolCall(SEARCH_KNOWLEDGE_TOOL, { query: "billing dispute" })],
+        { stopReason: "toolUse" },
+      ),
+      fauxAssistantMessage(
+        [fauxText("Billing disputes open more than 30 days move to ESC-3.[1]")],
+        { stopReason: "stop" },
+      ),
+    ]);
+    const coverAnswerParts = vi.fn();
+
+    const result = await runKnowledgeAgent({
+      question: "When do billing disputes escalate to ESC-3?",
+      pipeline,
+      principal,
+      policyPrincipal,
+      conversationId: "c-coverage-single",
+      runtime: {
+        model: { ...faux.getModel(), api: "openai-completions" },
+        stream: (model, context, options) => faux.provider.streamSimple(model, context, options),
+        coverAnswerParts,
+      },
+    });
+
+    expect(coverAnswerParts).not.toHaveBeenCalled();
+    expect(result.finalResponse).toBe("Billing disputes open more than 30 days move to ESC-3.[1]");
+  }, 20_000);
+
+  it("keeps the draft when coverage additions fail grounding", async () => {
+    const pipeline = await escalationPipeline();
+    const faux = fauxProvider({ provider: "useful-brain-coverage-invalid" });
+    faux.setResponses([
+      fauxAssistantMessage(
+        [fauxText("Searching."), fauxToolCall(SEARCH_KNOWLEDGE_TOOL, { query: "billing dispute complaint" })],
+        { stopReason: "toolUse" },
+      ),
+      fauxAssistantMessage(
+        [fauxText("Billing disputes open more than 30 days move to ESC-3.[1]")],
+        { stopReason: "stop" },
+      ),
+    ]);
+    const coverAnswerParts = vi.fn().mockResolvedValue("A fabricated approval claim.[2]");
+
+    const result = await runKnowledgeAgent({
+      question: "How do billing disputes and complaints interact?",
+      pipeline,
+      principal,
+      policyPrincipal,
+      conversationId: "c-coverage-invalid",
+      runtime: {
+        model: { ...faux.getModel(), api: "openai-completions" },
+        stream: (model, context, options) => faux.provider.streamSimple(model, context, options),
+        coverAnswerParts,
+      },
+    });
+
+    expect(coverAnswerParts).toHaveBeenCalledTimes(1);
+    expect(result.finalResponse).toBe("Billing disputes open more than 30 days move to ESC-3.[1]");
+  }, 20_000);
+
+  it("never runs coverage on a refusal", async () => {
+    const pipeline = await escalationPipeline();
+    const faux = fauxProvider({ provider: "useful-brain-coverage-refusal" });
+    faux.setResponses([
+      fauxAssistantMessage(
+        [fauxText("Searching."), fauxToolCall(SEARCH_KNOWLEDGE_TOOL, { query: "stock purchase plan" })],
+        { stopReason: "toolUse" },
+      ),
+      fauxAssistantMessage(
+        [fauxText("The retrieved documents do not contain any information about a stock purchase plan.")],
+        { stopReason: "stop" },
+      ),
+    ]);
+    const coverAnswerParts = vi.fn();
+
+    const result = await runKnowledgeAgent({
+      question: "Does the company offer a stock purchase plan and a bonus plan?",
+      pipeline,
+      principal,
+      policyPrincipal,
+      conversationId: "c-coverage-refusal",
+      runtime: {
+        model: { ...faux.getModel(), api: "openai-completions" },
+        stream: (model, context, options) => faux.provider.streamSimple(model, context, options),
+        coverAnswerParts,
+      },
+    });
+
+    expect(coverAnswerParts).not.toHaveBeenCalled();
+    expect(result.finalResponse).toBe(BRAIN_NOT_ENOUGH_EVIDENCE);
+  }, 20_000);
+});
+
+describe("evidence presentation", () => {
+  it("presents document identity before the chunk text in search results", async () => {
+    const pipeline = await tinyPipeline();
+    const budgets = new BudgetTracker();
+    const tool = createSearchKnowledgeTool({
+      pipeline,
+      principal,
+      policyPrincipal,
+      conversationId: "c-shape",
+      budgets,
+    });
+    const result = await tool.execute("call-1", { query: "leave" }, undefined as never);
+    const text = (result.content[0] as { type: "text"; text: string }).text;
+    const payload = JSON.parse(text.replace(/^UNTRUSTED_EVIDENCE\n/, "")) as {
+      hits: Array<Record<string, unknown>>;
+    };
+    expect(payload.hits[0]?.document).toBe("Leave Policy");
+    expect(payload.hits[0]?.section).toBe("Leave");
+    expect(text.indexOf('"document"')).toBeGreaterThan(-1);
+    expect(text.indexOf('"document"')).toBeLessThan(text.indexOf('"content"'));
+  }, 20_000);
+});
+
+describe("review regressions", () => {
+  async function negativePolicyPipeline() {
+    const store = new MemoryChunkStore();
+    const embedder = new FakeEmbeddingProvider(8);
+    const texts = [
+      "This document does not cover contractor travel under DOC-4412.",
+      "DOC-4412 reimburses employee mileage at the published federal rate.",
+    ];
+    const embeddings = await embedder.embedTexts(texts);
+    store.upsert(
+      texts.map((content, index) => ({
+        chunkId: `doc4412__body__00${index}`,
+        documentId: "doc-4412",
+        title: "Travel Policy",
+        sourceName: "Travel Policy",
+        sourcePath: "travel-policy.md",
+        sectionHeading: index === 0 ? "Exclusions" : "Mileage",
+        content,
+        chunkIndex: index,
+        charStart: 0,
+        charEnd: content.length,
+        accessScope: "public" as const,
+        allowedRoles: [],
+        allowedDepartments: [],
+        ownerUserId: "",
+        embedding: embeddings[index],
+      })),
+    );
+    return new KnowledgePipeline({ store, embedder });
+  }
+
+  it("keeps a grounded answer that quotes a negative policy sentence", async () => {
+    const pipeline = await negativePolicyPipeline();
+    const faux = fauxProvider({ provider: "useful-brain-negative-quote" });
+    faux.setResponses([
+      fauxAssistantMessage(
+        [fauxText("Searching."), fauxToolCall(SEARCH_KNOWLEDGE_TOOL, { query: "DOC-4412 contractor travel" })],
+        { stopReason: "toolUse" },
+      ),
+      fauxAssistantMessage(
+        [fauxText("This document does not cover contractor travel under DOC-4412.[1]")],
+        { stopReason: "stop" },
+      ),
+    ]);
+    const repairGroundedAnswer = vi
+      .fn()
+      .mockResolvedValue("DOC-4412 reimburses employee mileage at the published federal rate.[2]");
+
+    const result = await runKnowledgeAgent({
+      question: "Does DOC-4412 cover contractor travel?",
+      pipeline,
+      principal,
+      policyPrincipal,
+      conversationId: "c-negative-quote",
+      runtime: {
+        model: { ...faux.getModel(), api: "openai-completions" },
+        stream: (model, context, options) => faux.provider.streamSimple(model, context, options),
+        repairGroundedAnswer,
+      },
+    });
+
+    expect(result.finalResponse).toBe(
+      "This document does not cover contractor travel under DOC-4412.[1]",
+    );
+    expect(result.refusalReason).toBeUndefined();
+    expect(repairGroundedAnswer).not.toHaveBeenCalled();
+  }, 20_000);
+
+  it("completes an under-cited marker-free draft instead of refusing it", async () => {
+    const pipeline = await negativePolicyPipeline();
+    const faux = fauxProvider({ provider: "useful-brain-markerless-draft" });
+    faux.setResponses([
+      fauxAssistantMessage(
+        [fauxText("Searching."), fauxToolCall(SEARCH_KNOWLEDGE_TOOL, { query: "DOC-4412" })],
+        { stopReason: "toolUse" },
+      ),
+      fauxAssistantMessage(
+        [
+          fauxText(
+            "This document does not cover contractor travel under DOC-4412. DOC-4412 reimburses employee mileage at the published federal rate.",
+          ),
+        ],
+        { stopReason: "stop" },
+      ),
+    ]);
+    const repairGroundedAnswer = vi.fn();
+
+    const result = await runKnowledgeAgent({
+      question: "What does DOC-4412 say about travel?",
+      pipeline,
+      principal,
+      policyPrincipal,
+      conversationId: "c-markerless",
+      runtime: {
+        model: { ...faux.getModel(), api: "openai-completions" },
+        stream: (model, context, options) => faux.provider.streamSimple(model, context, options),
+        repairGroundedAnswer,
+      },
+    });
+
+    expect(result.finalResponse).toContain("[1]");
+    expect(result.finalResponse).toContain("[2]");
+    expect(result.refusalReason).toBeUndefined();
+    expect(repairGroundedAnswer).not.toHaveBeenCalled();
+  }, 20_000);
+
+  it("normalizes identifier tokens with sentence punctuation and skips decimals", () => {
+    expect(identifierTokens("Explain the remediation steps for ERR-7702.")).toEqual(["ERR-7702"]);
+    expect(identifierTokens("Is the mileage rate 0.58 per mile?")).toEqual([]);
+  });
 });

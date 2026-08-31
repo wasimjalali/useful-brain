@@ -1,0 +1,409 @@
+{
+  "model": "@cf/google/gemma-4-26b-a4b-it",
+  "latency": {
+    "count": 120,
+    "total": 120,
+    "partial": false,
+    "meanMs": 24651,
+    "p50Ms": 17888,
+    "p95Ms": 56846
+  },
+  "retrieval": {
+    "recallAtK": 0.9123711340206185,
+    "mrr": 0.824742268041237,
+    "ndcgAtK": 0.8370127906093069,
+    "citationCorrectness": 0.5051546391752577,
+    "abstentionCorrectness": 0,
+    "aclLeakCount": 0,
+    "questions": 120
+  },
+  "live": {
+    "total": 120,
+    "scored": 120,
+    "passed": 105,
+    "failed": 15,
+    "skipped": 0,
+    "passRate": 0.875,
+    "byCategory": {
+      "factual": {
+        "scored": 70,
+        "passed": 62
+      },
+      "trap": {
+        "scored": 17,
+        "passed": 16
+      },
+      "permission": {
+        "scored": 13,
+        "passed": 11
+      },
+      "unanswerable": {
+        "scored": 10,
+        "passed": 10
+      },
+      "multi_hop": {
+        "scored": 5,
+        "passed": 3
+      },
+      "multi_hop_expanded": {
+        "scored": 5,
+        "passed": 3
+      }
+    },
+    "retrievedRecall": 0.9278350515463918,
+    "goldRetrievedUncitedCount": 17,
+    "citedNotExpectedCount": 9,
+    "vectorDegradedTurns": 0,
+    "hybridBaselineComparable": true,
+    "refusedWithEvidence": 13
+  },
+  "failures": [
+    {
+      "layer": "live",
+      "questionId": "q028",
+      "detail": {
+        "questionId": "q028",
+        "category": "factual",
+        "answerType": "grounded",
+        "citedDocumentIds": [
+          "nw_support_dsar_process"
+        ],
+        "retrievedDocumentIds": [
+          "nw_hr_employee_handbook",
+          "nw_support_sla_policy",
+          "nw_finance_refund_policy",
+          "nw_legal_privacy_policy",
+          "nw_legal_data_retention",
+          "nw_support_complaint_escalation",
+          "nw_support_dsar_process"
+        ],
+        "sectionHit": false,
+        "liveRecall": 1,
+        "goldRetrievedUncited": [
+          "nw_legal_privacy_policy"
+        ],
+        "vectorDegradedCount": 0,
+        "status": "fail",
+        "detail": "Grounded answer did not cite expected documents (nw_legal_privacy_policy). Cited: nw_support_dsar_process."
+      }
+    },
+    {
+      "layer": "live",
+      "questionId": "q060",
+      "detail": {
+        "questionId": "q060",
+        "category": "trap",
+        "answerType": "insufficient_evidence",
+        "citedDocumentIds": [],
+        "retrievedDocumentIds": [
+          "nw_hr_recruiting_interview",
+          "nw_sales_referral_program",
+          "nw_hr_onboarding_guide",
+          "nw_sales_partner_program"
+        ],
+        "sectionHit": false,
+        "liveRecall": 1,
+        "goldRetrievedUncited": [
+          "nw_sales_referral_program"
+        ],
+        "vectorDegradedCount": 0,
+        "refusalReason": "model_abstained_with_evidence",
+        "status": "fail",
+        "detail": "Expected a grounded answer, got \"insufficient_evidence\"."
+      }
+    },
+    {
+      "layer": "live",
+      "questionId": "q073",
+      "detail": {
+        "questionId": "q073",
+        "category": "permission",
+        "answerType": "grounded",
+        "citedDocumentIds": [
+          "nw_engineering_release_notes_2026"
+        ],
+        "retrievedDocumentIds": [
+          "nw_engineering_release_notes_2026"
+        ],
+        "sectionHit": null,
+        "liveRecall": null,
+        "goldRetrievedUncited": [],
+        "vectorDegradedCount": 0,
+        "status": "fail",
+        "detail": "Expected insufficient_evidence for permission, got \"grounded\"."
+      }
+    },
+    {
+      "layer": "live",
+      "questionId": "q074",
+      "detail": {
+        "questionId": "q074",
+        "category": "permission",
+        "answerType": "grounded",
+        "citedDocumentIds": [
+          "nw_finance_employee_expense",
+          "nw_operations_equipment_return",
+          "nw_hr_leave_policy",
+          "nw_hr_onboarding_guide"
+        ],
+        "retrievedDocumentIds": [
+          "nw_finance_employee_expense",
+          "nw_hr_onboarding_guide",
+          "nw_operations_equipment_return",
+          "nw_hr_leave_policy",
+          "nw_hr_remote_work",
+          "nw_hr_anti_harassment",
+          "nw_hr_parental_leave",
+          "nw_legal_ip_confidentiality"
+        ],
+        "sectionHit": null,
+        "liveRecall": null,
+        "goldRetrievedUncited": [],
+        "vectorDegradedCount": 0,
+        "status": "fail",
+        "detail": "Expected insufficient_evidence for permission, got \"grounded\"."
+      }
+    },
+    {
+      "layer": "live",
+      "questionId": "q086",
+      "detail": {
+        "questionId": "q086",
+        "category": "multi_hop",
+        "answerType": "insufficient_evidence",
+        "citedDocumentIds": [],
+        "retrievedDocumentIds": [
+          "nw_engineering_change_management",
+          "nw_engineering_deployment",
+          "nw_engineering_release_notes_2026",
+          "nw_engineering_sdlc",
+          "nw_support_channels_hours"
+        ],
+        "sectionHit": false,
+        "liveRecall": 1,
+        "goldRetrievedUncited": [
+          "nw_engineering_change_management",
+          "nw_engineering_deployment"
+        ],
+        "vectorDegradedCount": 0,
+        "status": "fail",
+        "detail": "Expected a grounded answer, got \"insufficient_evidence\"."
+      }
+    },
+    {
+      "layer": "live",
+      "questionId": "q088",
+      "detail": {
+        "questionId": "q088",
+        "category": "multi_hop",
+        "answerType": "grounded",
+        "citedDocumentIds": [
+          "nw_hr_recruiting_interview",
+          "nw_sales_commission_plan"
+        ],
+        "retrievedDocumentIds": [
+          "nw_hr_recruiting_interview",
+          "nw_sales_commission_plan",
+          "nw_sales_referral_program",
+          "nw_hr_onboarding_guide",
+          "nw_sales_partner_program",
+          "nw_sales_discount_approval"
+        ],
+        "sectionHit": true,
+        "liveRecall": 1,
+        "goldRetrievedUncited": [
+          "nw_sales_referral_program"
+        ],
+        "vectorDegradedCount": 0,
+        "status": "fail",
+        "detail": "Multi-hop answer missing citations for nw_sales_referral_program."
+      }
+    },
+    {
+      "layer": "live",
+      "questionId": "q093",
+      "detail": {
+        "questionId": "q093",
+        "category": "factual",
+        "answerType": "insufficient_evidence",
+        "citedDocumentIds": [],
+        "retrievedDocumentIds": [],
+        "sectionHit": false,
+        "liveRecall": 0,
+        "goldRetrievedUncited": [],
+        "vectorDegradedCount": 0,
+        "status": "fail",
+        "detail": "Expected a grounded answer, got \"insufficient_evidence\"."
+      }
+    },
+    {
+      "layer": "live",
+      "questionId": "q094",
+      "detail": {
+        "questionId": "q094",
+        "category": "factual",
+        "answerType": "insufficient_evidence",
+        "citedDocumentIds": [],
+        "retrievedDocumentIds": [],
+        "sectionHit": false,
+        "liveRecall": 0,
+        "goldRetrievedUncited": [],
+        "vectorDegradedCount": 0,
+        "status": "fail",
+        "detail": "Expected a grounded answer, got \"insufficient_evidence\"."
+      }
+    },
+    {
+      "layer": "live",
+      "questionId": "q095",
+      "detail": {
+        "questionId": "q095",
+        "category": "factual",
+        "answerType": "insufficient_evidence",
+        "citedDocumentIds": [],
+        "retrievedDocumentIds": [
+          "nw_support_atlas_runbook"
+        ],
+        "sectionHit": false,
+        "liveRecall": 1,
+        "goldRetrievedUncited": [
+          "nw_support_atlas_runbook"
+        ],
+        "vectorDegradedCount": 0,
+        "status": "fail",
+        "detail": "Expected a grounded answer, got \"insufficient_evidence\"."
+      }
+    },
+    {
+      "layer": "live",
+      "questionId": "q099",
+      "detail": {
+        "questionId": "q099",
+        "category": "factual",
+        "answerType": "insufficient_evidence",
+        "citedDocumentIds": [],
+        "retrievedDocumentIds": [
+          "nw_operations_dr_runbook"
+        ],
+        "sectionHit": false,
+        "liveRecall": 1,
+        "goldRetrievedUncited": [
+          "nw_operations_dr_runbook"
+        ],
+        "vectorDegradedCount": 0,
+        "status": "fail",
+        "detail": "Expected a grounded answer, got \"insufficient_evidence\"."
+      }
+    },
+    {
+      "layer": "live",
+      "questionId": "q100",
+      "detail": {
+        "questionId": "q100",
+        "category": "factual",
+        "answerType": "insufficient_evidence",
+        "citedDocumentIds": [],
+        "retrievedDocumentIds": [],
+        "sectionHit": false,
+        "liveRecall": 0,
+        "goldRetrievedUncited": [],
+        "vectorDegradedCount": 0,
+        "status": "fail",
+        "detail": "Expected a grounded answer, got \"insufficient_evidence\"."
+      }
+    },
+    {
+      "layer": "live",
+      "questionId": "q105",
+      "detail": {
+        "questionId": "q105",
+        "category": "factual",
+        "answerType": "insufficient_evidence",
+        "citedDocumentIds": [],
+        "retrievedDocumentIds": [],
+        "sectionHit": false,
+        "liveRecall": 0,
+        "goldRetrievedUncited": [],
+        "vectorDegradedCount": 0,
+        "status": "fail",
+        "detail": "Expected a grounded answer, got \"insufficient_evidence\"."
+      }
+    },
+    {
+      "layer": "live",
+      "questionId": "q110",
+      "detail": {
+        "questionId": "q110",
+        "category": "factual",
+        "answerType": "insufficient_evidence",
+        "citedDocumentIds": [],
+        "retrievedDocumentIds": [],
+        "sectionHit": false,
+        "liveRecall": 0,
+        "goldRetrievedUncited": [],
+        "vectorDegradedCount": 0,
+        "status": "fail",
+        "detail": "Expected a grounded answer, got \"insufficient_evidence\"."
+      }
+    },
+    {
+      "layer": "live",
+      "questionId": "q116",
+      "detail": {
+        "questionId": "q116",
+        "category": "multi_hop_expanded",
+        "answerType": "grounded",
+        "citedDocumentIds": [
+          "nw_engineering_incident_escalation"
+        ],
+        "retrievedDocumentIds": [
+          "nw_engineering_incident_escalation",
+          "nw_engineering_release_notes_2026",
+          "nw_support_kb_guidelines",
+          "nw_engineering_log_retention",
+          "nw_engineering_sdlc",
+          "nw_operations_scheduled_maintenance",
+          "nw_hr_termination_offboarding",
+          "nw_legal_ip_confidentiality",
+          "nw_legal_data_retention"
+        ],
+        "sectionHit": true,
+        "liveRecall": 1,
+        "goldRetrievedUncited": [
+          "nw_engineering_log_retention"
+        ],
+        "vectorDegradedCount": 0,
+        "status": "fail",
+        "detail": "Multi-hop answer missing citations for nw_engineering_log_retention."
+      }
+    },
+    {
+      "layer": "live",
+      "questionId": "q117",
+      "detail": {
+        "questionId": "q117",
+        "category": "multi_hop_expanded",
+        "answerType": "insufficient_evidence",
+        "citedDocumentIds": [],
+        "retrievedDocumentIds": [
+          "nw_hr_remote_work",
+          "nw_hr_employee_handbook",
+          "nw_hr_leave_policy",
+          "nw_hr_parental_leave",
+          "nw_operations_equipment_return",
+          "nw_legal_ip_confidentiality"
+        ],
+        "sectionHit": false,
+        "liveRecall": 1,
+        "goldRetrievedUncited": [
+          "nw_hr_remote_work",
+          "nw_operations_equipment_return"
+        ],
+        "vectorDegradedCount": 0,
+        "refusalReason": "model_abstained_with_evidence",
+        "status": "fail",
+        "detail": "Expected a grounded answer, got \"insufficient_evidence\"."
+      }
+    }
+  ]
+}

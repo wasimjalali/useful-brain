@@ -7,7 +7,83 @@ import {
   type IdentityMode,
 } from "./identity-mode";
 import { resolvePrincipal, type DirectoryRecord } from "./principal";
+import { MAX_FILTER_TERMS, type Principal } from "../acl/access";
 import { assertionForBrain, rejectSpoofedPrincipal } from "../cf/service-binding-identity";
+
+export class AssumedPrincipalForbidden extends Error {
+  constructor() {
+    super("assumed principals are accepted only in loopback identity mode");
+    this.name = "AssumedPrincipalForbidden";
+  }
+}
+
+export class AssumedPrincipalInvalid extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AssumedPrincipalInvalid";
+  }
+}
+
+const MAX_SUBJECT_LENGTH = 128;
+const MAX_GRANT_LENGTH = 64;
+
+/**
+ * Parse an optional caller-supplied retrieval principal for ACL demos and
+ * evals. Fails closed: any presence outside loopback identity mode is
+ * forbidden, and a malformed shape (missing userId, missing grant arrays,
+ * non-string or oversized values) is rejected rather than defaulted.
+ *
+ * In loopback mode the assumed principal may be any synthetic principal,
+ * including a private-document owner: the local operator loaded the corpus
+ * and the demo must be able to show owner-scoped retrieval. This is why
+ * the field is confined to the loopback trust boundary.
+ */
+export function parseAssumedPrincipal(
+  identityMode: IdentityMode,
+  raw: unknown,
+): Principal | undefined {
+  if (raw === undefined || raw === null) {
+    return undefined;
+  }
+  if (identityMode !== "loopback") {
+    throw new AssumedPrincipalForbidden();
+  }
+  if (typeof raw !== "object" || Array.isArray(raw)) {
+    throw new AssumedPrincipalInvalid("assumed principal must be an object");
+  }
+  const record = raw as { userId?: unknown; roles?: unknown; departments?: unknown };
+  const userId = typeof record.userId === "string" ? record.userId.trim() : "";
+  if (!userId || userId.length > MAX_SUBJECT_LENGTH) {
+    throw new AssumedPrincipalInvalid("assumed principal requires a bounded userId");
+  }
+  return {
+    userId,
+    roles: parseGrantList(record.roles, "roles"),
+    departments: parseGrantList(record.departments, "departments"),
+  };
+}
+
+function parseGrantList(raw: unknown, field: string): string[] {
+  if (!Array.isArray(raw)) {
+    throw new AssumedPrincipalInvalid(`assumed principal requires a ${field} array`);
+  }
+  const values: string[] = [];
+  const seen = new Set<string>();
+  for (const value of raw) {
+    if (typeof value !== "string" || !value.trim() || value.length > MAX_GRANT_LENGTH) {
+      throw new AssumedPrincipalInvalid(`assumed principal ${field} entries must be bounded strings`);
+    }
+    const trimmed = value.trim();
+    if (!seen.has(trimmed)) {
+      seen.add(trimmed);
+      values.push(trimmed);
+    }
+  }
+  if (values.length > MAX_FILTER_TERMS) {
+    throw new AssumedPrincipalInvalid(`assumed principal carries too many ${field}`);
+  }
+  return values;
+}
 
 export type WorkerDirectoryLookup = (
   subject: string,

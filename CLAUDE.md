@@ -43,6 +43,7 @@ The target backend is the Cloudflare path in `docs/useful-brain-master-plan.md`.
 - `src/components/`: workspace, chat, evidence, knowledge and evaluation UI.
 - `src/lib/rag/`: loading, chunking, retrieval types and answer helpers.
 - `src/lib/eval/`: evaluation battery.
+- `evals/`: documented eval campaigns (model evals, system evals, frozen result snapshots), written blog-ready.
 - `docs/useful-brain-master-plan.md`: source of truth for the architecture.
 - `docs/superpowers/`: historical Nura design and implementation records.
 

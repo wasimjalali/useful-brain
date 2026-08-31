@@ -9,7 +9,7 @@ import {
   type ToolCall,
 } from "@earendil-works/pi-ai";
 
-import { CHAT_MODEL_ID, CHAT_MODEL_PROVIDER } from "../models/selection";
+import { CHAT_MODEL_PROVIDER } from "../models/selection";
 
 export class ChatModelError extends Error {
   constructor(message: string) {
@@ -19,7 +19,7 @@ export class ChatModelError extends Error {
 }
 
 export type WorkersAiChatRunner = {
-  run(model: typeof CHAT_MODEL_ID, input: Record<string, unknown>): Promise<unknown>;
+  run(model: string, input: Record<string, unknown>): Promise<unknown>;
 };
 
 type OpenAiChatMessage = {
@@ -131,11 +131,15 @@ async function runChat(
   const payload: Record<string, unknown> = {
     messages: contextToWorkersAiMessages(context),
     stream: false,
+    // Deterministic decoding: answers must be comparable across eval runs.
+    // The seed is best-effort per the Workers AI schema.
+    temperature: 0,
+    seed: 7,
   };
   if (tools.length > 0) {
     payload.tools = tools;
   }
-  const response = await ai.run(CHAT_MODEL_ID, payload);
+  const response = await ai.run(model.id, payload);
   options?.signal?.throwIfAborted();
   const message = parseWorkersAiChatMessage(response, model.id);
   const doneReason = message.stopReason === "toolUse" ? ("toolUse" as const) : ("stop" as const);
