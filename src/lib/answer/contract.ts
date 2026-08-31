@@ -251,7 +251,8 @@ export function addSupportedCitations(
   });
 }
 
-function normalizeSupportText(text: string): string {
+/** Word-normalized form used for verbatim-support matching and dedupe keys. */
+export function normalizeSupportText(text: string): string {
   return (text.toLowerCase().match(/[\p{L}\p{N}_]+/gu) ?? []).join(" ");
 }
 

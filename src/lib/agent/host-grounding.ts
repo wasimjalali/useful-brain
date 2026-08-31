@@ -1,5 +1,6 @@
 import {
   INSUFFICIENT_EVIDENCE_ANSWER,
+  normalizeSupportText,
   textSupportedByPassages,
 } from "../answer/contract";
 
@@ -283,7 +284,7 @@ export function salvageVerbatimQuotes(
         continue;
       }
       validated.push({
-        key: salvageKey(clean),
+        key: normalizeSupportText(clean),
         paragraph: `${clean}${labels.map((label) => `[${label}]`).join("")}`,
       });
     }
@@ -302,10 +303,6 @@ export function salvageVerbatimQuotes(
     }
   }
   return kept.length > 0 ? kept.map((entry) => entry.paragraph).join("\n\n") : null;
-}
-
-function salvageKey(text: string): string {
-  return (text.toLowerCase().match(/[\p{L}\p{N}_]+/gu) ?? []).join(" ");
 }
 
 export function appendSearchHit(ledger: TurnEvidenceLedger, identity: EvidenceIdentity): string {

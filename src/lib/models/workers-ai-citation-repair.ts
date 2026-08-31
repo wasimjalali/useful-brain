@@ -1,5 +1,6 @@
 import {
   formatEvidenceForPrompt,
+  normalizeSupportText,
   textSupportedByPassages,
   type CitedRetrievalResult,
 } from "../answer/contract";
@@ -238,9 +239,9 @@ export function createWorkersAiCoveragePass(
     if (!raw) {
       return null;
     }
-    const draftText = normalizedText(draft);
+    const draftText = normalizeSupportText(draft);
     const additions = parseExactQuoteItems(raw, evidence)
-      .filter((item) => !draftText.includes(normalizedText(item.quote)))
+      .filter((item) => !draftText.includes(normalizeSupportText(item.quote)))
       .map((item) => `${item.quote} ${item.citation}`);
     return additions.length > 0 ? additions.join("\n\n") : null;
   };
@@ -259,7 +260,7 @@ function referencedUncitedDocuments(
   evidence: CitedRetrievalResult[],
 ): CitedRetrievalResult[] {
   const draftLabels = new Set(draft.match(/\[\d{1,2}\]/g) ?? []);
-  const haystack = normalizedText(`${question} ${draft}`);
+  const haystack = normalizeSupportText(`${question} ${draft}`);
   const seenDocuments = new Set<string>();
   const referenced: CitedRetrievalResult[] = [];
   for (const item of evidence) {
@@ -272,7 +273,7 @@ function referencedUncitedDocuments(
     if (draftLabels.has(item.citationLabel) || seenDocuments.has(documentKey)) {
       continue;
     }
-    const titleTokens = (normalizedText(item.source.replace(/\.[a-z]+$/i, "")).split(" ") ?? [])
+    const titleTokens = (normalizeSupportText(item.source.replace(/\.[a-z]+$/i, "")).split(" ") ?? [])
       .filter((token) => token.length > 1 && !TITLE_STOP_WORDS.has(token));
     if (titleTokens.length === 0) {
       continue;
@@ -332,10 +333,6 @@ function coverageMessages(
       ].join("\n"),
     },
   ];
-}
-
-function normalizedText(text: string): string {
-  return (text.toLowerCase().match(/[\p{L}\p{N}_]+/gu) ?? []).join(" ");
 }
 
 function selectExactExtract(
