@@ -30,6 +30,11 @@ import {
   type PrincipalDirectoryRow,
 } from "../../../src/lib/store/principal-directory";
 import type { ApprovalBinding } from "../../../src/lib/agent/policy";
+import {
+  EvalModelOverrideForbidden,
+  EvalModelOverrideInvalid,
+  parseEvalModelOverride,
+} from "../../../src/lib/models/eval-override";
 import { executeTurn } from "../../../src/lib/brain/execute-turn";
 import { runManualEvaluations } from "../../../src/lib/brain/eval-run";
 import { ensureLoopbackPrincipal } from "../../../src/lib/store/loopback-principal";
@@ -454,6 +459,7 @@ const brainWorker = {
           requestId?: string;
           persistConversation?: boolean;
           assumePrincipal?: unknown;
+          evalModel?: unknown;
         };
         try {
           body = (await request.json()) as typeof body;
@@ -476,6 +482,18 @@ const brainWorker = {
           }
           throw error;
         }
+        let evalModelOverride;
+        try {
+          evalModelOverride = parseEvalModelOverride(identityMode, body.evalModel);
+        } catch (error) {
+          if (error instanceof EvalModelOverrideForbidden) {
+            throw new WorkerForbiddenError();
+          }
+          if (error instanceof EvalModelOverrideInvalid) {
+            throw new WorkerValidationError();
+          }
+          throw error;
+        }
         const turnRequestId = parseBoundedId(body.requestId ?? requestId, "request id");
         const conversationId = body.conversationId
           ? parseBoundedId(body.conversationId, "conversation id")
@@ -483,6 +501,7 @@ const brainWorker = {
         const answer = await executeTurn({
           ...turnDeps(env, principal),
           assumedPrincipal,
+          evalModelOverride,
           question,
           conversationId,
           requestId: turnRequestId,

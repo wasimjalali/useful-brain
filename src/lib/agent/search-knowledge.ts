@@ -89,10 +89,14 @@ export function createSearchKnowledgeTool(input: {
             rerankScore: response.trace.rerankScores[hit.chunkId] ?? hit.score,
           });
           return {
+            label,
+            // Document identity leads each hit so the model can tell a
+            // dedicated policy document from a handbook or neighbor.
+            document: hit.citation.sourceName,
+            section: hit.citation.sectionHeading,
             chunk_id: hit.chunkId,
             content: hit.content,
             score: hit.score,
-            label,
             citation: {
               chunk_id: hit.chunkId,
               document_id: hit.citation.documentId,

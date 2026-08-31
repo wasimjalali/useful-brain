@@ -217,6 +217,97 @@ export function completeProseCitations(text: string, ledger: TurnEvidenceLedger)
     .join("\n\n");
 }
 
+const SALVAGE_MAX_PARAGRAPHS = 6;
+
+/**
+ * Rebuild an invalid draft from its verbatim evidence spans. Models often
+ * wrap a correctly copied sentence in a bold label, quotation marks or a
+ * source attribution ("**Part one:** \"quote\" [1] — from file.md"), which
+ * fails whole-paragraph validation. This keeps every span that copies a
+ * current-turn evidence text exactly, labels it from the ledger, and drops
+ * everything else. Returns null when no verbatim span exists.
+ */
+export function salvageVerbatimQuotes(
+  text: string,
+  ledger: TurnEvidenceLedger,
+): string | null {
+  if (!text || ledger.labelConflict || ledger.byLabel.size === 0) {
+    return null;
+  }
+  const markerMatcher = new RegExp(MARKER_RE.source, "g");
+  const labelEntries = [...ledger.byLabel.entries()].sort((a, b) => a[0] - b[0]);
+  const kept: Array<{ key: string; paragraph: string }> = [];
+  for (const paragraph of text.split(/\n\s*\n/u)) {
+    const stripped = paragraph.replace(markerMatcher, "").trim();
+    if (!stripped) {
+      continue;
+    }
+    const candidates: string[] = [];
+    for (const match of stripped.matchAll(/["“]([^"”]{10,})["”]/gu)) {
+      candidates.push(match[1]);
+    }
+    for (const sentence of stripped.split(/(?<=[.!?])\s+/u)) {
+      const trimmedSentence = sentence.trim();
+      if (!trimmedSentence) {
+        continue;
+      }
+      candidates.push(trimmedSentence);
+      // Accept the after-colon remainder only when the prefix reads as a
+      // short label. A long or number-bearing prefix is a claim of its own,
+      // and dropping it would change the remainder's meaning.
+      const colon = trimmedSentence.indexOf(":");
+      if (colon >= 0 && colon < trimmedSentence.length - 1) {
+        const prefix = trimmedSentence.slice(0, colon).replace(/[*"“”]+/gu, "").trim();
+        if (prefix.split(/\s+/u).length <= 4 && !/\d/u.test(prefix)) {
+          candidates.push(trimmedSentence.slice(colon + 1).trim());
+        }
+      }
+    }
+    // Validate every candidate first, then keep longest-first so a quoted
+    // fragment can never suppress the complete sentence that contains it.
+    const validated: Array<{ key: string; paragraph: string }> = [];
+    for (const candidate of candidates) {
+      const clean = candidate
+        .replace(/^["“*\s]+/u, "")
+        .replace(/["”*\s]+$/u, "")
+        .trim();
+      if (!clean || clean.split(/\s+/u).length < 3) {
+        continue;
+      }
+      // Support requires the evidence body text: a span that matches only a
+      // section heading is not a statement of the fact.
+      const labels = labelEntries
+        .filter(([, identity]) => textSupportedByPassages(clean, [identity.text]))
+        .map(([label]) => label);
+      if (labels.length === 0) {
+        continue;
+      }
+      validated.push({
+        key: salvageKey(clean),
+        paragraph: `${clean}${labels.map((label) => `[${label}]`).join("")}`,
+      });
+    }
+    validated.sort((a, b) => b.key.length - a.key.length);
+    for (const entry of validated) {
+      if (kept.some((existing) => existing.key.includes(entry.key) || entry.key.includes(existing.key))) {
+        continue;
+      }
+      kept.push(entry);
+      if (kept.length >= SALVAGE_MAX_PARAGRAPHS) {
+        break;
+      }
+    }
+    if (kept.length >= SALVAGE_MAX_PARAGRAPHS) {
+      break;
+    }
+  }
+  return kept.length > 0 ? kept.map((entry) => entry.paragraph).join("\n\n") : null;
+}
+
+function salvageKey(text: string): string {
+  return (text.toLowerCase().match(/[\p{L}\p{N}_]+/gu) ?? []).join(" ");
+}
+
 export function appendSearchHit(ledger: TurnEvidenceLedger, identity: EvidenceIdentity): string {
   const label = addIdentity(ledger, identity);
   if (label === null) {

@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { CitedRetrievalResult } from "../answer/contract";
-import { createWorkersAiCitationRepair } from "./workers-ai-citation-repair";
+import {
+  createWorkersAiCitationRepair,
+  createWorkersAiCoveragePass,
+} from "./workers-ai-citation-repair";
 import { CHAT_MODEL_ID } from "./selection";
 
 const evidence: CitedRetrievalResult[] = [
@@ -50,7 +53,9 @@ describe("Workers AI citation repair", () => {
       expect.objectContaining({
         stream: false,
         temperature: 0,
-        max_completion_tokens: 512,
+        seed: 7,
+        max_completion_tokens: 1024,
+        chat_template_kwargs: { enable_thinking: false },
       }),
     );
   });
@@ -102,6 +107,105 @@ describe("Workers AI citation repair", () => {
     ).resolves.toBe(
       "For annual plans, a customer may request a refund within 14 calendar days of the invoice date. [1]",
     );
+  });
+
+  it("covers a missing part with a verbatim quote and drops quotes already in the draft", async () => {
+    const twoDocEvidence: CitedRetrievalResult[] = [
+      evidence[0],
+      {
+        ...evidence[0],
+        rank: 2,
+        chunkId: "escalation__owners__001",
+        source: "complaint-escalation.md",
+        section: "ESC-3: VP Support",
+        text: "ESC-3 complaints are owned by the VP of Support.",
+        citationLabel: "[2]",
+        documentId: "complaint-escalation",
+      },
+    ];
+    const run = vi.fn().mockResolvedValue({
+      choices: [
+        {
+          finish_reason: "stop",
+          message: {
+            content: JSON.stringify({
+              quotes: [
+                {
+                  quote: "P1 tickets have a first-response target of 1 hour.",
+                  citation: "[1]",
+                },
+                {
+                  quote: "ESC-3 complaints are owned by the VP of Support.",
+                  citation: "[2]",
+                },
+              ],
+            }),
+          },
+        },
+      ],
+    });
+    const cover = createWorkersAiCoveragePass({ run });
+
+    await expect(
+      cover({
+        question: "What is the P1 response target and who owns ESC-3 complaints?",
+        draft: "P1 tickets have a first-response target of 1 hour.[1]",
+        evidence: twoDocEvidence,
+      }),
+    ).resolves.toBe("ESC-3 complaints are owned by the VP of Support. [2]");
+    expect(run).toHaveBeenCalledWith(
+      CHAT_MODEL_ID,
+      expect.objectContaining({ stream: false, temperature: 0 }),
+    );
+  });
+
+  it("recovers the quotes object when the model narrates before the JSON", async () => {
+    const run = vi.fn().mockResolvedValue({
+      choices: [
+        {
+          finish_reason: "stop",
+          message: {
+            content:
+              'The draft misses the target. So output: {"quotes":[{"quote":"a mid-reasoning example that is not the answer","citation":"[9]"}]}\n\nLet me verify the exact text. Return JSON only.</think>{"quotes":[{"quote":"P1 tickets have a first-response target of 1 hour.","citation":"[1]"}]}',
+          },
+        },
+      ],
+    });
+    const cover = createWorkersAiCoveragePass({ run });
+
+    await expect(
+      cover({
+        question: "What is the P1 response target and the escalation owner?",
+        draft: "Something unrelated.[1]",
+        evidence,
+      }),
+    ).resolves.toBe("P1 tickets have a first-response target of 1 hour. [1]");
+  });
+
+  it("returns no coverage additions for non-verbatim quotes", async () => {
+    const run = vi.fn().mockResolvedValue({
+      choices: [
+        {
+          finish_reason: "stop",
+          message: {
+            content: JSON.stringify({
+              quotes: [
+                { quote: "P1 tickets are answered within 60 minutes.", citation: "[1]" },
+              ],
+            }),
+          },
+        },
+      ],
+    });
+    const cover = createWorkersAiCoveragePass({ run });
+
+    await expect(
+      cover({
+        question: "What is the P1 response target and who owns ESC-3 complaints?",
+        draft: "Something else entirely.[1]",
+        evidence,
+      }),
+    ).resolves.toBeNull();
   });
 
   it("never repairs or extracts a prohibited health claim", async () => {

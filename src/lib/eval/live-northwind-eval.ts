@@ -1,9 +1,11 @@
+import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import { ingestNorthwind } from "./ingest-northwind";
 import { coverageGaps } from "./northwind-coverage";
 import {
+  ABSTENTION_CATEGORIES,
   EVAL_CATEGORIES,
   loadNorthwindCorpus,
   type EvalCategory,
@@ -17,31 +19,68 @@ import {
   type NorthwindAnswerScore,
 } from "./score-northwind-answer";
 import type { GroundedAnswerResponse } from "../rag/grounded-answer";
+import { CHAT_MODEL_ID } from "../models/selection";
 
 export const EVAL_OUTPUT_DIR = path.join(process.cwd(), "eval-output");
 const RETRIEVAL_REPORT = path.join(EVAL_OUTPUT_DIR, "retrieval-report.json");
-const LIVE_CHECKPOINT = path.join(EVAL_OUTPUT_DIR, "live-checkpoint.json");
-const LIVE_SUMMARY = path.join(EVAL_OUTPUT_DIR, "live-summary.json");
-const FINDINGS = path.join(EVAL_OUTPUT_DIR, "findings.json");
 
 // Bumped when scoring semantics change so a resume never mixes rows scored
 // under different identity or metric rules.
-const HARNESS_VERSION = 2;
+const HARNESS_VERSION = 3;
 
 type LiveCheckpoint = {
   harnessVersion?: number;
   brainUrl: string;
   generationId: string | null;
+  model?: string;
+  /** Answer-pipeline build the rows were produced by (prompt + retrieval fingerprint). */
+  pipelineVersion?: string;
+  /** Digest of the loaded question set the rows were scored against. */
+  questionSetDigest?: string;
   results: NorthwindAnswerScore[];
+  latenciesMs?: Record<string, number>;
 };
+
+function questionSetDigest(questions: EvalQuestion[]): string {
+  const canonical = questions.map((question) => ({
+    id: question.questionId,
+    category: question.category,
+    query: question.query,
+    expected: question.expectedDocumentIds,
+    forbidden: question.forbiddenDocumentIds,
+    sections: question.expectedSections,
+    principal: question.principal,
+  }));
+  return createHash("sha256").update(JSON.stringify(canonical)).digest("hex").slice(0, 32);
+}
+
+/** Per-model output files so one candidate's run never overwrites another's. */
+function outputPaths(model: string | undefined) {
+  const suffix = model
+    ? `.${model.replace(/^@cf\//, "").replace(/[^a-zA-Z0-9.-]+/g, "-")}`
+    : "";
+  return {
+    checkpoint: path.join(EVAL_OUTPUT_DIR, `live-checkpoint${suffix}.json`),
+    summary: path.join(EVAL_OUTPUT_DIR, `live-summary${suffix}.json`),
+    findings: path.join(EVAL_OUTPUT_DIR, `findings${suffix}.json`),
+  };
+}
 
 function parseArgs(argv: string[]) {
   const liveIndex = argv.indexOf("--live");
   const brainUrl = (liveIndex >= 0 ? argv[liveIndex + 1] : process.env.NORTHWIND_EVAL_LIVE_URL) ?? "";
+  const modelIndex = argv.indexOf("--model");
+  const model = modelIndex >= 0 ? argv[modelIndex + 1] : undefined;
+  if (modelIndex >= 0 && (!model || model.startsWith("--"))) {
+    // Fail closed: a dangling --model must never silently evaluate the
+    // production model and record the run as the baseline.
+    throw new Error("--model requires a model id");
+  }
   return {
     live: Boolean(brainUrl),
     brainUrl: brainUrl.replace(/\/$/, ""),
     resume: argv.includes("--resume") || process.env.NORTHWIND_EVAL_RESUME === "1",
+    model,
   };
 }
 
@@ -186,18 +225,32 @@ async function runLiveLayer(
   questions: EvalQuestion[],
   brainUrl: string,
   resume: boolean,
-): Promise<{ generationId: string; results: NorthwindAnswerScore[] }> {
+  model: string | undefined,
+): Promise<{
+  generationId: string;
+  results: NorthwindAnswerScore[];
+  latenciesMs: Record<string, number>;
+}> {
   const generationId = await ensureSeeded(brainUrl);
+  const paths = outputPaths(model);
+  const expectedModel = model ?? CHAT_MODEL_ID;
+  const digest = questionSetDigest(questions);
   let results: NorthwindAnswerScore[] = [];
+  let latenciesMs: Record<string, number> = {};
+  let pipelineVersion: string | undefined;
   if (resume) {
     try {
-      const previous = JSON.parse(readFileSync(LIVE_CHECKPOINT, "utf8")) as LiveCheckpoint;
+      const previous = JSON.parse(readFileSync(paths.checkpoint, "utf8")) as LiveCheckpoint;
       if (
         previous.brainUrl === brainUrl &&
         previous.harnessVersion === HARNESS_VERSION &&
-        previous.generationId === generationId
+        previous.generationId === generationId &&
+        (previous.model ?? CHAT_MODEL_ID) === expectedModel &&
+        previous.questionSetDigest === digest
       ) {
         results = previous.results;
+        latenciesMs = previous.latenciesMs ?? {};
+        pipelineVersion = previous.pipelineVersion;
       }
     } catch {
       results = [];
@@ -210,6 +263,7 @@ async function runLiveLayer(
     }
     process.stderr.write(`live ${index + 1}/${questions.length} ${question.questionId}\n`);
     const requestId = `eval-live-${question.questionId}-${Date.now()}`;
+    const startedAt = Date.now();
     const response = await brainJson<GroundedAnswerResponse>(brainUrl, "/turns", {
       method: "POST",
       body: JSON.stringify({
@@ -221,8 +275,10 @@ async function runLiveLayer(
           roles: question.principal.roles,
           departments: question.principal.departments,
         },
+        ...(model ? { evalModel: model } : {}),
       }),
     });
+    latenciesMs[question.questionId] = Date.now() - startedAt;
     if (response.assumedPrincipal?.userId !== question.principal.userId) {
       // Fail closed: never score a turn whose retrieval identity was not
       // confirmed to be the question's principal.
@@ -232,20 +288,66 @@ async function runLiveLayer(
         })`,
       );
     }
+    if (response.answerModel !== expectedModel) {
+      // Fail closed: never score a turn answered by a different model than
+      // the one this run is evaluating.
+      throw new Error(
+        `${question.questionId}: Brain answered with ${response.answerModel}, expected ${expectedModel}`,
+      );
+    }
+    const responseVersion = `${response.promptVersion ?? "unreported"}|${
+      response.retrievalConfigVersion ?? "unreported"
+    }`;
+    if (pipelineVersion === undefined) {
+      pipelineVersion = responseVersion;
+    } else if (pipelineVersion !== responseVersion) {
+      // Fail closed: never mix rows produced by different Brain builds in
+      // one run or across a resume.
+      throw new Error(
+        `${question.questionId}: Brain pipeline changed mid-run (${responseVersion} vs ${pipelineVersion})`,
+      );
+    }
     const scored = scoreNorthwindAnswer(question, toEvalAnswer(response));
     results.push(scored);
-    writeJson(LIVE_CHECKPOINT, {
+    writeJson(paths.checkpoint, {
       harnessVersion: HARNESS_VERSION,
       brainUrl,
       generationId,
+      model: expectedModel,
+      pipelineVersion,
+      questionSetDigest: digest,
       results,
+      latenciesMs,
     } satisfies LiveCheckpoint);
     await sleep(250);
   }
-  return { generationId, results };
+  return { generationId, results, latenciesMs };
 }
 
-function summarize(retrieval: RetrievalEvalReport, live: NorthwindAnswerScore[] | null) {
+function latencySummary(latenciesMs: Record<string, number>, total: number) {
+  const values = Object.values(latenciesMs).sort((a, b) => a - b);
+  if (values.length === 0) {
+    return null;
+  }
+  const at = (q: number) => values[Math.min(values.length - 1, Math.floor(q * values.length))];
+  return {
+    count: values.length,
+    total,
+    // A resumed run only measures the questions it re-asked; a partial
+    // latency sample must never be read as run-level coverage.
+    partial: values.length < total,
+    meanMs: Math.round(values.reduce((sum, value) => sum + value, 0) / values.length),
+    p50Ms: at(0.5),
+    p95Ms: at(0.95),
+  };
+}
+
+function summarize(
+  retrieval: RetrievalEvalReport,
+  live: NorthwindAnswerScore[] | null,
+  questions: EvalQuestion[],
+) {
+  const questionById = new Map(questions.map((question) => [question.questionId, question]));
   const liveCounted = live?.filter((result) => result.status !== "skipped") ?? [];
   const livePassed = liveCounted.filter((result) => result.status === "pass").length;
   const liveByCategory: Record<string, { scored: number; passed: number }> = {};
@@ -292,6 +394,18 @@ function summarize(retrieval: RetrievalEvalReport, live: NorthwindAnswerScore[] 
           goldRetrievedUncitedCount: liveCounted.filter(
             (result) => result.goldRetrievedUncited.length > 0,
           ).length,
+          // Counterpart to goldRetrievedUncitedCount: grounded answers that
+          // also cite documents outside the gold set, so citation broadening
+          // stays visible next to the pass rate.
+          citedNotExpectedCount: liveCounted.filter((result) => {
+            const question = questionById.get(result.questionId);
+            if (!question || ABSTENTION_CATEGORIES.has(question.category)) {
+              return false;
+            }
+            return result.citedDocumentIds.some(
+              (id) => !question.expectedDocumentIds.includes(id),
+            );
+          }).length,
           vectorDegradedTurns,
           // Only a fully hybrid run may be compared with a hybrid baseline.
           hybridBaselineComparable: vectorDegradedTurns === 0,
@@ -319,13 +433,27 @@ async function main() {
     throw new Error(`Northwind coverage gaps: ${gaps.join("; ")}`);
   }
   const retrieval = await runRetrievalLayer(questions, documents);
-  let live: { generationId: string; results: NorthwindAnswerScore[] } | null = null;
+  const paths = outputPaths(args.model);
+  let live: {
+    generationId: string;
+    results: NorthwindAnswerScore[];
+    latenciesMs: Record<string, number>;
+  } | null = null;
   if (args.live) {
-    live = await runLiveLayer(questions, args.brainUrl, args.resume);
-    writeJson(LIVE_SUMMARY, live);
+    live = await runLiveLayer(questions, args.brainUrl, args.resume, args.model);
+    writeJson(paths.summary, {
+      model: args.model ?? CHAT_MODEL_ID,
+      generationId: live.generationId,
+      latency: latencySummary(live.latenciesMs, live.results.length),
+      results: live.results,
+    });
   }
-  const findings = summarize(retrieval, live?.results ?? null);
-  writeJson(FINDINGS, findings);
+  const findings = {
+    model: args.model ?? CHAT_MODEL_ID,
+    ...(live ? { latency: latencySummary(live.latenciesMs, live.results.length) } : {}),
+    ...summarize(retrieval, live?.results ?? null, questions),
+  };
+  writeJson(paths.findings, findings);
   process.stdout.write(`${JSON.stringify(findings, null, 2)}\n`);
 }
 

@@ -17,9 +17,13 @@ import {
 } from "../cf/worker-errors";
 import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL } from "../embeddings/instructions";
 import type { WorkersAiRunner } from "../embeddings/workers-ai-embed";
+import { evalChatModel } from "../models/eval-override";
 import { glm53FlashModel } from "../models/glm-5-3-flash";
 import { createWorkersAiChatStream } from "../models/workers-ai-chat";
-import { createWorkersAiCitationRepair } from "../models/workers-ai-citation-repair";
+import {
+  createWorkersAiCitationRepair,
+  createWorkersAiCoveragePass,
+} from "../models/workers-ai-citation-repair";
 import { CHAT_MODEL_ID } from "../models/selection";
 import type { GroundedAnswerResponse } from "../rag/grounded-answer";
 import { CloudflareKnowledgePipeline, type CorpusSql, type VectorizeIndex } from "../retrieve/cloudflare-pipeline";
@@ -61,6 +65,12 @@ export type ExecuteTurnInput = {
    * closed on this field outside loopback identity mode.
    */
   assumedPrincipal?: Principal;
+  /**
+   * Loopback-only chat-model override for the eval bake-off. Parsed and
+   * allowlisted by the Brain route; never changes the locked production
+   * selection.
+   */
+  evalModelOverride?: string;
   question: string;
   conversationId?: string;
   requestId: string;
@@ -78,7 +88,7 @@ export async function executeTurn(input: ExecuteTurnInput): Promise<GroundedAnsw
   };
   const policyPrincipal = { id: input.principal.id };
   const pipeline = await knowledgePipeline(input);
-  const runtime = liveRuntime(input.ai);
+  const runtime = liveRuntime(input.ai, input.evalModelOverride);
 
   if (!persist) {
     const result = await runKnowledgeAgent({
@@ -283,18 +293,20 @@ function emptyPipeline(): Pick<KnowledgePipeline, "search"> {
   };
 }
 
-function liveRuntime(ai: WorkersAiRunner | undefined): AgentRuntime | undefined {
+function liveRuntime(
+  ai: WorkersAiRunner | undefined,
+  evalModelOverride?: string,
+): AgentRuntime | undefined {
   if (!ai) {
     return undefined;
   }
+  const model = evalModelOverride ? evalChatModel(evalModelOverride) : glm53FlashModel();
+  const runner = { run: (id: string, payload: Record<string, unknown>) => ai.run(id, payload) };
   return {
-    model: glm53FlashModel(),
-    stream: createWorkersAiChatStream({
-      run: (model, payload) => ai.run(model, payload),
-    }),
-    repairGroundedAnswer: createWorkersAiCitationRepair({
-      run: (model, payload) => ai.run(model, payload),
-    }),
+    model,
+    stream: createWorkersAiChatStream(runner),
+    repairGroundedAnswer: createWorkersAiCitationRepair(runner, model.id),
+    coverAnswerParts: createWorkersAiCoveragePass(runner, model.id),
     systemPrompt: LIVE_KNOWLEDGE_SYSTEM_PROMPT,
   };
 }
@@ -369,6 +381,10 @@ function responseFromAgent(
       embeddingDimensions: EMBEDDING_DIMENSIONS,
       results: evidence,
     },
+    // The ephemeral eval path pins the answer-pipeline build so a resumed
+    // eval can refuse to mix rows produced by different Brain builds.
+    promptVersion: PROMPT_VERSION,
+    retrievalConfigVersion: fingerprintId(REAL_STACK_FINGERPRINT),
   };
 }
 

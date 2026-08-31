@@ -1,7 +1,12 @@
 import { Type } from "typebox";
 import { describe, expect, it } from "vitest";
 
-import { contextToWorkersAiMessages, parseWorkersAiChatMessage } from "./workers-ai-chat";
+import {
+  contextToWorkersAiMessages,
+  createWorkersAiChatStream,
+  parseWorkersAiChatMessage,
+} from "./workers-ai-chat";
+import { glm53FlashModel } from "./glm-5-3-flash";
 import { CHAT_MODEL_ID } from "./selection";
 
 describe("Workers AI chat mapping", () => {
@@ -51,6 +56,24 @@ describe("Workers AI chat mapping", () => {
     expect(messages[1]).toEqual({ role: "user", content: "What is the refund window?" });
     expect(messages[2]?.tool_calls?.[0]?.function.name).toBe("search_knowledge");
     expect(messages[3]).toMatchObject({ role: "tool", tool_call_id: "call-1" });
+  });
+
+  it("pins temperature 0 on every chat call for run-to-run comparability", async () => {
+    const inputs: Array<Record<string, unknown>> = [];
+    const stream = createWorkersAiChatStream({
+      run: async (_model, input) => {
+        inputs.push(input);
+        return { choices: [{ finish_reason: "stop", message: { content: "ok" } }] };
+      },
+    });
+    const message = await stream(glm53FlashModel(), {
+      systemPrompt: "Ground every answer.",
+      messages: [{ role: "user", content: "What is the refund window?", timestamp: 1 }],
+      tools: [],
+    }).result();
+    expect(message.stopReason).toBe("stop");
+    expect(inputs[0]?.temperature).toBe(0);
+    expect(inputs[0]?.seed).toBe(7);
   });
 
   it("parses tool_calls finish reason", () => {
