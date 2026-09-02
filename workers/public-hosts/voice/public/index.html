@@ -53,9 +53,13 @@
         background: var(--surface);
       }
       * { box-sizing: border-box; }
-      html, body { margin: 0; background: var(--surface); color: var(--ink); }
+      html, body {
+        margin: 0;
+        overflow-x: clip;
+        background: var(--surface);
+        color: var(--ink);
+      }
       body {
-        min-width: 320px;
         font-family: var(--font-sans);
         font-weight: 400;
         -webkit-font-smoothing: antialiased;
@@ -127,6 +131,7 @@
         font-weight: 500;
         letter-spacing: -0.035em;
         line-height: 1;
+        white-space: nowrap;
         transform: translateY(1px);
       }
       .hero { padding: 104px 0 96px; text-align: center; }
@@ -174,14 +179,13 @@
         margin: 0;
         overflow: hidden;
         border: 1px solid var(--rule);
-        border-radius: 1px;
+        border-radius: 20px;
         background: var(--paper-bright);
       }
       figure img {
         display: block;
         width: 100%;
         height: auto;
-        border-radius: 1px;
       }
       .cta { padding-block: 120px; }
       .cta-layout {
@@ -290,16 +294,21 @@
         .cta h2 { font-size: 36px; }
       }
       @media (max-width: 820px) {
-        .nav-inner { height: 60px; padding-inline: 20px; }
-        .hero { padding: 36px 0 48px; }
+        .wrap { padding-inline: 28px; }
+        .nav-inner { height: 60px; gap: 10px; padding-inline: 20px; }
+        .btn-compact { min-height: 40px; padding: 0.6rem 0.85rem; font-size: 0.875rem; }
+        .hero { padding: 48px 0 40px; }
+        .hero h1 { font-size: 32px; }
         .hero p { font-size: 17px; }
-        .shot { padding-top: 48px; }
+        .shot { padding-top: 40px; }
+        .shot:last-of-type { padding-bottom: 64px; }
         .shot h2 { font-size: 24px; }
         .footer { padding-block: 36px 32px; }
         .footer-nav { grid-template-columns: 1fr 1fr; }
         .footer-blurb { grid-column: 1 / -1; }
         .mega-brand { justify-content: flex-start; gap: 10px; margin-top: 36px; }
-        .mega-word { font-size: 44px; }
+        .mega-brand svg { width: 48px; height: 48px; }
+        .mega-word { font-size: clamp(32px, 11vw, 44px); }
         .legal { flex-direction: column; margin-top: 32px; }
       }
     </style>
