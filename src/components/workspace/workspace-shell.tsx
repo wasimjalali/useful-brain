@@ -73,8 +73,8 @@ export function WorkspaceShell({
         </MobileNavOverlay>
       ) : null}
 
-      <div className="flex min-w-0 flex-1">
-        <main className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 p-2.5 lg:pl-0">
+        <main className="stage flex min-w-0 flex-1 flex-col">
           <MobileTopBar onOpenNav={() => setMobileNavOpen(true)} />
           {children}
         </main>

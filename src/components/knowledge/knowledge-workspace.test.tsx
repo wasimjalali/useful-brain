@@ -95,9 +95,8 @@ describe("KnowledgeWorkspace", () => {
     ).not.toBeInTheDocument();
 
     fireEvent.change(search, { target: { value: "" } });
-    fireEvent.change(screen.getByLabelText("Filter by status"), {
-      target: { value: "needs_indexing" },
-    });
+    fireEvent.click(screen.getByRole("combobox", { name: "Filter by status" }));
+    fireEvent.click(screen.getByRole("option", { name: "Needs indexing" }));
     expect(within(table).getByRole("row", { name: /Shipping Policy/ })).toBeInTheDocument();
     expect(
       within(table).queryByRole("row", { name: /Return Policy/ }),
@@ -199,7 +198,7 @@ describe("KnowledgeWorkspace", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Re-index knowledge base" }));
+    fireEvent.click(screen.getByRole("button", { name: "Re-index sources" }));
 
     const table = screen.getByRole("table", { name: "Knowledge documents" });
     await waitFor(() => {
@@ -250,6 +249,7 @@ describe("KnowledgeWorkspace", () => {
         chunks={chunks}
         documents={documents}
         embedAction={async () => {}}
+        reindexAction={async () => {}}
         embeddingStorageStatus={{
           ...embeddingStorageStatus,
           embeddedChunks: 0,
@@ -268,6 +268,38 @@ describe("KnowledgeWorkspace", () => {
       .closest("article");
     expect(chunkPreview).not.toBeNull();
     expect(within(chunkPreview!).getByText("Failed")).toBeInTheDocument();
+
+    fireEvent.click(
+      within(table).getByRole("button", { name: "View Return Policy" }),
+    );
+    const dialog = screen.getByRole("dialog", { name: "Return Policy details" });
+    expect(within(dialog).getByRole("button", { name: "Re-index" })).toBeInTheDocument();
+  });
+
+  it("pages the document inventory", () => {
+    const manyDocuments = Array.from({ length: 16 }, (_, index) => ({
+      source: `doc-${index}.md`,
+      title: `Document ${index + 1}`,
+      text: `Body ${index + 1}`,
+    }));
+
+    render(
+      <KnowledgeWorkspace
+        addDocumentAction={async () => {}}
+        chunks={[]}
+        documents={manyDocuments}
+        embedAction={async () => {}}
+        embeddingStorageStatus={embeddingStorageStatus}
+      />,
+    );
+
+    const table = screen.getByRole("table", { name: "Knowledge documents" });
+    expect(within(table).getAllByRole("button", { name: /View Document/ })).toHaveLength(12);
+    expect(within(table).queryByRole("button", { name: "View Document 9" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Load more" }));
+    expect(within(table).getAllByRole("button", { name: /View Document/ })).toHaveLength(16);
+    expect(within(table).getByRole("button", { name: "View Document 9" })).toBeInTheDocument();
   });
 
   it("shows a ready corpus and promotes it explicitly", async () => {

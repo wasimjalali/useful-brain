@@ -226,16 +226,17 @@ describe("RagVisibilityDashboard", () => {
   it("marks the active workspace and changes views", () => {
     render(<WorkspaceShellHarness />);
 
-    expect(screen.getByRole("button", { name: "Chat" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "Sources" })).not.toHaveAttribute(
       "aria-current",
       "page",
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Knowledge base" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sources" }));
 
-    expect(
-      screen.getByRole("button", { name: "Knowledge base" }),
-    ).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("button", { name: "Sources" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
   });
 
   it("restores focus to the mobile navigation trigger when the drawer closes", () => {
@@ -333,13 +334,10 @@ describe("RagVisibilityDashboard", () => {
     expect(
       screen.getByRole("heading", { name: "Ask a grounded question" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Chat" })).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Knowledge base" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Evaluations" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "New chat" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Search" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sources" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Evals" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Settings" })).toBeInTheDocument();
 
     expect(screen.queryByRole("button", { name: "Retrieval" })).toBeNull();
@@ -349,41 +347,50 @@ describe("RagVisibilityDashboard", () => {
     render(<RagVisibilityDashboard {...baseProps} />);
 
     expect(
-      screen.getByRole("heading", { name: "Chat" }),
-    ).toHaveTextContent("Chat");
+      screen.getByRole("heading", { name: "Ask a grounded question" }),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Support agent" })).toBeNull();
+  });
+
+  it("opens search and settings as dialogs over chat", () => {
+    render(<RagVisibilityDashboard {...baseProps} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    expect(screen.getByRole("dialog", { name: "Search chats" })).toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "Search chats" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Close search" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    expect(screen.getByRole("dialog", { name: "Settings" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Assume principal")).toBeInTheDocument();
   });
 
   it("switches between the chat, knowledge and evaluations views", () => {
     render(<RagVisibilityDashboard {...baseProps} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Knowledge base" }));
-    expect(
-      screen.getByRole("heading", { name: "Knowledge base" }),
-    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Sources" }));
+    expect(screen.getByRole("heading", { name: "Sources" })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Evaluations" }));
-    expect(
-      screen.getByRole("heading", { name: "Evaluations" }),
-    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Evals" }));
+    expect(screen.getByRole("heading", { name: "Evals" })).toBeInTheDocument();
   });
 
   it("shows documents, chunk preview and the re-embed control", () => {
     render(<RagVisibilityDashboard {...baseProps} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Knowledge base" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sources" }));
     expect(screen.getAllByText("return_policy.md").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("return_policy__chunk_001")).toBeInTheDocument();
     expect(screen.getAllByText("Opened Products").length).toBeGreaterThan(0);
     expect(
-      screen.getByRole("button", { name: "Re-index knowledge base" }),
+      screen.getByRole("button", { name: "Re-index sources" }),
     ).toBeInTheDocument();
   });
 
   it("offers a file upload alongside paste in the add-document dialog", () => {
     render(<RagVisibilityDashboard {...baseProps} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Knowledge base" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sources" }));
     fireEvent.click(screen.getByRole("button", { name: "Upload document" }));
 
     expect(screen.getByText("Click to upload a file")).toBeInTheDocument();
@@ -407,20 +414,21 @@ describe("RagVisibilityDashboard", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Knowledge base" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sources" }));
     fireEvent.click(screen.getAllByRole("button", { name: "View Return Policy" })[0]);
     fireEvent.click(screen.getByRole("button", { name: "Delete document" }));
 
     expect(deleteDocumentAction).toHaveBeenCalledWith("nw_return_policy");
-    expect(await screen.findByRole("heading", { name: "Knowledge base" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Sources" })).toBeInTheDocument();
   });
 
   it("exposes a live eval runner instead of static passing checks", () => {
     render(<RagVisibilityDashboard {...baseProps} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Evaluations" }));
-    expect(screen.getByRole("button", { name: "Run evaluations" })).toBeInTheDocument();
-    expect(screen.getByText(/No run yet/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Evals" }));
+    expect(screen.getByRole("heading", { name: "Evals" })).toBeInTheDocument();
+    expect(screen.getByText("114")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Run evaluations" })).toBeNull();
   });
 
   it("shows a setup state before embeddings are stored", () => {
@@ -490,7 +498,7 @@ describe("RagVisibilityDashboard", () => {
     );
 
     askQuestion("Can customers return opened products?");
-    fireEvent.click(await screen.findByRole("button", { name: "Stop generating" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Stop" }));
 
     expect(await screen.findByText("Generation stopped.")).toBeInTheDocument();
     expect(cancelAction).toHaveBeenCalledWith(expect.any(String));

@@ -295,10 +295,50 @@ describe("ChatWorkspace", () => {
     expect(citation).toBeInTheDocument();
   });
 
+  it("previews a sample prompt on hover and fills the composer on click", () => {
+    const onSubmit = vi.fn();
+    render(
+      <ChatWorkspace
+        askDisabled={false}
+        canReset
+        focusedEvidenceId={null}
+        onFocusEvidence={vi.fn()}
+        onNewChat={vi.fn()}
+        onOpenSources={vi.fn()}
+        onSubmit={onSubmit}
+        pendingQuestion={null}
+        ready
+        turns={[]}
+      />,
+    );
+
+    const sample = screen.getByRole("button", {
+      name: "What is the first-response target for a P1 support ticket?",
+    });
+    expect(sample).toHaveTextContent("P1 first response");
+
+    fireEvent.mouseEnter(sample);
+    expect(screen.getByLabelText("Question")).toHaveValue(
+      "What is the first-response target for a P1 support ticket?",
+    );
+    expect(screen.getByRole("button", { name: "Generate answer" })).toBeDisabled();
+
+    fireEvent.mouseLeave(sample);
+    expect(screen.getByLabelText("Question")).toHaveValue("");
+
+    fireEvent.click(sample);
+    expect(screen.getByLabelText("Question")).toHaveValue(
+      "What is the first-response target for a P1 support ticket?",
+    );
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Generate answer" })).toBeEnabled();
+  });
+
   it("keeps the mobile composer compact while preserving a 40px send target", () => {
     render(<ChatWorkspaceHarness />);
 
-    expect(screen.getByLabelText("Question")).toHaveClass("min-h-[48px]");
+    expect(screen.getByLabelText("Question")).toHaveClass("min-h-[44px]");
+    expect(screen.getByLabelText("Question")).toHaveClass("composer-scroll");
     expect(screen.getByRole("button", { name: "Generate answer" })).toHaveClass(
       "size-10",
     );

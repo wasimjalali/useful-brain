@@ -1,28 +1,56 @@
 "use client";
 
-import type { KeyboardEvent } from "react";
+import { useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 
 import { SendIcon } from "@/components/icons";
 
+const COMPACT_HEIGHT = 44;
+const EXPANDED_MAX_HEIGHT = 192;
+
 type ChatComposerProps = {
   disabled: boolean;
+  flush?: boolean;
   onChange: (value: string) => void;
   onSend: () => void;
   onStop?: () => void;
   pending: boolean;
+  preview?: string | null;
   stopping?: boolean;
   value: string;
 };
 
 export function ChatComposer({
   disabled,
+  flush = false,
   onChange,
   onSend,
   onStop,
   pending,
+  preview = null,
   stopping = false,
   value,
 }: ChatComposerProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [boxHeight, setBoxHeight] = useState(COMPACT_HEIGHT);
+  const displayValue = value || preview || "";
+  const isPreview = !value && Boolean(preview);
+  const expanded = boxHeight > COMPACT_HEIGHT + 8;
+  const canScroll = boxHeight >= EXPANDED_MAX_HEIGHT;
+
+  useLayoutEffect(() => {
+    const field = textareaRef.current;
+    if (!field) {
+      return;
+    }
+    field.style.height = "0px";
+    const next = Math.min(
+      Math.max(field.scrollHeight, COMPACT_HEIGHT),
+      EXPANDED_MAX_HEIGHT,
+    );
+    field.style.height = `${next}px`;
+    setBoxHeight(next);
+  }, [displayValue]);
+
   function submit() {
     if (disabled || pending || !value.trim()) {
       return;
@@ -38,20 +66,31 @@ export function ChatComposer({
   }
 
   return (
-    <div className="pb-3 pt-2 sm:pb-6">
+    <div className={flush ? "w-full" : "px-4 pb-3 pt-2 sm:px-6 sm:pb-6"}>
       <form
-        className="mx-auto w-full max-w-3xl px-4 sm:px-6"
+        className={flush ? "w-full" : "mx-auto w-full max-w-xl"}
         onSubmit={(event) => {
           event.preventDefault();
           submit();
         }}
       >
-        <div className="field-input rounded-2xl bg-surface p-2 shadow-raise">
+        <div
+          className={[
+            "field-input bg-surface shadow-raise",
+            expanded
+              ? "flex flex-col rounded-2xl px-2 pb-2 pt-1.5"
+              : "flex items-end gap-2 rounded-full px-3 py-1.5",
+          ].join(" ")}
+        >
           <label className="sr-only" htmlFor="chat-question">
             Question
           </label>
           <textarea
-            className="min-h-[48px] max-h-48 w-full resize-none border-0 bg-transparent px-3 py-2.5 text-[15px] leading-6 text-ink outline-none placeholder:text-ink-faint focus:outline-none focus-visible:outline-none disabled:text-ink-faint sm:min-h-[64px] sm:py-3"
+            className={[
+              "composer-scroll min-h-[44px] w-full resize-none border-0 bg-transparent px-2 py-2.5 text-[15px] leading-6 outline-none placeholder:text-ink-faint focus:outline-none focus-visible:outline-none disabled:text-ink-faint",
+              isPreview ? "text-ink-muted" : "text-ink",
+              canScroll ? "overflow-y-auto" : "overflow-hidden",
+            ].join(" ")}
             disabled={disabled}
             id="chat-question"
             maxLength={2000}
@@ -61,29 +100,26 @@ export function ChatComposer({
             placeholder={
               disabled
                 ? "Promote a generation to start"
-                : "Ask the knowledge base…"
+                : "Ask Useful Brain"
             }
+            ref={textareaRef}
             rows={1}
-            value={value}
+            value={displayValue}
           />
-          <div className="flex items-center justify-between gap-3 px-1.5 pb-0.5">
-            <span className="hidden text-xs text-ink-faint sm:inline">
-              Enter to send · Shift+Enter for a new line
-            </span>
-            <span className="text-xs text-ink-faint sm:hidden">Enter to send</span>
+          <div className={expanded ? "flex justify-end px-1" : ""}>
             {pending && onStop ? (
               <button
-                className="btn btn-secondary min-h-10 shrink-0 px-3 text-sm"
+                className="btn btn-secondary mb-0.5 min-h-10 shrink-0 rounded-full px-3 text-sm"
                 disabled={stopping}
                 onClick={onStop}
                 type="button"
               >
-                {stopping ? "Stopping" : "Stop generating"}
+                {stopping ? "Stopping" : "Stop"}
               </button>
             ) : (
               <button
                 aria-label="Generate answer"
-                className="btn btn-primary size-10 shrink-0 rounded-full p-0"
+                className="btn btn-primary mb-0.5 size-10 shrink-0 rounded-full p-0"
                 disabled={disabled || pending || value.trim().length === 0}
                 type="submit"
               >

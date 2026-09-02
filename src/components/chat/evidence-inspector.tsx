@@ -124,7 +124,7 @@ function EvidenceInspectorPanel({
   return (
     <aside
       aria-label="Evidence"
-      className="panel-in fixed inset-y-0 right-0 z-40 flex w-[86%] max-w-[360px] flex-col border-l border-border bg-surface shadow-pop lg:static lg:z-auto lg:w-[360px] lg:shadow-none"
+      className="panel-in fixed inset-y-0 right-0 z-40 flex w-[86%] max-w-[360px] flex-col border-l border-border bg-surface shadow-pop lg:static lg:z-auto lg:my-0 lg:w-[360px] lg:overflow-hidden lg:rounded-[24px] lg:shadow-none"
     >
       <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-3.5">
         <div>

@@ -1,12 +1,12 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 
 import { SELECTED_MODELS } from "@/lib/models/selection";
 
 import { SettingsWorkspace } from "./settings-workspace";
 
 describe("SettingsWorkspace", () => {
-  it("shows identity, locked models and active corpus state", () => {
+  it("opens on operator and reveals retrieval and models on demand", () => {
     render(
       <SettingsWorkspace
         identity={{
@@ -15,6 +15,7 @@ describe("SettingsWorkspace", () => {
           roles: ["operator", "standard"],
           departments: ["support"],
         }}
+        onAssumePrincipal={vi.fn()}
         retrievalMode="keyword"
         status={{
           storedDocuments: 65,
@@ -31,11 +32,15 @@ describe("SettingsWorkspace", () => {
     );
 
     expect(screen.getByText("principal-dev")).toBeInTheDocument();
-    expect(screen.getByText("operator, standard")).toBeInTheDocument();
+    expect(screen.getByLabelText("Assume principal")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Retrieval" }));
     expect(screen.getByText("Retrieval ready")).toBeInTheDocument();
     expect(screen.getByText("Keyword retrieval in local preview")).toBeInTheDocument();
+    expect(screen.getByText("Synthetic documents only")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Models" }));
     expect(screen.getByText(SELECTED_MODELS.chat.id)).toBeInTheDocument();
     expect(screen.getByText(SELECTED_MODELS.rerank.id)).toBeInTheDocument();
-    expect(screen.getByText("Synthetic documents only")).toBeInTheDocument();
   });
 });

@@ -78,85 +78,89 @@ export function ConversationTurn({
           ) : null}
         </div>
 
-        <div className="flex flex-col gap-3.5 text-[15px] leading-7 text-ink">
-          {answer.structuredAnswer.paragraphs.map((paragraph, index) => (
-            <p className="break-words" key={index}>
-              {stripCitationMarkers(paragraph.text)}
-              {grounded
-                ? paragraph.citations.map((citation) => {
-                    const item = citedItems.find(
-                      (evidenceItem) => evidenceItem.label === citation,
-                    );
-                    if (!item) {
-                      return null;
-                    }
-                    return (
-                      <button
-                        aria-label={`Open source ${item.source}, ${item.section}`}
-                        className="cite citation-control ml-1 align-baseline"
-                        data-active={
-                          item.id === activeEvidenceId ? "true" : undefined
-                        }
-                        key={`${index}-${citation}`}
-                        onClick={() =>
-                          onFocusEvidence(item.id, stripCitationMarkers(paragraph.text))
-                        }
-                        type="button"
-                      >
-                        {citation}
-                      </button>
-                    );
-                  })
-                : null}
-            </p>
-          ))}
-        </div>
+        <div className="group">
+          <div className="flex flex-col gap-3.5 text-[15px] leading-7 text-ink">
+            {answer.structuredAnswer.paragraphs.map((paragraph, index) => (
+              <p className="break-words" key={index}>
+                {stripCitationMarkers(paragraph.text)}
+                {grounded
+                  ? paragraph.citations.map((citation) => {
+                      const item = citedItems.find(
+                        (evidenceItem) => evidenceItem.label === citation,
+                      );
+                      if (!item) {
+                        return null;
+                      }
+                      return (
+                        <button
+                          aria-label={`Open source ${item.source}, ${item.section}`}
+                          className="cite citation-control ml-1 align-baseline"
+                          data-active={
+                            item.id === activeEvidenceId ? "true" : undefined
+                          }
+                          key={`${index}-${citation}`}
+                          onClick={() =>
+                            onFocusEvidence(item.id, stripCitationMarkers(paragraph.text))
+                          }
+                          type="button"
+                        >
+                          {citation}
+                        </button>
+                      );
+                    })
+                  : null}
+              </p>
+            ))}
+          </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          {evidence.length > 0 ? (
-            <button
-              aria-label={`Evidence: ${citedItems.length} cited of ${evidence.length} retrieved`}
-              className="source-trigger min-h-10 px-3 text-xs font-medium"
-              onClick={onOpenSources}
-              type="button"
-            >
-              <SourceIcon className="size-3.5" />
-              Evidence
-              <span className="tnum text-accent-deep">{evidence.length}</span>
-            </button>
-          ) : null}
-          <AnswerActionButton
-            active={copied}
-            label={copied ? "Copied answer" : "Copy answer"}
-            onClick={copyAnswer}
-          >
-            <CopyIcon className="size-4" />
-          </AnswerActionButton>
-          <AnswerActionButton
-            label="Retry question"
-            onClick={() => {
-              onAction?.("retry");
-              onRetry(answer.question);
-            }}
-          >
-            <RetryIcon className="size-4" />
-          </AnswerActionButton>
-          <AnswerActionButton
-            active={feedback === "helpful"}
-            label="Mark answer helpful"
-            onClick={() => setAnswerFeedback("helpful")}
-            toggle
-          >
-            <ThumbUpIcon className="size-4" />
-          </AnswerActionButton>
-          <AnswerActionButton
-            active={feedback === "unhelpful"}
-            label="Mark answer unhelpful"
-            onClick={() => setAnswerFeedback("unhelpful")}
-            toggle
-          >
-            <ThumbDownIcon className="size-4" />
-          </AnswerActionButton>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            {evidence.length > 0 ? (
+              <button
+                aria-label={`Evidence: ${citedItems.length} cited of ${evidence.length} retrieved`}
+                className="source-trigger min-h-10 px-3 text-xs font-medium"
+                onClick={onOpenSources}
+                type="button"
+              >
+                <SourceIcon className="size-3.5" />
+                Evidence
+                <span className="tnum text-accent-deep">{evidence.length}</span>
+              </button>
+            ) : null}
+            <div className="answer-hover-actions flex flex-wrap items-center gap-2">
+              <AnswerActionButton
+                active={copied}
+                label={copied ? "Copied answer" : "Copy answer"}
+                onClick={copyAnswer}
+              >
+                <CopyIcon className="size-4" />
+              </AnswerActionButton>
+              <AnswerActionButton
+                label="Retry question"
+                onClick={() => {
+                  onAction?.("retry");
+                  onRetry(answer.question);
+                }}
+              >
+                <RetryIcon className="size-4" />
+              </AnswerActionButton>
+              <AnswerActionButton
+                active={feedback === "helpful"}
+                label="Mark answer helpful"
+                onClick={() => setAnswerFeedback("helpful")}
+                toggle
+              >
+                <ThumbUpIcon className="size-4" />
+              </AnswerActionButton>
+              <AnswerActionButton
+                active={feedback === "unhelpful"}
+                label="Mark answer unhelpful"
+                onClick={() => setAnswerFeedback("unhelpful")}
+                toggle
+              >
+                <ThumbDownIcon className="size-4" />
+              </AnswerActionButton>
+            </div>
+          </div>
         </div>
       </div>
     </div>

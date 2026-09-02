@@ -15,10 +15,11 @@ import type { DocumentChunk, KnowledgeDocument } from "@/lib/rag/types";
 import type { GroundedAnswerResponse } from "@/lib/rag/grounded-answer";
 import type { EmbeddingStorageStatus } from "@/lib/rag/storage-records";
 import type { ActionResult } from "@/lib/rag/app-errors";
-import { runEvalsAction } from "@/app/eval-actions";
 import { EvaluationsWorkspace } from "@/components/evaluations/evaluations-workspace";
 import { KnowledgeWorkspace } from "@/components/knowledge/knowledge-workspace";
 import { SettingsWorkspace } from "@/components/settings/settings-workspace";
+import { ChatSearchDialog } from "@/components/workspace/chat-search-dialog";
+import { Dialog } from "@/components/ui/dialog";
 import {
   buildEvidenceItems as buildChatEvidenceItems,
   ChatWorkspace,
@@ -118,7 +119,6 @@ export function RagVisibilityDashboard({
   cancelAction,
   embeddingStorageStatus,
   initialConversations = [],
-  initialEvalRuns = [],
   deleteConversationAction,
   deleteDocumentAction,
   promoteCorpusAction,
@@ -132,7 +132,11 @@ export function RagVisibilityDashboard({
   workspaceError = null,
 }: RagVisibilityDashboardProps) {
   const router = useRouter();
-  const [activeView, setActiveView] = useState<WorkspaceView>(initialView);
+  const [activeView, setActiveView] = useState<WorkspaceView>(
+    initialView === "settings" ? "chat" : initialView,
+  );
+  const [settingsOpen, setSettingsOpen] = useState(initialView === "settings");
+  const [searchOpen, setSearchOpen] = useState(false);
   const assumedPrincipalKey = useSyncExternalStore(
     subscribeToAssumedPrincipal,
     loadStoredAssumedPrincipal,
@@ -453,6 +457,10 @@ export function RagVisibilityDashboard({
   }, [selectedChunk]);
 
   function selectWorkspaceView(view: WorkspaceView) {
+    if (view === "settings") {
+      setSettingsOpen(true);
+      return;
+    }
     stoppedConversationRouteRef.current = null;
     setActiveView(view);
     setSourcesOpen(false);
@@ -463,6 +471,13 @@ export function RagVisibilityDashboard({
       settings: "/settings",
     }[view];
     router.push(href);
+  }
+
+  function closeSettings() {
+    setSettingsOpen(false);
+    if (window.location.pathname === "/settings") {
+      router.push("/chat");
+    }
   }
 
   return (
@@ -495,12 +510,13 @@ export function RagVisibilityDashboard({
           activeView={activeView}
           conversations={conversations}
           conversationError={conversationError}
-          documentsCount={documents.length}
-          embeddedChunks={embeddingStorageStatus.embeddedChunks}
           onDeleteConversation={deleteConversation}
           onNewChat={startNewChat}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onSearch={() => setSearchOpen(true)}
           onSelectConversation={selectConversation}
           onSelectView={selectWorkspaceView}
+          operatorLabel={identity?.id ?? "Operator"}
           retrievalReady={retrievalReady}
         />
       }
@@ -541,23 +557,7 @@ export function RagVisibilityDashboard({
               retrievalMode={retrievalMode}
             />
           ) : null}
-          {activeView === "evaluations" ? (
-            <EvaluationsWorkspace
-              history={initialEvalRuns.slice(1)}
-              initialRun={initialEvalRuns[0] ?? null}
-              runAction={runEvalsAction}
-              runLabel="Run evaluations"
-            />
-          ) : null}
-          {activeView === "settings" ? (
-            <SettingsWorkspace
-              assumedPrincipalKey={assumedPrincipalKey}
-              identity={identity}
-              onAssumePrincipal={assumePrincipal}
-              retrievalMode={retrievalMode}
-              status={embeddingStorageStatus}
-            />
-          ) : null}
+          {activeView === "evaluations" ? <EvaluationsWorkspace /> : null}
         </ScrollView>
       )}
 
@@ -567,6 +567,32 @@ export function RagVisibilityDashboard({
           item={selectedChunk}
           onClose={() => setSelectedChunk(null)}
         />
+      ) : null}
+      {searchOpen ? (
+        <ChatSearchDialog
+          conversations={conversations}
+          onClose={() => setSearchOpen(false)}
+          onNewChat={() => {
+            setSearchOpen(false);
+            startNewChat();
+          }}
+          onSelect={(id) => {
+            setSearchOpen(false);
+            selectConversation(id);
+          }}
+        />
+      ) : null}
+      {settingsOpen ? (
+        <Dialog ariaLabel="Settings" maxWidth="max-w-3xl" onClose={closeSettings}>
+          <SettingsWorkspace
+            assumedPrincipalKey={assumedPrincipalKey}
+            identity={identity}
+            onAssumePrincipal={assumePrincipal}
+            onClose={closeSettings}
+            retrievalMode={retrievalMode}
+            status={embeddingStorageStatus}
+          />
+        </Dialog>
       ) : null}
     </WorkspaceShell>
   );
