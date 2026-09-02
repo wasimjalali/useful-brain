@@ -10,6 +10,33 @@ import { OPEN_BOOK_HREF, OPEN_BOOK_LABEL, OPEN_BUILD_HREF } from "@/lib/open-sit
 
 const latest = campaignRun(NORTHWIND_CAMPAIGN.latestKey);
 
+function UsefulBuildMark({ className }: { className?: string }) {
+  return (
+    <svg aria-hidden="true" className={className} viewBox="0 0 32 32">
+      <path d="M4 4H11V21H28V28H4Z" fill="currentColor" />
+      <path d="M14 4H28V18H21V11H14Z" fill="currentColor" />
+    </svg>
+  );
+}
+
+function HeroGrid() {
+  return (
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+      <svg className="h-full w-full" preserveAspectRatio="none" viewBox="0 0 1440 620">
+        <defs>
+          <pattern id="open-sheet-grid" height="96" patternUnits="userSpaceOnUse" width="96">
+            <path d="M96 0H0V96" fill="none" stroke="var(--border-strong)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+          </pattern>
+        </defs>
+        <rect fill="url(#open-sheet-grid)" height="620" opacity="0.56" width="1440" />
+        <path d="M0 540H1440" fill="none" opacity="0.18" stroke="var(--ink-muted)" vectorEffect="non-scaling-stroke" />
+        <path d="M192 0V620M1248 0V620" fill="none" opacity="0.18" stroke="var(--ink-muted)" vectorEffect="non-scaling-stroke" />
+        <path d="M1224 72V120M1272 72V120M1224 72H1272M1224 120H1272" fill="none" opacity="0.24" stroke="var(--ink-muted)" vectorEffect="non-scaling-stroke" />
+      </svg>
+    </div>
+  );
+}
+
 const SHOTS = [
   {
     src: "/open/chat.png",
@@ -35,8 +62,22 @@ export function OpenLanding() {
   return (
     <div className="min-h-full bg-canvas text-ink">
       <header className="sticky top-0 z-10 border-b border-transparent bg-canvas/90">
-        <div className="mx-auto flex h-[72px] max-w-[1248px] items-center justify-between gap-6 px-6">
-          <UsefulBrainLogo />
+        <div className="mx-auto flex h-[72px] max-w-[1248px] items-center gap-6 px-6">
+          <div className="mr-auto flex items-center gap-3.5">
+            <a aria-label="Useful Brain" href="/open">
+              <UsefulBrainLogo />
+            </a>
+            <a
+              aria-label="Useful Brain, by Useful Build"
+              className="flex min-h-10 items-center gap-1.5 border-l border-border-strong pl-3.5 text-[13px] text-ink-muted transition-colors duration-150 hover:text-ink"
+              href={OPEN_BUILD_HREF}
+            >
+              <span>by</span>
+              <UsefulBuildMark className="size-[17px]" />
+              <strong className="hidden text-[13.5px] font-medium text-ink sm:inline">Useful Build</strong>
+              <span className="font-medium text-ink sm:hidden">UB</span>
+            </a>
+          </div>
           <a className="btn btn-primary min-h-10 px-3 text-sm" href={OPEN_BOOK_HREF}>
             {OPEN_BOOK_LABEL}
           </a>
@@ -44,7 +85,9 @@ export function OpenLanding() {
       </header>
 
       <main>
-        <section className="mx-auto max-w-[1248px] px-6 py-16 text-center sm:py-24">
+        <section className="relative overflow-hidden py-16 text-center sm:py-24">
+          <HeroGrid />
+          <div className="relative mx-auto max-w-[1248px] px-6">
           <h1 className="mx-auto max-w-[16em] text-[2.5rem] font-medium leading-[1.02] tracking-[-0.042em] text-ink sm:text-[4rem]">
             Answers only from evidence you can inspect.
           </h1>
@@ -54,7 +97,8 @@ export function OpenLanding() {
             the corpus does not support the claim.
           </p>
           <p className="mx-auto mt-3 max-w-[52ch] text-[18px] leading-[1.55] text-ink-muted">
-            Useful Build builds, customizes, and maintains this for companies.
+            <a className="text-ink underline underline-offset-4" href={OPEN_BUILD_HREF}>Useful Build</a>{" "}
+            builds, customizes, and maintains this for companies.
           </p>
           <a
             className="btn btn-primary mt-9 inline-flex min-h-[52px] px-6 text-base"
@@ -62,6 +106,7 @@ export function OpenLanding() {
           >
             {OPEN_BOOK_LABEL}
           </a>
+          </div>
         </section>
 
         {SHOTS.map((shot) => (
