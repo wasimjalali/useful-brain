@@ -227,8 +227,25 @@ describe("protected Worker configuration", () => {
     expect(html).toContain("/fonts/geist-variable.woff2");
     expect(html).toContain("https://usefulbuild.com");
     expect(html).toContain("https://cal.com/usefulbuild/free-audit");
+    expect(html).toContain("Useful Brain, by Useful Build");
+    expect(html).toContain('id="brain-sheet-grid"');
+    expect(html).toContain('aria-current="page">Useful Brain');
     expect(html).not.toContain("View on GitHub");
+    expect(html).not.toContain(">Kursfind</a>");
     expect(html).not.toMatch(/LOOPBACK|Cloudflare Access|href=["']\/chat/i);
+  });
+
+  it("ships the Useful Build family system on the Voice landing", () => {
+    const html = readFileSync(
+      path.join(process.cwd(), "workers/public-hosts/voice/public/index.html"),
+      "utf8",
+    );
+    expect(html).toContain("/brand/useful-voice-mark.svg");
+    expect(html).toContain("Useful Voice, by Useful Build");
+    expect(html).toContain('id="voice-sheet-grid"');
+    expect(html).toContain('aria-current="page">Useful Voice');
+    expect(html).toContain("https://usefulbuild.com");
+    expect(html).not.toContain(">Kursfind</a>");
   });
 
   it("starts Cloud Agent terminals on Brain, not a Convex Next.js server", () => {
