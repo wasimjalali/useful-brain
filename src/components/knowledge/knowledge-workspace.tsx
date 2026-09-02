@@ -139,9 +139,6 @@ export function KnowledgeWorkspace({
   const pagedDocuments = visibleDocuments.slice(0, documentLimit);
   const previewChunks = chunks.slice(0, chunkLimit);
   const activeCount = inventory.filter((item) => item.status === "active").length;
-  const needsCorpusReindex = inventory.some(
-    (item) => item.status === "failed" || item.status === "needs_indexing",
-  );
   const documentStatusBySource = useMemo(
     () => new Map(inventory.map((item) => [item.document.source, item.status])),
     [inventory],
@@ -280,7 +277,7 @@ export function KnowledgeWorkspace({
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
-            {reindexAction && needsCorpusReindex ? (
+            {reindexAction ? (
               <button
                 className="btn btn-secondary min-h-10 px-3.5 text-sm"
                 disabled={isReindexing || isPromoting}

@@ -9,7 +9,7 @@ import {
   ThumbDownIcon,
   ThumbUpIcon,
 } from "@/components/icons";
-import { UsefulBrainMark } from "@/components/useful-brain-logo";
+import { UsefulBrainAvatar } from "@/components/useful-brain-logo";
 import { StatusLabel } from "@/components/ui/status-label";
 import { DEFAULT_USEFUL_BRAIN_CONFIG } from "@/lib/useful-brain-config";
 import type { GroundedAnswerResponse } from "@/lib/rag/grounded-answer";
@@ -58,9 +58,7 @@ export function ConversationTurn({
 
   return (
     <div className="msg-in flex gap-3">
-      <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-brand shadow-sm">
-        <UsefulBrainMark className="size-5" tone="dark" />
-      </span>
+      <UsefulBrainAvatar />
 
       <div className="min-w-0 flex-1">
         <div className="mb-2 flex items-center gap-2">

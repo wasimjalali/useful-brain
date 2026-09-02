@@ -4,7 +4,7 @@ import { useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 
 import { SendIcon } from "@/components/icons";
 
-const COMPACT_HEIGHT = 44;
+const COMPACT_HEIGHT = 40;
 const EXPANDED_MAX_HEIGHT = 192;
 
 type ChatComposerProps = {
@@ -68,7 +68,7 @@ export function ChatComposer({
   return (
     <div className={flush ? "w-full" : "px-4 pb-3 pt-2 sm:px-6 sm:pb-6"}>
       <form
-        className={flush ? "w-full" : "mx-auto w-full max-w-xl"}
+        className={flush ? "w-full" : "mx-auto w-full max-w-2xl"}
         onSubmit={(event) => {
           event.preventDefault();
           submit();
@@ -78,8 +78,8 @@ export function ChatComposer({
           className={[
             "field-input bg-surface shadow-raise",
             expanded
-              ? "flex flex-col rounded-2xl px-2 pb-2 pt-1.5"
-              : "flex items-end gap-2 rounded-full px-3 py-1.5",
+              ? "flex flex-col rounded-2xl px-2 pb-2 pt-1"
+              : "flex items-center gap-1.5 rounded-full py-0 pl-2.5 pr-1",
           ].join(" ")}
         >
           <label className="sr-only" htmlFor="chat-question">
@@ -87,7 +87,7 @@ export function ChatComposer({
           </label>
           <textarea
             className={[
-              "composer-scroll min-h-[44px] w-full resize-none border-0 bg-transparent px-2 py-2.5 text-[15px] leading-6 outline-none placeholder:text-ink-faint focus:outline-none focus-visible:outline-none disabled:text-ink-faint",
+              "composer-scroll min-h-[40px] w-full resize-none border-0 bg-transparent px-2 py-2 text-[15px] leading-6 outline-none placeholder:text-ink-faint focus:outline-none focus-visible:outline-none disabled:text-ink-faint",
               isPreview ? "text-ink-muted" : "text-ink",
               canScroll ? "overflow-y-auto" : "overflow-hidden",
             ].join(" ")}
@@ -106,10 +106,16 @@ export function ChatComposer({
             rows={1}
             value={displayValue}
           />
-          <div className={expanded ? "flex justify-end px-1" : ""}>
+          <div
+            className={
+              expanded
+                ? "flex justify-end px-1"
+                : "grid size-10 shrink-0 place-items-center"
+            }
+          >
             {pending && onStop ? (
               <button
-                className="btn btn-secondary mb-0.5 min-h-10 shrink-0 rounded-full px-3 text-sm"
+                className="btn btn-secondary min-h-9 shrink-0 rounded-full px-3 text-sm"
                 disabled={stopping}
                 onClick={onStop}
                 type="button"
@@ -119,11 +125,11 @@ export function ChatComposer({
             ) : (
               <button
                 aria-label="Generate answer"
-                className="btn btn-primary mb-0.5 size-10 shrink-0 rounded-full p-0"
+                className="btn btn-primary size-7 shrink-0 rounded-full p-0"
                 disabled={disabled || pending || value.trim().length === 0}
                 type="submit"
               >
-                <SendIcon className="size-[18px]" />
+                <SendIcon className="size-3.5" />
               </button>
             )}
           </div>

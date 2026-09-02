@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { JetBrains_Mono, Nunito } from "next/font/google";
 
 import "./globals.css";
 
-const inter = Inter({
+const nunito = Nunito({
   subsets: ["latin"],
-  variable: "--font-inter",
+  variable: "--font-nunito",
   display: "swap",
   weight: ["400", "500", "600", "700"],
 });
@@ -31,7 +31,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`h-full antialiased ${inter.variable} ${jetBrainsMono.variable}`}
+      className={`h-full antialiased ${nunito.variable} ${jetBrainsMono.variable}`}
     >
       <body className="flex min-h-full flex-col">{children}</body>
     </html>

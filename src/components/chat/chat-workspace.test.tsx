@@ -334,14 +334,14 @@ describe("ChatWorkspace", () => {
     expect(screen.getByRole("button", { name: "Generate answer" })).toBeEnabled();
   });
 
-  it("keeps the mobile composer compact while preserving a 40px send target", () => {
+  it("keeps the composer compact with a smaller send mark in a 40px hit area", () => {
     render(<ChatWorkspaceHarness />);
 
-    expect(screen.getByLabelText("Question")).toHaveClass("min-h-[44px]");
+    expect(screen.getByLabelText("Question")).toHaveClass("min-h-[40px]");
     expect(screen.getByLabelText("Question")).toHaveClass("composer-scroll");
-    expect(screen.getByRole("button", { name: "Generate answer" })).toHaveClass(
-      "size-10",
-    );
+    const send = screen.getByRole("button", { name: "Generate answer" });
+    expect(send).toHaveClass("size-7");
+    expect(send.parentElement).toHaveClass("size-10");
   });
 
   it("uses toggle semantics only for answer feedback", () => {

@@ -117,6 +117,15 @@ describe("protected Worker configuration", () => {
     expect((environments.production.vars as Record<string, string>).IDENTITY_MODE).toBe("access");
   });
 
+  it("sends public hosts to the landing page and keeps loopback on the workspace", () => {
+    const source = readFileSync(path.join(process.cwd(), "src/app/page.tsx"), "utf8");
+    expect(source).toMatch(/getCloudflareContext/);
+    expect(source).toMatch(/LOOPBACK_RUNTIME/);
+    expect(source).toMatch(/redirect\("\/open"\)/);
+    expect(source).toMatch(/\/chat/);
+    expect(source).toMatch(/\/knowledge/);
+  });
+
   it("web whoami route forwards only through the Brain Service Binding helper", () => {
     const source = readFileSync(path.join(process.cwd(), "src/app/api/brain/whoami/route.ts"), "utf8");
     expect(source).toMatch(/forwardIdentityToBrain/);
@@ -192,6 +201,34 @@ describe("protected Worker configuration", () => {
     expect(pkg.scripts["preview:cf"]).toMatch(/npm run db:local/);
     expect(pkg.scripts["preview:cf"]).toMatch(/--persist-to \.wrangler\/state/);
     expect(pkg.scripts["eval:northwind"]).toMatch(/live-northwind-eval/);
+  });
+
+  it("reserves public usefulbuild hostnames on landing workers, not the operator app", () => {
+    const brain = readJsonc("workers/public-hosts/brain/wrangler.jsonc");
+    const voice = readJsonc("workers/public-hosts/voice/wrangler.jsonc");
+    expect(brain.name).toBe("useful-brain-open");
+    expect(voice.name).toBe("useful-voice");
+    expect(brain.routes).toEqual([{ pattern: "brain.usefulbuild.com", custom_domain: true }]);
+    expect(voice.routes).toEqual([{ pattern: "voice.usefulbuild.com", custom_domain: true }]);
+    expect(brain.vars).toBeUndefined();
+    expect(voice.vars).toBeUndefined();
+  });
+
+  it("ships the designed Brain landing on the public host", () => {
+    const html = readFileSync(
+      path.join(process.cwd(), "workers/public-hosts/brain/public/index.html"),
+      "utf8",
+    );
+    expect(html).toContain("/brand/useful-brain-mark.svg");
+    expect(html).toContain("/open/chat.png");
+    expect(html).toContain("/open/sources.png");
+    expect(html).toContain("/open/evals.png");
+    expect(html).toContain("114/120");
+    expect(html).toContain("/fonts/geist-variable.woff2");
+    expect(html).toContain("https://usefulbuild.com");
+    expect(html).toContain("https://cal.com/usefulbuild/free-audit");
+    expect(html).not.toContain("View on GitHub");
+    expect(html).not.toMatch(/LOOPBACK|Cloudflare Access|href=["']\/chat/i);
   });
 
   it("starts Cloud Agent terminals on Brain, not a Convex Next.js server", () => {

@@ -1,0 +1,16 @@
+{
+  "$schema": "../../../node_modules/wrangler/config-schema.json",
+  "name": "useful-voice",
+  "compatibility_date": "2026-09-02",
+  "workers_dev": true,
+  "preview_urls": false,
+  "routes": [
+    {
+      "pattern": "voice.usefulbuild.com",
+      "custom_domain": true
+    }
+  ],
+  "assets": {
+    "directory": "./public"
+  }
+}

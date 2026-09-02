@@ -28,7 +28,7 @@ npm test -- retrieval
 
 ## Repository state
 
-The product is now named Useful Brain. Active UI terminology lives in `src/lib/useful-brain-config.ts`. The constellation mark and wordmark live in `src/components/useful-brain-logo.tsx`.
+The product is now named Useful Brain. Active UI terminology lives in `src/lib/useful-brain-config.ts`. The document-and-quote mark and Nunito wordmark live in `src/components/useful-brain-logo.tsx`.
 
 The live backend is Cloudflare Workers (web + Brain). Convex has been removed. Do not reintroduce it.
 

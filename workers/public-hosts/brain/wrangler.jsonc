@@ -1,0 +1,16 @@
+{
+  "$schema": "../../../node_modules/wrangler/config-schema.json",
+  "name": "useful-brain-open",
+  "compatibility_date": "2026-09-02",
+  "workers_dev": true,
+  "preview_urls": false,
+  "routes": [
+    {
+      "pattern": "brain.usefulbuild.com",
+      "custom_domain": true
+    }
+  ],
+  "assets": {
+    "directory": "./public"
+  }
+}

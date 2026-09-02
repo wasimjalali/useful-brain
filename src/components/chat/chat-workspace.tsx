@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { LayersIcon, NewChatIcon } from "@/components/icons";
-import { UsefulBrainMark } from "@/components/useful-brain-logo";
+import { UsefulBrainAvatar } from "@/components/useful-brain-logo";
 import { DEFAULT_USEFUL_BRAIN_CONFIG } from "@/lib/useful-brain-config";
 import type { GroundedAnswerResponse } from "@/lib/rag/grounded-answer";
 import type { ChatTurn } from "@/lib/rag/chat-history";
@@ -209,14 +209,14 @@ function ChatWelcome({
 }) {
   return (
     <div className="rise flex min-h-0 flex-1 flex-col items-center justify-center px-4 pb-16 text-center">
-      <h1 className="max-w-xl text-2xl font-semibold tracking-[-0.03em] text-ink sm:text-[28px]">
+      <h1 className="max-w-2xl text-2xl font-semibold tracking-[-0.03em] text-ink sm:text-[28px]">
         Ask a grounded question
       </h1>
       <p className="mt-2 max-w-md text-[15px] leading-6 text-ink-muted">
         Answers only from retrieved company documents. Missing evidence is a refusal.
       </p>
-      <div className="mt-8 w-full max-w-xl">{composer}</div>
-      <div className="mt-5 flex w-full max-w-xl flex-wrap justify-center gap-2">
+      <div className="mt-8 w-full max-w-2xl">{composer}</div>
+      <div className="mt-5 flex w-full max-w-2xl flex-wrap justify-center gap-2">
         {SAMPLE_QUESTIONS.map((sample) => (
           <button
             aria-label={sample.prompt}
@@ -251,9 +251,7 @@ function UserMessage({ text }: { text: string }) {
 function ThinkingIndicator({ error }: { error: string | null }) {
   return (
     <div className="msg-in flex gap-3" role="status">
-      <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-brand shadow-sm">
-        <UsefulBrainMark className="size-5" tone="dark" />
-      </span>
+      <UsefulBrainAvatar />
       <div className="pt-1.5">
         <div className="flex items-center gap-2.5">
           <span
@@ -309,9 +307,7 @@ function ErrorMessage({
 }) {
   return (
     <div className="msg-in flex gap-3">
-      <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-brand shadow-sm">
-        <UsefulBrainMark className="size-5" tone="dark" />
-      </span>
+      <UsefulBrainAvatar />
       <div className="flex-1 rounded-2xl border border-danger/25 bg-danger-soft px-4 py-3" role="alert">
         <p className="text-sm font-medium text-danger">{message}</p>
         {onRetry ? (
