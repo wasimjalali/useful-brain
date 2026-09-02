@@ -4,7 +4,7 @@ Useful Brain is a knowledge agent that answers questions about a company corpus 
 
 This is a single-operator portfolio product: no billing, no public signup, no hosted demo. It runs locally on `127.0.0.1`.
 
-![Chat with cited answer and the evidence inspector open](docs/images/ub-chat-evidence.png)
+![Useful Brain chat with a cited answer and the evidence inspector open.](docs/images/ub-chat-evidence.png)
 
 ## The eval story: 72% to 95% without touching the scorer
 
@@ -23,7 +23,7 @@ Every gain came from the answer layer. Retrieval metrics and every scoring rule 
 
 Frozen result snapshots back both reports in [`evals/results/`](evals/results/).
 
-![Evaluations page with per-case results and evidence](docs/images/ub-evaluations.png)
+![Useful Brain Evals dashboard for the locked Northwind campaign.](docs/images/ub-evaluations.png)
 
 ## What it enforces
 
@@ -50,7 +50,7 @@ Hybrid retrieval fuses D1 FTS5 keyword search with Vectorize dense search (both 
 
 Models (all Cloudflare-hosted, selected by measured bake-off): `@cf/zai-org/glm-5.3-flash` for chat, `@cf/qwen/qwen3-embedding-0.6b` for embeddings, `@cf/baai/bge-reranker-base` for reranking.
 
-![Knowledge base with corpus generation status and document inventory](docs/images/ub-knowledge.png)
+![Useful Brain Sources inventory with the operator corpus and document list.](docs/images/ub-knowledge.png)
 
 ## Run it locally
 
