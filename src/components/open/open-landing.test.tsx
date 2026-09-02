@@ -2,7 +2,12 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { OpenLanding } from "./open-landing";
-import { OPEN_BOOK_HREF, OPEN_BOOK_LABEL, OPEN_GITHUB_LABEL } from "@/lib/open-site";
+import {
+  OPEN_BOOK_HREF,
+  OPEN_BOOK_LABEL,
+  OPEN_GITHUB_HREF,
+  OPEN_GITHUB_LABEL,
+} from "@/lib/open-site";
 
 describe("OpenLanding", () => {
   it("keeps a single audit action in the header and stacks product shots", () => {
@@ -12,7 +17,10 @@ describe("OpenLanding", () => {
     expect(
       header.querySelector(`a[href="${OPEN_BOOK_HREF}"]`),
     ).not.toBeNull();
-    expect(screen.queryByRole("link", { name: OPEN_GITHUB_LABEL })).toBeNull();
+    expect(screen.getByRole("link", { name: OPEN_GITHUB_LABEL })).toHaveAttribute(
+      "href",
+      OPEN_GITHUB_HREF,
+    );
 
     const audit = screen.getAllByRole("link", { name: OPEN_BOOK_LABEL });
     expect(audit.length).toBeGreaterThan(0);
