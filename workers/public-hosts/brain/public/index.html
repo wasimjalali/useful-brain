@@ -98,6 +98,11 @@
       .btn:hover { box-shadow: 0 12px 24px -18px rgb(23 23 23 / 0.65); transform: translateY(-1px); }
       .btn:active, .btn:hover:active { box-shadow: none; transform: scale(0.98); }
       .btn-compact { min-height: 42px; padding: 0.7rem 1.05rem; }
+      .btn-quiet {
+        color: var(--ink);
+        border-color: var(--rule);
+        background: transparent;
+      }
       header.nav {
         position: sticky;
         top: 0;
@@ -191,7 +196,14 @@
         font-size: 18px;
         line-height: 1.55;
       }
-      .hero .btn { min-height: 52px; padding: 0 26px; font-size: 16px; margin-top: 36px; }
+      .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 12px;
+        margin-top: 36px;
+      }
+      .hero .btn { min-height: 52px; padding: 0 26px; font-size: 16px; }
       .parent-inline { color: var(--ink); text-underline-offset: 3px; }
       .has-js [data-hero] [data-rise] {
         opacity: 0;
@@ -436,7 +448,10 @@
         <p data-rise style="--i:2">
           <a class="parent-inline" href="https://usefulbuild.com">Useful Build</a> builds, customizes, and maintains this for companies.
         </p>
-        <a class="btn" data-rise style="--i:3" href="https://cal.com/usefulbuild/free-audit">Book a free audit</a>
+        <div class="hero-actions" data-rise style="--i:3">
+          <a class="btn" href="https://cal.com/usefulbuild/free-audit">Book a free audit</a>
+          <a class="btn btn-quiet" href="https://github.com/wasimjalali/useful-brain">View the source</a>
+        </div>
         </div>
       </section>
 

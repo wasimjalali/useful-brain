@@ -6,7 +6,13 @@ import {
   formatPassRate,
   NORTHWIND_CAMPAIGN,
 } from "@/lib/eval/campaign-snapshot";
-import { OPEN_BOOK_HREF, OPEN_BOOK_LABEL, OPEN_BUILD_HREF } from "@/lib/open-site";
+import {
+  OPEN_BOOK_HREF,
+  OPEN_BOOK_LABEL,
+  OPEN_BUILD_HREF,
+  OPEN_GITHUB_HREF,
+  OPEN_GITHUB_LABEL,
+} from "@/lib/open-site";
 
 const latest = campaignRun(NORTHWIND_CAMPAIGN.latestKey);
 
@@ -100,12 +106,20 @@ export function OpenLanding() {
             <a className="text-ink underline underline-offset-4" href={OPEN_BUILD_HREF}>Useful Build</a>{" "}
             builds, customizes, and maintains this for companies.
           </p>
-          <a
-            className="btn btn-primary mt-9 inline-flex min-h-[52px] px-6 text-base"
-            href={OPEN_BOOK_HREF}
-          >
-            {OPEN_BOOK_LABEL}
-          </a>
+          <div className="mt-9 flex flex-wrap justify-center gap-3">
+            <a
+              className="btn btn-primary inline-flex min-h-[52px] px-6 text-base"
+              href={OPEN_BOOK_HREF}
+            >
+              {OPEN_BOOK_LABEL}
+            </a>
+            <a
+              className="btn btn-secondary inline-flex min-h-[52px] px-6 text-base"
+              href={OPEN_GITHUB_HREF}
+            >
+              {OPEN_GITHUB_LABEL}
+            </a>
+          </div>
           </div>
         </section>
 

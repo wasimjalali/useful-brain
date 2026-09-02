@@ -230,7 +230,8 @@ describe("protected Worker configuration", () => {
     expect(html).toContain("Useful Brain, by Useful Build");
     expect(html).toContain('id="brain-sheet-grid"');
     expect(html).toContain('aria-current="page">Useful Brain');
-    expect(html).not.toContain("View on GitHub");
+    expect(html).toContain("https://github.com/wasimjalali/useful-brain");
+    expect(html).toContain("View the source");
     expect(html).not.toContain(">Kursfind</a>");
     expect(html).not.toMatch(/LOOPBACK|Cloudflare Access|href=["']\/chat/i);
   });
