@@ -338,7 +338,12 @@ describe("RagVisibilityDashboard", () => {
     expect(screen.getByRole("button", { name: "Search" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Sources" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Evals" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Settings" })).toBeInTheDocument();
+    const settings = screen.getByRole("button", { name: "Settings" });
+    expect(settings).toHaveClass("icon-btn");
+    expect(settings).toHaveClass("operator-settings");
+    const row = settings.closest(".operator-row");
+    expect(row).toHaveTextContent("Operator");
+    expect(row).toHaveTextContent("O");
 
     expect(screen.queryByRole("button", { name: "Retrieval" })).toBeNull();
   });

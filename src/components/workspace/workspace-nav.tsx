@@ -47,7 +47,7 @@ export function WorkspaceNav({
   onSelectConversation = () => {},
   onSelectView,
   operatorLabel = "Operator",
-  retrievalReady = true,
+  retrievalReady: _retrievalReady = true,
 }: {
   activeConversationId?: string | null;
   activeView: WorkspaceView;
@@ -66,8 +66,8 @@ export function WorkspaceNav({
   return (
     <aside
       className={[
-        "flex w-[248px] shrink-0 flex-col gap-5 px-3 py-4",
-        mobile ? "h-full bg-canvas" : "hidden lg:flex",
+        "rail flex w-[248px] shrink-0 flex-col gap-5 px-3 py-4",
+        mobile ? "h-full" : "hidden lg:flex",
       ].join(" ")}
     >
       <div className="px-2 pt-1">
@@ -124,29 +124,22 @@ export function WorkspaceNav({
         ) : null}
       </div>
 
-      <div className="flex flex-col gap-2">
-        <div className="rail-group">
-          <button
-            aria-current={activeView === "settings" ? "page" : undefined}
-            className="nav-item w-full text-sm"
-            onClick={onOpenSettings}
-            type="button"
-          >
-            <SettingsIcon className="size-[18px] shrink-0" />
-            <span>Settings</span>
-          </button>
-        </div>
-        <div className="flex items-center gap-2.5 rounded-2xl px-2 py-2">
-          <span className="grid size-8 shrink-0 place-items-center rounded-full bg-sunken text-xs font-semibold text-ink">
-            {operatorInitial(operatorLabel)}
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[13px] font-medium text-ink">{operatorLabel}</p>
-            <p className="text-[11px] text-ink-faint">
-              {retrievalReady ? "Retrieval ready" : "Setup needed"}
-            </p>
-          </div>
-        </div>
+      <div className="operator-row flex items-center gap-2.5 px-1.5 pt-3">
+        <span aria-hidden="true" className="operator-avatar shrink-0">
+          {operatorInitials(operatorLabel)}
+        </span>
+        <p className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink">
+          {operatorLabel}
+        </p>
+        <button
+          aria-label="Settings"
+          className="icon-btn operator-settings tip size-7 shrink-0"
+          data-tip="Settings"
+          onClick={onOpenSettings}
+          type="button"
+        >
+          <SettingsIcon className="size-4" />
+        </button>
       </div>
     </aside>
   );
@@ -198,7 +191,10 @@ function ChatHistoryList({
   );
 }
 
-function operatorInitial(label: string) {
-  const trimmed = label.trim();
-  return trimmed ? trimmed.slice(0, 1).toUpperCase() : "O";
+function operatorInitials(label: string) {
+  const parts = label.trim().split(/[\s._-]+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  }
+  return (parts[0]?.[0] ?? "O").toUpperCase();
 }

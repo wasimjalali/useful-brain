@@ -29,13 +29,13 @@ export function ChatSearchDialog({
   }, [conversations, query]);
 
   return (
-    <Dialog ariaLabel="Search chats" maxWidth="max-w-lg" onClose={onClose}>
+    <Dialog ariaLabel="Search chats" maxWidth="max-w-2xl" onClose={onClose}>
       <div className="search-modal">
         <div className="flex items-center gap-2">
           <label className="sr-only" htmlFor="chat-search">
             Search chats
           </label>
-          <div className="field-input flex min-h-11 flex-1 items-center gap-2 px-3">
+          <div className="field-input flex min-h-10 flex-1 items-center gap-2 px-3">
             <SearchIcon className="size-4 text-ink-faint" />
             <input
               autoComplete="off"

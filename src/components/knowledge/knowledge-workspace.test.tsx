@@ -276,7 +276,7 @@ describe("KnowledgeWorkspace", () => {
     expect(within(dialog).getByRole("button", { name: "Re-index" })).toBeInTheDocument();
   });
 
-  it("hides corpus re-index when every document is active", () => {
+  it("keeps corpus re-index when every document is active", () => {
     render(
       <KnowledgeWorkspace
         addDocumentAction={async () => {}}
@@ -304,8 +304,8 @@ describe("KnowledgeWorkspace", () => {
     );
 
     expect(
-      screen.queryByRole("button", { name: "Re-index sources" }),
-    ).toBeNull();
+      screen.getByRole("button", { name: "Re-index sources" }),
+    ).toBeInTheDocument();
   });
 
   it("pages the document inventory", () => {
