@@ -1,20 +1,18 @@
 import type { Metadata } from "next";
-import { JetBrains_Mono, Nunito } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 
 import "./globals.css";
 
-const nunito = Nunito({
+const geist = Geist({
   subsets: ["latin"],
-  variable: "--font-nunito",
+  variable: "--font-geist",
   display: "swap",
-  weight: ["400", "500", "600", "700"],
 });
 
-const jetBrainsMono = JetBrains_Mono({
+const geistMono = Geist_Mono({
   subsets: ["latin"],
-  variable: "--font-jetbrains-mono",
+  variable: "--font-geist-mono",
   display: "swap",
-  weight: ["400", "500", "600"],
 });
 
 export const metadata: Metadata = {
@@ -31,7 +29,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`h-full antialiased ${nunito.variable} ${jetBrainsMono.variable}`}
+      className={`h-full antialiased ${geist.variable} ${geistMono.variable}`}
     >
       <body className="flex min-h-full flex-col">{children}</body>
     </html>
