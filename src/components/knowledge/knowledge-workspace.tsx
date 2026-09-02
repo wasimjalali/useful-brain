@@ -139,6 +139,9 @@ export function KnowledgeWorkspace({
   const pagedDocuments = visibleDocuments.slice(0, documentLimit);
   const previewChunks = chunks.slice(0, chunkLimit);
   const activeCount = inventory.filter((item) => item.status === "active").length;
+  const needsCorpusReindex = inventory.some(
+    (item) => item.status === "failed" || item.status === "needs_indexing",
+  );
   const documentStatusBySource = useMemo(
     () => new Map(inventory.map((item) => [item.document.source, item.status])),
     [inventory],
@@ -277,19 +280,21 @@ export function KnowledgeWorkspace({
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
-            {reindexAction ? <button
-              className="btn btn-secondary min-h-10 px-3.5 text-sm"
-              disabled={isReindexing || isPromoting}
-              onClick={handleReindex}
-              type="button"
-            >
-              <LayersIcon className="size-4" />
-              {isReindexing ? "Re-indexing" : "Re-index sources"}
-            </button> : null}
+            {reindexAction && needsCorpusReindex ? (
+              <button
+                className="btn btn-secondary min-h-10 px-3.5 text-sm"
+                disabled={isReindexing || isPromoting}
+                onClick={handleReindex}
+                type="button"
+              >
+                <LayersIcon className="size-4" />
+                {isReindexing ? "Re-indexing" : "Re-index sources"}
+              </button>
+            ) : null}
             {embeddingStorageStatus.readyVersionId && promoteAction ? (
               <button
                 className="btn btn-primary min-h-10 px-3.5 text-sm"
-                disabled={isPromoting || isEmbedding}
+                disabled={isPromoting || isEmbedding || isReindexing}
                 onClick={handlePromote}
                 type="button"
               >

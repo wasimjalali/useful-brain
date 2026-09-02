@@ -447,14 +447,14 @@ export function RagVisibilityDashboard({
       }
       // A dialog owns Escape while it is open; let it close only itself so the
       // sources panel behind it does not collapse at the same time.
-      if (selectedChunk) {
+      if (selectedChunk || settingsOpen || searchOpen) {
         return;
       }
       setSourcesOpen(false);
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedChunk]);
+  }, [searchOpen, selectedChunk, settingsOpen]);
 
   function selectWorkspaceView(view: WorkspaceView) {
     if (view === "settings") {

@@ -276,6 +276,38 @@ describe("KnowledgeWorkspace", () => {
     expect(within(dialog).getByRole("button", { name: "Re-index" })).toBeInTheDocument();
   });
 
+  it("hides corpus re-index when every document is active", () => {
+    render(
+      <KnowledgeWorkspace
+        addDocumentAction={async () => {}}
+        chunks={[
+          chunks[0],
+          {
+            id: "shipping_policy__chunk_001",
+            source: "shipping_policy.md",
+            section: "Delivery",
+            text: "Standard shipping takes five days.",
+            tokenEstimate: 6,
+            createdAt: "2026-07-01T00:00:00.000Z",
+          },
+        ]}
+        documents={documents}
+        embedAction={async () => {}}
+        reindexAction={async () => {}}
+        embeddingStorageStatus={{
+          ...embeddingStorageStatus,
+          storedDocuments: 2,
+          storedChunks: 2,
+          embeddedChunks: 2,
+        }}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: "Re-index sources" }),
+    ).toBeNull();
+  });
+
   it("pages the document inventory", () => {
     const manyDocuments = Array.from({ length: 16 }, (_, index) => ({
       source: `doc-${index}.md`,
