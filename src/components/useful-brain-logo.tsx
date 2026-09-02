@@ -47,13 +47,8 @@ export function UsefulBrainLogo({ compact = false }: { compact?: boolean }) {
         <UsefulBrainMark tone="dark" className="size-6" />
       </span>
       {!compact ? (
-        <span className="flex min-w-0 flex-col leading-none">
-          <span className="text-[15px] font-semibold tracking-[-0.01em] text-ink">
-            Useful Brain
-          </span>
-          <span className="mt-1 text-[11px] font-medium uppercase tracking-[0.14em] text-ink-faint">
-            Company knowledge
-          </span>
+        <span className="text-[15px] font-semibold tracking-[-0.02em] text-ink">
+          Useful Brain
         </span>
       ) : null}
     </div>

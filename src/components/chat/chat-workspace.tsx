@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
-import { ArrowRightIcon, LayersIcon, NewChatIcon } from "@/components/icons";
+import { LayersIcon, NewChatIcon } from "@/components/icons";
 import { UsefulBrainMark } from "@/components/useful-brain-logo";
 import { DEFAULT_USEFUL_BRAIN_CONFIG } from "@/lib/useful-brain-config";
 import type { GroundedAnswerResponse } from "@/lib/rag/grounded-answer";
@@ -16,11 +16,23 @@ import type { EvidenceItem } from "./evidence-inspector";
 export { type EvidenceItem } from "./evidence-inspector";
 
 const SAMPLE_QUESTIONS = [
-  "What is the first-response target for a P1 support ticket?",
-  "What email address do customers use for support?",
-  "How much parental leave does Northwind provide?",
-  "What is the refund window for an annual plan?",
-];
+  {
+    label: "P1 first response",
+    prompt: "What is the first-response target for a P1 support ticket?",
+  },
+  {
+    label: "Support email",
+    prompt: "What email address do customers use for support?",
+  },
+  {
+    label: "Parental leave",
+    prompt: "How much parental leave does Northwind provide?",
+  },
+  {
+    label: "Refund window",
+    prompt: "What is the refund window for an annual plan?",
+  },
+] as const;
 
 type ChatWorkspaceProps = {
   askDisabled: boolean;
@@ -60,6 +72,7 @@ export function ChatWorkspace({
   turns,
 }: ChatWorkspaceProps) {
   const [question, setQuestion] = useState("");
+  const [hoveredPrompt, setHoveredPrompt] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const hasConversation = turns.length > 0 || pendingQuestion !== null;
 
@@ -76,110 +89,148 @@ export function ChatWorkspace({
     setQuestion("");
   }
 
+  const showWelcome = ready && !hasConversation;
+
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-center justify-between gap-3 border-b border-border bg-surface px-4 py-2.5 sm:px-6">
-        <h1 className="text-sm font-semibold text-ink">Chat</h1>
-        <button
-          className="btn btn-secondary min-h-10 px-3 text-sm"
-          disabled={!canReset}
-          onClick={onNewChat}
-          type="button"
-        >
-          <NewChatIcon className="size-4" />
-          New chat
-        </button>
-      </header>
+      {hasConversation ? (
+        <header className="flex items-center justify-end gap-3 px-4 py-3 sm:px-6">
+          {canReset ? (
+            <button
+              className="icon-btn size-9"
+              onClick={onNewChat}
+              type="button"
+            >
+              <NewChatIcon className="size-4" />
+              <span className="sr-only">New chat</span>
+            </button>
+          ) : null}
+        </header>
+      ) : null}
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
-          {!ready ? (
-            <SetupNotice onOpenKnowledge={onOpenKnowledge} />
-          ) : !hasConversation ? (
-            <ChatWelcome onRunQuestion={send} />
-          ) : (
-            <div className="flex flex-col gap-6">
-              {turns.map((turn, index) => {
-                const isLast = index === turns.length - 1 && pendingQuestion === null;
-                return (
-                  <div className="flex flex-col gap-6" key={turn.id}>
-                    <UserMessage text={turn.question} />
-                    <div aria-live={isLast ? "polite" : undefined}>
-                      {turn.cancelled ? (
-                        <StoppedMessage onRetry={() => send(turn.question)} />
-                      ) : turn.error ? (
-                        <ErrorMessage
-                          message={turn.error}
-                          onRetry={
-                            turn.errorRetryable
-                              ? () => send(turn.question)
-                              : undefined
-                          }
-                        />
-                      ) : turn.answer ? (
-                        <ConversationTurn
-                          activeEvidenceId={focusedEvidenceId}
-                          answer={turn.answer}
-                          onFocusEvidence={(evidenceId, matchedSentence) =>
-                            onFocusEvidence(turn.id, evidenceId, matchedSentence)
-                          }
-                          onOpenSources={() => onOpenSources(turn.id)}
-                          onRetry={send}
-                        />
-                      ) : null}
-                    </div>
-                  </div>
-                );
-              })}
-              {pendingQuestion ? (
+      {showWelcome ? (
+        <ChatWelcome
+          composer={
+            <ChatComposer
+              disabled={askDisabled}
+              flush
+              onChange={setQuestion}
+              onSend={() => send()}
+              onStop={onStop}
+              pending={pendingQuestion !== null}
+              preview={question ? null : hoveredPrompt}
+              stopping={stopping}
+              value={question}
+            />
+          }
+          activePrompt={question ? null : hoveredPrompt}
+          onFillQuestion={(prompt) => {
+            setQuestion(prompt);
+            setHoveredPrompt(null);
+          }}
+          onPreviewQuestion={setHoveredPrompt}
+        />
+      ) : (
+        <>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
+              {!ready ? (
+                <SetupNotice onOpenKnowledge={onOpenKnowledge} />
+              ) : (
                 <div className="flex flex-col gap-6">
-                  <UserMessage text={pendingQuestion} />
-                  <ThinkingIndicator error={stopError} />
+                  {turns.map((turn, index) => {
+                    const isLast = index === turns.length - 1 && pendingQuestion === null;
+                    return (
+                      <div className="flex flex-col gap-6" key={turn.id}>
+                        <UserMessage text={turn.question} />
+                        <div aria-live={isLast ? "polite" : undefined}>
+                          {turn.cancelled ? (
+                            <StoppedMessage onRetry={() => send(turn.question)} />
+                          ) : turn.error ? (
+                            <ErrorMessage
+                              message={turn.error}
+                              onRetry={
+                                turn.errorRetryable
+                                  ? () => send(turn.question)
+                                  : undefined
+                              }
+                            />
+                          ) : turn.answer ? (
+                            <ConversationTurn
+                              activeEvidenceId={focusedEvidenceId}
+                              answer={turn.answer}
+                              onFocusEvidence={(evidenceId, matchedSentence) =>
+                                onFocusEvidence(turn.id, evidenceId, matchedSentence)
+                              }
+                              onOpenSources={() => onOpenSources(turn.id)}
+                              onRetry={send}
+                            />
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {pendingQuestion ? (
+                    <div className="flex flex-col gap-6">
+                      <UserMessage text={pendingQuestion} />
+                      <ThinkingIndicator error={stopError} />
+                    </div>
+                  ) : null}
+                  <div aria-hidden="true" ref={bottomRef} />
                 </div>
-              ) : null}
-              <div aria-hidden="true" ref={bottomRef} />
+              )}
             </div>
-          )}
-        </div>
-      </div>
-
-      <ChatComposer
-        disabled={askDisabled}
-        onChange={setQuestion}
-        onSend={() => send()}
-        onStop={onStop}
-        pending={pendingQuestion !== null}
-        stopping={stopping}
-        value={question}
-      />
+          </div>
+          <ChatComposer
+            disabled={askDisabled}
+            onChange={setQuestion}
+            onSend={() => send()}
+            onStop={onStop}
+            pending={pendingQuestion !== null}
+            stopping={stopping}
+            value={question}
+          />
+        </>
+      )}
     </div>
   );
 }
 
-function ChatWelcome({ onRunQuestion }: { onRunQuestion: (value: string) => void }) {
+function ChatWelcome({
+  activePrompt,
+  composer,
+  onFillQuestion,
+  onPreviewQuestion,
+}: {
+  activePrompt: string | null;
+  composer: ReactNode;
+  onFillQuestion: (value: string) => void;
+  onPreviewQuestion: (value: string | null) => void;
+}) {
   return (
-    <div className="rise flex flex-col items-center pt-8 text-center sm:pt-16">
-      <span className="grid size-14 place-items-center rounded-2xl bg-brand shadow-sm">
-        <UsefulBrainMark className="size-9" tone="dark" />
-      </span>
-      <h2 className="mt-5 text-2xl font-semibold tracking-[-0.01em] text-ink">
+    <div className="rise flex min-h-0 flex-1 flex-col items-center justify-center px-4 pb-16 text-center">
+      <h1 className="max-w-xl text-2xl font-semibold tracking-[-0.03em] text-ink sm:text-[28px]">
         Ask a grounded question
-      </h2>
+      </h1>
       <p className="mt-2 max-w-md text-[15px] leading-6 text-ink-muted">
-        {DEFAULT_USEFUL_BRAIN_CONFIG.productName} answers only from retrieved company documents
-        and cites every source. If evidence is missing, it says so.
+        Answers only from retrieved company documents. Missing evidence is a refusal.
       </p>
-
-      <div className="mt-8 grid w-full max-w-xl gap-2 sm:grid-cols-2">
+      <div className="mt-8 w-full max-w-xl">{composer}</div>
+      <div className="mt-5 flex w-full max-w-xl flex-wrap justify-center gap-2">
         {SAMPLE_QUESTIONS.map((sample) => (
           <button
-            className="suggestion-button min-h-12 px-4 py-3 text-left text-sm text-ink"
-            key={sample}
-            onClick={() => onRunQuestion(sample)}
+            aria-label={sample.prompt}
+            className="chip"
+            data-active={activePrompt === sample.prompt ? "true" : undefined}
+            key={sample.prompt}
+            onBlur={() => onPreviewQuestion(null)}
+            onClick={() => onFillQuestion(sample.prompt)}
+            onFocus={() => onPreviewQuestion(sample.prompt)}
+            onMouseEnter={() => onPreviewQuestion(sample.prompt)}
+            onMouseLeave={() => onPreviewQuestion(null)}
             type="button"
           >
-            <span>{sample}</span>
-            <ArrowRightIcon className="size-4 shrink-0 text-ink-faint" />
+            {sample.label}
           </button>
         ))}
       </div>
@@ -190,7 +241,7 @@ function ChatWelcome({ onRunQuestion }: { onRunQuestion: (value: string) => void
 function UserMessage({ text }: { text: string }) {
   return (
     <div className="msg-in flex justify-end">
-      <div className="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-accent px-4 py-2.5 text-[15px] leading-6 text-accent-ink shadow-sm">
+      <div className="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-sunken px-4 py-2.5 text-[15px] leading-6 text-ink">
         {text}
       </div>
     </div>
@@ -238,7 +289,7 @@ function SetupNotice({ onOpenKnowledge }: { onOpenKnowledge: () => void }) {
       <span className="mx-auto grid size-11 place-items-center rounded-xl bg-warning-soft text-warning">
         <LayersIcon className="size-6" />
       </span>
-      <h2 className="mt-4 text-lg font-semibold text-ink">Set up the knowledge base</h2>
+      <h2 className="mt-4 text-lg font-semibold text-ink">Set up sources</h2>
       <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-muted">
         Chat becomes available after a ready generation is promoted.
       </p>

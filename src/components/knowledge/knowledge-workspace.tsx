@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 
 import { CloseIcon, LayersIcon, PlusIcon, UploadIcon } from "@/components/icons";
 import { Dialog } from "@/components/ui/dialog";
+import { Select } from "@/components/ui/select";
 import { StatusLabel, type StatusTone } from "@/components/ui/status-label";
 import type { ActionResult } from "@/lib/rag/app-errors";
 import type { DocumentChunk, KnowledgeDocument } from "@/lib/rag/types";
@@ -56,6 +57,9 @@ const STATUS_TONE: Record<DocumentStatus, StatusTone> = {
   failed: "danger",
 };
 
+const DOCUMENT_PAGE_SIZE = 12;
+const CHUNK_PAGE_SIZE = 5;
+
 export function KnowledgeWorkspace({
   addDocumentAction,
   chunks,
@@ -81,6 +85,8 @@ export function KnowledgeWorkspace({
   const [embedError, setEmbedError] = useState<string | null>(null);
   const [isPromoting, setIsPromoting] = useState(false);
   const [isReindexing, setIsReindexing] = useState(false);
+  const [documentLimit, setDocumentLimit] = useState(DOCUMENT_PAGE_SIZE);
+  const [chunkLimit, setChunkLimit] = useState(CHUNK_PAGE_SIZE);
 
   const inventory = useMemo(() => {
     const chunksBySource = new Map<string, DocumentChunk[]>();
@@ -130,7 +136,12 @@ export function KnowledgeWorkspace({
     });
   }, [inventory, query, sort, statusFilter]);
 
+  const pagedDocuments = visibleDocuments.slice(0, documentLimit);
+  const previewChunks = chunks.slice(0, chunkLimit);
   const activeCount = inventory.filter((item) => item.status === "active").length;
+  const needsCorpusReindex = inventory.some(
+    (item) => item.status === "failed" || item.status === "needs_indexing",
+  );
   const documentStatusBySource = useMemo(
     () => new Map(inventory.map((item) => [item.document.source, item.status])),
     [inventory],
@@ -196,8 +207,8 @@ export function KnowledgeWorkspace({
   if (firstRun) {
     return (
       <div className="flex flex-col gap-6">
-        <header className="border-b border-border pb-5">
-          <h1 className="text-2xl font-semibold tracking-[-0.02em] text-ink">Knowledge base</h1>
+        <header>
+          <h1 className="text-2xl font-semibold tracking-[-0.02em] text-ink">Sources</h1>
         </header>
         <section className="first-run-panel" aria-labelledby="first-run-heading">
           <div>
@@ -237,8 +248,8 @@ export function KnowledgeWorkspace({
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-start sm:justify-between">
-        <h1 className="text-2xl font-semibold tracking-[-0.02em] text-ink">Knowledge base</h1>
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <h1 className="text-2xl font-semibold tracking-[-0.02em] text-ink">Sources</h1>
         <button
           className="btn btn-primary min-h-10 shrink-0 px-3.5 text-sm"
           onClick={() => setAddOpen(true)}
@@ -269,19 +280,21 @@ export function KnowledgeWorkspace({
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
-            {reindexAction ? <button
-              className="btn btn-secondary min-h-10 px-3.5 text-sm"
-              disabled={isReindexing || isPromoting}
-              onClick={handleReindex}
-              type="button"
-            >
-              <LayersIcon className="size-4" />
-              {isReindexing ? "Re-indexing" : "Re-index knowledge base"}
-            </button> : null}
+            {reindexAction && needsCorpusReindex ? (
+              <button
+                className="btn btn-secondary min-h-10 px-3.5 text-sm"
+                disabled={isReindexing || isPromoting}
+                onClick={handleReindex}
+                type="button"
+              >
+                <LayersIcon className="size-4" />
+                {isReindexing ? "Re-indexing" : "Re-index sources"}
+              </button>
+            ) : null}
             {embeddingStorageStatus.readyVersionId && promoteAction ? (
               <button
                 className="btn btn-primary min-h-10 px-3.5 text-sm"
-                disabled={isPromoting || isEmbedding}
+                disabled={isPromoting || isEmbedding || isReindexing}
                 onClick={handlePromote}
                 type="button"
               >
@@ -297,7 +310,10 @@ export function KnowledgeWorkspace({
               <input
                 className="field-input min-h-10 px-3 text-sm text-ink outline-none"
                 name="document-search"
-                onChange={(event) => setQuery(event.target.value)}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setDocumentLimit(DOCUMENT_PAGE_SIZE);
+                }}
                 placeholder="Title or source"
                 type="search"
                 value={query}
@@ -305,34 +321,37 @@ export function KnowledgeWorkspace({
             </label>
             <label className="flex min-w-40 flex-col gap-1.5 text-[13px] font-medium text-ink-muted">
               Filter by status
-              <select
-                className="field-input min-h-10 px-3 text-sm text-ink outline-none"
-                onChange={(event) =>
-                  setStatusFilter(event.target.value as "all" | DocumentStatus)
-                }
+              <Select
+                id="document-status-filter"
+                onChange={(next) => {
+                  setStatusFilter(next as "all" | DocumentStatus);
+                  setDocumentLimit(DOCUMENT_PAGE_SIZE);
+                }}
+                options={[
+                  { value: "all", label: "All statuses" },
+                  ...Object.entries(STATUS_COPY).map(([value, label]) => ({
+                    value,
+                    label,
+                  })),
+                ]}
                 value={statusFilter}
-              >
-                <option value="all">All statuses</option>
-                {Object.entries(STATUS_COPY).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
+              />
             </label>
             <label className="flex min-w-36 flex-col gap-1.5 text-[13px] font-medium text-ink-muted">
               Sort documents
-              <select
-                className="field-input min-h-10 px-3 text-sm text-ink outline-none"
-                onChange={(event) =>
-                  setSort(event.target.value as "title" | "source" | "chunks")
-                }
+              <Select
+                id="document-sort"
+                onChange={(next) => {
+                  setSort(next as "title" | "source" | "chunks");
+                  setDocumentLimit(DOCUMENT_PAGE_SIZE);
+                }}
+                options={[
+                  { value: "title", label: "Title" },
+                  { value: "source", label: "Source" },
+                  { value: "chunks", label: "Most chunks" },
+                ]}
                 value={sort}
-              >
-                <option value="title">Title</option>
-                <option value="source">Source</option>
-                <option value="chunks">Most chunks</option>
-              </select>
+              />
             </label>
         </div>
 
@@ -343,13 +362,24 @@ export function KnowledgeWorkspace({
         ) : null}
 
         <DocumentTable
-          documents={visibleDocuments}
+          documents={pagedDocuments}
           onSelectDocument={setSelectedDocument}
         />
         <DocumentRows
-          documents={visibleDocuments}
+          documents={pagedDocuments}
           onSelectDocument={setSelectedDocument}
         />
+        {visibleDocuments.length > documentLimit ? (
+          <button
+            className="btn btn-secondary min-h-10 self-start px-3.5 text-sm"
+            onClick={() =>
+              setDocumentLimit((current) => current + DOCUMENT_PAGE_SIZE)
+            }
+            type="button"
+          >
+            Load more
+          </button>
+        ) : null}
       </section>
 
       <section aria-labelledby="recent-chunks-heading" className="flex flex-col gap-3">
@@ -357,23 +387,36 @@ export function KnowledgeWorkspace({
           Chunk preview
         </h2>
         {chunks.length > 0 ? (
-          <div className="overflow-hidden rounded-xl border border-border bg-surface">
-            {chunks.slice(0, 5).map((chunk) => (
-              <article className="border-b border-border px-4 py-3 last:border-b-0" key={chunk.id}>
-                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-                  <span className="font-mono text-xs font-semibold text-accent-deep">{chunk.id}</span>
-                  <div className="flex items-center gap-3">
-                    <span className="tnum text-xs text-ink-faint">~{chunk.tokenEstimate} tokens</span>
-                    <DocumentStatusLabel
-                      status={documentStatusBySource.get(chunk.source) ?? "needs_indexing"}
-                    />
+          <>
+            <div className="overflow-hidden rounded-xl border border-border bg-surface">
+              {previewChunks.map((chunk) => (
+                <article className="border-b border-border px-4 py-3 last:border-b-0" key={chunk.id}>
+                  <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+                    <span className="font-mono text-xs font-semibold text-accent-deep">{chunk.id}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="tnum text-xs text-ink-faint">~{chunk.tokenEstimate} tokens</span>
+                      <DocumentStatusLabel
+                        status={documentStatusBySource.get(chunk.source) ?? "needs_indexing"}
+                      />
+                    </div>
                   </div>
-                </div>
-                <p className="mt-1 text-xs font-medium text-ink-muted">{chunk.section}</p>
-                <p className="mt-2 line-clamp-2 text-sm leading-6 text-ink-muted">{chunk.text}</p>
-              </article>
-            ))}
-          </div>
+                  <p className="mt-1 text-xs font-medium text-ink-muted">{chunk.section}</p>
+                  <p className="mt-2 line-clamp-2 text-sm leading-6 text-ink-muted">{chunk.text}</p>
+                </article>
+              ))}
+            </div>
+            {chunks.length > chunkLimit ? (
+              <button
+                className="btn btn-secondary min-h-10 self-start px-3.5 text-sm"
+                onClick={() =>
+                  setChunkLimit((current) => current + CHUNK_PAGE_SIZE)
+                }
+                type="button"
+              >
+                Load more chunks
+              </button>
+            ) : null}
+          </>
         ) : (
           <p className="rounded-xl border border-dashed border-border-strong px-4 py-6 text-sm text-ink-muted">
             No chunks have been created yet.
@@ -394,6 +437,14 @@ export function KnowledgeWorkspace({
           deleteAction={deleteDocumentAction}
           item={selectedDocument}
           onClose={() => setSelectedDocument(null)}
+          onReindex={
+            reindexAction &&
+            (selectedDocument.status === "failed" ||
+              selectedDocument.status === "needs_indexing")
+              ? handleReindex
+              : undefined
+          }
+          reindexing={isReindexing}
         />
       ) : null}
     </div>
@@ -562,11 +613,15 @@ function DocumentDetailDialog({
   deleteAction,
   item,
   onClose,
+  onReindex,
+  reindexing = false,
 }: {
   canDelete: boolean;
   deleteAction?: (documentId: string) => Promise<ActionResult<null>>;
   item: DocumentInventoryItem;
   onClose: () => void;
+  onReindex?: () => Promise<void>;
+  reindexing?: boolean;
 }) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
@@ -632,22 +687,39 @@ function DocumentDetailDialog({
             <p className="mt-2 text-sm text-ink-muted">No chunks are available for this document yet.</p>
           )}
         </div>
-        {deleteAction && item.document.id ? (
-          <div className="border-t border-border pt-4">
-            <p className="text-sm text-ink-muted">
-              Deletion creates a ready generation. Retrieval changes only after promotion.
-            </p>
-            {deleteError ? <p className="mt-2 text-sm text-danger" role="alert">{deleteError}</p> : null}
-            <button
-              className="btn btn-secondary mt-3 min-h-10 px-3.5 text-sm text-danger"
-              disabled={deleting || !canDelete}
-              onClick={handleDelete}
-              type="button"
-            >
-              {deleting ? "Deleting document" : "Delete document"}
-            </button>
-            {!canDelete ? (
-              <p className="mt-2 text-xs text-ink-faint">At least one document must remain.</p>
+        {onReindex || (deleteAction && item.document.id) ? (
+          <div className="flex flex-col gap-3 border-t border-border pt-4">
+            {onReindex ? (
+              <button
+                className="btn btn-primary min-h-10 self-start px-3.5 text-sm"
+                disabled={reindexing}
+                onClick={() => {
+                  void onReindex();
+                  onClose();
+                }}
+                type="button"
+              >
+                {reindexing ? "Re-indexing" : "Re-index"}
+              </button>
+            ) : null}
+            {deleteAction && item.document.id ? (
+              <>
+                <p className="text-sm text-ink-muted">
+                  Deletion creates a ready generation. Retrieval changes only after promotion.
+                </p>
+                {deleteError ? <p className="mt-2 text-sm text-danger" role="alert">{deleteError}</p> : null}
+                <button
+                  className="btn btn-secondary min-h-10 self-start px-3.5 text-sm text-danger"
+                  disabled={deleting || !canDelete}
+                  onClick={handleDelete}
+                  type="button"
+                >
+                  {deleting ? "Deleting document" : "Delete document"}
+                </button>
+                {!canDelete ? (
+                  <p className="text-xs text-ink-faint">At least one document must remain.</p>
+                ) : null}
+              </>
             ) : null}
           </div>
         ) : null}

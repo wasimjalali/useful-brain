@@ -144,6 +144,15 @@ export function UploadIcon(props: IconProps) {
   );
 }
 
+export function SearchIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="m16 16 4 4" />
+    </Icon>
+  );
+}
+
 export function NewChatIcon(props: IconProps) {
   return (
     <Icon {...props}>
@@ -194,6 +203,14 @@ export function ThumbDownIcon(props: IconProps) {
     <Icon {...props}>
       <path d="M7.5 4H5.8A1.8 1.8 0 0 0 4 5.8v6.4A1.8 1.8 0 0 0 5.8 14H7.5" />
       <path d="M7.5 4h8.2a2 2 0 0 1 1.9 1.4l1.5 5a2 2 0 0 1-1.9 2.6h-3.6l.8 3.5a3.2 3.2 0 0 1-1.2 3.1L12 20.5 7.5 14Z" />
+    </Icon>
+  );
+}
+
+export function ChevronDownIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="m6 9 6 6 6-6" />
     </Icon>
   );
 }
