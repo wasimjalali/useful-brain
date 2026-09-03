@@ -516,7 +516,7 @@ export function RagVisibilityDashboard({
           onSearch={() => setSearchOpen(true)}
           onSelectConversation={selectConversation}
           onSelectView={selectWorkspaceView}
-          operatorLabel={identity?.id ?? "Operator"}
+          operatorLabel={identity?.subject ?? identity?.id ?? "Operator"}
           retrievalReady={retrievalReady}
         />
       }

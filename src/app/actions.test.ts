@@ -14,6 +14,12 @@ vi.mock("next/cache", () => ({
   revalidatePath: (...args: unknown[]) => revalidatePath(...args),
 }));
 
+vi.mock("next/navigation", () => ({
+  redirect: (path: string) => {
+    throw new Error(`REDIRECT:${path}`);
+  },
+}));
+
 vi.mock("@/lib/eval/northwind-seed", () => ({
   northwindSeedDocuments: () => [
     {

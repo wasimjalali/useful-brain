@@ -5,6 +5,7 @@ import { IdentityConfigError } from "./identity-mode";
 import { PrincipalResolutionError } from "./principal";
 import { UnsignedPrincipalError } from "../cf/service-binding-identity";
 import { authenticateWorkerRequest } from "./worker-identity";
+import { SessionRequiredError } from "./session-errors";
 
 const directory = {
   id: "principal-dev",
@@ -139,5 +140,39 @@ describe("worker inbound identity", () => {
         },
       }),
     ).rejects.toBeInstanceOf(AccessJwtError);
+  });
+
+  it("resolves a session principal and fails closed without a session cookie", async () => {
+    const principal = await authenticateWorkerRequest({
+      identityMode: "session",
+      headers: new Headers({ cookie: "usefulbrain.session=tok_live" }),
+      requirePrincipal: true,
+      loadSession: async (token) => {
+        expect(token).toBe("tok_live");
+        return directory;
+      },
+    });
+    expect(principal).toEqual(directory);
+    await expect(
+      authenticateWorkerRequest({
+        identityMode: "session",
+        headers: new Headers(),
+        requirePrincipal: true,
+        loadSession: async () => directory,
+      }),
+    ).rejects.toBeInstanceOf(SessionRequiredError);
+  });
+
+  it("prefers a valid session cookie over the loopback operator", async () => {
+    const sessionUser = { ...directory, id: "principal-user", subject: "user@example.com" };
+    const principal = await authenticateWorkerRequest({
+      identityMode: "loopback",
+      headers: new Headers({ cookie: "usefulbrain.session=tok_live" }),
+      loopbackSubject: "dev@localhost",
+      requirePrincipal: true,
+      loadDirectory: async () => directory,
+      loadSession: async () => sessionUser,
+    });
+    expect(principal).toEqual(sessionUser);
   });
 });

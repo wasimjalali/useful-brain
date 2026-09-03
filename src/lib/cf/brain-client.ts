@@ -35,6 +35,10 @@ export async function brainFetch(
   if (assertion) {
     incomingHeaders.set("cf-access-jwt-assertion", assertion);
   }
+  const cookie = incoming.get("cookie");
+  if (cookie) {
+    incomingHeaders.set("cookie", cookie);
+  }
   const requestId = incoming.get("x-request-id");
   if (requestId) {
     incomingHeaders.set("x-request-id", requestId);

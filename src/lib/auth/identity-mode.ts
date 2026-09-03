@@ -1,4 +1,4 @@
-export type IdentityMode = "access" | "loopback" | "disabled";
+export type IdentityMode = "access" | "loopback" | "session" | "disabled";
 export type RuntimeEnv = "development" | "staging" | "production";
 
 export class IdentityConfigError extends Error {
@@ -10,10 +10,10 @@ export class IdentityConfigError extends Error {
 
 export function parseIdentityMode(raw: string | undefined): IdentityMode {
   const value = raw?.trim();
-  if (value === "access" || value === "loopback" || value === "disabled") {
+  if (value === "access" || value === "loopback" || value === "session" || value === "disabled") {
     return value;
   }
-  throw new IdentityConfigError("IDENTITY_MODE must be access, loopback or disabled");
+  throw new IdentityConfigError("IDENTITY_MODE must be access, loopback, session or disabled");
 }
 
 export function parseRuntimeEnv(raw: string | undefined): RuntimeEnv {
@@ -46,7 +46,7 @@ export function assertIdentityConfiguration(config: {
 
   if (config.runtimeEnv === "production" && config.identityMode === "disabled") {
     throw new IdentityConfigError(
-      "production cannot use disabled identity; use loopback on 127.0.0.1 or Access",
+      "production cannot use disabled identity; use session, loopback on 127.0.0.1 or Access",
     );
   }
 
@@ -54,9 +54,13 @@ export function assertIdentityConfiguration(config: {
     if (config.identityMode === "loopback") {
       throw new IdentityConfigError("loopback identity is not allowed on staging workers.dev");
     }
-    if (config.identityMode !== "access" && config.identityMode !== "disabled") {
+    if (
+      config.identityMode !== "access" &&
+      config.identityMode !== "session" &&
+      config.identityMode !== "disabled"
+    ) {
       throw new IdentityConfigError(
-        "staging must use Access identity or the authorized disabled smoke exception",
+        "staging must use session, Access or the authorized disabled smoke exception",
       );
     }
   }
@@ -66,6 +70,12 @@ export function assertIdentityConfiguration(config: {
   }
   if (config.identityMode === "access" && config.loopbackRuntimeConfigured) {
     throw new IdentityConfigError("Access mode cannot combine with the loopback runtime signal");
+  }
+  if (config.identityMode === "session" && config.wranglerAccessDevConfigured) {
+    throw new IdentityConfigError("session mode cannot combine with Wrangler access.dev");
+  }
+  if (config.identityMode === "session" && config.loopbackRuntimeConfigured) {
+    throw new IdentityConfigError("session mode cannot combine with the loopback runtime signal");
   }
 
   if (config.identityMode === "loopback") {

@@ -37,7 +37,7 @@ describe("protected Worker configuration", () => {
         expect(vars.LOOPBACK_SUBJECT ?? "").toBe("");
       }
       if (name === "staging") {
-        expect(vars.IDENTITY_MODE).toBe("disabled");
+        expect(vars.IDENTITY_MODE).toBe("session");
         expect(vars.RESOURCES_PROVISIONED).toBe("true");
         const databases = env.d1_databases as Array<{ database_id: string; database_name: string }>;
         expect(databases.map((db) => db.database_name).sort()).toEqual([
@@ -49,7 +49,7 @@ describe("protected Worker configuration", () => {
         }
       }
       if (name === "production") {
-        expect(vars.IDENTITY_MODE).toBe("access");
+        expect(vars.IDENTITY_MODE).toBe("session");
         expect(vars.RESOURCES_PROVISIONED).toBe("false");
       }
     }
@@ -110,18 +110,20 @@ describe("protected Worker configuration", () => {
     expect(environments.staging.route).toBeUndefined();
     expect(environments.staging.routes).toBeUndefined();
     const stagingVars = environments.staging.vars as Record<string, string>;
-    expect(stagingVars.IDENTITY_MODE).toBe("disabled");
+    expect(stagingVars.IDENTITY_MODE).toBe("session");
     expect(stagingVars.LOOPBACK_RUNTIME).toBe("false");
     expect(stagingVars.WRANGLER_ACCESS_DEV).toBe("false");
     expect(stagingVars.RESOURCES_PROVISIONED).toBe("true");
-    expect((environments.production.vars as Record<string, string>).IDENTITY_MODE).toBe("access");
+    expect((environments.production.vars as Record<string, string>).IDENTITY_MODE).toBe("session");
   });
 
   it("sends public hosts to the landing page and keeps loopback on the workspace", () => {
     const source = readFileSync(path.join(process.cwd(), "src/app/page.tsx"), "utf8");
     expect(source).toMatch(/getCloudflareContext/);
     expect(source).toMatch(/LOOPBACK_RUNTIME/);
+    expect(source).toMatch(/IDENTITY_MODE/);
     expect(source).toMatch(/redirect\("\/open"\)/);
+    expect(source).toMatch(/redirect\("\/login"\)/);
     expect(source).toMatch(/\/chat/);
     expect(source).toMatch(/\/knowledge/);
   });

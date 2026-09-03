@@ -62,6 +62,7 @@ describe("Web-to-Brain identity", () => {
     expect(await response.json()).toEqual({
       id: "principal-alice",
       kind: "user",
+      subject: "alice@karkoai.com",
       roles: ["operator"],
       departments: ["engineering"],
     });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { CloseIcon, LayersIcon, SettingsIcon, UserIcon } from "@/components/icons";
 import { Select } from "@/components/ui/select";
@@ -104,6 +105,7 @@ function OperatorPane({
   identity: WorkspaceIdentity | null;
   onAssumePrincipal?: (key: string | null) => void;
 }) {
+  const router = useRouter();
   return (
     <section aria-labelledby="identity-heading">
       <h2 className="sr-only" id="identity-heading">
@@ -132,9 +134,22 @@ function OperatorPane({
           </div>
         ) : null}
         <SettingsRow label="Principal" value={identity?.id ?? "Unavailable"} mono />
+        <SettingsRow label="Email" value={identity?.subject ?? "Unavailable"} />
         <SettingsRow label="Identity kind" value={identity?.kind ?? "Unavailable"} />
-        <SettingsRow label="Runtime" value="Loopback on 127.0.0.1" />
       </dl>
+      <form
+        className="mt-6"
+        onSubmit={async (event) => {
+          event.preventDefault();
+          await fetch("/api/auth/logout", { method: "POST" });
+          router.push("/login");
+          router.refresh();
+        }}
+      >
+        <button className="rounded-md border border-border px-3 py-2 text-sm text-ink" type="submit">
+          Log out
+        </button>
+      </form>
     </section>
   );
 }

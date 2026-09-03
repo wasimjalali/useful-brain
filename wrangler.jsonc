@@ -64,7 +64,7 @@
       "preview_urls": false,
       "vars": {
         "RUNTIME_ENV": "staging",
-        "IDENTITY_MODE": "disabled",
+        "IDENTITY_MODE": "session",
         "RESOURCES_PROVISIONED": "true",
         "WRANGLER_ACCESS_DEV": "false",
         "LOOPBACK_RUNTIME": "false"
@@ -89,7 +89,7 @@
       "preview_urls": false,
       "vars": {
         "RUNTIME_ENV": "production",
-        "IDENTITY_MODE": "access",
+        "IDENTITY_MODE": "session",
         "RESOURCES_PROVISIONED": "false",
         "WRANGLER_ACCESS_DEV": "false",
         "LOOPBACK_RUNTIME": "false"

@@ -7,9 +7,10 @@ import {
 } from "./identity-mode";
 
 describe("identity modes", () => {
-  it("parses the three mutually exclusive modes", () => {
+  it("parses the four mutually exclusive modes", () => {
     expect(parseIdentityMode("access")).toBe("access");
     expect(parseIdentityMode("loopback")).toBe("loopback");
+    expect(parseIdentityMode("session")).toBe("session");
     expect(parseIdentityMode("disabled")).toBe("disabled");
     expect(() => parseIdentityMode("asserted")).toThrow(IdentityConfigError);
   });
@@ -82,6 +83,33 @@ describe("identity modes", () => {
         loopbackRuntimeConfigured: false,
       }),
     ).toThrow(/production cannot use disabled identity/);
+  });
+
+  it("allows session identity on staging and production without loopback", () => {
+    expect(() =>
+      assertIdentityConfiguration({
+        runtimeEnv: "staging",
+        identityMode: "session",
+        wranglerAccessDevConfigured: false,
+        loopbackRuntimeConfigured: false,
+      }),
+    ).not.toThrow();
+    expect(() =>
+      assertIdentityConfiguration({
+        runtimeEnv: "production",
+        identityMode: "session",
+        wranglerAccessDevConfigured: false,
+        loopbackRuntimeConfigured: false,
+      }),
+    ).not.toThrow();
+    expect(() =>
+      assertIdentityConfiguration({
+        runtimeEnv: "staging",
+        identityMode: "session",
+        wranglerAccessDevConfigured: false,
+        loopbackRuntimeConfigured: true,
+      }),
+    ).toThrow(/loopback runtime signal/);
   });
 
   it("fails staging and production when Wrangler access.dev or loopback runtime is configured", () => {

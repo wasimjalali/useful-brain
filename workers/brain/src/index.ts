@@ -35,6 +35,8 @@ import {
   EvalModelOverrideInvalid,
   parseEvalModelOverride,
 } from "../../../src/lib/models/eval-override";
+import { handlePublicAuthRoute } from "../../../src/lib/auth/session-routes";
+import { resolveSessionPrincipal } from "../../../src/lib/auth/session-account";
 import { executeTurn } from "../../../src/lib/brain/execute-turn";
 import { runManualEvaluations } from "../../../src/lib/brain/eval-run";
 import { ensureLoopbackPrincipal } from "../../../src/lib/store/loopback-principal";
@@ -44,6 +46,7 @@ import {
   loadConversationForUi,
 } from "../../../src/lib/store/conversation-queries";
 import { loadKnowledgeInventory } from "../../../src/lib/store/knowledge-inventory";
+import { seedDocumentOwnerId, stampPrivateOwner } from "../../../src/lib/store/owned-seed";
 import {
   latestReadyOrActiveGenerationId,
   loadSeedDocumentsFromGeneration,
@@ -211,6 +214,24 @@ const brainWorker = {
         return new Response("ok", { headers: withRequestId(new Headers(), requestId) });
       }
 
+      const authResponse = await handlePublicAuthRoute({
+        request,
+        path,
+        identityMode,
+        db: env.OPERATIONS_DB as OperationsDatabase,
+        requestId,
+      });
+      if (authResponse) {
+        operation = path.slice(1);
+        writeOperationalLog({
+          requestId,
+          operation,
+          status: authResponse.ok ? "ok" : "error",
+          durationMs: Date.now() - started,
+        });
+        return authResponse;
+      }
+
       if (identityMode === "loopback") {
         await ensureLoopbackPrincipal(
           env.OPERATIONS_DB as OperationsDatabase,
@@ -226,6 +247,8 @@ const brainWorker = {
         requirePrincipal: true,
         verifyAccess: (token) => verifyAccess(env, token),
         loadDirectory: (subject, kind) => loadDirectory(env, subject, kind),
+        loadSession: (token) =>
+          resolveSessionPrincipal(env.OPERATIONS_DB as OperationsDatabase, token),
       });
       if (!principal) {
         throw new AccessJwtUnavailable("Access is not configured");
@@ -244,6 +267,7 @@ const brainWorker = {
           {
             id: principal.id,
             kind: principal.kind,
+            subject: principal.subject,
             roles: principal.roles,
             departments: principal.departments,
           },
@@ -595,6 +619,7 @@ const brainWorker = {
         const inventory = await loadKnowledgeInventory(
           env.CORPUS_DB as SqlExecutor,
           env.VECTORIZE ? "hybrid" : "keyword",
+          { userId: principal.id, roles: principal.roles, departments: principal.departments },
         );
         writeOperationalLog({
           requestId,
@@ -608,24 +633,36 @@ const brainWorker = {
 
       if (path === "/knowledge/seed" && request.method === "POST") {
         operation = "knowledge-seed";
-        requireOperator(principal.roles);
-        if (!env.CORPUS_DB) {
-          throw new WorkerValidationError();
-        }
         let body: { documents?: SeedDocumentInput[]; merge?: boolean };
         try {
           body = (await request.json()) as { documents?: SeedDocumentInput[]; merge?: boolean };
         } catch {
           throw new WorkerValidationError();
         }
+        if (body.merge !== true) {
+          requireOperator(principal.roles);
+        }
+        if (!env.CORPUS_DB) {
+          throw new WorkerValidationError();
+        }
         const incoming = Array.isArray(body.documents) ? body.documents : [];
-        let documents = incoming;
+        let ownedIncoming = incoming;
+        if (!principal.roles.includes("operator")) {
+          ownedIncoming = incoming.map((document) => stampPrivateOwner(principal.id, document));
+        }
+        let documents = ownedIncoming;
         if (body.merge === true) {
           const generationId = await latestReadyOrActiveGenerationId(env.CORPUS_DB as SqlExecutor);
           const existing = generationId
             ? await loadSeedDocumentsFromGeneration(env.CORPUS_DB as SqlExecutor, generationId)
             : [];
-          documents = mergeSeedDocuments(existing, incoming);
+          for (const document of ownedIncoming) {
+            const current = existing.find((row) => row.documentId === document.documentId);
+            if (current && seedDocumentOwnerId(current) && seedDocumentOwnerId(current) !== principal.id) {
+              throw new WorkerForbiddenError();
+            }
+          }
+          documents = mergeSeedDocuments(existing, ownedIncoming);
         }
         if (documents.length === 0) {
           throw new WorkerValidationError();
@@ -684,7 +721,6 @@ const brainWorker = {
       const deleteDocumentMatch = path.match(/^\/knowledge\/documents\/([^/]+)$/);
       if (deleteDocumentMatch && request.method === "DELETE") {
         operation = "knowledge-delete-document";
-        requireOperator(principal.roles);
         if (!env.CORPUS_DB) {
           throw new WorkerValidationError();
         }
@@ -699,6 +735,14 @@ const brainWorker = {
           env.CORPUS_DB as SqlExecutor,
           sourceGenerationId,
         );
+        const target = documents.find((document) => document.documentId === documentId);
+        if (!target) {
+          throw new WorkerValidationError();
+        }
+        const ownerId = seedDocumentOwnerId(target);
+        if (!principal.roles.includes("operator") && ownerId !== principal.id) {
+          throw new WorkerForbiddenError();
+        }
         const remaining = removeSeedDocument(documents, documentId);
         if (remaining.length === documents.length || remaining.length === 0) {
           throw new WorkerValidationError();

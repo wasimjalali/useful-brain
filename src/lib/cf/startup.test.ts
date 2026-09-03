@@ -39,16 +39,16 @@ describe("worker startup", () => {
     ).toThrow(/loopback runtime/);
   });
 
-  it("allows provisioned staging in disabled identity without a loopback signal", () => {
+  it("allows provisioned staging in session identity without a loopback signal", () => {
     expect(
       assertWorkerStartup({
         RUNTIME_ENV: "staging",
-        IDENTITY_MODE: "disabled",
+        IDENTITY_MODE: "session",
         RESOURCES_PROVISIONED: "true",
         WRANGLER_ACCESS_DEV: "false",
         LOOPBACK_RUNTIME: "false",
       }),
-    ).toEqual({ runtimeEnv: "staging", identityMode: "disabled" });
+    ).toEqual({ runtimeEnv: "staging", identityMode: "session" });
   });
 
   it("fails development loopback without the trusted runtime signal", () => {

@@ -34,7 +34,7 @@ describe("service-binding identity", () => {
           "cf-access-jwt-assertion": "signed.jwt.token",
           "x-useful-brain-principal": "alice@karkoai.com",
           "cf-access-authenticated-user-email": "alice@karkoai.com",
-          cookie: "CF_Authorization=browser-cookie",
+          cookie: "CF_Authorization=browser-cookie; usefulbrain.session=tok_live",
           authorization: "Bearer spoofed",
           "x-request-id": "11111111-1111-4111-8111-111111111111",
         },
@@ -44,7 +44,7 @@ describe("service-binding identity", () => {
     expect(forwarded.headers.get("x-request-id")).toBe("11111111-1111-4111-8111-111111111111");
     expect(forwarded.headers.get("x-useful-brain-principal")).toBeNull();
     expect(forwarded.headers.get("cf-access-authenticated-user-email")).toBeNull();
-    expect(forwarded.headers.get("cookie")).toBeNull();
+    expect(forwarded.headers.get("cookie")).toBe("usefulbrain.session=tok_live");
     expect(forwarded.headers.get("authorization")).toBeNull();
   });
 
