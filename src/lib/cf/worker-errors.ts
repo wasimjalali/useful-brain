@@ -1,6 +1,13 @@
 import { AccessJwtError, AccessJwtUnavailable } from "../auth/access-jwt";
 import { IdentityConfigError } from "../auth/identity-mode";
 import { PrincipalResolutionError } from "../auth/principal";
+import {
+  AuthConflictError,
+  AuthInvalidCredentialsError,
+  AuthRateLimitedError,
+  AuthValidationError,
+  SessionRequiredError,
+} from "../auth/session-errors";
 import { IngestQueueMessageError } from "../ingest/queue-message";
 import { BoundedIdError } from "./bounded-id";
 import { UnsignedPrincipalError } from "./service-binding-identity";
@@ -58,6 +65,38 @@ export function toPublicWorkerError(error: unknown, requestId: string): PublicWo
       code: "FORBIDDEN",
       message: "You cannot access that resource.",
       retryable: false,
+      requestId,
+    };
+  }
+  if (error instanceof SessionRequiredError) {
+    return {
+      code: "AUTH_REQUIRED",
+      message: "Sign in to continue.",
+      retryable: false,
+      requestId,
+    };
+  }
+  if (error instanceof AuthInvalidCredentialsError) {
+    return {
+      code: "AUTH_REQUIRED",
+      message: error.message,
+      retryable: false,
+      requestId,
+    };
+  }
+  if (error instanceof AuthConflictError || error instanceof AuthValidationError) {
+    return {
+      code: "VALIDATION_FAILED",
+      message: error.message,
+      retryable: false,
+      requestId,
+    };
+  }
+  if (error instanceof AuthRateLimitedError) {
+    return {
+      code: "RATE_LIMITED",
+      message: error.message,
+      retryable: true,
       requestId,
     };
   }

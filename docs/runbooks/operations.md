@@ -1,11 +1,12 @@
 # Operations runbook (Phase 7A staging)
 
-Local portfolio agent. Synthetic data only. No billing, public signup, or production cutover.
+Local portfolio agent. Synthetic data only. No billing or production cutover.
 
 ## Operator identity
 
-- Local: `IDENTITY_MODE=loopback` on `127.0.0.1` with `LOOPBACK_RUNTIME=true`.
-- Staging `workers.dev`: `IDENTITY_MODE=disabled`. Never enable loopback on a public URL.
+- Local: `IDENTITY_MODE=loopback` on `127.0.0.1` with `LOOPBACK_RUNTIME=true`. A signed-in session cookie, if present, wins over the loopback operator.
+- Staging `workers.dev`: `IDENTITY_MODE=session`. Never enable loopback on a public URL.
+- Email/password accounts live in operations D1 (`auth_users`, `auth_sessions`). Cookie name is `usefulbrain.session`.
 - Cloudflare Access JWT is optional demonstration code, not a launch gate.
 
 ## Staging surfaces

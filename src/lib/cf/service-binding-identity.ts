@@ -1,3 +1,5 @@
+import { sessionCookieHeader } from "../auth/session-cookie";
+
 const ACCESS_ASSERTION_HEADER = "cf-access-jwt-assertion";
 
 const SPOOFED_PRINCIPAL_HEADERS = [
@@ -59,6 +61,10 @@ export function createBrainServiceRequest(input: {
   const assertion = readAccessAssertion(input.incomingHeaders);
   if (assertion) {
     headers.set(ACCESS_ASSERTION_HEADER, assertion);
+  }
+  const sessionCookie = sessionCookieHeader(input.incomingHeaders);
+  if (sessionCookie) {
+    headers.set("cookie", sessionCookie);
   }
   const requestId = input.incomingHeaders.get("x-request-id");
   if (requestId) {

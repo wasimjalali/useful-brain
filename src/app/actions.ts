@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 import { brainJson } from "@/lib/cf/brain-client";
 import {
@@ -26,6 +27,7 @@ const MAX_QUESTION_LENGTH = 2000;
 export type WorkspaceIdentity = {
   id: string;
   kind: "user" | "service_token";
+  subject?: string;
   roles: string[];
   departments: string[];
 };
@@ -242,6 +244,19 @@ export async function addSyntheticDocumentAction(formData: FormData) {
   revalidateWorkspace();
 }
 
+export async function signOutAction() {
+  try {
+    await brainJson("/auth/logout", { method: "POST", json: {} });
+  } catch {
+    // Browser cookie is cleared below either way.
+  }
+  const { cookies } = await import("next/headers");
+  const { SESSION_COOKIE_NAME } = await import("@/lib/auth/session-cookie");
+  const jar = await cookies();
+  jar.delete(SESSION_COOKIE_NAME);
+  redirect("/login");
+}
+
 export async function loadWorkspaceSnapshot(): Promise<{
   documents: KnowledgeDocument[];
   chunks: DocumentChunk[];
@@ -271,7 +286,10 @@ export async function loadWorkspaceSnapshot(): Promise<{
       retrievalMode: inventory.retrievalMode,
       error: null,
     };
-  } catch {
+  } catch (error) {
+    if (error instanceof AppError && error.code === "AUTH_REQUIRED") {
+      redirect("/login");
+    }
     return {
       documents: [],
       chunks: [],

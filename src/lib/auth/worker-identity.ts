@@ -9,6 +9,8 @@ import {
 import { resolvePrincipal, type DirectoryRecord } from "./principal";
 import { MAX_FILTER_TERMS, type Principal } from "../acl/access";
 import { assertionForBrain, rejectSpoofedPrincipal } from "../cf/service-binding-identity";
+import { readSessionToken } from "./session-cookie";
+import { SessionRequiredError } from "./session-errors";
 
 export class AssumedPrincipalForbidden extends Error {
   constructor() {
@@ -90,6 +92,8 @@ export type WorkerDirectoryLookup = (
   kind: AccessIdentity["kind"],
 ) => Promise<DirectoryRecord | null>;
 
+export type WorkerSessionLookup = (token: string) => Promise<DirectoryRecord | null>;
+
 export type AuthenticateWorkerRequestInput = {
   identityMode: IdentityMode;
   headers: Headers;
@@ -97,7 +101,21 @@ export type AuthenticateWorkerRequestInput = {
   requirePrincipal: boolean;
   verifyAccess?: (token: string) => Promise<AccessIdentity>;
   loadDirectory?: WorkerDirectoryLookup;
+  loadSession?: WorkerSessionLookup;
 };
+
+async function principalFromSession(
+  input: AuthenticateWorkerRequestInput,
+): Promise<DirectoryRecord | null> {
+  const token = readSessionToken(input.headers);
+  if (!token) {
+    return null;
+  }
+  if (!input.loadSession) {
+    throw new IdentityConfigError("session lookup is not configured");
+  }
+  return input.loadSession(token);
+}
 
 export async function authenticateWorkerRequest(
   input: AuthenticateWorkerRequestInput,
@@ -108,7 +126,19 @@ export async function authenticateWorkerRequest(
 
   rejectSpoofedPrincipal(input.headers);
 
+  if (input.identityMode === "session") {
+    const sessionPrincipal = await principalFromSession(input);
+    if (!sessionPrincipal) {
+      throw new SessionRequiredError();
+    }
+    return sessionPrincipal;
+  }
+
   if (input.identityMode === "loopback") {
+    const sessionPrincipal = await principalFromSession(input);
+    if (sessionPrincipal) {
+      return sessionPrincipal;
+    }
     if (!input.requirePrincipal) {
       return null;
     }

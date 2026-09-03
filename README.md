@@ -2,7 +2,7 @@
 
 Useful Brain is a knowledge agent that answers questions about a company corpus and proves every answer. It retrieves only the evidence the asking principal is allowed to read, cites a verbatim source for every factual sentence and refuses when the evidence isn't there. It runs entirely on Cloudflare (Workers, D1, Vectorize, Workers AI) with a Next.js workspace UI.
 
-This is a single-operator portfolio product: no billing, no public signup, no hosted demo. It runs locally on `127.0.0.1`.
+This is a portfolio knowledge agent: no billing and no tenant switching. Local development still uses loopback on `127.0.0.1`. Staging uses email/password sessions (`IDENTITY_MODE=session`).
 
 ![Useful Brain chat with a cited answer and the evidence inspector open.](docs/images/ub-chat-evidence.png)
 

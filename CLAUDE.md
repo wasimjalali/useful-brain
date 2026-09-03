@@ -55,4 +55,4 @@ The target backend is the Cloudflare path in `docs/useful-brain-master-plan.md`.
 - Provider calls have bounded retry and sanitized operation records.
 - The UI exposes the retrieval evidence used for every answer.
 
-The master plan defines how these contracts move to D1, R2, Vectorize, Workflows, Queues, Durable Objects, optional Access JWT verification, Workers AI, AI Gateway and Pi Agent Core. This is a local portfolio product: no billing, public signup or required Cloudflare Access.
+The master plan defines how these contracts move to D1, R2, Vectorize, Workflows, Queues, Durable Objects, optional Access JWT verification, Workers AI, AI Gateway and Pi Agent Core. This is a portfolio product: no billing or required Cloudflare Access. Staging identity is email/password sessions.

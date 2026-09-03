@@ -34,7 +34,7 @@ The stack is:
 - Vector search: Vectorize as a rebuildable projection.
 - Durable work: Workflows and Queues.
 - Real-time coordination: Durable Objects and hibernating WebSockets.
-- Identity: loopback local operator on 127.0.0.1. Cloudflare Access JWT verification is retained as a ported capability, not a launch requirement. No billing, public signup or tenant switching.
+- Identity: loopback local operator on 127.0.0.1, or email/password sessions (`IDENTITY_MODE=session`) with HttpOnly cookies in operations D1. Cloudflare Access JWT verification is retained as a ported capability. No billing or tenant switching.
 - Embeddings and reranking: Workers AI.
 - Model routing: AI Gateway.
 - Agent framework: `@earendil-works/pi-agent-core` with the minimum `pi-ai` provider imports.
@@ -113,5 +113,5 @@ Useful Brain is a local portfolio product. Keep the existing left-aligned worksp
 
 - One application and one Cloudflare resource set for this local/staging portfolio deployment.
 - Keep company terminology in `src/lib/useful-brain-config.ts`.
-- Do not add public signup, billing, SSO onboarding or tenant switching.
-- Operator identity is loopback on 127.0.0.1 with `LOOPBACK_RUNTIME`. Never enable loopback on a public `workers.dev` URL. Staging may use `IDENTITY_MODE=disabled` for skeleton smoke. Cloudflare Access is optional demonstration code, not a required production perimeter.
+- Do not add billing, SSO onboarding or tenant switching.
+- Local operator identity is loopback on 127.0.0.1 with `LOOPBACK_RUNTIME`. Never enable loopback on a public `workers.dev` URL. Staging and production use `IDENTITY_MODE=session` (email/password, operations D1). Cloudflare Access is optional demonstration code, not a required production perimeter.
