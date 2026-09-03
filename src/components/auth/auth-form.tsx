@@ -14,6 +14,7 @@ export function AuthForm({
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [signupCode, setSignupCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const isSignup = mode === "signup";
@@ -26,7 +27,9 @@ export function AuthForm({
       const response = await fetch(isSignup ? "/api/auth/signup" : "/api/auth/login", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(
+          isSignup ? { email, password, signupCode } : { email, password },
+        ),
       });
       const payload = (await response.json().catch(() => null)) as { message?: string } | null;
       if (!response.ok) {
@@ -80,6 +83,19 @@ export function AuthForm({
               value={password}
             />
           </label>
+          {isSignup ? (
+            <label className="flex flex-col gap-1.5 text-sm text-ink">
+              Signup code
+              <input
+                autoComplete="off"
+                className="rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink"
+                name="signupCode"
+                onChange={(event) => setSignupCode(event.target.value)}
+                type="password"
+                value={signupCode}
+              />
+            </label>
+          ) : null}
           <button
             className="rounded-md bg-brand px-3 py-2 text-sm font-medium text-brand-ink disabled:opacity-60"
             disabled={pending}

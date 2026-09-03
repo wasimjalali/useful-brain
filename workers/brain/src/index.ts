@@ -78,6 +78,7 @@ export type BrainEnv = {
   LOOPBACK_RUNTIME?: string;
   ACCESS_TEAM_DOMAIN?: string;
   ACCESS_AUD?: string;
+  SIGNUP_CODE?: string;
   LOOPBACK_SUBJECT?: string;
   OPERATIONS_DB: {
     prepare(query: string): {
@@ -221,6 +222,7 @@ const brainWorker = {
         identityMode,
         db: env.OPERATIONS_DB as OperationsDatabase,
         requestId,
+        signupCode: env.SIGNUP_CODE,
       });
       if (authResponse) {
         operation = path.slice(1);

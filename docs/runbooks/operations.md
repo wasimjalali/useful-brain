@@ -7,6 +7,7 @@ Local portfolio agent. Synthetic data only. No billing or production cutover.
 - Local: `IDENTITY_MODE=loopback` on `127.0.0.1` with `LOOPBACK_RUNTIME=true`. A signed-in session cookie, if present, wins over the loopback operator.
 - Staging `workers.dev`: `IDENTITY_MODE=session`. Never enable loopback on a public URL.
 - Email/password accounts live in operations D1 (`auth_users`, `auth_sessions`). Cookie name is `usefulbrain.session`.
+- Signup is gated by `SIGNUP_CODE` (Wrangler secret on Brain). Requests must carry the matching `signupCode`; when the secret is unset, signup is closed entirely. The code lives in the password manager, not in the repo.
 - Cloudflare Access JWT is optional demonstration code, not a launch gate.
 
 ## Staging surfaces

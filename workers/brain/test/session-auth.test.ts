@@ -19,6 +19,7 @@ const sessionEnv = {
   IDENTITY_MODE: "session",
   LOOPBACK_RUNTIME: "false",
   LOOPBACK_SUBJECT: "",
+  SIGNUP_CODE: "test-signup-code",
 };
 
 describe("email/password sessions", () => {
@@ -34,6 +35,7 @@ describe("email/password sessions", () => {
         body: JSON.stringify({
           email: "wasim@example.com",
           password: "correct-horse",
+          signupCode: "test-signup-code",
         }),
       }),
       sessionEnv,
@@ -72,7 +74,7 @@ describe("email/password sessions", () => {
       new IncomingRequest("https://brain.internal/auth/signup", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email: "dup@example.com", password: "correct-horse" }),
+        body: JSON.stringify({ email: "dup@example.com", password: "correct-horse", signupCode: "test-signup-code" }),
       }),
       sessionEnv,
     );
@@ -82,7 +84,7 @@ describe("email/password sessions", () => {
       new IncomingRequest("https://brain.internal/auth/signup", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email: "dup@example.com", password: "correct-horse" }),
+        body: JSON.stringify({ email: "dup@example.com", password: "correct-horse", signupCode: "test-signup-code" }),
       }),
       sessionEnv,
     );

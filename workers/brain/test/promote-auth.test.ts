@@ -19,6 +19,7 @@ const sessionEnv = {
   IDENTITY_MODE: "session",
   LOOPBACK_RUNTIME: "false",
   LOOPBACK_SUBJECT: "",
+  SIGNUP_CODE: "test-signup-code",
 };
 
 type Signup = { user: { id: string }; sessionToken: string };
@@ -28,7 +29,7 @@ async function signup(email: string): Promise<Signup> {
     new IncomingRequest("https://brain.internal/auth/signup", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email, password: "correct-horse" }),
+      body: JSON.stringify({ email, password: "correct-horse", signupCode: "test-signup-code" }),
     }),
     sessionEnv,
   );

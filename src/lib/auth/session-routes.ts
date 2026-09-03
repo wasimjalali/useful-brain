@@ -4,6 +4,7 @@ import {
   revokeSession,
 } from "./session-account";
 import { readSessionToken } from "./session-cookie";
+import { assertSignupAllowed } from "./signup-gate";
 import type { IdentityMode } from "./identity-mode";
 import type { OperationsDatabase } from "../store/conversations";
 import { withRequestId } from "../cf/request-id";
@@ -35,6 +36,7 @@ export async function handlePublicAuthRoute(input: {
   identityMode: IdentityMode;
   db: OperationsDatabase;
   requestId: string;
+  signupCode?: string;
 }): Promise<Response | null> {
   if (!isPublicAuthPath(input.request.method, input.path)) {
     return null;
@@ -48,7 +50,7 @@ export async function handlePublicAuthRoute(input: {
       await revokeSession(input.db, readSessionToken(input.request.headers));
       return json({ ok: true }, input.requestId);
     }
-    let body: { email?: unknown; password?: unknown; name?: unknown };
+    let body: { email?: unknown; password?: unknown; name?: unknown; signupCode?: unknown };
     try {
       body = (await input.request.json()) as {
         email?: unknown;
@@ -64,11 +66,12 @@ export async function handlePublicAuthRoute(input: {
     }
     const result =
       input.path === "/auth/signup"
-        ? await createAccount(input.db, {
+        ? (assertSignupAllowed(input.signupCode, body.signupCode),
+          await createAccount(input.db, {
             email: body.email,
             password: body.password,
             name: body.name,
-          })
+          }))
         : await authenticateAccount(input.db, {
             email: body.email,
             password: body.password,
