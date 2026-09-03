@@ -47,6 +47,7 @@ import {
 } from "../../../src/lib/store/conversation-queries";
 import { loadKnowledgeInventory } from "../../../src/lib/store/knowledge-inventory";
 import { seedDocumentOwnerId, stampPrivateOwner } from "../../../src/lib/store/owned-seed";
+import { mayPromoteGeneration } from "../../../src/lib/store/promote-auth";
 import {
   latestReadyOrActiveGenerationId,
   loadSeedDocumentsFromGeneration,
@@ -56,7 +57,7 @@ import {
   type SeedDocumentInput,
 } from "../../../src/lib/store/corpus-seed";
 import { listRecentEvalRuns } from "../../../src/lib/store/eval-runs";
-import { promoteGeneration, type SqlExecutor } from "../../../src/lib/store/corpus-d1";
+import { getGeneration, promoteGeneration, type SqlExecutor } from "../../../src/lib/store/corpus-d1";
 import type { WorkersAiRunner } from "../../../src/lib/embeddings/workers-ai-embed";
 import type { CorpusSql, VectorizeIndex } from "../../../src/lib/retrieve/cloudflare-pipeline";
 import { ConversationRunLock } from "./conversation-lock";
@@ -765,7 +766,6 @@ const brainWorker = {
 
       if (path === "/knowledge/promote" && request.method === "POST") {
         operation = "knowledge-promote";
-        requireOperator(principal.roles);
         if (!env.CORPUS_DB) {
           throw new WorkerValidationError();
         }
@@ -776,6 +776,24 @@ const brainWorker = {
           throw new WorkerValidationError();
         }
         const generationId = parseBoundedId(body.generationId, "generation id");
+        if (!principal.roles.includes("operator")) {
+          const generation = await getGeneration(env.CORPUS_DB as SqlExecutor, generationId);
+          if (!generation || generation.state !== "ready") {
+            throw new WorkerValidationError();
+          }
+          const generationDocuments = await loadSeedDocumentsFromGeneration(
+            env.CORPUS_DB as SqlExecutor,
+            generationId,
+          );
+          if (
+            !mayPromoteGeneration(generationDocuments, {
+              id: principal.id,
+              roles: principal.roles,
+            })
+          ) {
+            throw new WorkerForbiddenError();
+          }
+        }
         await promoteGeneration(env.CORPUS_DB as SqlExecutor, generationId);
         writeOperationalLog({
           requestId,
