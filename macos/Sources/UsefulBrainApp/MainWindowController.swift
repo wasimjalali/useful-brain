@@ -110,23 +110,14 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate, WKUI
 
     // MARK: - Navigation routing
 
-    private func isAllowed(_ url: URL) -> Bool {
-        if let host = url.host?.lowercased(),
-           host == "127.0.0.1" || host == "localhost",
-           url.port == config.port {
-            return true
-        }
-        return ["blob", "about", "data"].contains(url.scheme?.lowercased() ?? "")
-    }
-
-    /// Decides where a navigation goes: the app webview for the local origin,
-    /// the default browser for external web content, cancel for everything
-    /// else. Used by both the navigation policy and new-window requests.
+    /// Decides where a navigation goes: the app webview for the active
+    /// origin (loopback or staging), the default browser for external web
+    /// content, cancel for everything else.
     private func route(_ navigationAction: WKNavigationAction) -> WKNavigationActionPolicy {
         guard let url = navigationAction.request.url else {
             return .cancel
         }
-        if isAllowed(url) {
+        if config.isAllowedOrigin(url) {
             return .allow
         }
         switch url.scheme?.lowercased() {
@@ -162,7 +153,7 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate, WKUI
         guard let url = navigationAction.request.url else {
             return nil
         }
-        if isAllowed(url) {
+        if config.isAllowedOrigin(url) {
             webView.load(navigationAction.request)
         } else if ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
             NSWorkspace.shared.open(url)

@@ -21,7 +21,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.onStateChange = { [weak self] state in
             DispatchQueue.main.async { self?.windowController?.render(state: state) }
         }
-        controller.start()
+        if config.spawnsLocalServer {
+            controller.start()
+        } else {
+            // Staging is already live; the webview loads it directly.
+            wc.render(state: .running)
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
