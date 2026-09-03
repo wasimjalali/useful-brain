@@ -211,6 +211,12 @@ const baseProps = {
   embedAction: async () => {},
   askAction: async () => successfulAnswer(groundedAnswer),
   embeddingStorageStatus,
+  identity: {
+    id: "principal-dev",
+    kind: "user" as const,
+    roles: ["operator"],
+    departments: ["engineering"],
+  },
   reindexAction: async () => {},
 };
 
@@ -342,8 +348,8 @@ describe("RagVisibilityDashboard", () => {
     expect(settings).toHaveClass("icon-btn");
     expect(settings).toHaveClass("operator-settings");
     const row = settings.closest(".operator-row");
-    expect(row).toHaveTextContent("Operator");
-    expect(row).toHaveTextContent("O");
+    expect(row).toHaveTextContent("principal-dev");
+    expect(row).toHaveTextContent("PD");
 
     expect(screen.queryByRole("button", { name: "Retrieval" })).toBeNull();
   });

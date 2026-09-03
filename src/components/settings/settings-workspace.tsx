@@ -112,7 +112,7 @@ function OperatorPane({
         Operator
       </h2>
       <dl className="settings-list !mt-0 !border-t-0">
-        {onAssumePrincipal ? (
+        {onAssumePrincipal && identity?.kind === "user" && identity.roles.includes("operator") ? (
           <div className="settings-row">
             <dt>
               <label htmlFor="assume-principal">Assume principal</label>
