@@ -6,30 +6,30 @@ const DOCUMENT =
 const QUOTE =
   "M164.2 139h11.6c1.7 0 2.8 1.2 2.8 2.9v9.4c0 1.1-.7 2-1.8 2.3c1.2.6 1.6 2.2 1.4 3.8-.5 4-3.4 8.2-8.2 10-2.2.8-5 .2-5.6-1.8-.5-1.4.2-2.8 1.4-3.4 1.6 1.6 4.6 1.4 5.4-1 .6-1.8-.4-3.6-2.2-4.4l-1.2-1.2h-5.2c-1.3 0-2.4-1.1-2.4-2.4V142c0-1.7 1.2-3 2.9-3z";
 
+// The quote pair's identity bbox spans x 160-203, y 139-167, centered on
+// (181.5, 153). The document bbox centers on (110, 121), so this transform
+// pins the quote to the document center at 43% of the document width, the
+// same proportion as the app tile icon.
+const QUOTE_TRANSFORM = "translate(110 121) scale(2) translate(-181.5 -153)";
+
 function markColors(tone: MarkTone) {
-  if (tone === "dark") {
-    return { ink: "#fafafa", bar: "#595959", quote: "#171717" };
-  }
-  return { ink: "#171717", bar: "#d4d4d4", quote: "#ffffff" };
+  // One ink for document and quote: the document interior is transparent, so
+  // the quote always sits on the surface showing through the outline.
+  const ink = tone === "dark" ? "#fafafa" : "#171717";
+  return { ink, quote: ink };
 }
 
 export function UsefulBrainMarkPaths({
   ink,
-  bar,
   quote,
 }: {
   ink: string;
-  bar: string;
   quote: string;
 }) {
   return (
     <>
       <path fill={ink} fillRule="evenodd" d={DOCUMENT} />
-      <rect x="35" y="85" width="95" height="13" rx="6.5" fill={ink} />
-      <rect x="35" y="117" width="95" height="13" rx="6.5" fill={ink} />
-      <rect x="35" y="151" width="95" height="33" rx="8" fill={bar} />
-      <circle cx="181.5" cy="153.5" r="38.5" fill={ink} />
-      <g fill={quote}>
+      <g fill={quote} transform={QUOTE_TRANSFORM}>
         <path d={QUOTE} />
         <path d={QUOTE} transform="translate(25 0)" />
       </g>
@@ -37,7 +37,7 @@ export function UsefulBrainMarkPaths({
   );
 }
 
-/** Document + quote mark. Light = ink on canvas. Dark = inverted for a brand tile. */
+/** Document + centered quote mark. Light = ink on canvas. Dark = inverted for a brand tile. */
 export function UsefulBrainMark({
   tone = "light",
   className,
