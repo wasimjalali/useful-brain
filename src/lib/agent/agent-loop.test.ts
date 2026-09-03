@@ -282,6 +282,8 @@ describe("Pi knowledge agent", () => {
     expect(LIVE_KNOWLEDGE_SYSTEM_PROMPT).toContain("citation label from this turn");
     expect(LIVE_KNOWLEDGE_SYSTEM_PROMPT).toContain("dedicated policy document");
     expect(LIVE_KNOWLEDGE_SYSTEM_PROMPT).toContain("is not an answer");
+    expect(LIVE_KNOWLEDGE_SYSTEM_PROMPT).toContain("not evidence for a different process");
+    expect(LIVE_KNOWLEDGE_SYSTEM_PROMPT).toContain("Follow attribution pointers");
   });
 
   it("blocks a registered mutating tool in the host before any side effect", async () => {
@@ -654,7 +656,7 @@ async function escalationPipeline() {
 }
 
 describe("abstention and citation discipline", () => {
-  it("honors a model-authored refusal instead of repairing it into an answer", async () => {
+  it("rechecks an abstention with one strict quote pass before refusing", async () => {
     const pipeline = await tinyPipeline();
     const faux = fauxProvider({ provider: "useful-brain-abstain" });
     faux.setResponses([
@@ -667,7 +669,9 @@ describe("abstention and citation discipline", () => {
         { stopReason: "stop" },
       ),
     ]);
-    const repairGroundedAnswer = vi.fn().mockResolvedValue("Employees accrue 1.5 days of leave per month.[1]");
+    // The recheck repair model finds no evidence quote answering the
+    // question, so the refusal stands.
+    const repairGroundedAnswer = vi.fn().mockResolvedValue(null);
 
     const result = await runKnowledgeAgent({
       question: "Does the company offer a stock purchase plan?",
@@ -684,7 +688,48 @@ describe("abstention and citation discipline", () => {
 
     expect(result.finalResponse).toBe(BRAIN_NOT_ENOUGH_EVIDENCE);
     expect(result.refusalReason).toBe("model_abstained_with_evidence");
-    expect(repairGroundedAnswer).not.toHaveBeenCalled();
+    expect(repairGroundedAnswer).toHaveBeenCalledTimes(1);
+    expect(repairGroundedAnswer).toHaveBeenCalledWith(
+      expect.objectContaining({ lexicalFallback: false }),
+    );
+  }, 20_000);
+
+  it("recovers an over-refused question with an evidence-verbatim recheck quote", async () => {
+    const pipeline = await tinyPipeline();
+    const faux = fauxProvider({ provider: "useful-brain-abstain-recover" });
+    faux.setResponses([
+      fauxAssistantMessage(
+        [fauxText("Searching."), fauxToolCall(SEARCH_KNOWLEDGE_TOOL, { query: "leave accrual" })],
+        { stopReason: "toolUse" },
+      ),
+      fauxAssistantMessage(
+        [fauxText("The retrieved documents do not state how much leave accrues per month.")],
+        { stopReason: "stop" },
+      ),
+    ]);
+    const repairGroundedAnswer = vi
+      .fn()
+      .mockResolvedValue("Employees accrue 1.5 days of leave per month.[1]");
+
+    const result = await runKnowledgeAgent({
+      question: "How many days of leave do employees accrue per month?",
+      pipeline,
+      principal,
+      policyPrincipal,
+      conversationId: "c-abstain-recover",
+      runtime: {
+        model: { ...faux.getModel(), api: "openai-completions" },
+        stream: (model, context, options) => faux.provider.streamSimple(model, context, options),
+        repairGroundedAnswer,
+      },
+    });
+
+    expect(result.finalResponse).toBe("Employees accrue 1.5 days of leave per month.[1]");
+    expect(result.refusalReason).toBeUndefined();
+    expect(repairGroundedAnswer).toHaveBeenCalledTimes(1);
+    expect(repairGroundedAnswer).toHaveBeenCalledWith(
+      expect.objectContaining({ lexicalFallback: false }),
+    );
   }, 20_000);
 
   it("completes the citation for a verbatim second hop before any model repair", async () => {

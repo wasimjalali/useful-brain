@@ -46,6 +46,12 @@ export function fuseCandidates(input: {
   candidateLimit: number;
   vectorWeight?: number;
   keywordWeight?: number;
+  /**
+   * Keyword-only blind-spot cover: keep up to this many top keyword-only
+   * hits (no vector hit) past the candidate slice so they can reach the
+   * reranker. 0 (default) preserves the legacy slice exactly.
+   */
+  keywordRescue?: number;
 }): ScoredChunk[] {
   const vectorWeight = input.vectorWeight ?? VECTOR_WEIGHT;
   const keywordWeight = input.keywordWeight ?? KEYWORD_WEIGHT;
@@ -81,7 +87,51 @@ export function fuseCandidates(input: {
     }
     return left.chunk.chunkId.localeCompare(right.chunk.chunkId);
   });
-  return scored.slice(0, input.candidateLimit);
+  const sliced = scored.slice(0, input.candidateLimit);
+  const rescue = Math.max(0, input.keywordRescue ?? 0);
+  if (rescue === 0) {
+    return sliced;
+  }
+  const kept = new Set(sliced.map((item) => item.chunk.chunkId));
+  let added = 0;
+  for (const item of scored) {
+    if (added >= rescue) {
+      break;
+    }
+    if (kept.has(item.chunk.chunkId) || !isKeywordOnly(item)) {
+      continue;
+    }
+    sliced.push(item);
+    kept.add(item.chunk.chunkId);
+    added += 1;
+  }
+  return sliced;
+}
+
+/** A hit the vector channel missed: exact-token FTS matches live here. */
+function isKeywordOnly(item: ScoredChunk): boolean {
+  return item.vectorScore === null && item.keywordScore !== null;
+}
+
+/**
+ * Build the reranker head so rescued keyword-only hits are always scored:
+ * rescued items first (keyword-rank order), then the fused order up to the
+ * cap. Without rescued items this is a plain top-N slice.
+ */
+export function selectRerankHead(input: {
+  ordered: ScoredChunk[];
+  rerankCandidates: number;
+  rescueCount?: number;
+}): ScoredChunk[] {
+  const cap = Math.max(0, input.rerankCandidates);
+  const rescue = Math.max(0, input.rescueCount ?? 0);
+  if (rescue === 0) {
+    return input.ordered.slice(0, cap);
+  }
+  const rescued = input.ordered.filter(isKeywordOnly).slice(0, rescue);
+  const rescuedIds = new Set(rescued.map((item) => item.chunk.chunkId));
+  const rest = input.ordered.filter((item) => !rescuedIds.has(item.chunk.chunkId));
+  return [...rescued, ...rest].slice(0, cap);
 }
 
 export function simpleRerank(

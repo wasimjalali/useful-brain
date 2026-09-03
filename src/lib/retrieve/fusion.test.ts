@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { fuseCandidates, simpleRerank } from "./fusion";
+import { fuseCandidates, selectRerankHead, simpleRerank } from "./fusion";
 import type { ChunkRecord } from "./types";
 
 const ALGEBRA = { vectorWeight: 0.55, keywordWeight: 0.45 };
@@ -79,6 +79,74 @@ describe("fusion", () => {
       ...ALGEBRA,
     })[0];
     expect(both.mergedScore).toBeGreaterThan(vectorOnly.mergedScore);
+  });
+
+  it("rescues top keyword-only hits past the fused slice", () => {
+    // Regression guard for the 2026-09-03 Northwind pass: an FTS top hit the
+    // vector channel missed (rare name, clause identifier, connector ID)
+    // scores below every vector-only hit under 0.70/0.30 weights, so without
+    // rescue it never reaches the reranker.
+    const vectorHits = Array.from({ length: 24 }, (_, index) => ({
+      chunkId: `vector-only-${index.toString().padStart(2, "0")}`,
+      score: 0.3,
+    }));
+    const ids = ["keyword-exact", ...vectorHits.map((hit) => hit.chunkId)];
+    const base = {
+      vectorHits,
+      keywordHits: [{ chunkId: "keyword-exact", score: 10 }],
+      chunksById: chunks(...ids),
+      candidateLimit: 24,
+      vectorWeight: 0.7,
+      keywordWeight: 0.3,
+    };
+    const without = fuseCandidates(base);
+    expect(without.map((item) => item.chunk.chunkId)).not.toContain("keyword-exact");
+    const rescued = fuseCandidates({ ...base, keywordRescue: 3 });
+    expect(rescued).toHaveLength(25);
+    expect(rescued.map((item) => item.chunk.chunkId)).toContain("keyword-exact");
+  });
+
+  it("guarantees rescued hits a rerank slot without disturbing fused order", () => {
+    const vectorHits = Array.from({ length: 8 }, (_, index) => ({
+      chunkId: `v-${index}`,
+      score: 0.9,
+    }));
+    const fused = fuseCandidates({
+      vectorHits,
+      keywordHits: [
+        { chunkId: "k-only", score: 5 },
+        { chunkId: "v-0", score: 0.1 },
+      ],
+      chunksById: chunks("k-only", ...vectorHits.map((hit) => hit.chunkId)),
+      candidateLimit: 8,
+      keywordRescue: 3,
+      ...ALGEBRA,
+    });
+    const ordered = simpleRerank(fused, fused.length);
+    // Without rescue the keyword-only hit is cut from a head of 8.
+    expect(ordered.slice(0, 8).map((item) => item.chunk.chunkId)).not.toContain("k-only");
+    const head = selectRerankHead({ ordered, rerankCandidates: 8, rescueCount: 3 });
+    expect(head).toHaveLength(8);
+    expect(head[0].chunk.chunkId).toBe("k-only");
+    // Dual-channel hits keep their fused relative order behind the rescue.
+    expect(head.slice(1).map((item) => item.chunk.chunkId)).toEqual(
+      ordered.filter((item) => item.chunk.chunkId !== "k-only").slice(0, 7).map((item) => item.chunk.chunkId),
+    );
+  });
+
+  it("leaves the head untouched when rescue is disabled", () => {
+    const fused = fuseCandidates({
+      vectorHits: [{ chunkId: "a", score: 0.8 }],
+      keywordHits: [{ chunkId: "b", score: 4 }],
+      chunksById: chunks("a", "b"),
+      candidateLimit: 10,
+      ...ALGEBRA,
+    });
+    const ordered = simpleRerank(fused, fused.length);
+    expect(selectRerankHead({ ordered, rerankCandidates: 1 })).toEqual(ordered.slice(0, 1));
+    expect(selectRerankHead({ ordered, rerankCandidates: 1, rescueCount: 0 })).toEqual(
+      ordered.slice(0, 1),
+    );
   });
 
   it("boosts agreement in simple rerank without changing membership", () => {

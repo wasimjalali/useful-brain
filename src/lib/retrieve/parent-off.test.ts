@@ -20,6 +20,7 @@ describe("locked retrieval fingerprint", () => {
       vectorWeight: 0.7,
       keywordWeight: 0.3,
       keywordCandidates: 6,
+      keywordRescue: 3,
       rerankCandidates: 20,
       reranker: "@cf/baai/bge-reranker-base",
       relevanceFloor: 0.05,
@@ -33,6 +34,7 @@ describe("locked retrieval fingerprint", () => {
     expect(fingerprintId(FAKE_PROVIDER_FINGERPRINT)).toContain("0.20/0.80");
     expect(fingerprintId(REAL_STACK_FINGERPRINT)).toContain("300/30");
     expect(fingerprintId(REAL_STACK_FINGERPRINT)).toContain("0.70/0.30");
+    expect(fingerprintId(REAL_STACK_FINGERPRINT)).toContain("kr3");
     expect(fingerprintId(FAKE_PROVIDER_FINGERPRINT)).toContain("fts-stopword-or-v1");
     expect(fingerprintId(REAL_STACK_FINGERPRINT)).toContain("fts-stopword-or-v1");
     expect(fingerprintId(REAL_STACK_FINGERPRINT)).not.toBe(fingerprintId(FAKE_PROVIDER_FINGERPRINT));

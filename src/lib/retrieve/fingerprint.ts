@@ -4,6 +4,15 @@ export const REAL_STACK_FINGERPRINT = {
   overlapTokens: 30,
   vectorWeight: 0.7,
   keywordWeight: 0.3,
+  // Keyword-only rescue since the 2026-09-03 Northwind eval pass: with
+  // fixed-bounds vector normalization every vector-only hit scores above any
+  // keyword-only hit at 0.70/0.30, so an FTS top hit that the vector channel
+  // missed (rare names, clause identifiers, connector IDs) never reached the
+  // reranker. The top keywordRescue keyword-only hits are guaranteed a
+  // rerank slot; the reranker and relevance floor still decide the final set.
+  // (Equal 0.50/0.50 weights were measured first and fixed the same misses,
+  // but promoted keyword junk corpus-wide and destabilized other questions.)
+  keywordRescue: 3,
   keywordCandidates: 6,
   channelOverlapBonus: 0.05,
   rerankCandidates: 20,
@@ -60,6 +69,8 @@ export type RetrievalFingerprint = {
   literalVectorWeight?: number;
   literalKeywordWeight?: number;
   keywordCandidates: number;
+  /** Top keyword-only hits guaranteed a rerank slot; 0/absent disables. */
+  keywordRescue?: number;
   channelOverlapBonus: number;
   rerankCandidates: number;
   reranker: string;
@@ -76,6 +87,7 @@ export function fingerprintId(fingerprint: RetrievalFingerprint): string {
     `${fingerprint.maxTokens}/${fingerprint.overlapTokens}`,
     `${fingerprint.vectorWeight.toFixed(2)}/${fingerprint.keywordWeight.toFixed(2)}`,
     `kw${fingerprint.keywordCandidates}`,
+    `kr${fingerprint.keywordRescue ?? 0}`,
     `cb${fingerprint.channelOverlapBonus.toFixed(2)}`,
     `rr${fingerprint.rerankCandidates}`,
     fingerprint.reranker,
