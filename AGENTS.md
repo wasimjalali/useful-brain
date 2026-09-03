@@ -38,6 +38,7 @@ The stack is:
 - Embeddings and reranking: Workers AI.
 - Model routing: AI Gateway.
 - Agent framework: `@earendil-works/pi-agent-core` with the minimum `pi-ai` provider imports.
+- macOS shell: SwiftPM package in `macos/` that bundles `Useful Brain.app` (AppKit + WKWebView over the local stack on 127.0.0.1). Build and install with `make -C macos test|bundle|install`; see `docs/macos-app.md`.
 
 Do not introduce Convex. Do not propose or add Microsoft Foundry. Do not add LangChain, LangGraph, CrewAI, Cloudflare Agents SDK or another competing agent framework.
 
