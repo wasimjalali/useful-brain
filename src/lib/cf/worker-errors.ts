@@ -8,6 +8,7 @@ import {
   AuthValidationError,
   SessionRequiredError,
 } from "../auth/session-errors";
+import { SignupClosedError } from "../auth/signup-gate";
 import { IngestQueueMessageError } from "../ingest/queue-message";
 import { BoundedIdError } from "./bounded-id";
 import { UnsignedPrincipalError } from "./service-binding-identity";
@@ -80,6 +81,14 @@ export function toPublicWorkerError(error: unknown, requestId: string): PublicWo
     return {
       code: "AUTH_REQUIRED",
       message: error.message,
+      retryable: false,
+      requestId,
+    };
+  }
+  if (error instanceof SignupClosedError) {
+    return {
+      code: "VALIDATION_FAILED",
+      message: "Signup is closed. Ask the operator for an account.",
       retryable: false,
       requestId,
     };
