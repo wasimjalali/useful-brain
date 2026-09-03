@@ -25,6 +25,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        // Bounded block on quit is intentional: the tree must not outlive
+        // the app, and we have up to the 5 s grace to SIGKILL it.
         controller.stop()
     }
 
@@ -33,7 +35,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func stopServer() {
-        controller.stop()
+        controller.stopAsync()
     }
 
     @objc func reloadPage() {

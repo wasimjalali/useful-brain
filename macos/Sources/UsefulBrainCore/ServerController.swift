@@ -49,19 +49,79 @@ public final class ServerController {
         queue.async { self.startSync(healthTimeout: healthTimeout) }
     }
 
-    /// Stops the spawned server. Safe to call from any thread, at any time,
-    /// and more than once.
-    public func stop() {
-        let victim = takeProcess()
-        if let victim {
-            terminate(victim)
+    /// Stops the spawned server and waits (bounded) for the tree to die.
+    /// Use from app termination and tests, where blocking is correct.
+    public func stop(grace: TimeInterval = 5) {
+        guard let victim = takeProcess() else {
+            if state != .idle {
+                setState(.idle)
+            }
+            return
         }
+        let grouped = takeGrouped()
+        terminateTree(victim, grouped: grouped, grace: grace)
         if state != .idle {
             setState(.idle)
         }
     }
 
+    /// Stops the spawned server without blocking the caller. The SIGTERM,
+    /// bounded wait and SIGKILL escalation run on a background queue.
+    /// Use from UI actions so the menu never freezes.
+    public func stopAsync(grace: TimeInterval = 5) {
+        guard let victim = takeProcess() else {
+            DispatchQueue.main.async {
+                if self.state != .idle {
+                    self.setState(.idle)
+                }
+            }
+            return
+        }
+        let grouped = takeGrouped()
+        if state != .idle {
+            setState(.idle)
+        }
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            self?.terminateTree(victim, grouped: grouped, grace: grace)
+        }
+    }
+
     // MARK: - Internals
+
+    private func terminateTree(_ p: Process, grouped: Bool, grace: TimeInterval) {
+        let pid = p.processIdentifier
+        if grouped {
+            killpg(pid, SIGTERM)
+        } else {
+            kill(pid, SIGTERM)
+        }
+        let deadline = Date().addingTimeInterval(grace)
+        while p.isRunning && Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        if p.isRunning {
+            if grouped {
+                killpg(pid, SIGKILL)
+            } else {
+                kill(pid, SIGKILL)
+            }
+        }
+        closeLogHandle()
+    }
+
+    private func takeGrouped() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return childInOwnGroup
+    }
+
+    private func closeLogHandle() {
+        lock.lock()
+        let handle = logHandle
+        logHandle = nil
+        lock.unlock()
+        try? handle?.close()
+    }
 
     private func startSync(healthTimeout: TimeInterval) {
         switch state {
@@ -149,7 +209,7 @@ public final class ServerController {
 
         // Put the child in its own process group so stop() can signal the
         // whole npm -> wrangler -> workerd tree. If the child already exec'd
-        // (setpgid lost the race), terminate() falls back to signaling the
+        // (setpgid lost the race), terminateTree falls back to signaling the
         // pid and relies on npm forwarding the signal.
         let grouped = setpgid(p.processIdentifier, p.processIdentifier) == 0
 
@@ -169,30 +229,6 @@ public final class ServerController {
         }
         handle.seekToEndOfFile()
         return handle
-    }
-
-    private func terminate(_ p: Process) {
-        lock.lock()
-        let grouped = childInOwnGroup
-        lock.unlock()
-
-        let pid = p.processIdentifier
-        if grouped {
-            killpg(pid, SIGTERM)
-        } else {
-            kill(pid, SIGTERM)
-        }
-        let deadline = Date().addingTimeInterval(5)
-        while p.isRunning && Date() < deadline {
-            Thread.sleep(forTimeInterval: 0.05)
-        }
-        if p.isRunning {
-            if grouped {
-                killpg(pid, SIGKILL)
-            } else {
-                kill(pid, SIGKILL)
-            }
-        }
     }
 
     private func takeProcess() -> Process? {

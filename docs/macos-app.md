@@ -25,7 +25,8 @@ defaults write ai.karko.usefulbrain port -int 8791
 ```
 
 Server output is appended to `~/Library/Logs/useful-brain/server.log`
-(Server menu > Show Log in Finder).
+(Server menu > Show Log in Finder). The log grows without bound; delete it
+whenever it gets large.
 
 ## Build and install
 

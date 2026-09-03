@@ -2,7 +2,7 @@ import AppKit
 import UsefulBrainCore
 import WebKit
 
-final class MainWindowController: NSWindowController, WKNavigationDelegate {
+final class MainWindowController: NSWindowController, WKNavigationDelegate, WKUIDelegate {
     private let config: ServerConfig
     private let controller: ServerController
 
@@ -47,6 +47,7 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate {
         webView.autoresizingMask = [.width, .height]
         webView.isHidden = true
         webView.navigationDelegate = self
+        webView.uiDelegate = self
         webView.isInspectable = true
         content.addSubview(webView)
 
@@ -107,6 +108,36 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate {
         webView.reload()
     }
 
+    // MARK: - Navigation routing
+
+    private func isAllowed(_ url: URL) -> Bool {
+        if let host = url.host?.lowercased(),
+           host == "127.0.0.1" || host == "localhost",
+           url.port == config.port {
+            return true
+        }
+        return ["blob", "about", "data"].contains(url.scheme?.lowercased() ?? "")
+    }
+
+    /// Decides where a navigation goes: the app webview for the local origin,
+    /// the default browser for external web content, cancel for everything
+    /// else. Used by both the navigation policy and new-window requests.
+    private func route(_ navigationAction: WKNavigationAction) -> WKNavigationActionPolicy {
+        guard let url = navigationAction.request.url else {
+            return .cancel
+        }
+        if isAllowed(url) {
+            return .allow
+        }
+        switch url.scheme?.lowercased() {
+        case "http", "https":
+            NSWorkspace.shared.open(url)
+        default:
+            break
+        }
+        return .cancel
+    }
+
     // MARK: - WKNavigationDelegate
 
     func webView(
@@ -114,22 +145,28 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate {
         decidePolicyFor navigationAction: WKNavigationAction,
         decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
     ) {
+        decisionHandler(route(navigationAction))
+    }
+
+    // MARK: - WKUIDelegate
+
+    /// target=_blank and window.open: the same policy decides. Allowed URLs
+    /// load in this webview, external ones open in the default browser, and
+    /// no second webview is ever created.
+    func webView(
+        _ webView: WKWebView,
+        createWebViewWith configuration: WKWebViewConfiguration,
+        for navigationAction: WKNavigationAction,
+        windowFeatures: WKWindowFeatures
+    ) -> WKWebView? {
         guard let url = navigationAction.request.url else {
-            decisionHandler(.cancel)
-            return
+            return nil
         }
-        if url.host == "127.0.0.1" && url.port == config.port {
-            decisionHandler(.allow)
-            return
-        }
-        switch url.scheme {
-        case "blob", "about", "data":
-            decisionHandler(.allow)
-        case "http", "https":
+        if isAllowed(url) {
+            webView.load(navigationAction.request)
+        } else if ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
             NSWorkspace.shared.open(url)
-            decisionHandler(.cancel)
-        default:
-            decisionHandler(.cancel)
         }
+        return nil
     }
 }
