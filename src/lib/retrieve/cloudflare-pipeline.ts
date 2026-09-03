@@ -13,7 +13,7 @@ import { EMBEDDING_MODEL } from "../embeddings/instructions";
 import { embedWithWorkersAi, type WorkersAiRunner } from "../embeddings/workers-ai-embed";
 import { buildVectorizeQuery } from "./cloudflare-query";
 import { REAL_STACK_FINGERPRINT, fingerprintId, type RetrievalFingerprint } from "./fingerprint";
-import { fuseCandidates, simpleRerank } from "./fusion";
+import { fuseCandidates, selectRerankHead, simpleRerank } from "./fusion";
 import { queryLooksLiteral, rescoreLocally } from "./keyword-score";
 import { applyRelevanceFloor, rerankWithHeading, type Reranker } from "./rerank";
 import { expandParent } from "./parent-off";
@@ -165,6 +165,7 @@ export class CloudflareKnowledgePipeline {
       keywordWeight: literal
         ? (fingerprint.literalKeywordWeight ?? fingerprint.keywordWeight)
         : fingerprint.keywordWeight,
+      keywordRescue: fingerprint.keywordRescue ?? 0,
     });
     const reranked = await rerankMerged(query, merged, this.input.reranker, fingerprint);
     const final = reranked.slice(0, topK);
@@ -299,7 +300,11 @@ async function rerankMerged(
   fingerprint: RetrievalFingerprint,
 ): Promise<ScoredChunk[]> {
   const ordered = simpleRerank(merged, merged.length, fingerprint.channelOverlapBonus);
-  const head = ordered.slice(0, fingerprint.rerankCandidates);
+  const head = selectRerankHead({
+    ordered,
+    rerankCandidates: fingerprint.rerankCandidates,
+    rescueCount: fingerprint.keywordRescue ?? 0,
+  });
   const passages = head.map((item) => rerankWithHeading(item.chunk.sectionHeading, item.chunk.content));
   const scores = await reranker.rerank(query, passages);
   if (scores.length !== head.length) {

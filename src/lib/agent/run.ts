@@ -89,6 +89,12 @@ export type GroundedAnswerRepair = (input: {
    * any lexical-overlap fallback. Used for identifier-lookup recovery.
    */
   strictTokens?: string[];
+  /**
+   * When false, a model-selected quote must validate or the repair returns
+   * null; the lexical-overlap fallback stays off. Used for the abstention
+   * recheck so a refusal is never overturned by mere word overlap.
+   */
+  lexicalFallback?: boolean;
 }) => Promise<string | null>;
 
 export const LIVE_KNOWLEDGE_SYSTEM_PROMPT = [
@@ -99,7 +105,7 @@ export const LIVE_KNOWLEDGE_SYSTEM_PROMPT = [
   "Write each copied sentence as its own paragraph followed only by its label. Do not add headings, bold labels, surrounding quotation marks, file paths, section names or commentary around it.",
   "Every evidence item names its document. When more than one item states a fact, quote and cite the item from the dedicated policy document for that topic rather than a handbook, guide or neighboring policy, or cite both labels.",
   "Do not paraphrase, infer or combine separate evidence spans into one sentence. Every paragraph must include a citation label from this turn.",
-  "Answer only the exact fact the question asks. A sentence about a different program, plan, metric, document or policy than the one asked is not an answer, even when it looks similar.",
+  "Answer only the exact fact the question asks. A sentence about a different program, plan, metric, document or policy than the one asked is not an answer, even when it looks similar. A number, timeframe or rule stated for one named process is not evidence for a different process: a patch-availability window for supported product versions does not answer an internal remediation deadline, a hiring referral bonus does not answer a customer referral payout, and a neighboring policy restating another document's rule does not replace that document. A deadline that tells customers what they receive is not our internal deadline to act. Follow attribution pointers: when a document says its rule or window comes from another policy, quote and cite that policy, not the restating document. When the evidence states the asked number or rule only for a different program or process than the one asked about, reply exactly with the not-enough-evidence sentence.",
   `Do not invent facts. A related or similar document is not evidence for a fact it does not state. If no evidence states the specific program, benefit, policy, amount or rule the question asks about, reply exactly: ${BRAIN_NOT_ENOUGH_EVIDENCE}`,
   `Prompt version ${PROMPT_VERSION}.`,
 ].join(" ");
@@ -557,6 +563,42 @@ export async function runKnowledgeAgent(input: {
       } catch {
         // Keep the refusal.
       }
+    }
+  }
+
+  // Abstention recheck: the chat model sometimes refuses a question whose
+  // evidence does state the fact (measured 2026-09-03: 2-3 rotating factual
+  // misses per Northwind run, all replaying grounded). When the model
+  // abstained but evidence exists and identifier recovery did not apply,
+  // ask once for a model-selected verbatim quote answering the question.
+  // The lexical-overlap fallback stays off, so a refusal survives unless
+  // the repair model itself returns an evidence-supported quote.
+  if (
+    canRepair &&
+    isRefusal(grounded) &&
+    refusalReason === "model_abstained_with_evidence"
+  ) {
+    try {
+      budgets.assertWithinWallTime();
+      budgets.noteTurn();
+      const recovered = await input.runtime!.repairGroundedAnswer!({
+        question: input.question,
+        evidence,
+        lexicalFallback: false,
+        signal: toolDeadlineSignal(
+          Math.min(AGENT_BUDGETS.modelTimeoutMs, budgets.remainingWallTimeMs()),
+          input.abort?.signal,
+        ),
+      });
+      if (recovered && !wall.aborted && !input.abort?.signal.aborted) {
+        const enforcedRecovery = enforce(recovered);
+        if (enforcedRecovery === recovered) {
+          grounded = recovered;
+          refusalReason = undefined;
+        }
+      }
+    } catch {
+      // Keep the refusal.
     }
   }
 

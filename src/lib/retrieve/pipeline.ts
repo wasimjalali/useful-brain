@@ -5,7 +5,7 @@ import {
   type Principal,
 } from "../acl/access";
 import { FAKE_PROVIDER_FINGERPRINT, fingerprintId, type RetrievalFingerprint } from "./fingerprint";
-import { fuseCandidates, simpleRerank } from "./fusion";
+import { fuseCandidates, selectRerankHead, simpleRerank } from "./fusion";
 import { queryLooksLiteral, rescoreLocally } from "./keyword-score";
 import type { FakeEmbeddingProvider } from "./fake-embed";
 import { detectConflicts, expandParent } from "./parent-off";
@@ -76,6 +76,7 @@ export class KnowledgePipeline {
       candidateLimit: fetchLimit,
       vectorWeight,
       keywordWeight,
+      keywordRescue: this.fingerprint.keywordRescue ?? 0,
     });
     const reranked = await this.rerank(query, merged);
     const final = reranked.slice(0, topK);
@@ -147,7 +148,11 @@ export class KnowledgePipeline {
       merged.length,
       this.fingerprint.channelOverlapBonus,
     );
-    const head = ordered.slice(0, this.fingerprint.rerankCandidates);
+    const head = selectRerankHead({
+      ordered,
+      rerankCandidates: this.fingerprint.rerankCandidates,
+      rescueCount: this.fingerprint.keywordRescue ?? 0,
+    });
     const passages = head.map((item) => rerankWithHeading(item.chunk.sectionHeading, item.chunk.content));
     const scores = await this.reranker.rerank(query, passages);
     if (scores.length !== head.length) {

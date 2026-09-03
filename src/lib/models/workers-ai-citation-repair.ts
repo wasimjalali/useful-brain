@@ -31,7 +31,7 @@ export function createWorkersAiCitationRepair(
   ai: WorkersAiChatRunner,
   modelId: string = CHAT_MODEL_ID,
 ): GroundedAnswerRepair {
-  return async ({ question, evidence, signal, strictTokens }) => {
+  return async ({ question, evidence, signal, strictTokens, lexicalFallback }) => {
     signal?.throwIfAborted();
     const response = await ai.run(modelId, {
       messages: citationRepairMessages(question, evidence),
@@ -43,6 +43,12 @@ export function createWorkersAiCitationRepair(
       // Strict mode: only a model-selected quote containing an asked token
       // is accepted; the lexical-overlap fallback stays off so a refusal is
       // never overturned by mere word overlap.
+      return validated;
+    }
+    if (lexicalFallback === false) {
+      // Abstention recheck: same discipline as strict mode without token
+      // matching. Only a model-selected, evidence-supported quote may
+      // overturn a refusal; word overlap alone never does.
       return validated;
     }
     return validated ?? selectExactExtract(question, evidence);

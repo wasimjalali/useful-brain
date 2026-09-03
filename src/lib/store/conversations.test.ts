@@ -149,7 +149,7 @@ describe("conversation helpers", () => {
       },
     ]);
     expect(evidence[0].citationLabel).toBe("[1]");
-    expect(PROMPT_VERSION).toBe("grounded-answer.v5");
+    expect(PROMPT_VERSION).toBe("grounded-answer.v8");
     await persistThenRelease({
       persist: async () => {
         order.push("persist");
