@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 
-import { SendIcon } from "@/components/icons";
+import { SendIcon, StopIcon } from "@/components/icons";
 
 const COMPACT_HEIGHT = 40;
 const EXPANDED_MAX_HEIGHT = 192;
@@ -115,12 +115,13 @@ export function ChatComposer({
           >
             {pending && onStop ? (
               <button
-                className="btn btn-secondary min-h-9 shrink-0 rounded-full px-3 text-sm"
+                aria-label="Stop"
+                className="btn btn-secondary size-9 shrink-0 rounded-full p-0"
                 disabled={stopping}
                 onClick={onStop}
                 type="button"
               >
-                {stopping ? "Stopping" : "Stop"}
+                <StopIcon className="size-3.5" />
               </button>
             ) : (
               <button

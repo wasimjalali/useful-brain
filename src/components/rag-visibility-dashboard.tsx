@@ -552,6 +552,7 @@ export function RagVisibilityDashboard({
               embedAction={embedAction}
               embeddingStorageStatus={embeddingStorageStatus}
               initialAddOpen={initialAddDocument}
+              isOperator={identity?.kind === "user" && identity.roles.includes("operator")}
               promoteAction={promoteCorpusAction}
               reindexAction={reindexAction}
               retrievalMode={retrievalMode}

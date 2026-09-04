@@ -79,11 +79,44 @@ describe("extractUploadedText", () => {
     );
   });
 
-  it("rejects files over the max upload size", async () => {
-    const bigContent = "a".repeat(5 * 1024 * 1024 + 1);
-    const file = new File([bigContent], "large.txt", { type: "text/plain" });
+  it("rejects oversized files at the size gate before reading content", async () => {
+    const overLimit = new File(["a".repeat(10 * 1024 * 1024 + 1)], "big.txt", {
+      type: "text/plain",
+    });
 
-    await expect(extractUploadedText(file)).rejects.toThrow(/too large/i);
+    await expect(extractUploadedText(overLimit)).rejects.toThrow(/too large/i);
+  });
+
+  it("accepts a multi-megabyte file and applies the per-document text cap", async () => {
+    // A 6 MB .txt passes the 10 MB size gate but extracts to more text than
+    // one knowledge document can hold, so it must fail with the split hint
+    // rather than the size error.
+    const file = new File(["a".repeat(6 * 1024 * 1024)], "big.txt", {
+      type: "text/plain",
+    });
+
+    await expect(extractUploadedText(file)).rejects.toThrow(
+      /split it into parts/i,
+    );
+  });
+
+  it("accepts a text file just under the per-document character cap", async () => {
+    const file = new File(["a".repeat(1_400_000)], "long.txt", {
+      type: "text/plain",
+    });
+
+    const result = await extractUploadedText(file);
+    expect(result.markdown).toHaveLength(1_400_000);
+  });
+
+  it("rejects text that exceeds the per-document character cap", async () => {
+    const file = new File(["a".repeat(1_500_001)], "long.txt", {
+      type: "text/plain",
+    });
+
+    await expect(extractUploadedText(file)).rejects.toThrow(
+      /split it into parts/i,
+    );
   });
 
   it("rejects files that extract to empty or whitespace-only text", async () => {
@@ -130,15 +163,15 @@ describe("addSyntheticDocumentAction", () => {
     expect(brainJson).not.toHaveBeenCalled();
   });
 
-  it("rejects a body over 50,000 characters", async () => {
+  it("rejects a body over the per-document character cap", async () => {
     const addSyntheticDocumentAction = await importAction();
     const formData = formDataOf({
       title: "Valid Title",
-      body: "a".repeat(50_001),
+      body: "a".repeat(1_500_001),
     });
 
     await expect(addSyntheticDocumentAction(formData)).rejects.toThrow(
-      /under 50,000 characters/i,
+      /split it into parts/i,
     );
     expect(brainJson).not.toHaveBeenCalled();
   });

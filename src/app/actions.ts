@@ -12,7 +12,7 @@ import {
   type ActionResult,
   type PublicAppError,
 } from "@/lib/rag/app-errors";
-import { extractUploadedText } from "@/lib/rag/extract-upload";
+import { extractUploadedText, MAX_DOCUMENT_TEXT_CHARS } from "@/lib/rag/extract-upload";
 import type { GroundedAnswerResponse } from "@/lib/rag/grounded-answer";
 import type { Conversation } from "@/lib/rag/chat-history";
 import { emptyEmbeddingStorageStatus, type EmbeddingStorageStatus } from "@/lib/rag/storage-records";
@@ -222,8 +222,12 @@ export async function addSyntheticDocumentAction(formData: FormData) {
     throw new AppError("VALIDATION_FAILED", "Keep the title under 120 characters.", false);
   }
 
-  if (body.length > 50_000) {
-    throw new AppError("VALIDATION_FAILED", "Keep the document under 50,000 characters.", false);
+  if (body.length > MAX_DOCUMENT_TEXT_CHARS) {
+    throw new AppError(
+      "VALIDATION_FAILED",
+      "That document is larger than one knowledge document can hold (about 1.5 million characters). Split it into parts and upload each part.",
+      false,
+    );
   }
 
   const document = seedDocumentFromUpload(title, body);

@@ -160,4 +160,28 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate, WKUI
         }
         return nil
     }
+
+    /// File inputs: without this delegate method WKWebView silently drops
+    /// clicks on <input type="file">, so the Sources upload dialog appears
+    /// dead. The panel is restricted to the types the upload form accepts.
+    func webView(
+        _ webView: WKWebView,
+        runOpenPanelWith parameters: WKOpenPanelParameters,
+        initiatedByFrame frame: WKFrameInfo,
+        completionHandler: @escaping ([URL]?) -> Void
+    ) {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = parameters.allowsMultipleSelection
+        panel.allowedContentTypes = [
+            .init(filenameExtension: "md") ?? .data,
+            .init(filenameExtension: "markdown") ?? .data,
+            .init(filenameExtension: "txt") ?? .data,
+            .pdf,
+        ]
+        panel.begin { response in
+            completionHandler(response == .OK ? panel.urls : nil)
+        }
+    }
 }

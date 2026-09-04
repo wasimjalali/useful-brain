@@ -55,6 +55,7 @@ describe("KnowledgeWorkspace", () => {
           readyVersionId: null,
           corpusStatus: "not_started",
         }}
+        isOperator
       />,
     );
 
@@ -66,6 +67,35 @@ describe("KnowledgeWorkspace", () => {
       screen.getByRole("button", { name: "Upload document" }),
     ).toBeInTheDocument();
     expect(screen.queryByRole("table", { name: "Knowledge documents" })).toBeNull();
+  });
+
+  it("hides operator-only seeding from a plain user on first run", () => {
+    render(
+      <KnowledgeWorkspace
+        addDocumentAction={async () => {}}
+        chunks={[]}
+        documents={[]}
+        embedAction={async () => {}}
+        embeddingStorageStatus={{
+          storedDocuments: 0,
+          storedChunks: 0,
+          embeddedChunks: 0,
+          lastRunStatus: "not_started",
+          lastRunMessage: null,
+          lastEmbeddedAt: null,
+          activeVersionId: null,
+          readyVersionId: null,
+          corpusStatus: "not_started",
+        }}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: "Seed Northwind corpus" }),
+    ).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Upload document" }),
+    ).toBeInTheDocument();
   });
 
   it("filters documents by title, source and status", () => {
@@ -195,6 +225,7 @@ describe("KnowledgeWorkspace", () => {
           })
         }
         embeddingStorageStatus={{ ...embeddingStorageStatus, embeddedChunks: 0 }}
+        isOperator
       />,
     );
 
@@ -255,6 +286,7 @@ describe("KnowledgeWorkspace", () => {
           embeddedChunks: 0,
           lastRunStatus: "failed",
         }}
+        isOperator
       />,
     );
 
@@ -300,12 +332,30 @@ describe("KnowledgeWorkspace", () => {
           storedChunks: 2,
           embeddedChunks: 2,
         }}
+        isOperator
       />,
     );
 
     expect(
       screen.getByRole("button", { name: "Re-index sources" }),
     ).toBeInTheDocument();
+  });
+
+  it("hides corpus re-index from a plain user", () => {
+    render(
+      <KnowledgeWorkspace
+        addDocumentAction={async () => {}}
+        chunks={chunks}
+        documents={documents}
+        embedAction={async () => {}}
+        reindexAction={async () => {}}
+        embeddingStorageStatus={embeddingStorageStatus}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: "Re-index sources" }),
+    ).toBeNull();
   });
 
   it("pages the document inventory", () => {

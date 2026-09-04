@@ -74,6 +74,14 @@ export function SendIcon(props: IconProps) {
   );
 }
 
+export function StopIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect height="9" rx="1.5" width="9" x="7.5" y="7.5" />
+    </Icon>
+  );
+}
+
 export function SourceIcon(props: IconProps) {
   return (
     <Icon {...props}>
