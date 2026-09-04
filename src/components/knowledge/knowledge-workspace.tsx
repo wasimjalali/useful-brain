@@ -833,16 +833,23 @@ function AddDocumentDialog({
     setFolderBusy(true);
     setError(null);
     for (let index = 0; index < items.length; index += 1) {
+      const planned = items[index];
       if (cancelledRef.current) {
-        updateQueueItem(index, { state: "failed", message: "Cancelled" });
+        if (planned.state !== "failed") {
+          updateQueueItem(index, { state: "failed", message: "Cancelled" });
+        }
         continue;
       }
-      const item = items[index];
+      // Pre-queue rejects (unsupported, empty, oversized) keep their skip
+      // message and are never sent to the server.
+      if (planned.state === "failed") {
+        continue;
+      }
       updateQueueItem(index, { state: "uploading" });
       try {
         const formData = new FormData();
-        formData.set("file", item.file, item.file.name);
-        formData.set("title", item.title);
+        formData.set("file", planned.file, planned.file.name);
+        formData.set("title", planned.title);
         await action(formData);
         updateQueueItem(index, { state: "added" });
       } catch (caught) {
