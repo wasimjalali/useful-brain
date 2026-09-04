@@ -25,7 +25,9 @@ export type KnowledgeWorkspaceProps = {
   documents: KnowledgeDocument[];
   chunks: DocumentChunk[];
   deleteDocumentAction?: (documentId: string) => Promise<ActionResult<null>>;
-  addDocumentAction: (formData: FormData) => Promise<void>;
+  addDocumentAction: (
+    formData: FormData,
+  ) => Promise<ActionResult<null> | void>;
   embedAction: () => Promise<void>;
   embeddingStorageStatus: EmbeddingStorageStatus;
   initialAddOpen?: boolean;
@@ -783,7 +785,7 @@ function AddDocumentDialog({
   action,
   onClose,
 }: {
-  action: (formData: FormData) => Promise<void>;
+  action: (formData: FormData) => Promise<ActionResult<null> | void>;
   onClose: () => void;
 }) {
   const [error, setError] = useState<string | null>(null);
@@ -809,14 +811,12 @@ function AddDocumentDialog({
       return;
     }
 
-    try {
-      await action(formData);
-      onClose();
-    } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : "Could not add the document.",
-      );
+    const result = await action(formData);
+    if (result && !result.ok) {
+      setError(result.error.message);
+      return;
     }
+    onClose();
   }
 
   function updateQueueItem(index: number, patch: Partial<FolderQueueItem>) {
@@ -850,7 +850,11 @@ function AddDocumentDialog({
         const formData = new FormData();
         formData.set("file", planned.file, planned.file.name);
         formData.set("title", planned.title);
-        await action(formData);
+        const result = await action(formData);
+        if (result && !result.ok) {
+          updateQueueItem(index, { state: "failed", message: result.error.message });
+          continue;
+        }
         updateQueueItem(index, { state: "added" });
       } catch (caught) {
         updateQueueItem(index, {

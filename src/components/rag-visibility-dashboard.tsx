@@ -86,7 +86,9 @@ type CancelAction = (
 type RagVisibilityDashboardProps = {
   documents: KnowledgeDocument[];
   chunks: DocumentChunk[];
-  addDocumentAction: (formData: FormData) => Promise<void>;
+  addDocumentAction: (
+    formData: FormData,
+  ) => Promise<ActionResult<null> | void>;
   embedAction: () => Promise<void>;
   askAction: AskAction;
   cancelAction?: CancelAction;

@@ -157,9 +157,11 @@ describe("addSyntheticDocumentAction", () => {
       body: "Some body text.",
     });
 
-    await expect(addSyntheticDocumentAction(formData)).rejects.toThrow(
-      /under 120 characters/i,
-    );
+    const result = await addSyntheticDocumentAction(formData);
+    expect(result).toEqual({
+      ok: false,
+      error: expect.objectContaining({ message: "Keep the title under 120 characters." }),
+    });
     expect(brainJson).not.toHaveBeenCalled();
   });
 
@@ -170,9 +172,11 @@ describe("addSyntheticDocumentAction", () => {
       body: "a".repeat(1_500_001),
     });
 
-    await expect(addSyntheticDocumentAction(formData)).rejects.toThrow(
-      /split it into parts/i,
-    );
+    const result = await addSyntheticDocumentAction(formData);
+    expect(result).toEqual({
+      ok: false,
+      error: expect.objectContaining({ message: expect.stringMatching(/split it into parts/i) }),
+    });
     expect(brainJson).not.toHaveBeenCalled();
   });
 
@@ -183,9 +187,29 @@ describe("addSyntheticDocumentAction", () => {
       body: "Some body text.",
     });
 
-    await expect(addSyntheticDocumentAction(formData)).rejects.toThrow(
-      /letters or numbers/i,
+    const result = await addSyntheticDocumentAction(formData);
+    expect(result).toEqual({
+      ok: false,
+      error: expect.objectContaining({ message: expect.stringMatching(/letters or numbers/i) }),
+    });
+    expect(brainJson).not.toHaveBeenCalled();
+  });
+
+  it("rejects unreadable uploads with the extraction error", async () => {
+    const addSyntheticDocumentAction = await importAction();
+    const formData = new FormData();
+    formData.set("title", "");
+    formData.set("body", "");
+    formData.set(
+      "file",
+      new File(["<html></html>"], "page.html", { type: "text/html" }),
     );
+
+    const result = await addSyntheticDocumentAction(formData);
+    expect(result).toEqual({
+      ok: false,
+      error: expect.objectContaining({ message: expect.stringMatching(/unsupported file type/i) }),
+    });
     expect(brainJson).not.toHaveBeenCalled();
   });
 
@@ -227,9 +251,11 @@ describe("addSyntheticDocumentAction", () => {
       body: "Body text describing the policy.",
     });
 
-    await expect(addSyntheticDocumentAction(formData)).rejects.toThrow(
-      /could not be stored/i,
-    );
+    const result = await addSyntheticDocumentAction(formData);
+    expect(result).toEqual({
+      ok: false,
+      error: expect.objectContaining({ message: expect.stringMatching(/could not be stored/i) }),
+    });
     expect(revalidatePath).not.toHaveBeenCalled();
   });
 
