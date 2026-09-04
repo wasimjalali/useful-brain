@@ -28,6 +28,23 @@ Server output is appended to `~/Library/Logs/useful-brain/server.log`
 (Server menu > Show Log in Finder). The log grows without bound; delete it
 whenever it gets large.
 
+## Staging mode
+
+The app can point at the deployed staging app on Cloudflare instead of the
+local stack. In this mode no local server is spawned and the webview loads
+the https origin directly, so signup and login work there as a normal user:
+
+```
+defaults write ai.karko.usefulbrain mode staging
+defaults delete ai.karko.usefulbrain mode   # back to local
+```
+
+The staging URL defaults to `https://useful-brain-staging.karko-ai.workers.dev`
+and can be overridden with the `stagingURL` key. The webview may navigate only
+to the active mode's own origin: staging allows only that https host, local
+allows only its loopback origin (plus the localhost alias). Signup on staging
+is gated by the `SIGNUP_CODE` secret; see `docs/runbooks/operations.md`.
+
 ## Build and install
 
 Prerequisites: Node.js >= 22.19, Command Line Tools (`xcode-select --install`),
