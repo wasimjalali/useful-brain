@@ -87,7 +87,7 @@ export function ChatComposer({
           </label>
           <textarea
             className={[
-              "composer-scroll min-h-[40px] w-full resize-none border-0 bg-transparent px-2 py-2 text-[15px] leading-6 outline-none placeholder:text-ink-faint focus:outline-none focus-visible:outline-none disabled:text-ink-faint",
+              "uv-scroll composer-scroll min-h-[40px] w-full resize-none border-0 bg-transparent px-2 py-2 text-[15px] leading-6 outline-none placeholder:text-ink-faint focus:outline-none focus-visible:outline-none disabled:text-ink-faint",
               isPreview ? "text-ink-muted" : "text-ink",
               canScroll ? "overflow-y-auto" : "overflow-hidden",
             ].join(" ")}

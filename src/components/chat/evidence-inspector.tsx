@@ -168,7 +168,7 @@ function EvidenceInspectorPanel({
           </p>
         </div>
       ) : (
-        <div className="flex-1 overflow-y-auto px-4 py-4" role="tabpanel">
+        <div className="uv-scroll flex-1 overflow-y-auto px-4 py-4" role="tabpanel">
           <div className="flex flex-col gap-2.5">
             {activeItems.map((item) => (
               <button
@@ -298,7 +298,7 @@ export function EvidenceChunkDialog({
         <StatCell label="Tokens" value={`~${item.tokenEstimate}`} />
       </dl>
 
-      <div className="max-h-[50vh] overflow-y-auto px-5 py-4">
+      <div className="uv-scroll max-h-[50vh] overflow-y-auto px-5 py-4">
         <p className="mb-1 font-mono text-xs text-ink-faint">
           Generation {item.generationId ?? "Unavailable"}
         </p>

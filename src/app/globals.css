@@ -25,6 +25,11 @@
   --border: #ebebeb;
   --border-strong: #e0e0e0;
 
+  /* Overlay scrollbar knob (Useful Voice parity): lighter than ink-faint so
+     it reads as chrome, not content. */
+  --scroll-knob: #e3e3e3;
+  --scroll-knob-active: #d4d4d4;
+
   --success: #0f6f56;
   --success-soft: #e4f4ee;
   --warning: #8a5300;
@@ -188,19 +193,43 @@ body {
   box-shadow: 0 0 0 3px rgb(23 23 23 / 0.08);
 }
 
-.composer-scroll {
+/* Scrollbars, matching Useful Voice's ThinScroller: hidden by default,
+   revealed while scrolling (the ScrollChrome client toggles .is-scrolling)
+   or on hover of the gutter, 5px rounded thumb, no track. The knob is a
+   light gray that reads on white and sunken surfaces; a step darker while
+   hovered or active. */
+.uv-scroll {
   scrollbar-width: thin;
-  scrollbar-color: var(--ink-faint) transparent;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 220ms var(--ease-out);
 }
-.composer-scroll::-webkit-scrollbar {
-  width: 3px;
+.uv-scroll.is-scrolling,
+.uv-scroll:hover {
+  scrollbar-color: var(--scroll-knob) transparent;
 }
-.composer-scroll::-webkit-scrollbar-track {
+.uv-scroll::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.uv-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
-.composer-scroll::-webkit-scrollbar-thumb {
-  background: var(--ink-faint);
+.uv-scroll::-webkit-scrollbar-thumb {
+  background: transparent;
   border-radius: 999px;
+  transition: background-color 220ms var(--ease-out);
+}
+.uv-scroll.is-scrolling::-webkit-scrollbar-thumb,
+.uv-scroll:hover::-webkit-scrollbar-thumb {
+  background: var(--scroll-knob);
+}
+.uv-scroll.is-scrolling::-webkit-scrollbar-thumb:hover,
+.uv-scroll:hover::-webkit-scrollbar-thumb:hover {
+  background: var(--scroll-knob-active);
+}
+
+.composer-scroll {
+  overflow-y: auto;
 }
 
 /* Left navigation item */

@@ -157,7 +157,7 @@ function ChatHistoryList({
   onSelect: (id: string) => void;
 }) {
   return (
-    <div className="-mr-1 min-h-0 flex-1 space-y-0.5 overflow-y-auto pr-1">
+    <div className="uv-scroll -mr-1 min-h-0 flex-1 space-y-0.5 overflow-y-auto pr-1">
       {conversations.map((conversation) => {
         const active = conversation.id === activeConversationId;
         return (

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
+import { ScrollChrome } from "@/components/ui/scroll-chrome";
+
 import "./globals.css";
 
 const geist = Geist({
@@ -31,7 +33,10 @@ export default function RootLayout({
       lang="en"
       className={`h-full antialiased ${geist.variable} ${geistMono.variable}`}
     >
-      <body className="flex min-h-full flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">
+        <ScrollChrome />
+        {children}
+      </body>
     </html>
   );
 }

@@ -155,7 +155,7 @@ export function Select({
       </button>
       {open ? (
         <ul
-          className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-border bg-surface py-1 shadow-raise"
+          className="uv-scroll absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-border bg-surface py-1 shadow-raise"
           id={listId}
           role="listbox"
         >
