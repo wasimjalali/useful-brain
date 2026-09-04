@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { useRouter } from "next/navigation";
 
+import { MAX_UPLOAD_BYTES } from "@/lib/rag/extract-upload";
 import { CloseIcon, LayersIcon, PlusIcon, UploadIcon } from "@/components/icons";
 import { Dialog } from "@/components/ui/dialog";
 import { Select } from "@/components/ui/select";
@@ -24,10 +25,13 @@ export type KnowledgeWorkspaceProps = {
   documents: KnowledgeDocument[];
   chunks: DocumentChunk[];
   deleteDocumentAction?: (documentId: string) => Promise<ActionResult<null>>;
-  addDocumentAction: (formData: FormData) => Promise<void>;
+  addDocumentAction: (
+    formData: FormData,
+  ) => Promise<ActionResult<null> | void>;
   embedAction: () => Promise<void>;
   embeddingStorageStatus: EmbeddingStorageStatus;
   initialAddOpen?: boolean;
+  isOperator?: boolean;
   promoteAction?: (versionId: string) => Promise<void>;
   reindexAction?: () => Promise<void>;
   retrievalMode?: KnowledgeInventory["retrievalMode"];
@@ -68,6 +72,7 @@ export function KnowledgeWorkspace({
   embedAction,
   embeddingStorageStatus,
   initialAddOpen = false,
+  isOperator = false,
   promoteAction,
   reindexAction,
   retrievalMode = "keyword",
@@ -219,17 +224,19 @@ export function KnowledgeWorkspace({
           </div>
           {embedError ? <p className="text-sm font-medium text-danger" role="alert">{embedError}</p> : null}
           <div className="flex flex-col gap-2 sm:flex-row">
+            {isOperator ? (
+              <button
+                className="btn btn-primary min-h-11 px-4 text-sm"
+                disabled={isEmbedding}
+                onClick={handleEmbed}
+                type="button"
+              >
+                <LayersIcon className="size-4" />
+                {isEmbedding ? "Seeding Northwind" : "Seed Northwind corpus"}
+              </button>
+            ) : null}
             <button
               className="btn btn-primary min-h-11 px-4 text-sm"
-              disabled={isEmbedding}
-              onClick={handleEmbed}
-              type="button"
-            >
-              <LayersIcon className="size-4" />
-              {isEmbedding ? "Seeding Northwind" : "Seed Northwind corpus"}
-            </button>
-            <button
-              className="btn btn-secondary min-h-11 px-4 text-sm"
               onClick={() => setAddOpen(true)}
               type="button"
             >
@@ -277,7 +284,7 @@ export function KnowledgeWorkspace({
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
-            {reindexAction ? (
+            {reindexAction && isOperator ? (
               <button
                 className="btn btn-secondary min-h-10 px-3.5 text-sm"
                 disabled={isReindexing || isPromoting}
@@ -747,15 +754,50 @@ function DetailMetric({ label, value }: { label: string; value: string }) {
   );
 }
 
+type FolderQueueItemState = "waiting" | "uploading" | "added" | "failed";
+
+type FolderQueueItem = {
+  file: File;
+  title: string;
+  state: FolderQueueItemState;
+  message?: string;
+};
+
+const FOLDER_EXTENSIONS = new Set([".md", ".markdown", ".txt", ".pdf"]);
+
+/**
+ * Titles from a folder's relative path (root folder dropped) so two files
+ * named alike in different subfolders become distinct documents instead of
+ * silently merging into one slug.
+ */
+export function folderFileTitle(relativePath: string): string {
+  const parts = relativePath.split("/").filter(Boolean);
+  const withoutRoot = parts.length > 1 ? parts.slice(1) : parts;
+  const base = withoutRoot.join(" / ").replace(/\.[^.]+$/, "").trim();
+  return base;
+}
+
+function relativePathOf(file: File): string {
+  return (file as File & { webkitRelativePath?: string }).webkitRelativePath || "";
+}
+
 function AddDocumentDialog({
   action,
   onClose,
 }: {
-  action: (formData: FormData) => Promise<void>;
+  action: (formData: FormData) => Promise<ActionResult<null> | void>;
   onClose: () => void;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [folderQueue, setFolderQueue] = useState<FolderQueueItem[] | null>(null);
+  const [folderBusy, setFolderBusy] = useState(false);
+  const cancelledRef = useRef(false);
+
+  function requestClose() {
+    cancelledRef.current = true;
+    onClose();
+  }
 
   async function handle(formData: FormData) {
     setError(null);
@@ -769,101 +811,254 @@ function AddDocumentDialog({
       return;
     }
 
-    try {
-      await action(formData);
-      onClose();
-    } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : "Could not add the document.",
-      );
+    const result = await action(formData);
+    if (result && !result.ok) {
+      setError(result.error.message);
+      return;
     }
+    onClose();
   }
 
+  function updateQueueItem(index: number, patch: Partial<FolderQueueItem>) {
+    setFolderQueue(
+      (current) =>
+        current?.map((item, itemIndex) =>
+          itemIndex === index ? { ...item, ...patch } : item,
+        ) ?? null,
+    );
+  }
+
+  async function runFolderQueue(items: FolderQueueItem[]) {
+    setFolderQueue(items);
+    setFolderBusy(true);
+    setError(null);
+    for (let index = 0; index < items.length; index += 1) {
+      const planned = items[index];
+      if (cancelledRef.current) {
+        if (planned.state !== "failed") {
+          updateQueueItem(index, { state: "failed", message: "Cancelled" });
+        }
+        continue;
+      }
+      // Pre-queue rejects (unsupported, empty, oversized) keep their skip
+      // message and are never sent to the server.
+      if (planned.state === "failed") {
+        continue;
+      }
+      updateQueueItem(index, { state: "uploading" });
+      try {
+        const formData = new FormData();
+        formData.set("file", planned.file, planned.file.name);
+        formData.set("title", planned.title);
+        const result = await action(formData);
+        if (result && !result.ok) {
+          updateQueueItem(index, { state: "failed", message: result.error.message });
+          continue;
+        }
+        updateQueueItem(index, { state: "added" });
+      } catch (caught) {
+        updateQueueItem(index, {
+          state: "failed",
+          message:
+            caught instanceof Error ? caught.message : "Could not add the document.",
+        });
+      }
+    }
+    setFolderBusy(false);
+  }
+
+  function queueFolder(files: FileList | null) {
+    if (!files || files.length === 0) {
+      return;
+    }
+    const queued: FolderQueueItem[] = [];
+    for (const file of Array.from(files)) {
+      const relativePath = relativePathOf(file);
+      const extension = (relativePath || file.name).match(/\.[^.]+$/)?.[0]?.toLowerCase() ?? "";
+      const emptyState: FolderQueueItemState | null =
+        !FOLDER_EXTENSIONS.has(extension)
+          ? "failed"
+          : file.size === 0
+            ? "failed"
+            : file.size > MAX_UPLOAD_BYTES
+              ? "failed"
+              : null;
+      const skipMessage =
+        !FOLDER_EXTENSIONS.has(extension)
+          ? "Skipped: unsupported file type"
+          : file.size === 0
+            ? "Skipped: empty file"
+            : "Skipped: larger than 10 MB";
+      if (emptyState) {
+        queued.push({ file, title: folderFileTitle(relativePath) || file.name, state: "failed", message: skipMessage });
+        continue;
+      }
+      queued.push({
+        file,
+        title: folderFileTitle(relativePath) || file.name.replace(/\.[^.]+$/, ""),
+        state: "waiting",
+      });
+    }
+    if (queued.every((item) => item.state === "failed")) {
+      setError("No supported files in that folder. Upload .md, .txt or .pdf files.");
+      return;
+    }
+    void runFolderQueue(queued);
+  }
+
+  const folderDone =
+    !folderBusy && folderQueue !== null && folderQueue.length > 0;
+
   return (
-    <Dialog ariaLabel="Upload document" maxWidth="max-w-lg" onClose={onClose}>
+    <Dialog ariaLabel="Upload document" maxWidth="max-w-lg" onClose={requestClose}>
       <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-4">
         <div>
           <h2 className="text-base font-semibold text-ink">Upload document</h2>
           <p className="mt-0.5 text-xs text-ink-muted">
-            Upload a Markdown, text or PDF file, or paste text with {" "}
+            Upload a Markdown, text or PDF file, or paste text with { " " }
             <code className="font-mono">## Heading</code> lines.
           </p>
         </div>
         <button
           aria-label="Close"
           className="icon-btn size-8 shrink-0"
-          onClick={onClose}
+          onClick={requestClose}
           type="button"
         >
           <CloseIcon className="size-5" />
         </button>
       </div>
 
-      <form action={handle} className="flex flex-col gap-4 px-5 py-4">
-        <label className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-dashed border-border-strong bg-canvas px-4 py-6 text-center transition hover:border-accent hover:bg-accent-soft">
-          <input
-            accept=".md,.markdown,.txt,.pdf"
-            className="sr-only"
-            name="file"
-            onChange={(event) => setFileName(event.target.files?.[0]?.name ?? null)}
-            type="file"
-          />
-          <span className="grid size-9 place-items-center rounded-lg bg-accent-soft text-accent-deep">
-            <UploadIcon className="size-5" />
-          </span>
-          <span className="break-words text-sm font-medium text-ink">
-            {fileName ?? "Click to upload a file"}
-          </span>
-          <span className="text-xs text-ink-faint">
-            Markdown, text or PDF, up to 5 MB
-          </span>
-        </label>
-
-        <div className="flex items-center gap-3 text-xs font-medium text-ink-faint">
-          <span className="h-px flex-1 bg-border" />
-          or paste manually
-          <span className="h-px flex-1 bg-border" />
+      {folderQueue !== null ? (
+        <div className="flex flex-col gap-4 px-5 py-4">
+          <div className="flex flex-col gap-1.5">
+            <p className="text-[13px] font-medium text-ink-muted">
+              {folderBusy
+                ? `Uploading ${folderQueue.filter((item) => item.state === "added" || item.state === "failed").length + 1 > folderQueue.length ? folderQueue.length : folderQueue.filter((item) => item.state !== "waiting").length + 1} of ${folderQueue.length}`
+                : `Finished: ${folderQueue.filter((item) => item.state === "added").length} added, ${folderQueue.filter((item) => item.state === "failed").length} not uploaded`}
+            </p>
+            <ul className="max-h-64 overflow-y-auto rounded-xl border border-border bg-surface">
+              {folderQueue.map((item, index) => (
+                <li
+                  className="flex items-center justify-between gap-3 border-b border-border px-3 py-2 last:border-b-0"
+                  key={`${item.title}:${index}`}
+                >
+                  <span className="min-w-0 truncate text-sm text-ink">{item.title}</span>
+                  <span
+                    className={[
+                      "shrink-0 text-xs font-medium",
+                      item.state === "added"
+                        ? "text-success"
+                        : item.state === "failed"
+                          ? "text-danger"
+                          : "text-ink-faint",
+                    ].join(" ")}
+                  >
+                    {item.state === "added"
+                      ? "Added"
+                      : item.state === "uploading"
+                        ? "Uploading"
+                        : item.state === "failed"
+                          ? item.message ?? "Failed"
+                          : "Waiting"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          {folderDone ? (
+            <div className="flex justify-end">
+              <button
+                className="btn btn-primary h-10 px-4 text-sm"
+                onClick={requestClose}
+                type="button"
+              >
+                Done
+              </button>
+            </div>
+          ) : null}
         </div>
-
-        <div className="flex flex-col gap-1.5">
-          <label className="text-[13px] font-medium text-ink-muted" htmlFor="doc-title">
-            Title
+      ) : (
+        <form action={handle} className="flex flex-col gap-4 px-5 py-4">
+          <label className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-dashed border-border-strong bg-canvas px-4 py-6 text-center transition hover:border-accent hover:bg-accent-soft">
+            <input
+              accept=".md,.markdown,.txt,.pdf"
+              className="sr-only"
+              name="file"
+              onChange={(event) => setFileName(event.target.files?.[0]?.name ?? null)}
+              type="file"
+            />
+            <span className="grid size-9 place-items-center rounded-lg bg-accent-soft text-accent-deep">
+              <UploadIcon className="size-5" />
+            </span>
+            <span className="break-words text-sm font-medium text-ink">
+              {fileName ?? "Click to upload a file"}
+            </span>
+            <span className="text-xs text-ink-faint">
+              Markdown, text or PDF, up to 10 MB
+            </span>
           </label>
-          <input
-            className="field-input px-3 py-2.5 text-sm text-ink outline-none"
-            id="doc-title"
-            name="title"
-            placeholder="Warranty policy"
-            type="text"
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label className="text-[13px] font-medium text-ink-muted" htmlFor="doc-body">
-            Document text
+
+          <label className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-dashed border-border-strong bg-canvas px-4 py-4 text-center transition hover:border-accent hover:bg-accent-soft">
+            <input
+              className="sr-only"
+              multiple
+              onChange={(event) => queueFolder(event.target.files)}
+              type="file"
+              { ...{ webkitdirectory: "", directory: "" } }
+            />
+            <span className="text-sm font-medium text-ink">Upload a folder</span>
+            <span className="text-xs text-ink-faint">
+              Every .md, .txt or .pdf file inside is indexed
+            </span>
           </label>
-          <textarea
-            className="field-input min-h-40 resize-y px-3 py-2.5 text-sm leading-6 text-ink outline-none"
-            id="doc-body"
-            name="body"
-            placeholder={"## Coverage\nProducts are covered for 12 months.\n\n## Exclusions\nMisuse is not covered."}
-          />
-        </div>
-        {error ? (
-          <p className="text-[13px] font-medium text-danger" role="alert">
-            {error}
-          </p>
-        ) : null}
-        <div className="flex justify-end gap-2">
-          <button
-            className="btn btn-secondary h-10 px-4 text-sm"
-            onClick={onClose}
-            type="button"
-          >
-            Cancel
-          </button>
-          <AddDocumentSubmit />
-        </div>
-      </form>
+
+          <div className="flex items-center gap-3 text-xs font-medium text-ink-faint">
+            <span className="h-px flex-1 bg-border" />
+            or paste manually
+            <span className="h-px flex-1 bg-border" />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[13px] font-medium text-ink-muted" htmlFor="doc-title">
+              Title
+            </label>
+            <input
+              className="field-input px-3 py-2.5 text-sm text-ink outline-none"
+              id="doc-title"
+              name="title"
+              placeholder="Warranty policy"
+              type="text"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[13px] font-medium text-ink-muted" htmlFor="doc-body">
+              Document text
+            </label>
+            <textarea
+              className="field-input min-h-40 resize-y px-3 py-2.5 text-sm leading-6 text-ink outline-none"
+              id="doc-body"
+              name="body"
+              placeholder={"## Coverage\nProducts are covered for 12 months.\n\n## Exclusions\nMisuse is not covered."}
+            />
+          </div>
+          {error ? (
+            <p className="text-[13px] font-medium text-danger" role="alert">
+              {error}
+            </p>
+          ) : null}
+          <div className="flex justify-end gap-2">
+            <button
+              className="btn btn-secondary h-10 px-4 text-sm"
+              onClick={requestClose}
+              type="button"
+            >
+              Cancel
+            </button>
+            <AddDocumentSubmit />
+          </div>
+        </form>
+      )}
     </Dialog>
   );
 }

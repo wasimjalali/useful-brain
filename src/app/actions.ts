@@ -12,7 +12,7 @@ import {
   type ActionResult,
   type PublicAppError,
 } from "@/lib/rag/app-errors";
-import { extractUploadedText } from "@/lib/rag/extract-upload";
+import { extractUploadedText, MAX_DOCUMENT_TEXT_CHARS } from "@/lib/rag/extract-upload";
 import type { GroundedAnswerResponse } from "@/lib/rag/grounded-answer";
 import type { Conversation } from "@/lib/rag/chat-history";
 import { emptyEmbeddingStorageStatus, type EmbeddingStorageStatus } from "@/lib/rag/storage-records";
@@ -203,30 +203,53 @@ export async function importLegacyConversationsAction(
   return actionSuccess(null);
 }
 
-export async function addSyntheticDocumentAction(formData: FormData) {
+export async function addSyntheticDocumentAction(
+  formData: FormData,
+): Promise<ActionResult<null>> {
   let title = String(formData.get("title") ?? "").trim();
   let body = String(formData.get("body") ?? "").trim();
 
   const file = formData.get("file");
   if (file instanceof File && file.size > 0) {
-    const extracted = await extractUploadedText(file);
-    title = title || extracted.title;
-    body = extracted.markdown.trim();
+    try {
+      const extracted = await extractUploadedText(file);
+      title = title || extracted.title;
+      body = extracted.markdown.trim();
+    } catch (error) {
+      return actionFailure(
+        new AppError(
+          "VALIDATION_FAILED",
+          error instanceof Error ? error.message : "The uploaded file could not be read.",
+          false,
+        ),
+      );
+    }
   }
 
   if (!title || !body) {
-    throw new AppError("VALIDATION_FAILED", "A title and document text are both required.", false);
+    return actionFailure(new AppError("VALIDATION_FAILED", "A title and document text are both required.", false));
   }
 
   if (title.length > 120) {
-    throw new AppError("VALIDATION_FAILED", "Keep the title under 120 characters.", false);
+    return actionFailure(new AppError("VALIDATION_FAILED", "Keep the title under 120 characters.", false));
   }
 
-  if (body.length > 50_000) {
-    throw new AppError("VALIDATION_FAILED", "Keep the document under 50,000 characters.", false);
+  if (body.length > MAX_DOCUMENT_TEXT_CHARS) {
+    return actionFailure(
+      new AppError(
+        "VALIDATION_FAILED",
+        "That document is larger than one knowledge document can hold (about 1.5 million characters). Split it into parts and upload each part.",
+        false,
+      ),
+    );
   }
 
-  const document = seedDocumentFromUpload(title, body);
+  let document: SeedDocumentInput;
+  try {
+    document = seedDocumentFromUpload(title, body);
+  } catch (error) {
+    return actionFailure(error);
+  }
 
   try {
     await brainJson("/knowledge/seed", {
@@ -234,14 +257,17 @@ export async function addSyntheticDocumentAction(formData: FormData) {
       json: { merge: true, documents: [document] },
     });
   } catch {
-    throw new AppError(
-      "PROVIDER_TEMPORARY",
-      "The document could not be stored. Try again from the Knowledge view.",
-      true,
+    return actionFailure(
+      new AppError(
+        "PROVIDER_TEMPORARY",
+        "The document could not be stored. Try again from the Knowledge view.",
+        true,
+      ),
     );
   }
 
   revalidateWorkspace();
+  return actionSuccess(null);
 }
 
 export async function signOutAction() {

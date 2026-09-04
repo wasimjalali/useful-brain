@@ -86,7 +86,9 @@ type CancelAction = (
 type RagVisibilityDashboardProps = {
   documents: KnowledgeDocument[];
   chunks: DocumentChunk[];
-  addDocumentAction: (formData: FormData) => Promise<void>;
+  addDocumentAction: (
+    formData: FormData,
+  ) => Promise<ActionResult<null> | void>;
   embedAction: () => Promise<void>;
   askAction: AskAction;
   cancelAction?: CancelAction;
@@ -552,6 +554,7 @@ export function RagVisibilityDashboard({
               embedAction={embedAction}
               embeddingStorageStatus={embeddingStorageStatus}
               initialAddOpen={initialAddDocument}
+              isOperator={identity?.kind === "user" && identity.roles.includes("operator")}
               promoteAction={promoteCorpusAction}
               reindexAction={reindexAction}
               retrievalMode={retrievalMode}

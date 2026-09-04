@@ -1,4 +1,8 @@
-const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+// D1 stores one document body per row and caps rows at 2 MB. A 10 MB upload
+// of plain text cannot become one knowledge document, so text is capped below
+// that with a clear message instead of an opaque seed failure.
+export const MAX_DOCUMENT_TEXT_CHARS = 1_500_000;
 
 const TEXT_EXTENSIONS = new Set([".md", ".markdown", ".txt"]);
 
@@ -6,7 +10,7 @@ export async function extractUploadedText(
   file: File,
 ): Promise<{ title: string; markdown: string }> {
   if (file.size > MAX_UPLOAD_BYTES) {
-    throw new Error("That file is too large. Keep uploads under 5 MB.");
+    throw new Error("That file is too large. Keep uploads under 10 MB.");
   }
 
   const extension = getExtension(file.name);
@@ -30,6 +34,12 @@ export async function extractUploadedText(
 
   if (!markdown.trim()) {
     throw new Error("That file did not contain any readable text.");
+  }
+
+  if (markdown.length > MAX_DOCUMENT_TEXT_CHARS) {
+    throw new Error(
+      "That file extracts to more text than one knowledge document can hold (about 1.5 million characters). Split it into parts and upload each part.",
+    );
   }
 
   return { title, markdown };
