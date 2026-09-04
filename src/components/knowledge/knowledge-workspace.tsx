@@ -937,7 +937,7 @@ function AddDocumentDialog({
                 ? `Uploading ${folderQueue.filter((item) => item.state === "added" || item.state === "failed").length + 1 > folderQueue.length ? folderQueue.length : folderQueue.filter((item) => item.state !== "waiting").length + 1} of ${folderQueue.length}`
                 : `Finished: ${folderQueue.filter((item) => item.state === "added").length} added, ${folderQueue.filter((item) => item.state === "failed").length} not uploaded`}
             </p>
-            <ul className="max-h-64 overflow-y-auto rounded-xl border border-border bg-surface">
+            <ul className="uv-scroll max-h-64 overflow-y-auto rounded-xl border border-border bg-surface">
               {folderQueue.map((item, index) => (
                 <li
                   className="flex items-center justify-between gap-3 border-b border-border px-3 py-2 last:border-b-0"

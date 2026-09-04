@@ -621,7 +621,7 @@ function WorkspaceLoadError({ message }: { message: string }) {
 
 function ScrollView({ children }: { children: ReactNode }) {
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="uv-scroll h-full overflow-y-auto">
       <div className="panel-in mx-auto w-full max-w-5xl px-4 py-8 sm:px-8 sm:py-10">
         {children}
       </div>

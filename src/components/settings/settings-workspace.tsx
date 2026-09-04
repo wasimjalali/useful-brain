@@ -78,7 +78,7 @@ export function SettingsWorkspace({
           ) : null}
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6">
+        <div className="uv-scroll min-h-0 flex-1 overflow-y-auto px-5 pb-6">
           {pane === "operator" ? (
             <OperatorPane
               assumedPrincipalKey={assumedPrincipalKey}
