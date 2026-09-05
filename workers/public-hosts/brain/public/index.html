@@ -6,11 +6,11 @@
     <title>Useful Brain</title>
     <meta
       name="description"
-      content="A company knowledge agent that cites retrieved evidence and refuses unsupported claims."
+      content="A portfolio knowledge assistant that answers questions from sample company documents, with supporting sources you can inspect."
     />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="preload" href="/fonts/geist-variable.woff2" as="font" type="font/woff2" crossorigin />
-    <script>document.documentElement.classList.add("has-js");</script>
+
     <style>
       @font-face {
         font-family: "Geist";
@@ -107,7 +107,7 @@
         position: sticky;
         top: 0;
         z-index: 10;
-        background: color-mix(in srgb, var(--surface) 92%, transparent);
+        background: var(--surface);
         border-bottom: 1px solid transparent;
         transition: background-color 180ms var(--ease-out), border-color 180ms var(--ease-out);
       }
@@ -419,7 +419,7 @@
             <span class="endorsement-short">UB</span>
           </a>
         </div>
-        <a class="btn btn-compact" href="https://cal.com/usefulbuild/free-audit"><span class="wide-label">Book a free audit</span><span class="compact-label">Free audit</span></a>
+        <a class="btn btn-compact" href="https://cal.com/usefulbuild/free-audit"><span class="wide-label">Book a discovery call</span><span class="compact-label">Book a call</span></a>
       </div>
     </header>
 
@@ -439,17 +439,16 @@
           </svg>
         </div>
         <div class="wrap hero-copy">
-        <h1 data-rise style="--i:0">Answers only from evidence you can inspect.</h1>
+        <h1 data-rise style="--i:0">Your company knowledge. With the source attached.</h1>
         <p data-rise style="--i:1">
-          Useful Brain is a company knowledge agent. It retrieves documents
-          the operator may read, cites every factual answer, and refuses when
-          the corpus does not support the claim.
+          Useful Brain brings questions and supporting documents into one workspace.
+          Ask about a policy or process, read the answer and inspect the source.
         </p>
         <p data-rise style="--i:2">
-          <a class="parent-inline" href="https://usefulbuild.com">Useful Build</a> builds, customizes, and maintains this for companies.
+          <a class="parent-inline" href="https://usefulbuild.com">Useful Build</a> built this portfolio product using sample documents. Company setups are scoped separately.
         </p>
         <div class="hero-actions" data-rise style="--i:3">
-          <a class="btn" href="https://cal.com/usefulbuild/free-audit">Book a free audit</a>
+          <a class="btn" href="https://cal.com/usefulbuild/free-audit">Book a discovery call</a>
           <a class="btn btn-quiet" href="https://github.com/wasimjalali/useful-brain">View the source</a>
         </div>
         </div>
@@ -457,8 +456,8 @@
 
       <section class="shot wrap" data-reveal>
         <div class="shot-copy">
-          <h2>Chat</h2>
-          <p>Every factual answer cites the retrieved chunk. Missing evidence is a refusal, not a guess.</p>
+          <h2>Check the answer against the policy.</h2>
+          <p>This recorded example shows a support target beside its policy. Brain is designed to flag missing evidence; important answers still need a human check.</p>
         </div>
         <figure>
           <img
@@ -472,12 +471,12 @@
 
       <section class="shot wrap" data-reveal>
         <div class="shot-copy">
-          <h2>Sources</h2>
-          <p>The operator corpus stays visible. Promotion is an explicit step, so a failed draft cannot change retrieval.</p>
+          <h2>Know which documents are in use.</h2>
+          <p>Inspect the document library and its status. New source versions are checked before they replace the active collection.</p>
         </div>
         <figure>
           <img
-            alt="Useful Brain Sources inventory with the operator corpus and document list."
+            alt="Useful Brain source library showing document names and processing status."
             src="/open/sources.png"
             width="1440"
             height="900"
@@ -487,8 +486,8 @@
 
       <section class="shot wrap" data-reveal>
         <div class="shot-copy">
-          <h2>Evals</h2>
-          <p>Locked Northwind run: 114/120, 95%. 65 documents, 120 questions.</p>
+          <h2>Test the answers, including the limits.</h2>
+          <p>A recorded test passed 114/120 checks using 65 synthetic Northwind documents. This is a sample-data benchmark, not a customer result or a general accuracy guarantee.</p>
         </div>
         <figure>
           <img
@@ -505,15 +504,14 @@
       <section class="cta" id="contact">
         <div class="wrap">
           <div class="cta-layout">
-            <h2>Tell us what's slowing your team down.</h2>
+            <h2>Put your company knowledge to work.</h2>
             <div>
               <p>
-                A free 30-minute audit, no prep. We look at one job your team does
-                by hand and tell you whether to build, train or wait, and what it
-                costs. Even if you never hire us.
+                Bring one recurring question or task. We'll discuss your sources,
+                existing tools and whether a setup or build would help.
               </p>
               <div class="cta-row">
-                <a class="btn" href="https://cal.com/usefulbuild/free-audit">Book a free audit</a>
+                <a class="btn" href="https://cal.com/usefulbuild/free-audit">Book a discovery call</a>
                 <a class="email" href="mailto:hello@usefulbuild.com">hello@usefulbuild.com</a>
               </div>
             </div>
@@ -532,19 +530,19 @@
             </nav>
             <nav aria-label="Site links">
               <span>Site</span>
-              <a href="https://usefulbuild.com/#savings">How it works</a>
+              <a href="https://usefulbuild.com/#process">How it works</a>
               <a href="https://usefulbuild.com/#work">Work</a>
               <a href="https://usefulbuild.com/#offers">What we do</a>
               <a href="https://usefulbuild.com/#about">About</a>
             </nav>
             <nav aria-label="Contact links">
               <span>Contact</span>
-              <a href="https://cal.com/usefulbuild/free-audit">Book a free audit</a>
+              <a href="https://cal.com/usefulbuild/free-audit">Book a discovery call</a>
               <a href="mailto:hello@usefulbuild.com">Email us</a>
               <a href="https://github.com/wasimjalali" rel="me noopener">GitHub</a>
             </nav>
             <div class="footer-blurb">
-              <p>Knowledge agents and AI training for small and medium businesses. Start with a free audit.</p>
+              <p>Company knowledge assistants and custom internal tools, built around your team.</p>
               <a href="mailto:hello@usefulbuild.com">hello@usefulbuild.com</a>
             </div>
           </div>
@@ -577,20 +575,7 @@
       updateNav();
       window.addEventListener("scroll", updateNav, { passive: true });
 
-      const sections = document.querySelectorAll("[data-reveal]");
-      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches || !("IntersectionObserver" in window)) {
-        sections.forEach((section) => { section.dataset.visible = "true"; });
-      } else {
-        document.documentElement.classList.add("reveal-on");
-        const observer = new IntersectionObserver((entries) => {
-          entries.forEach((entry) => {
-            if (!entry.isIntersecting) return;
-            entry.target.dataset.visible = "true";
-            observer.unobserve(entry.target);
-          });
-        }, { rootMargin: "0px 0px -10% 0px", threshold: 0.08 });
-        sections.forEach((section) => observer.observe(section));
-      }
+
     </script>
   </body>
 </html>
