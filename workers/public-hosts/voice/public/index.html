@@ -6,11 +6,11 @@
     <title>Useful Voice</title>
     <meta
       name="description"
-      content="Type with your voice anywhere on your Mac. Local-first dictation: tap a hotkey, speak English or German, and the words land at your cursor."
+      content="macOS dictation in English and German, with Deepgram cloud transcription. Available to build from source."
     />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="preload" href="/fonts/geist-variable.woff2" as="font" type="font/woff2" crossorigin />
-    <script>document.documentElement.classList.add("has-js");</script>
+
     <style>
       @font-face {
         font-family: "Geist";
@@ -110,7 +110,7 @@
         position: sticky;
         top: 0;
         z-index: 10;
-        background: color-mix(in srgb, var(--surface) 92%, transparent);
+        background: var(--surface);
         border-bottom: 1px solid transparent;
         transition: background-color 180ms var(--ease-out), border-color 180ms var(--ease-out);
       }
@@ -211,6 +211,7 @@
         gap: 12px;
         margin-top: 36px;
       }
+      .hero p.requirements { font-size: 14px; line-height: 1.5; }
       .hero .btn { min-height: 52px; padding: 0 26px; font-size: 16px; }
       .parent-inline { color: var(--ink); text-underline-offset: 3px; }
       .has-js [data-hero] [data-rise] {
@@ -427,7 +428,7 @@
             <span class="endorsement-short">UB</span>
           </a>
         </div>
-        <a class="btn btn-compact" href="https://cal.com/usefulbuild/free-audit"><span class="wide-label">Book a free audit</span><span class="compact-label">Free audit</span></a>
+        <a class="btn btn-compact" href="https://github.com/wasimjalali/useful-voice#readme"><span class="wide-label">View source and setup</span><span class="compact-label">View source</span></a>
       </div>
     </header>
 
@@ -449,20 +450,21 @@
         <div class="wrap hero-copy">
         <h1 data-rise style="--i:0">Type with your voice, anywhere on your Mac.</h1>
         <p data-rise style="--i:1">
-          Useful Voice is local-first dictation. Tap a hotkey, speak English or
-          German, and the transcript lands at your cursor.
+          Tap a hotkey, speak English or German and insert the transcript
+          where you type. Useful Voice also keeps searchable notes and a personal dictionary.
         </p>
         <p data-rise style="--i:2">
-          A <a class="parent-inline" href="https://usefulbuild.com">Useful Build</a> product. Your dictionary, notes and history stay on this Mac.
+          A <a class="parent-inline" href="https://usefulbuild.com">Useful Build</a> product. Notes and history stay on your Mac. Audio and dictionary hints go to Deepgram for transcription.
         </p>
         <div class="hero-actions" data-rise style="--i:3">
-          <a class="btn" href="https://cal.com/usefulbuild/free-audit">Book a free audit</a>
-          <a class="btn btn-quiet" href="https://github.com/wasimjalali/useful-voice">View the source</a>
+          <a class="btn" href="https://github.com/wasimjalali/useful-voice#readme">View source and setup</a>
+          <a class="btn btn-quiet" href="#dictate">See the app</a>
         </div>
+        <p class="requirements">macOS 14+ · Apple Silicon · Build from source · Deepgram API key required</p>
         </div>
       </section>
 
-      <section class="shot wrap" data-reveal>
+      <section id="dictate" class="shot wrap" data-reveal>
         <div class="shot-copy">
           <h2>Dictate</h2>
           <p>Tap Right Command once to start and again to stop. The words appear where you are typing.</p>
@@ -495,7 +497,7 @@
       <section class="shot wrap" data-reveal>
         <div class="shot-copy">
           <h2>Dictionary</h2>
-          <p>Teach a name or a specialist spelling once. Useful Voice writes it correctly next time.</p>
+          <p>Add names and specialist terms as transcription hints. Review the result, especially for unfamiliar words.</p>
         </div>
         <figure>
           <img
@@ -527,15 +529,15 @@
       <section class="cta" id="contact">
         <div class="wrap">
           <div class="cta-layout">
-            <h2>Tell us what's slowing your team down.</h2>
+            <h2>Build Useful Voice for your Mac.</h2>
             <div>
               <p>
-                A free 30-minute audit, no prep. We look at one job your team does
-                by hand and tell you whether to build, train or wait, and what it
-                costs. Even if you never hire us.
+                Available from source for Apple Silicon Macs running macOS 14 or later.
+                Setup requires Xcode command-line tools and your own Deepgram API key.
+                Deepgram usage is billed separately. Follow the repository instructions to build the app.
               </p>
               <div class="cta-row">
-                <a class="btn" href="https://cal.com/usefulbuild/free-audit">Book a free audit</a>
+                <a class="btn" href="https://github.com/wasimjalali/useful-voice#readme">View source and setup</a>
                 <a class="email" href="mailto:hello@usefulbuild.com">hello@usefulbuild.com</a>
               </div>
             </div>
@@ -554,19 +556,19 @@
             </nav>
             <nav aria-label="Site links">
               <span>Site</span>
-              <a href="https://usefulbuild.com/#savings">How it works</a>
+              <a href="https://usefulbuild.com/#process">How it works</a>
               <a href="https://usefulbuild.com/#work">Work</a>
               <a href="https://usefulbuild.com/#offers">What we do</a>
               <a href="https://usefulbuild.com/#about">About</a>
             </nav>
             <nav aria-label="Contact links">
               <span>Contact</span>
-              <a href="https://cal.com/usefulbuild/free-audit">Book a free audit</a>
+              <a href="https://cal.com/usefulbuild/free-audit">Book a discovery call</a>
               <a href="mailto:hello@usefulbuild.com">Email us</a>
               <a href="https://github.com/wasimjalali" rel="me noopener">GitHub</a>
             </nav>
             <div class="footer-blurb">
-              <p>Knowledge agents and AI training for small and medium businesses. Start with a free audit.</p>
+              <p>Company knowledge assistants and custom internal tools, built around your team.</p>
               <a href="mailto:hello@usefulbuild.com">hello@usefulbuild.com</a>
             </div>
           </div>
@@ -599,20 +601,7 @@
       updateNav();
       window.addEventListener("scroll", updateNav, { passive: true });
 
-      const sections = document.querySelectorAll("[data-reveal]");
-      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches || !("IntersectionObserver" in window)) {
-        sections.forEach((section) => { section.dataset.visible = "true"; });
-      } else {
-        document.documentElement.classList.add("reveal-on");
-        const observer = new IntersectionObserver((entries) => {
-          entries.forEach((entry) => {
-            if (!entry.isIntersecting) return;
-            entry.target.dataset.visible = "true";
-            observer.unobserve(entry.target);
-          });
-        }, { rootMargin: "0px 0px -10% 0px", threshold: 0.08 });
-        sections.forEach((section) => observer.observe(section));
-      }
+
     </script>
   </body>
 </html>
