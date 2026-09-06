@@ -9,6 +9,7 @@ import type { Model, StreamFunction } from "@earendil-works/pi-ai";
 
 import type { Principal } from "../acl/access";
 import { PROMPT_VERSION, type CitedRetrievalResult } from "../answer/contract";
+import { hintedUncitedDocuments } from "./pointer-completion";
 import type { KnowledgePipeline } from "../retrieve/pipeline";
 import { mutatingIdempotencyKey } from "./approvals";
 import {
@@ -105,7 +106,7 @@ export const LIVE_KNOWLEDGE_SYSTEM_PROMPT = [
   "Write each copied sentence as its own paragraph followed only by its label. Do not add headings, bold labels, surrounding quotation marks, file paths, section names or commentary around it.",
   "Every evidence item names its document. When more than one item states a fact, quote and cite the item from the dedicated policy document for that topic rather than a handbook, guide or neighboring policy, or cite both labels.",
   "Do not paraphrase, infer or combine separate evidence spans into one sentence. Every paragraph must include a citation label from this turn.",
-  "Answer only the exact fact the question asks. A sentence about a different program, plan, metric, document or policy than the one asked is not an answer, even when it looks similar. A number, timeframe or rule stated for one named process is not evidence for a different process: a patch-availability window for supported product versions does not answer an internal remediation deadline, a hiring referral bonus does not answer a customer referral payout, and a neighboring policy restating another document's rule does not replace that document. A deadline that tells customers what they receive is not our internal deadline to act. Follow attribution pointers: when a document says its rule or window comes from another policy, quote and cite that policy, not the restating document. When the evidence states the asked number or rule only for a different program or process than the one asked about, reply exactly with the not-enough-evidence sentence.",
+  "Answer only the exact fact the question asks. A sentence about a different program, plan, metric, document or policy than the one asked is not an answer, even when it looks similar. A number, timeframe or rule stated for one named process is not evidence for a different process: a patch-availability window for supported product versions does not answer an internal remediation deadline, a hiring referral bonus does not answer a customer referral payout, and a neighboring policy restating another document's rule does not replace that document. When evidence states that two similar-sounding programs, policies or processes are different, treat them as different: answer each only from its own document, never from the other's numbers or rules. A deadline that tells customers what they receive is not our internal deadline to act. Follow attribution pointers: when a document says its rule or window comes from another policy, quote and cite that policy, not the restating document. When the evidence states the asked number or rule only for a different program or process than the one asked about, reply exactly with the not-enough-evidence sentence.",
   `Do not invent facts. A related or similar document is not evidence for a fact it does not state. If no evidence states the specific program, benefit, policy, amount or rule the question asks about, reply exactly: ${BRAIN_NOT_ENOUGH_EVIDENCE}`,
   `Prompt version ${PROMPT_VERSION}.`,
 ].join(" ");
@@ -602,10 +603,14 @@ export async function runKnowledgeAgent(input: {
     }
   }
 
-  // Multi-part coverage pass: a grounded draft on a question that asks for
-  // several facts may have answered only one of them. Ask for the exact
-  // evidence sentence answering each missing part and keep the additions
-  // only when the combined answer re-validates against the ledger.
+  // Coverage pass: a grounded draft may have answered only part of the
+  // question, or cited a neighbor that restates a rule owned by a
+  // dedicated policy in evidence. The model is asked for the exact
+  // evidence sentence answering each missing part, and additions are kept
+  // only when the combined answer re-validates against the ledger. It runs
+  // for multi-part questions and for single-part drafts where the evidence
+  // itself points at an uncited document, so pointer-following stays a
+  // model judgment, never a host graft.
   const answerProse = (value: string | null | undefined): value is string =>
     typeof value === "string" &&
     value.trim().length > 0 &&
@@ -623,7 +628,8 @@ export async function runKnowledgeAgent(input: {
   if (
     canCover &&
     answerProse(grounded) &&
-    isMultiPartQuestion(input.question) &&
+    (isMultiPartQuestion(input.question) ||
+      hintedUncitedDocuments(input.question, grounded, evidence).length > 0) &&
     new Set(evidence.map((item) => item.documentId)).size >= 2
   ) {
     try {
@@ -652,6 +658,7 @@ export async function runKnowledgeAgent(input: {
       // Keep the validated draft.
     }
   }
+
   const recorded = toolCallsFromMessages(agent.state.messages);
   const pendingApproval = recorded.some((call) => call.status === "pending_approval");
   const searchErrored = recorded.some((call) => call.tool === SEARCH_KNOWLEDGE_TOOL && call.status === "error");

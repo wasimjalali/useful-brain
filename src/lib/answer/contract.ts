@@ -1,7 +1,7 @@
 export const INSUFFICIENT_EVIDENCE_ANSWER =
   "I do not have enough retrieved evidence to answer that question.";
 
-export const PROMPT_VERSION = "grounded-answer.v8";
+export const PROMPT_VERSION = "grounded-answer.v9";
 
 export type ChatMessage = {
   role: "system" | "user" | "assistant";
