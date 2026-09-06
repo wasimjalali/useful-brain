@@ -1032,7 +1032,7 @@ describe("multi-part coverage pass", () => {
     expect(result.finalResponse).toContain("ESC-3 complaints are owned by the VP of Support. [2]");
   }, 20_000);
 
-  it("skips the coverage pass for a single-part question", async () => {
+  it("skips the coverage pass for a single-part question with no pointer hints", async () => {
     const pipeline = await escalationPipeline();
     const faux = fauxProvider({ provider: "useful-brain-coverage-single" });
     faux.setResponses([
@@ -1062,6 +1062,68 @@ describe("multi-part coverage pass", () => {
 
     expect(coverAnswerParts).not.toHaveBeenCalled();
     expect(result.finalResponse).toBe("Billing disputes open more than 30 days move to ESC-3.[1]");
+  }, 20_000);
+
+  it("runs coverage for a single-part draft that ignores a pointed-to document", async () => {
+    const store = new MemoryChunkStore();
+    const embedder = new FakeEmbeddingProvider(8);
+    const texts = [
+      "Billing disputes open more than 30 days move to ESC-3 under the Complaint Escalation process.",
+      "ESC-3 complaints are owned by the VP of Support.",
+    ];
+    const embeddings = await embedder.embedTexts(texts);
+    store.upsert(
+      texts.map((content, index) => ({
+        chunkId: `pointer__body__00${index}`,
+        documentId: index === 0 ? "invoicing" : "complaint-escalation",
+        title: index === 0 ? "Invoicing" : "Complaint Escalation",
+        sourceName: index === 0 ? "Invoicing" : "Complaint Escalation",
+        sourcePath: index === 0 ? "invoicing.md" : "complaint-escalation.md",
+        sectionHeading: index === 0 ? "Billing Disputes" : "ESC-3: VP Support",
+        content,
+        chunkIndex: 0,
+        charStart: 0,
+        charEnd: content.length,
+        accessScope: "public" as const,
+        allowedRoles: [],
+        allowedDepartments: [],
+        ownerUserId: "",
+        embedding: embeddings[index],
+      })),
+    );
+    const pipeline = new KnowledgePipeline({ store, embedder });
+    const faux = fauxProvider({ provider: "useful-brain-coverage-pointer" });
+    faux.setResponses([
+      fauxAssistantMessage(
+        [fauxText("Searching."), fauxToolCall(SEARCH_KNOWLEDGE_TOOL, { query: "billing dispute escalation" })],
+        { stopReason: "toolUse" },
+      ),
+      fauxAssistantMessage(
+        [fauxText("Billing disputes open more than 30 days move to ESC-3 under the Complaint Escalation process.[1]")],
+        { stopReason: "stop" },
+      ),
+    ]);
+    const coverAnswerParts = vi
+      .fn()
+      .mockResolvedValue("ESC-3 complaints are owned by the VP of Support. [2]");
+
+    const result = await runKnowledgeAgent({
+      question: "When do billing disputes escalate to ESC-3?",
+      pipeline,
+      principal,
+      policyPrincipal,
+      conversationId: "c-coverage-pointer",
+      runtime: {
+        model: { ...faux.getModel(), api: "openai-completions" },
+        stream: (model, context, options) => faux.provider.streamSimple(model, context, options),
+        coverAnswerParts,
+      },
+    });
+
+    expect(isMultiPartQuestion("When do billing disputes escalate to ESC-3?")).toBe(false);
+    expect(coverAnswerParts).toHaveBeenCalledTimes(1);
+    expect(result.finalResponse).toContain("under the Complaint Escalation process.[1]");
+    expect(result.finalResponse).toContain("ESC-3 complaints are owned by the VP of Support. [2]");
   }, 20_000);
 
   it("keeps the draft when coverage additions fail grounding", async () => {

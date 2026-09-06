@@ -6,6 +6,7 @@ Every eval campaign in this repo gets documented here: model evals (comparing mo
 
 | Date | Type | Report | Headline |
 | --- | --- | --- | --- |
+| 2026-09-06 | System | [Pointer-triggered coverage](system-evals/2026-09-06-northwind-pointer-coverage.md) | Systemic fixes only: 116 to 118/120, no corpus-fitted logic |
 | 2026-08-31 | System | [Northwind grounding repair](system-evals/2026-08-31-northwind-grounding-repair.md) | Live pass rate 72% to 95% (114/120) without touching a scorer |
 | 2026-08-31 | Model | [Chat model bake-off](model-evals/2026-08-31-chat-model-bakeoff.md) | GLM 5.3 Flash confirmed: 114/120 at one ninth the price of its closest rival |
 

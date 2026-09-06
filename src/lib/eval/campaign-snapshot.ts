@@ -1,4 +1,4 @@
-export type CampaignKey = "baseline" | "pass1" | "final";
+export type CampaignKey = "baseline" | "pass1" | "final" | "coverage";
 
 export type CampaignCategoryId =
   | "factual"
@@ -79,7 +79,7 @@ export const NORTHWIND_CAMPAIGN_RUNS: CampaignRun[] = [
   },
   {
     key: "final",
-    label: "Latest",
+    label: "Pass 2",
     date: "2026-08-31",
     passed: 114,
     scored: 120,
@@ -129,6 +129,36 @@ export const NORTHWIND_CAMPAIGN_RUNS: CampaignRun[] = [
       },
     ],
   },
+  {
+    key: "coverage",
+    label: "Latest",
+    date: "2026-09-06",
+    passed: 118,
+    scored: 120,
+    passRate: 118 / 120,
+    note: "Pointer-triggered coverage, GLM 5.3 Flash. Two residual misses, both pass on replay.",
+    categories: [
+      category("factual", 69, 70),
+      category("trap", 17, 17),
+      category("permission", 13, 13),
+      category("unanswerable", 10, 10),
+      category("multi_hop", 9, 10),
+    ],
+    failures: [
+      {
+        id: "q093",
+        category: "factual",
+        detail:
+          "Identifier lookup. Model returned insufficient_evidence with the error-code document retrieved.",
+      },
+      {
+        id: "q120",
+        category: "multi_hop",
+        detail:
+          "Missing the second-hop citation for nw_support_sla_policy.",
+      },
+    ],
+  },
 ];
 
 export const NORTHWIND_CAMPAIGN = {
@@ -136,12 +166,12 @@ export const NORTHWIND_CAMPAIGN = {
   model: "@cf/zai-org/glm-5.3-flash",
   questions: 120,
   documents: 65,
-  latestKey: "final" as const,
+  latestKey: "coverage" as const,
   retrieval: {
     recallAt3: 0.912,
     mrr: 0.825,
     ndcg: 0.837,
-    liveRetrievedRecall: 0.974,
+    liveRetrievedRecall: 0.995,
     aclLeaks: 0,
   },
   runs: NORTHWIND_CAMPAIGN_RUNS,
