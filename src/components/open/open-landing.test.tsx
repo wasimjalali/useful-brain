@@ -31,6 +31,6 @@ describe("OpenLanding", () => {
     expect(screen.getByRole("heading", { name: "Chat" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Sources" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Evals" })).toBeInTheDocument();
-    expect(screen.getByText(/114\/120/)).toBeInTheDocument();
+    expect(screen.getByText(/118\/120/)).toBeInTheDocument();
   });
 });

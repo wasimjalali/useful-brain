@@ -438,7 +438,7 @@ describe("RagVisibilityDashboard", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Evals" }));
     expect(screen.getByRole("heading", { name: "Evals" })).toBeInTheDocument();
-    expect(screen.getByText("114")).toBeInTheDocument();
+    expect(screen.getByText("118")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Run evaluations" })).toBeNull();
   });
 

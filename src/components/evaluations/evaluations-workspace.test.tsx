@@ -4,11 +4,11 @@ import { describe, expect, it } from "vitest";
 import { EvaluationsWorkspace } from "./evaluations-workspace";
 
 describe("EvaluationsWorkspace", () => {
-  it("shows the locked 114/120 campaign and no run control", () => {
+  it("shows the latest 118/120 campaign and no run control", () => {
     render(<EvaluationsWorkspace />);
 
     expect(screen.getByRole("heading", { name: "Evals" })).toBeInTheDocument();
-    expect(screen.getByText("114")).toBeInTheDocument();
+    expect(screen.getByText("118")).toBeInTheDocument();
     expect(screen.getByText("/120")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Run evaluations" })).toBeNull();
   });
@@ -16,6 +16,7 @@ describe("EvaluationsWorkspace", () => {
   it("filters remaining failures by category", () => {
     render(<EvaluationsWorkspace />);
 
+    fireEvent.click(screen.getByRole("tab", { name: "Pass 2" }));
     fireEvent.click(screen.getByRole("button", { name: /Permission/ }));
 
     expect(screen.getByText("q073")).toBeInTheDocument();
@@ -25,9 +26,9 @@ describe("EvaluationsWorkspace", () => {
   it("expands a failure and switches campaign runs", () => {
     render(<EvaluationsWorkspace />);
 
-    fireEvent.click(screen.getByRole("button", { name: /q028/ }));
+    fireEvent.click(screen.getByRole("button", { name: /q093/ }));
     expect(
-      screen.getByText(/Twin-document citation/),
+      screen.getByText(/Identifier lookup/),
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "Baseline" }));

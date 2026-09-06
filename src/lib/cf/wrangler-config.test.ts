@@ -225,7 +225,7 @@ describe("protected Worker configuration", () => {
     expect(html).toContain("/open/chat.png");
     expect(html).toContain("/open/sources.png");
     expect(html).toContain("/open/evals.png");
-    expect(html).toContain("114/120");
+    expect(html).toContain("118/120");
     expect(html).toContain("/fonts/geist-variable.woff2");
     expect(html).toContain("https://usefulbuild.com");
     expect(html).toContain("https://cal.com/usefulbuild/free-audit");
