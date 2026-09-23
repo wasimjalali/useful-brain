@@ -81,7 +81,7 @@ header.nav[data-scrolled="true"] { border-color: var(--rule); }
   -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 30%, transparent 62%); mask-image: linear-gradient(to bottom, #000 0, #000 30%, transparent 62%); }
 .hero-inner { position: relative; width: min(100%, 1248px); margin-inline: auto; padding: 80px 24px 0; }
 .kicker { display: inline-flex; align-items: center; gap: 10px; margin: 0 0 26px; color: var(--night-muted); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
-.kicker::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--signal); }
+.kicker::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--night-ink); }
 h1 { max-width: 13em; margin: 0; font-size: clamp(40px, 6vw, 84px); font-weight: 500; line-height: 0.98; letter-spacing: -0.045em; text-wrap: balance; }
 .hero-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 64px; align-items: start; margin-top: 34px; }
 .lede { max-width: 46ch; margin: 0; color: #bdbdbd; font-size: 18px; line-height: 1.55; text-wrap: pretty; }
@@ -89,7 +89,7 @@ h1 { max-width: 13em; margin: 0; font-size: clamp(40px, 6vw, 84px); font-weight:
 .facts { margin: 18px 0 0; color: #8a8a8a; font-size: 13.5px; line-height: 1.5; }
 .stage { position: relative; margin-top: 64px; }
 .stage figure { margin: 0 auto; width: min(100%, 1120px); }
-.window { overflow: hidden; border: 1px solid #2c2c2c; border-bottom: 0; border-radius: 16px 16px 0 0; background: #1b1b1b; box-shadow: 0 -30px 80px -40px rgb(232 102 63 / 0.18); }
+.window { overflow: hidden; border: 1px solid #2c2c2c; border-bottom: 0; border-radius: 16px 16px 0 0; background: #1b1b1b; box-shadow: 0 -30px 80px -40px rgb(255 255 255 / 0.08); }
 .window img { display: block; width: 100%; height: auto; }
 .stage figcaption { padding: 14px 0 26px; color: #7a7a7a; font-size: 12.5px; text-align: center; }
 
@@ -107,12 +107,12 @@ h1 { max-width: 13em; margin: 0; font-size: clamp(40px, 6vw, 84px); font-weight:
 .rule-row s::before, .rule-row s::after { content: ""; position: absolute; background: var(--ink-muted); }
 .rule-row s::before { top: 6px; left: 0; width: 13px; height: 1px; }
 .rule-row s::after { top: 0; left: 6px; width: 1px; height: 13px; }
-.chapter { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); gap: 64px; align-items: center; padding: 56px 0; }
-.chapter:nth-of-type(even) { grid-template-columns: minmax(0, 8fr) minmax(0, 4fr); }
-.chapter:nth-of-type(even) .ch-copy { order: 2; }
-.ch-copy .n { display: block; margin-bottom: 14px; color: var(--signal-text); font-family: var(--font-mono); font-size: 12px; }
+.chapter { padding: 48px 0 64px; }
+.ch-copy { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 64px; align-items: end; margin-bottom: 36px; }
+.ch-copy .n { grid-column: 1 / -1; margin-bottom: -40px; }
+.ch-copy .n { display: block; color: var(--ink-muted); font-family: var(--font-mono); font-size: 12px; }
 .ch-copy h2 { max-width: 14ch; margin: 0; font-size: clamp(28px, 3vw, 42px); font-weight: 500; line-height: 1.06; letter-spacing: -0.035em; text-wrap: balance; }
-.ch-copy p { max-width: 38ch; margin: 18px 0 0; color: var(--ink-muted); font-size: 16.5px; line-height: 1.6; }
+.ch-copy p { max-width: 46ch; margin: 0; color: var(--ink-muted); font-size: 17px; line-height: 1.6; }
 .shot { margin: 0; }
 .shot .frame { overflow: hidden; border: 1px solid var(--rule); border-radius: 16px; background: var(--paper-bright); box-shadow: 0 1px 0 rgb(23 23 23 / 0.03), 0 30px 60px -40px rgb(23 23 23 / 0.35); }
 .shot img { display: block; width: 100%; height: auto; }
@@ -126,6 +126,19 @@ h1 { max-width: 13em; margin: 0; font-size: clamp(40px, 6vw, 84px); font-weight:
 }
 @keyframes shot-in { from { opacity: 0; transform: translateY(60px) scale(0.96); } to { opacity: 1; transform: none; } }
 @keyframes head-in { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+
+/* Coded illustration, labelled, where no clean real capture exists yet. */
+.ill { position: relative; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 20px; padding: 36px; border: 1px solid var(--rule); border-radius: 16px; background: var(--paper-bright);
+  background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px; }
+.ill-tag { position: absolute; top: 14px; right: 16px; color: var(--ink-muted); font-family: var(--font-mono); font-size: 11px; }
+.ill-chat, .ill-doc { display: grid; align-content: start; gap: 12px; padding: 20px; border: 1px solid var(--rule); border-radius: 12px; background: var(--paper-bright); box-shadow: 0 18px 36px -28px rgb(23 23 23 / 0.35); font-size: 15px; line-height: 1.45; }
+.ill-q { justify-self: end; max-width: 85%; margin: 0; padding: 10px 14px; border-radius: 12px 12px 4px 12px; background: var(--paper-deep); }
+.ill-a { display: grid; gap: 10px; max-width: 92%; padding: 12px 14px; border: 1px solid var(--rule); border-radius: 12px 12px 12px 4px; }
+.ill-a p, .ill-doc p { margin: 0; }
+.ill-src { justify-self: start; padding: 2px 8px; border: 1px solid var(--ink); border-radius: 6px; font-family: var(--font-mono); font-size: 12px; }
+.ill-doc-title { color: var(--ink-muted); font-family: var(--font-mono); font-size: 12px; }
+.ill-doc p { color: var(--ink-muted); }
+.ill-doc .hl { padding: 8px 10px; border-left: 2px solid var(--ink); background: var(--paper-deep); color: var(--ink); }
 
 /* Spec sheet: the plain facts. */
 .spec-wrap { padding: 72px 0 120px; }
@@ -165,9 +178,9 @@ h1 { max-width: 13em; margin: 0; font-size: clamp(40px, 6vw, 84px); font-weight:
 
 @media (max-width: 1100px) {
   .hero-row, .spec-head { grid-template-columns: 1fr; gap: 28px; }
-  .chapter { grid-template-columns: 1fr; gap: 28px; padding: 40px 0; }
-  .chapter:nth-of-type(even) { grid-template-columns: 1fr; }
-  .chapter:nth-of-type(even) .ch-copy { order: 0; }
+  .chapter { padding: 32px 0 44px; }
+  .ch-copy { grid-template-columns: 1fr; gap: 14px; margin-bottom: 24px; }
+  .ch-copy .n { margin-bottom: 0; }
   .cta-layout { grid-template-columns: 1fr; gap: 24px; align-items: start; }
   .nav-links { display: none; }
 }
@@ -178,7 +191,7 @@ h1 { max-width: 13em; margin: 0; font-size: clamp(40px, 6vw, 84px); font-weight:
   .lockup img { height: 24px; }
   .lockup span { font-size: 16px; }
   .endorsement { padding-left: 9px; font-size: 12px; }
-  .endorsement strong { display: none; }
+  .endorsement strong, .endorsement > span { display: none; }
   .wide-label { display: none; }
   .compact-label { display: inline; }
   .btn-compact { min-height: 40px; padding: 0 12px; font-size: 14px; }
@@ -193,6 +206,7 @@ h1 { max-width: 13em; margin: 0; font-size: clamp(40px, 6vw, 84px); font-weight:
   .window { border-radius: 10px 10px 0 0; }
   .chapters { padding-top: 72px; }
   .spec { grid-template-columns: 1fr; }
+  .ill { grid-template-columns: 1fr; padding: 40px 14px 14px; }
   .spec-wrap { padding: 40px 0 72px; }
   .cta { padding-block: 64px 56px; }
   .strip { gap: 3px; margin-bottom: 40px; }
@@ -244,15 +258,15 @@ h1 { max-width: 13em; margin: 0; font-size: clamp(40px, 6vw, 84px); font-weight:
               <div>
                 <div class="actions">
                   <a class="btn btn-light" href="https://cal.com/usefulbuild/free-audit">Book a free audit</a>
-                  <a class="link-light" href="https://github.com/wasimjalali/useful-brain">View the source <span aria-hidden="true">&nearr;</span></a>
+                  <a class="link-light" href="https://github.com/wasimjalali/useful-brain">View the code on GitHub <span aria-hidden="true">&nearr;</span></a>
                 </div>
                 <p class="facts">Portfolio product · Demonstrated on 65 sample documents · Company setups are scoped separately</p>
               </div>
             </div>
             <div class="stage" data-rise style="--i:2">
               <figure>
-                <div class="window"><img alt="Useful Brain chat with a cited answer and the evidence inspector open." src="/open/chat.png" width="1440" height="900" fetchpriority="high" /></div>
-                <figcaption>The real product: an answer, and the policy it came from. Sample company documents.</figcaption>
+                <div class="window"><img alt="Useful Brain source library showing document names and processing status." src="/open/sources.png" width="1440" height="900" fetchpriority="high" /></div>
+                <figcaption>The real product: the documents it reads, each with its status. Sample company documents.</figcaption>
               </figure>
             </div>
           </div>
@@ -265,6 +279,28 @@ h1 { max-width: 13em; margin: 0; font-size: clamp(40px, 6vw, 84px); font-weight:
           <article class="chapter">
             <div class="ch-copy">
               <span class="n">01</span>
+              <h2>Check every answer against its source.</h2>
+              <p>Each answer carries the documents it used. Open one and read the passage before you act on it. Important answers still deserve a human check.</p>
+            </div>
+            <figure class="shot">
+              <div class="ill" aria-label="Illustration: a question, an answer and the cited policy passage">
+                <span class="ill-tag">Illustration based on sample documents</span>
+                <div class="ill-chat">
+                  <p class="ill-q">What's our first-response target for P1 tickets?</p>
+                  <div class="ill-a"><p>P1 tickets get a first response within 1 hour, and a fix or workaround within 24 hours.</p><span class="ill-src">[1] Support SLA policy &middot; section 2</span></div>
+                </div>
+                <div class="ill-doc">
+                  <span class="ill-doc-title">support-sla-policy.md</span>
+                  <p>2. Response targets</p>
+                  <p class="hl">P1: first response within 1 hour. Resolution or workaround within 24 hours.</p>
+                  <p>P2: first response within 4 business hours.</p>
+                </div>
+              </div>
+            </figure>
+          </article>
+          <article class="chapter">
+            <div class="ch-copy">
+              <span class="n">02</span>
               <h2>Know exactly which documents it reads.</h2>
               <p>The library shows every source and its status. A new version is checked before it replaces the active collection, so a bad upload never goes live by accident.</p>
             </div>
@@ -274,9 +310,9 @@ h1 { max-width: 13em; margin: 0; font-size: clamp(40px, 6vw, 84px); font-weight:
           </article>
           <article class="chapter">
             <div class="ch-copy">
-              <span class="n">02</span>
+              <span class="n">03</span>
               <h2>Tested on real questions, including the hard ones.</h2>
-              <p>The dashboard shows a recorded run of 120 checks over 65 synthetic Northwind documents, including questions it should decline: 114 passed. The latest run passed 118. A benchmark on sample data, not a customer result or an accuracy guarantee.</p>
+              <p>We test it with 120 questions over 65 sample documents, including ones it should decline. The latest run passed 118 of 120; the dashboard shows an earlier run at 114. A benchmark on sample data, not a customer result.</p>
             </div>
             <figure class="shot">
               <div class="frame"><img alt="Useful Brain evaluations dashboard showing a recorded run of 114 of 120 checks on the Northwind test set." src="/open/evals.png" width="1440" height="900" loading="lazy" decoding="async" /></div>
@@ -332,7 +368,7 @@ h1 { max-width: 13em; margin: 0; font-size: clamp(40px, 6vw, 84px); font-weight:
             <nav aria-label="Site links">
               <span>Useful Build</span>
               <a href="https://usefulbuild.com/#services">What we build</a>
-              <a href="https://usefulbuild.com/#work">Work</a>
+              <a href="https://usefulbuild.com/#work">Proof</a>
               <a href="https://usefulbuild.com/#process">How it works</a>
               <a href="https://usefulbuild.com/#about">About</a>
             </nav>
