@@ -225,12 +225,14 @@ describe("protected Worker configuration", () => {
     expect(html).toContain("/open/chat.png");
     expect(html).toContain("/open/sources.png");
     expect(html).toContain("/open/evals.png");
-    expect(html).toContain("118/120");
+    // The benchmark names the run the screenshot shows and the latest run.
+    expect(html).toContain("114 passed");
+    expect(html).toContain("The latest run passed 118");
     expect(html).toContain("/fonts/geist-variable.woff2");
     expect(html).toContain("https://usefulbuild.com");
     expect(html).toContain("https://cal.com/usefulbuild/free-audit");
     expect(html).toContain("Useful Brain, by Useful Build");
-    expect(html).toContain('id="brain-sheet-grid"');
+    expect(html).toContain('class="sheet-grid"');
     expect(html).toContain('aria-current="page">Useful Brain');
     expect(html).toContain("https://github.com/wasimjalali/useful-brain");
     expect(html).toContain("View the source");
@@ -245,7 +247,9 @@ describe("protected Worker configuration", () => {
     );
     expect(html).toContain("/brand/useful-voice-mark.svg");
     expect(html).toContain("Useful Voice, by Useful Build");
-    expect(html).toContain('id="voice-sheet-grid"');
+    expect(html).toContain('class="sheet-grid"');
+    expect(html).toContain("Deepgram");
+    expect(html).toContain("/open/dictate-live.jpg");
     expect(html).toContain('aria-current="page">Useful Voice');
     expect(html).toContain("https://usefulbuild.com");
     expect(html).not.toContain(">Kursfind</a>");
