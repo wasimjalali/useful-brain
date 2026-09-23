@@ -74,7 +74,7 @@ npm run build
 
 ## Public portfolio pages
 
-`workers/public-hosts/brain/public` and `workers/public-hosts/voice/public` serve the static product landing pages. Brain is presented with sample-data proof and the contextualized 114/120 benchmark. A company setup is a separately scoped Useful Build service, not a public multi-company Brain subscription. Voice directs visitors to source-build instructions and discloses Deepgram cloud transcription. These marketing pages do not change the local/staging product scope or authorize a commercial launch.
+`workers/public-hosts/brain/public` and `workers/public-hosts/voice/public` serve the static product landing pages, built on the Useful Build design system. Brain is presented with sample-data proof: the benchmark its evals screenshot shows (114/120) and the latest recorded run (118/120), both on synthetic documents. A company setup is a separately scoped Useful Build service, not a public multi-company Brain subscription. Voice directs visitors to source-build instructions and discloses Deepgram cloud transcription. These marketing pages do not change the local/staging product scope or authorize a commercial launch.
 
 ## Repo map
 
