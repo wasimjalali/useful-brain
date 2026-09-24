@@ -8,10 +8,19 @@
     <meta name="theme-color" content="#f8f8f8" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="preload" href="/fonts/geist-variable.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="canonical" href="https://brain.usefulbuild.com/" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Useful Brain" />
+    <meta property="og:locale" content="en_GB" />
     <meta property="og:title" content="Useful Brain | Answers from company documents, with the source" />
     <meta property="og:description" content="A knowledge assistant that answers questions from company documents and shows the source. A Useful Build portfolio product, demonstrated on sample documents." />
+    <meta property="og:url" content="https://brain.usefulbuild.com/" />
+    <meta property="og:image" content="https://brain.usefulbuild.com/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Useful Brain: answers from your company&#x27;s documents, with the source attached." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","@id":"https://brain.usefulbuild.com/#app","name":"Useful Brain","url":"https://brain.usefulbuild.com/","applicationCategory":"BusinessApplication","description":"A knowledge assistant that answers questions from company documents and shows the source. A Useful Build portfolio product, demonstrated on sample documents.","license":"https://opensource.org/licenses/MIT","isAccessibleForFree":true,"sameAs":["https://github.com/wasimjalali/useful-brain"],"publisher":{"@type":"Organization","@id":"https://usefulbuild.com/#organization","name":"Useful Build","url":"https://usefulbuild.com/"}}</script>
     <script>document.documentElement.classList.add("has-js");</script>
     <style>
 @font-face { font-family: "Geist"; src: url("/fonts/geist-variable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
@@ -91,9 +100,11 @@ h1 { max-width: 13em; margin: 0; font-size: clamp(40px, 6vw, 84px); font-weight:
 .stage figure { margin: 0 auto; width: min(100%, 1120px); }
 .window { overflow: hidden; border: 1px solid #2c2c2c; border-bottom: 0; border-radius: 16px 16px 0 0; background: #1b1b1b; box-shadow: 0 -30px 80px -40px rgb(255 255 255 / 0.08); }
 .window img { display: block; width: 100%; height: auto; }
-.stage figcaption { padding: 14px 0 26px; color: #7a7a7a; font-size: 12.5px; text-align: center; }
+.stage figcaption { padding: 14px 0 26px; color: #8f8f8f; font-size: 12.5px; text-align: center; }
 
 .has-js [data-rise] { opacity: 0; transform: translateY(12px); }
+/* The headline is the LCP element: it only moves, it never fades in. */
+.has-js h1[data-rise] { opacity: 1; }
 .has-js [data-hero][data-visible="true"] [data-rise] { opacity: 1; transform: none; transition: opacity 600ms var(--ease-out), transform 700ms var(--ease-out); transition-delay: calc(var(--i, 0) * 90ms); }
 .has-js [data-hero] .stage[data-rise] { transform: translateY(40px); }
 .has-js [data-hero][data-visible="true"] .stage[data-rise] { transform: none; transition-duration: 700ms, 1000ms; }
@@ -266,7 +277,7 @@ h1 { max-width: 13em; margin: 0; font-size: clamp(40px, 6vw, 84px); font-weight:
             <div class="stage" data-rise style="--i:2">
               <figure>
                 <div class="window"><img alt="Useful Brain source library showing document names and processing status." src="/open/sources.png" width="1440" height="900" fetchpriority="high" /></div>
-                <figcaption>The real product: the documents it reads, each with its status. Sample company documents.</figcaption>
+                <figcaption>The real product: every document it reads, with its status. A new version is checked before it replaces the active one.</figcaption>
               </figure>
             </div>
           </div>
@@ -283,7 +294,7 @@ h1 { max-width: 13em; margin: 0; font-size: clamp(40px, 6vw, 84px); font-weight:
               <p>Each answer carries the documents it used. Open one and read the passage before you act on it. Important answers still deserve a human check.</p>
             </div>
             <figure class="shot">
-              <div class="ill" aria-label="Illustration: a question, an answer and the cited policy passage">
+              <div class="ill" role="img" aria-label="Illustration based on sample documents: the question What's our first-response target for P1 tickets, answered as first response within 1 hour and a fix or workaround within 24 hours, citing the support SLA policy, section 2.">
                 <span class="ill-tag">Illustration based on sample documents</span>
                 <div class="ill-chat">
                   <p class="ill-q">What's our first-response target for P1 tickets?</p>
@@ -301,16 +312,6 @@ h1 { max-width: 13em; margin: 0; font-size: clamp(40px, 6vw, 84px); font-weight:
           <article class="chapter">
             <div class="ch-copy">
               <span class="n">02</span>
-              <h2>Know exactly which documents it reads.</h2>
-              <p>The library shows every source and its status. A new version is checked before it replaces the active collection, so a bad upload never goes live by accident.</p>
-            </div>
-            <figure class="shot">
-              <div class="frame"><img alt="Useful Brain source library showing document names and processing status." src="/open/sources.png" width="1440" height="900" loading="lazy" decoding="async" /></div>
-            </figure>
-          </article>
-          <article class="chapter">
-            <div class="ch-copy">
-              <span class="n">03</span>
               <h2>Tested on real questions, including the hard ones.</h2>
               <p>We test it with 120 questions over 65 sample documents, including ones it should decline. The latest run passed 118 of 120; the dashboard shows an earlier run at 114. A benchmark on sample data, not a customer result.</p>
             </div>
@@ -390,9 +391,9 @@ h1 { max-width: 13em; margin: 0; font-size: clamp(40px, 6vw, 84px); font-weight:
           <div class="legal">
             <p>Useful Build is a studio operated by Karko AI Inc., a US Delaware corporation. &copy; 2026 Karko AI Inc.</p>
             <div>
-              <a href="https://usefulbuild.com/imprint">Imprint</a>
-              <a href="https://usefulbuild.com/privacy">Privacy</a>
-              <a href="https://usefulbuild.com/terms">Terms</a>
+              <a href="https://usefulbuild.com/imprint/">Imprint</a>
+              <a href="https://usefulbuild.com/privacy/">Privacy</a>
+              <a href="https://usefulbuild.com/terms/">Terms</a>
             </div>
           </div>
         </div>
