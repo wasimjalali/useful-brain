@@ -214,6 +214,9 @@ describe("protected Worker configuration", () => {
     expect(voice.routes).toEqual([{ pattern: "voice.usefulbuild.com", custom_domain: true }]);
     expect(brain.vars).toBeUndefined();
     expect(voice.vars).toBeUndefined();
+    // Custom domains only: no duplicate *.workers.dev copies of the pages.
+    expect(brain.workers_dev).toBe(false);
+    expect(voice.workers_dev).toBe(false);
   });
 
   it("ships the designed Brain landing on the public host", () => {
