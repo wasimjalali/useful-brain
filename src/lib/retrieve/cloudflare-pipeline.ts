@@ -394,12 +394,14 @@ async function rerankMerged(
 
 function isAbortError(error: unknown): boolean {
   // Name-based, not instanceof: jsdom's DOMException does not inherit from
-  // Error, and abort reasons may cross realms.
+  // Error, and abort reasons may cross realms. Only AbortError counts as
+  // caller cancellation: a transport-side TimeoutError from the provider or
+  // AI Gateway is an ordinary degradation and keeps the keyword-only path.
   return (
     typeof error === "object" &&
     error !== null &&
     "name" in error &&
-    (error.name === "AbortError" || error.name === "TimeoutError")
+    error.name === "AbortError"
   );
 }
 

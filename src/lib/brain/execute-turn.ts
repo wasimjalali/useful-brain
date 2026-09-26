@@ -229,6 +229,13 @@ export async function executeTurn(input: ExecuteTurnInput): Promise<GroundedAnsw
     if (runAbort.signal.aborted || (await lock.cancelled())) {
       throw new WorkerCancelledError();
     }
+    // An internal abort (wall-time budget exhausted inside the run) must
+    // fail the turn the same way an external cancellation does: the run
+    // never produced a validated answer, so persisting one would store an
+    // unvalidated result as a completed answer.
+    if (result.aborted) {
+      throw new WorkerCancelledError();
+    }
     await markStage("checking_citations");
     const rawModelJson = structuredJsonFromGroundedProse(result.finalResponse, result.evidence);
     const completed = await persistThenRelease({
