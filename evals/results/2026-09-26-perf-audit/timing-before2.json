@@ -1,0 +1,42 @@
+[
+ {
+  "q": "What is the first-response target for a P1 support ticket?",
+  "s": 31.77,
+  "ok": true
+ },
+ {
+  "q": "What email address do customers use for support?",
+  "s": 18.3,
+  "ok": true
+ },
+ {
+  "q": "How much parental leave does Northwind provide?",
+  "s": 4.67,
+  "ok": true
+ },
+ {
+  "q": "What is the refund window for an annual plan?",
+  "s": 7.84,
+  "ok": true
+ },
+ {
+  "q": "How many vacation days do employees get per year?",
+  "s": 9.72,
+  "ok": true
+ },
+ {
+  "q": "What is the expense reimbursement limit for meals?",
+  "s": 14.23,
+  "ok": true
+ },
+ {
+  "q": "Who approves a discount above 20 percent?",
+  "s": 10.97,
+  "ok": true
+ },
+ {
+  "q": "What is the data retention period for contracts?",
+  "s": 34.51,
+  "ok": true
+ }
+]
