@@ -650,4 +650,90 @@ describe("operations conversation snapshots", () => {
       "Legacy answer is stored without a parent.",
     );
   });
+
+  it("recovers the newest six completed turns even when failed turns fill the bounded tail", async () => {
+    await seedPrincipals();
+    const seed = await createPendingTurn(env.OPERATIONS_DB, {
+      ownerPrincipalId: "principal-alice",
+      requestId: "req-tail-seed",
+      question: "seed question",
+      now: 200,
+    });
+    const complete = (
+      pending: { assistantMessageId: string },
+      requestId: string,
+      question: string,
+      text: string,
+      now: number,
+    ) =>
+      completeTurn(env.OPERATIONS_DB, {
+        ownerPrincipalId: "principal-alice",
+        assistantMessageId: pending.assistantMessageId,
+        requestId,
+        rawModelJson: JSON.stringify({
+          answerType: "grounded",
+          paragraphs: [{ text, citations: ["[1]"] }],
+        }),
+        evidence: addCitationLabels([
+          {
+            rank: 1,
+            score: 0.9,
+            chunkId: `chunk-${requestId}`,
+            source: `${requestId}.md`,
+            section: "Body",
+            text,
+            tokenEstimate: 4,
+          },
+        ]),
+        answerModel: "test-model",
+        embeddingModel: "fake-embed",
+        embeddingDimensions: 8,
+        promptVersion: PROMPT_VERSION,
+        retrievalConfigVersion: "fake-provider",
+        corpusGenerationId: "gen-1",
+        now,
+      });
+    await complete(seed, "req-tail-seed", "seed question", "Seed answer is stored first.", 201);
+    // Ten failing attempts interleaved with the completions: each failed
+    // turn leaves two rows (failed assistant + its user parent) that occupy
+    // the tail without contributing usable history.
+    for (let index = 0; index < 10; index += 1) {
+      const failed = await createPendingTurn(env.OPERATIONS_DB, {
+        ownerPrincipalId: "principal-alice",
+        conversationId: seed.conversationId,
+        requestId: `req-tail-failed-${index}`,
+        question: `strictly for failure ${index}`,
+        now: 210 + index * 2,
+      });
+      await failTurn(env.OPERATIONS_DB, {
+        assistantMessageId: failed.assistantMessageId,
+        ownerPrincipalId: "principal-alice",
+        errorCode: "CANCELLED",
+        now: 210 + index * 2 + 1,
+      });
+      const kept = await createPendingTurn(env.OPERATIONS_DB, {
+        ownerPrincipalId: "principal-alice",
+        conversationId: seed.conversationId,
+        requestId: `req-tail-kept-${index}`,
+        question: `kept question ${index}`,
+        now: 211 + index * 2,
+      });
+      await complete(
+        kept,
+        `req-tail-kept-${index}`,
+        `kept question ${index}`,
+        `Kept answer ${index} is stored.`,
+        212 + index * 2,
+      );
+    }
+    const history = await loadBoundedHistory(
+      env.OPERATIONS_DB,
+      seed.conversationId,
+      "principal-alice",
+    );
+    expect(history).toHaveLength(6);
+    expect(history[5]?.question).toBe("kept question 9");
+    expect(history[5]?.answer).toContain("Kept answer 9 is stored.");
+    expect(history[0]?.question).toBe("kept question 4");
+  });
 });

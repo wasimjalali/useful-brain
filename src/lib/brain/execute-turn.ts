@@ -89,9 +89,14 @@ export async function executeTurn(input: ExecuteTurnInput): Promise<GroundedAnsw
   const policyPrincipal = { id: input.principal.id };
   // Resolved once per turn: the corpus state row does not move during a turn
   // (promotion is an explicit separate request), so both the pipeline and the
-  // completion record read the same value without a second query.
-  const corpusGenerationId = (await knowledgeGenerationId(input)) ?? "none";
-  const pipeline = knowledgePipelineFor(input, corpusGenerationId);
+  // completion record read the same value without a second query. The
+  // nullable value drives the empty-pipeline decision; "none" is only the
+  // storage stamp for turns without a corpus, so a corpus with no active
+  // generation still builds an empty pipeline rather than a real one bound
+  // to a sentinel id.
+  const generationIdValue = await knowledgeGenerationId(input);
+  const corpusGenerationId = generationIdValue ?? "none";
+  const pipeline = knowledgePipelineFor(input, generationIdValue);
   const runtime = liveRuntime(input.ai, input.evalModelOverride);
 
   if (!persist) {

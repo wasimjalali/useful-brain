@@ -68,18 +68,23 @@ type ChunkRow = {
 /**
  * ACL shapes for a generation are immutable once the generation is built, so
  * per-pipeline-instance memoization removes one full chunk-table scan from
- * every search after the first within a turn.
+ * every search after the first within a turn. Only settled successes are
+ * cached: a rejected load stays uncached so a transient D1 failure can
+ * succeed on the next search instead of poisoning the rest of the turn.
  */
-async function memoizedAclShapes(
+function memoizedAclShapes(
   db: CorpusSql,
   generationId: string,
   cache: Map<string, Promise<AclShape[]>>,
-): Promise<Promise<AclShape[]>> {
+): Promise<AclShape[]> {
   const existing = cache.get(generationId);
   if (existing) {
     return existing;
   }
-  const shapes = loadAclShapes(db, generationId);
+  const shapes = loadAclShapes(db, generationId).catch((error) => {
+    cache.delete(generationId);
+    throw error;
+  });
   cache.set(generationId, shapes);
   return shapes;
 }
@@ -130,6 +135,10 @@ export class CloudflareKnowledgePipeline {
     let vectorChannelError = false;
     const vectorMatches: Array<{ vectorId: string; score: number }> = [];
     const { sql, params } = aclSqlAndParams(acl);
+    // The keyword promise is always settled exactly once, even when the
+    // vector path throws first: the catch swallows the expected error and
+    // the await below re-raises the real keyword failure. Without this, an
+    // in-flight FTS rejection on a vector-throwing path would be unhandled.
     const keywordRows = this.input.db
       .prepare(keywordSearchSql(sql))
       .bind(
@@ -138,7 +147,8 @@ export class CloudflareKnowledgePipeline {
         ...params,
         ftsCandidateFetchLimit(Math.min(fetchLimit, fingerprint.keywordCandidates)),
       )
-      .all<{ chunk_id: string }>();
+      .all<{ chunk_id: string }>()
+      .catch((error) => ({ keywordError: error }));
     if (this.input.vectorize && aclKeys.length > 0) {
       const vectorQuery = await buildVectorizeQuery({ generationId, aclGroupKeys: aclKeys });
       try {
@@ -175,6 +185,9 @@ export class CloudflareKnowledgePipeline {
       return { chunkId, score: match.score };
     });
     const rows = await keywordRows;
+    if ("keywordError" in rows) {
+      throw rows.keywordError;
+    }
     const keywordHits = rows.results.map((row) => ({ chunkId: row.chunk_id, score: 0 }));
     const candidateIds = [...new Set([...vectorHits, ...keywordHits].map((hit) => hit.chunkId))].sort();
     const loaded = await loadChunks(this.input.db, candidateIds);

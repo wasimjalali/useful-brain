@@ -11,6 +11,14 @@ import {
 export const MAX_HISTORY_TURNS = 6;
 export const MAX_HISTORY_CHARS = 6000;
 
+/**
+ * Row bound for the bounded history tail. Generous rather than exact:
+ * failed/pending turn rows occupy the tail without contributing completed
+ * turns, so no small constant can prove the trim target is reachable. When
+ * the bound is not provably enough, the caller falls back to the full scan.
+ */
+export const HISTORY_TAIL_ROWS = MAX_HISTORY_TURNS * 4 + 12;
+
 export type StoredHistoryTurn = { question: string; answer: string };
 
 export type HistoryMessageRow = {
@@ -177,6 +185,25 @@ export function trimStoredHistory(
     chars += size;
   }
   return result;
+}
+
+/**
+ * True when the bounded tail provably reached the trim target: a saturated
+ * turn count or a hard char stop means older completions cannot change the
+ * trimmed result, because both trim rules keep the newest turns first.
+ */
+function boundedTurnSaturated(
+  bounded: StoredHistoryTurn[],
+  tailRows: Array<HistoryMessageRow & { created_at: number }>,
+): boolean {
+  if (bounded.length >= MAX_HISTORY_TURNS) {
+    return true;
+  }
+  let chars = 0;
+  for (const turn of bounded) {
+    chars += turn.question.length + turn.answer.length;
+  }
+  return chars >= MAX_HISTORY_CHARS || tailRows.length === 0;
 }
 
 export function newBoundedId(prefix: string): string {
@@ -785,15 +812,16 @@ export async function loadBoundedHistory(
     parseBoundedId(conversationId, "conversation id"),
     parseBoundedId(ownerPrincipalId, "principal id"),
   );
-  // Fetch a bounded tail from the end: the trim keeps at most
-  // MAX_HISTORY_TURNS completed turns, and each turn is a user+assistant
-  // message pair, so 2 * MAX_HISTORY_TURNS + slack rows from the newest side
-  // is enough to build exactly the same history the full-conversation scan
-  // produced. The tail is reversed back to chronological order before
-  // pairing.
+  // Fetch a bounded tail from the end. The trim keeps at most
+  // MAX_HISTORY_TURNS completed turns, so scanning the newest
+  // HISTORY_TAIL_ROWS rows backwards and falling back to the full scan when
+  // the bound may have hidden older completions reproduces the
+  // full-conversation result: turns are completed user+assistant pairs, but
+  // failed/pending turns occupy tail rows without contributing usable turns,
+  // so a row-count bound alone cannot prove the trim target is met.
   const historyRows = await db
     .prepare(
-      `SELECT id, role, content, status, parent_user_message_id FROM (
+      `SELECT id, role, content, status, parent_user_message_id, created_at FROM (
          SELECT id, role, content, status, parent_user_message_id, created_at
          FROM messages
          WHERE conversation_id = ?
@@ -801,9 +829,22 @@ export async function loadBoundedHistory(
          LIMIT ?
        ) ORDER BY created_at ASC, id ASC`,
     )
-    .bind(conversationId, MAX_HISTORY_TURNS * 2 + 10)
+    .bind(conversationId, HISTORY_TAIL_ROWS)
+    .all<HistoryMessageRow & { created_at: number }>();
+  const bounded = trimStoredHistory(pairCompletedHistoryTurns(historyRows.results));
+  if (historyRows.results.length < HISTORY_TAIL_ROWS || boundedTurnSaturated(bounded, historyRows.results)) {
+    return bounded;
+  }
+  // The tail held mostly failed/pending rows, so older completed turns may
+  // exist beyond the bound. One full ordered scan is the rare fallback.
+  const fullRows = await db
+    .prepare(
+      `SELECT id, role, content, status, parent_user_message_id FROM messages
+       WHERE conversation_id = ? ORDER BY created_at ASC, id ASC`,
+    )
+    .bind(conversationId)
     .all<HistoryMessageRow>();
-  return trimStoredHistory(pairCompletedHistoryTurns(historyRows.results));
+  return trimStoredHistory(pairCompletedHistoryTurns(fullRows.results));
 }
 
 export async function persistThenRelease<T>(input: {
