@@ -1,0 +1,435 @@
+
+> useful-brain@0.1.0 preview:cf
+> opennextjs-cloudflare build && npm run db:local && wrangler dev -c wrangler.jsonc -c workers/brain/wrangler.jsonc --ip 127.0.0.1 --persist-to .wrangler/state
+
+
+┌─────────────────────────────┐
+│ OpenNext — Cloudflare build │
+└─────────────────────────────┘
+
+App directory: /Users/wasimjalali/Desktop/Personal Project/useful-brain
+Next.js version : 16.3.3
+@opennextjs/cloudflare version: 1.20.3
+@opennextjs/aws version: 4.1.1
+workerd compatibility_date: 2026-08-26
+
+┌─────────────────────────────────┐
+│ OpenNext — Building Next.js app │
+└─────────────────────────────────┘
+
+
+> useful-brain@0.1.0 build
+> next build
+
+▲ Next.js 16.3.3 (Turbopack)
+- Environments: .env.local
+✓ Running next.config.ts took 117ms
+- Experiments (use with caution):
+  · serverActions
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 856ms
+  Running TypeScript ...
+  Finished TypeScript in 2.6s ...
+  Collecting page data using 7 workers ...
+  Generating static pages using 7 workers (0/7) ...
+  Generating static pages using 7 workers (1/7) 
+  Generating static pages using 7 workers (3/7) 
+  Generating static pages using 7 workers (5/7) 
+✓ Generating static pages using 7 workers (7/7) in 117ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ƒ /
+├ ○ /_not-found
+├ ƒ /api/auth/login
+├ ƒ /api/auth/logout
+├ ƒ /api/auth/signup
+├ ƒ /api/brain/whoami
+├ ƒ /api/health
+├ ƒ /api/turns/[requestId]
+├ ƒ /chat
+├ ƒ /chat/[id]
+├ ƒ /evaluations
+├ ○ /icon.svg
+├ ƒ /knowledge
+├ ƒ /knowledge/new
+├ ƒ /login
+├ ○ /open
+├ ƒ /settings
+└ ƒ /signup
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+
+┌──────────────────────────────┐
+│ OpenNext — Generating bundle │
+└──────────────────────────────┘
+
+Bundling middleware function...
+Bundling static assets...
+Bundling cache assets...
+Building server function: default...
+Applying code patches: 1.970s
+# copyPackageTemplateFiles
+[35m⚙️ Bundling the OpenNext server...
+[0m
+[35mWorker saved in `.open-next/worker.js` 🚀
+[0m
+OpenNext build complete.
+
+> useful-brain@0.1.0 db:local
+> CI=true wrangler d1 migrations apply useful-brain-corpus-development --local --persist-to .wrangler/state -c workers/brain/wrangler.jsonc && CI=true wrangler d1 migrations apply useful-brain-operations-development --local --persist-to .wrangler/state -c workers/brain/wrangler.jsonc
+
+
+ ⛅️ wrangler 4.126.0 (update available 4.141.0)
+───────────────────────────────────────────────
+Resource location: local 
+
+Use --remote if you want to access the remote instance.
+
+✅ No migrations to apply!
+
+ ⛅️ wrangler 4.126.0 (update available 4.141.0)
+───────────────────────────────────────────────
+Resource location: local 
+
+Use --remote if you want to access the remote instance.
+
+✅ No migrations to apply!
+
+ ⛅️ wrangler 4.126.0 (update available 4.141.0)
+───────────────────────────────────────────────
+Using secrets defined in .dev.vars
+useful-brain has access to the following bindings:
+Binding                                             Resource                  Mode
+env.WORKER_SELF_REFERENCE (useful-brain)            Worker                    local [connected]
+env.BRAIN (useful-brain-brain)                      Worker                    local [not connected]
+env.ASSETS                                          Assets                    local
+env.RUNTIME_ENV ("development")                     Environment Variable      local
+env.IDENTITY_MODE ("loopback")                      Environment Variable      local
+env.RESOURCES_PROVISIONED ("false")                 Environment Variable      local
+env.WRANGLER_ACCESS_DEV ("false")                   Environment Variable      local
+env.LOOPBACK_RUNTIME ("true")                       Environment Variable      local
+env.NEXTJS_ENV ("(hidden)")                         Environment Variable      local
+
+
+Service bindings, Durable Object bindings, and Tail consumers connect to other Wrangler or Vite dev processes running locally, with their connection status indicated by [connected] or [not connected]. For more details, refer to https://developers.cloudflare.com/workers/runtime-apis/bindings/service-bindings/#local-development
+
+useful-brain-brain has access to the following bindings:
+Binding                                                                   Resource                  Mode
+env.CONVERSATION (ConversationRunLock)                                    Durable Object            local
+env.APPROVAL_WORKFLOW (ApprovalWorkflow)                                  Workflow                  local
+env.INGEST_QUEUE (useful-brain-ingest-development)                        Queue                     local
+env.APPROVAL_RESUME_QUEUE (useful-brain-approval-resume-development)      Queue                     local
+env.CORPUS_DB (useful-brain-corpus-development)                           D1 Database               local
+env.OPERATIONS_DB (useful-brain-operations-development)                   D1 Database               local
+env.VECTORIZE (useful-brain-development)                                  Vectorize Index           remote
+env.AI                                                                    AI                        remote
+env.RUNTIME_ENV ("development")                                           Environment Variable      local
+env.IDENTITY_MODE ("loopback")                                            Environment Variable      local
+env.RESOURCES_PROVISIONED ("false")                                       Environment Variable      local
+env.WRANGLER_ACCESS_DEV ("false")                                         Environment Variable      local
+env.LOOPBACK_RUNTIME ("true")                                             Environment Variable      local
+env.LOOPBACK_SUBJECT ("dev@localhost")                                    Environment Variable      local
+
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mScheduled Workers are not automatically triggered during local development.[0m
+
+  To manually trigger a scheduled event, run:
+    curl "http://127.0.0.1:8788/cdn-cgi/local/scheduled"
+  For more details, see [4mhttps://developers.cloudflare.com/workers/configuration/cron-triggers/#test-cron-triggers-locally[0m
+
+
+Wrangler detected this dev session is running in an AI agent.
+The Local Explorer API is available at http://127.0.0.1:8788/cdn-cgi/local/explorer/api
+Useful routes:
+  GET http://127.0.0.1:8788/cdn-cgi/local/explorer/api/local/workers - local Workers and bindings
+  GET http://127.0.0.1:8788/cdn-cgi/local/explorer/api/storage/kv/namespaces - KV namespaces
+  GET http://127.0.0.1:8788/cdn-cgi/local/explorer/api/d1/database - D1 databases
+  GET http://127.0.0.1:8788/cdn-cgi/local/explorer/api/r2/buckets - R2 buckets
+  GET http://127.0.0.1:8788/cdn-cgi/local/explorer/api/workers/durable_objects/namespaces - Durable Object namespaces
+  GET http://127.0.0.1:8788/cdn-cgi/local/explorer/api/workflows - Workflows
+  POST http://127.0.0.1:8788/cdn-cgi/local/explorer/api/local/observability/query - run a read-only SQL query (SELECT/WITH only) over captured request traces and console logs. Tables: spans, logs (read attributes via json(attributes)). Example:
+    curl -X POST http://127.0.0.1:8788/cdn-cgi/local/explorer/api/local/observability/query -H 'Content-Type: application/json' -d '{"sql":"SELECT service, name, outcome, duration_ms FROM spans WHERE parent_id IS NULL LIMIT 20"}'
+If the routes above don't cover what you need, fetch the full OpenAPI schema (large - use only as a last resort):
+  GET http://127.0.0.1:8788/cdn-cgi/local/explorer/api - OpenAPI schema
+⎔ Establishing remote connection...
+⎔ Starting local server...
+[wrangler:info] ✨ Parsed 1 valid header rule.
+useful-brain has access to the following bindings:
+Binding                                             Resource                  Mode
+env.WORKER_SELF_REFERENCE (useful-brain)            Worker                    local [connected]
+env.BRAIN (useful-brain-brain)                      Worker                    local [connected]
+env.ASSETS                                          Assets                    local
+env.RUNTIME_ENV ("development")                     Environment Variable      local
+env.IDENTITY_MODE ("loopback")                      Environment Variable      local
+env.RESOURCES_PROVISIONED ("false")                 Environment Variable      local
+env.WRANGLER_ACCESS_DEV ("false")                   Environment Variable      local
+env.LOOPBACK_RUNTIME ("true")                       Environment Variable      local
+env.NEXTJS_ENV ("(hidden)")                         Environment Variable      local
+
+[wrangler:info] Ready on http://127.0.0.1:8788
+[useful-brain-brain] {"requestId":"fc667786-721a-4d70-acbf-b78a6185524d","operation":"health","status":"ok","durationMs":1}
+[wrangler:info] GET /api/health 200 OK (291ms)
+[useful-brain-brain] {"requestId":"f376c716-1edd-4463-bd07-a73745ba9f80","principalKind":"user","operation":"whoami","status":"ok","durationMs":18}
+[useful-brain-brain] {"requestId":"ce184ce5-07ed-4c1b-99b6-ba059814cf01","principalKind":"user","operation":"conversations","status":"ok","durationMs":24}
+[useful-brain-brain] {"requestId":"9b1f299f-9090-459a-b40e-0a49bc767f91","principalKind":"user","operation":"evaluations","status":"ok","durationMs":26}
+[useful-brain-brain] {"requestId":"3e354c6a-0764-4f83-83e3-845b349db6bf","principalKind":"user","operation":"knowledge","status":"ok","durationMs":65}
+[wrangler:info] GET /chat 200 OK (164ms)
+[useful-brain-brain] [AI-CALL] @cf/zai-org/glm-5.3-flash 2003ms kind=chat
+[useful-brain-brain] [AI-CALL] @cf/zai-org/glm-5.3-flash 2304ms kind=chat
+[useful-brain-brain] [AI-CALL] @cf/zai-org/glm-5.3-flash 11571ms kind=chat
+[useful-brain-brain] {"requestId":"b3397945-5a71-4e50-b1a1-260464075b8f","principalKind":"user","operation":"turns","status":"ok","durationMs":19874}
+[wrangler:info] POST /chat 200 OK (19897ms)
+[useful-brain-brain] [AI-CALL] @cf/zai-org/glm-5.3-flash 1838ms kind=chat
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = rks6ugef5ri0nl7flmpn70v3[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = j7degthiv8tolf10sgpprb45[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = kjn0713me0s5n2in3u3g0f8p[0m
+
+
+[useful-brain-brain] [AI-CALL] @cf/zai-org/glm-5.3-flash 8660ms kind=chat
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 8uqkkbbqan9d10s5th5aipkc[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = u3ielvjdos6q48ooihuhpovc[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 392538mauo4lk1g1bfu6q7ga[0m
+
+
+[useful-brain-brain] [AI-CALL] @cf/zai-org/glm-5.3-flash 22000ms kind=chat
+[useful-brain-brain] {"requestId":"4816c676-0990-447a-b187-d47aa952a52c","principalKind":"user","operation":"turns","status":"ok","durationMs":34231}
+[wrangler:info] POST /chat 200 OK (34245ms)
+[useful-brain-brain] [AI-CALL] @cf/zai-org/glm-5.3-flash 1582ms kind=chat
+[useful-brain-brain] [AI-CALL] @cf/zai-org/glm-5.3-flash 1872ms kind=chat
+[useful-brain-brain] {"requestId":"351a50c0-467a-416e-9a9e-b4cea89a5d95","principalKind":"user","operation":"turns","status":"ok","durationMs":7249}
+[wrangler:info] POST /chat 200 OK (7258ms)
+[useful-brain-brain] [AI-CALL] @cf/zai-org/glm-5.3-flash 1267ms kind=chat
+[useful-brain-brain] [AI-CALL] @cf/zai-org/glm-5.3-flash 3311ms kind=chat
+[useful-brain-brain] {"requestId":"82456160-12e8-4636-a2a4-ee5608eec64b","principalKind":"user","operation":"turns","status":"ok","durationMs":5916}
+[wrangler:info] POST /chat 200 OK (5927ms)
+[useful-brain-brain] [AI-CALL] @cf/zai-org/glm-5.3-flash 2364ms kind=chat
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = rtijbvvc49cipg0s64mii486[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = j5uchp1lq01dukonmp7sq1ne[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = tu8tu4ln020i2aqmnmra3no5[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mBuild failed with 8 errors:[0m
+
+  [31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mCould not resolve "./cloudflare/images.js"[0m
+  
+      .open-next/worker.js:2:61:
+  [37m      2 │ ...giImageRequest, handleImageRequest } from [32m"./cloudflare/images.js"[37m;
+          ╵                                              [32m~~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+  
+  [31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mCould not resolve "./cloudflare/init.js"[0m
+  
+      .open-next/worker.js:4:48:
+  [37m      4 │ ...rt { runWithCloudflareRequestContext } from [32m"./cloudflare/init.js"[37m;
+          ╵                                                [32m~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+  
+  [31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mCould not resolve "./cloudflare/skew-protection.js"[0m
+  
+      .open-next/worker.js:6:47:
+  [37m      6 │ ...GetSkewProtectionResponse } from [32m"./cloudflare/skew-protection.js"[37m;
+          ╵                                     [32m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+  
+  [31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mCould not resolve "./middleware/handler.mjs"[0m
+  
+      .open-next/worker.js:8:45:
+  [37m      8 │ ...t { handler as middlewareHandler } from [32m"./middleware/handler.mjs"[37m;
+          ╵                                            [32m~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+  
+  [31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mCould not resolve "./.build/durable-objects/queue.js"[0m
+  
+      .open-next/worker.js:10:31:
+  [37m      10 │ export { DOQueueHandler } from [32m"./.build/durable-objects/queue.js"[37m;
+           ╵                                [32m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+  
+  [31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mCould not resolve "./.build/durable-objects/sharded-tag-cache.js"[0m
+  
+      .open-next/worker.js:12:34:
+  [37m      12 │ ...edTagCache } from [32m"./.build/durable-objects/sharded-tag-cache.js"[37m;
+           ╵                      [32m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+  
+  [31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mCould not resolve "./.build/durable-objects/bucket-cache-purge.js"[0m
+  
+      .open-next/worker.js:14:33:
+  [37m      14 │ ...achePurge } from [32m"./.build/durable-objects/bucket-cache-purge.js"[37m;
+           ╵                     [32m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+  
+  [31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mCould not resolve "./server-functions/default/handler.mjs"[0m
+  
+      .open-next/worker.js:39:45:
+  [37m      39 │ ...andler } = await import([32m"./server-functions/default/handler.mjs"[37m);
+           ╵                            [32m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+  
+
+
+⎔ Reloading local server...
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mBuild failed with 1 error:[0m
+
+  [31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mCould not resolve "/Users/wasimjalali/Desktop/Personal Project/useful-brain/.open-next/worker.js"[0m
+  
+      .wrangler/tmp/bundle-u7DyQV/middleware-insertion-facade.js:1:43:
+  [37m      1 │ ...PORTS from [32m"/Users/wasimjalali/Desktop/Personal Project/useful-b[37m...
+          ╵               [32m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+  
+
+
+[wrangler:info] POST /chat 503 Service Unavailable (13925ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: Network connection lost.[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: Network connection lost.[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: Network connection lost.[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: Network connection lost.[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: Network connection lost.[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: Network connection lost.[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: Network connection lost.[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: Network connection lost.[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: Network connection lost.[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: Network connection lost.[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: Network connection lost.[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: Network connection lost.[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: Network connection lost.[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: Network connection lost.[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: Network connection lost.[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: Network connection lost.[0m
+
+
+useful-brain has access to the following bindings:
+Binding                                             Resource                  Mode
+env.WORKER_SELF_REFERENCE (useful-brain)            Worker                    local [connected]
+env.BRAIN (useful-brain-brain)                      Worker                    local [connected]
+env.ASSETS                                          Assets                    local
+env.RUNTIME_ENV ("development")                     Environment Variable      local
+env.IDENTITY_MODE ("loopback")                      Environment Variable      local
+env.RESOURCES_PROVISIONED ("false")                 Environment Variable      local
+env.WRANGLER_ACCESS_DEV ("false")                   Environment Variable      local
+env.LOOPBACK_RUNTIME ("true")                       Environment Variable      local
+env.NEXTJS_ENV ("(hidden)")                         Environment Variable      local
+
+⎔ Local server updated and ready
+[useful-brain-brain] [AI-CALL] @cf/zai-org/glm-5.3-flash 2259ms kind=chat
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mBuild failed with 1 error:[0m
+
+  [31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mCould not resolve "./server-functions/default/handler.mjs"[0m
+  
+      .open-next/worker.js:39:45:
+  [37m      39 │ ...andler } = await import([32m"./server-functions/default/handler.mjs"[37m);
+           ╵                            [32m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+  
+
+
+⎔ Reloading local server...
+[wrangler:info] ✨ Parsed 1 valid header rule.
+[wrangler:info] POST /chat 503 Service Unavailable (13594ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: Network connection lost.[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: Network connection lost.[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: Network connection lost.[0m
+
+
+useful-brain has access to the following bindings:
+Binding                                             Resource                  Mode
+env.WORKER_SELF_REFERENCE (useful-brain)            Worker                    local [connected]
+env.BRAIN (useful-brain-brain)                      Worker                    local [connected]
+env.ASSETS                                          Assets                    local
+env.RUNTIME_ENV ("development")                     Environment Variable      local
+env.IDENTITY_MODE ("loopback")                      Environment Variable      local
+env.RESOURCES_PROVISIONED ("false")                 Environment Variable      local
+env.WRANGLER_ACCESS_DEV ("false")                   Environment Variable      local
+env.LOOPBACK_RUNTIME ("true")                       Environment Variable      local
+env.NEXTJS_ENV ("(hidden)")                         Environment Variable      local
+
+⎔ Local server updated and ready
+[wrangler:error] Error: Dynamic require of "fs" is not supported
+    at .open-next/server-functions/default/node_modules/next/dist/server/dev/browser-logs/file-logger.js (file:///Users/wasimjalali/Desktop/Personal%20Project/useful-brain/.open-next/server-functions/default/handler.mjs:2:5133)
+    at null.<anonymous> (file:///Users/wasimjalali/Desktop/Personal%20Project/useful-brain/.open-next/server-functions/default/handler.mjs:2:679)
+    at .open-next/server-functions/default/node_modules/next/dist/server/node-environment-extensions/console-file.js (file:///Users/wasimjalali/Desktop/Personal%20Project/useful-brain/.open-next/server-functions/default/handler.mjs:3:6739)
+    at null.<anonymous> (file:///Users/wasimjalali/Desktop/Personal%20Project/useful-brain/.open-next/server-functions/default/handler.mjs:2:679)
+    at .open-next/server-functions/default/node_modules/next/dist/server/node-environment.js (file:///Users/wasimjalali/Desktop/Personal%20Project/useful-brain/.open-next/server-functions/default/handler.mjs:172:338)
+    at null.<anonymous> (file:///Users/wasimjalali/Desktop/Personal%20Project/useful-brain/.open-next/server-functions/default/handler.mjs:2:679)
+    at .open-next/server-functions/default/node_modules/next/dist/server/next-server.js (file:///Users/wasimjalali/Desktop/Personal%20Project/useful-brain/.open-next/server-functions/default/handler.mjs:1640:4391)
+    at null.<anonymous> (file:///Users/wasimjalali/Desktop/Personal%20Project/useful-brain/.open-next/server-functions/default/handler.mjs:2:679)
+    at .open-next/server-functions/default/handler.mjs (file:///Users/wasimjalali/Desktop/Personal%20Project/useful-brain/.open-next/server-functions/default/handler.mjs:1656:721)
+[wrangler:info] POST /chat 500 Internal Server Error (1032ms)
+[wrangler:error] Error: Dynamic require of "fs" is not supported
+    at .open-next/server-functions/default/node_modules/next/dist/server/dev/browser-logs/file-logger.js (file:///Users/wasimjalali/Desktop/Personal%20Project/useful-brain/.open-next/server-functions/default/handler.mjs:2:5133)
+    at null.<anonymous> (file:///Users/wasimjalali/Desktop/Personal%20Project/useful-brain/.open-next/server-functions/default/handler.mjs:2:679)
+    at .open-next/server-functions/default/node_modules/next/dist/server/node-environment-extensions/console-file.js (file:///Users/wasimjalali/Desktop/Personal%20Project/useful-brain/.open-next/server-functions/default/handler.mjs:3:6739)
+    at null.<anonymous> (file:///Users/wasimjalali/Desktop/Personal%20Project/useful-brain/.open-next/server-functions/default/handler.mjs:2:679)
+    at .open-next/server-functions/default/node_modules/next/dist/server/node-environment.js (file:///Users/wasimjalali/Desktop/Personal%20Project/useful-brain/.open-next/server-functions/default/handler.mjs:172:338)
+    at null.<anonymous> (file:///Users/wasimjalali/Desktop/Personal%20Project/useful-brain/.open-next/server-functions/default/handler.mjs:2:679)
+    at .open-next/server-functions/default/node_modules/next/dist/server/next-server.js (file:///Users/wasimjalali/Desktop/Personal%20Project/useful-brain/.open-next/server-functions/default/handler.mjs:1640:4391)
+    at null.<anonymous> (file:///Users/wasimjalali/Desktop/Personal%20Project/useful-brain/.open-next/server-functions/default/handler.mjs:2:679)
+    at .open-next/server-functions/default/handler.mjs (file:///Users/wasimjalali/Desktop/Personal%20Project/useful-brain/.open-next/server-functions/default/handler.mjs:1656:721)
+[wrangler:info] POST /chat 500 Internal Server Error (202ms)
+⎔ Reloading local server...
+[wrangler:info] ✨ Parsed 1 valid header rule.
+useful-brain has access to the following bindings:
+Binding                                             Resource                  Mode
+env.WORKER_SELF_REFERENCE (useful-brain)            Worker                    local [connected]
+env.BRAIN (useful-brain-brain)                      Worker                    local [connected]
+env.ASSETS                                          Assets                    local
+env.RUNTIME_ENV ("development")                     Environment Variable      local
+env.IDENTITY_MODE ("loopback")                      Environment Variable      local
+env.RESOURCES_PROVISIONED ("false")                 Environment Variable      local
+env.WRANGLER_ACCESS_DEV ("false")                   Environment Variable      local
+env.LOOPBACK_RUNTIME ("true")                       Environment Variable      local
+env.NEXTJS_ENV ("(hidden)")                         Environment Variable      local
+
+⎔ Local server updated and ready
+🪵  Logs were written to "/Users/wasimjalali/Library/Preferences/.wrangler/logs/wrangler-2026-09-26_14-01-35_869.log"
