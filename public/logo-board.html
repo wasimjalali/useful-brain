@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Useful Brain · logo board</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --canvas: #f8f8f8;
+        --surface: #ffffff;
+        --sunken: #f0f0f0;
+        --ink: #171717;
+        --ink-muted: #5c5c5c;
+        --ink-faint: #a3a3a3;
+        --border: #ebebeb;
+        --brand: #171717;
+        --brand-ink: #fafafa;
+      }
+
+      * { box-sizing: border-box; }
+      html, body { margin: 0; background: var(--canvas); color: var(--ink); }
+      body {
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      header {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 48px 24px 28px;
+      }
+      header h1 {
+        margin: 0;
+        font-size: 28px;
+        letter-spacing: -0.04em;
+        font-weight: 600;
+      }
+      header p {
+        margin: 10px 0 0;
+        max-width: 52ch;
+        color: var(--ink-muted);
+        font-size: 15px;
+        line-height: 1.55;
+      }
+
+      .board { max-width: 1120px; margin: 0 auto; padding: 0 24px 80px; }
+
+      .concept {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 28px;
+        margin-top: 20px;
+      }
+      .concept h2 {
+        margin: 0;
+        font-size: 18px;
+        letter-spacing: -0.03em;
+      }
+      .concept .why {
+        margin: 6px 0 22px;
+        color: var(--ink-muted);
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      .row { display: flex; flex-wrap: wrap; gap: 28px 36px; align-items: end; }
+      .cell { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+      .cell span {
+        font-size: 11px;
+        color: var(--ink-faint);
+        letter-spacing: 0.02em;
+      }
+
+      .tile {
+        display: grid;
+        place-items: center;
+        background: var(--brand);
+        color: var(--brand-ink);
+        border-radius: 22%;
+      }
+      .tile.r8 { border-radius: 8px; }
+      .on-paper {
+        display: grid;
+        place-items: center;
+        background: var(--sunken);
+        border-radius: 10px;
+      }
+
+      .lockup, .stack {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .stack { flex-direction: column; align-items: flex-start; gap: 8px; }
+      .word {
+        font-weight: 600;
+        letter-spacing: -0.03em;
+        line-height: 1;
+      }
+      .word.sm { font-size: 15px; }
+      .word.md { font-size: 20px; }
+      .word.lg { font-size: 32px; }
+      .word.tight { letter-spacing: -0.045em; }
+      .word .node { color: var(--ink); }
+
+      .letter {
+        font-weight: 600;
+        letter-spacing: -0.05em;
+        line-height: 1;
+      }
+
+      .uses {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 14px;
+        margin-top: 22px;
+      }
+      .use {
+        border: 1px solid var(--border);
+        background: var(--canvas);
+        border-radius: 14px;
+        padding: 14px 16px;
+        min-height: 72px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .use p { margin: 0; font-size: 12px; color: var(--ink-faint); }
+      .use .fake-tab {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px 10px 0 0;
+        padding: 8px 12px;
+      }
+      .use .nav {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .og {
+        width: 100%;
+        height: 88px;
+        border-radius: 10px;
+        background: var(--brand);
+        color: var(--brand-ink);
+        display: flex;
+        align-items: center;
+        padding: 0 18px;
+        gap: 12px;
+      }
+
+      svg { display: block; }
+      footer {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 0 24px 64px;
+        color: var(--ink-faint);
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Useful Brain logo board</h1>
+      <p>
+        Eight directions. Each one is shown as a mark, a tile, a lockup, a
+        single letter, and the sizes a logo actually has to survive: favicon,
+        tab, sidebar, wordmark, and a social crop.
+      </p>
+    </header>
+
+    <main class="board">
+      <!-- 1 Citation -->
+      <section class="concept">
+        <h2>1 · Citation</h2>
+        <p class="why">A source node held in brackets. The product cites or it refuses.</p>
+        <div class="row">
+          <div class="cell"><div class="tile" style="width:16px;height:16px" data-mark="citation"></div><span>16 favicon</span></div>
+          <div class="cell"><div class="tile" style="width:32px;height:32px" data-mark="citation"></div><span>32 tab</span></div>
+          <div class="cell"><div class="tile" style="width:48px;height:48px" data-mark="citation"></div><span>48 sidebar</span></div>
+          <div class="cell"><div class="tile" style="width:64px;height:64px" data-mark="citation"></div><span>64 app</span></div>
+          <div class="cell"><div class="on-paper" style="width:64px;height:64px" data-mark="citation" data-tone="light"></div><span>64 on paper</span></div>
+          <div class="cell">
+            <div class="lockup">
+              <div class="tile" style="width:32px;height:32px" data-mark="citation"></div>
+              <span class="word sm">Useful Brain</span>
+            </div>
+            <span>lockup 32</span>
+          </div>
+          <div class="cell">
+            <div class="lockup">
+              <div class="tile" style="width:40px;height:40px" data-mark="citation"></div>
+              <span class="word md">Useful Brain</span>
+            </div>
+            <span>lockup 40</span>
+          </div>
+          <div class="cell">
+            <div class="stack">
+              <div class="tile" style="width:48px;height:48px" data-mark="citation"></div>
+              <span class="word md">Useful Brain</span>
+            </div>
+            <span>stacked</span>
+          </div>
+        </div>
+        <div class="uses" data-uses="citation"></div>
+      </section>
+
+      <!-- 2 Cite one -->
+      <section class="concept">
+        <h2>2 · Cite one</h2>
+        <p class="why">The answer’s first citation mark, turned into the identity.</p>
+        <div class="row">
+          <div class="cell"><div class="tile" style="width:16px;height:16px" data-mark="cite1"></div><span>16 favicon</span></div>
+          <div class="cell"><div class="tile" style="width:32px;height:32px" data-mark="cite1"></div><span>32 tab</span></div>
+          <div class="cell"><div class="tile" style="width:48px;height:48px" data-mark="cite1"></div><span>48 sidebar</span></div>
+          <div class="cell"><div class="tile" style="width:64px;height:64px" data-mark="cite1"></div><span>64 app</span></div>
+          <div class="cell"><div class="on-paper" style="width:64px;height:64px" data-mark="cite1" data-tone="light"></div><span>64 on paper</span></div>
+          <div class="cell">
+            <div class="lockup">
+              <div class="tile" style="width:32px;height:32px" data-mark="cite1"></div>
+              <span class="word sm">Useful Brain</span>
+            </div>
+            <span>lockup 32</span>
+          </div>
+          <div class="cell">
+            <div class="lockup">
+              <div class="tile" style="width:40px;height:40px" data-mark="cite1"></div>
+              <span class="word md">Useful Brain</span>
+            </div>
+            <span>lockup 40</span>
+          </div>
+          <div class="cell">
+            <div class="stack">
+              <div class="tile" style="width:48px;height:48px" data-mark="cite1"></div>
+              <span class="word md">Useful Brain</span>
+            </div>
+            <span>stacked</span>
+          </div>
+        </div>
+        <div class="uses" data-uses="cite1"></div>
+      </section>
+
+      <!-- 3 Evidence node -->
+      <section class="concept">
+        <h2>3 · Evidence node</h2>
+        <p class="why">One retrieved chunk, held in a ring. Quiet at 16px. Clear at 32.</p>
+        <div class="row">
+          <div class="cell"><div class="tile" style="width:16px;height:16px" data-mark="node"></div><span>16 favicon</span></div>
+          <div class="cell"><div class="tile" style="width:32px;height:32px" data-mark="node"></div><span>32 tab</span></div>
+          <div class="cell"><div class="tile" style="width:48px;height:48px" data-mark="node"></div><span>48 sidebar</span></div>
+          <div class="cell"><div class="tile" style="width:64px;height:64px" data-mark="node"></div><span>64 app</span></div>
+          <div class="cell"><div class="on-paper" style="width:64px;height:64px" data-mark="node" data-tone="light"></div><span>64 on paper</span></div>
+          <div class="cell">
+            <div class="lockup">
+              <div class="tile" style="width:32px;height:32px" data-mark="node"></div>
+              <span class="word sm">Useful Brain</span>
+            </div>
+            <span>lockup 32</span>
+          </div>
+          <div class="cell">
+            <div class="lockup">
+              <div class="tile" style="width:40px;height:40px" data-mark="node"></div>
+              <span class="word md">Useful Brain</span>
+            </div>
+            <span>lockup 40</span>
+          </div>
+          <div class="cell">
+            <div class="stack">
+              <div class="tile" style="width:48px;height:48px" data-mark="node"></div>
+              <span class="word md">Useful Brain</span>
+            </div>
+            <span>stacked</span>
+          </div>
+        </div>
+        <div class="uses" data-uses="node"></div>
+      </section>
+
+      <!-- 4 Bracket B -->
+      <section class="concept">
+        <h2>4 · Bracket B</h2>
+        <p class="why">The letter B built from citation brackets. Reads as a monogram and as a cite.</p>
+        <div class="row">
+          <div class="cell"><div class="tile" style="width:16px;height:16px" data-mark="bracketb"></div><span>16 favicon</span></div>
+          <div class="cell"><div class="tile" style="width:32px;height:32px" data-mark="bracketb"></div><span>32 tab</span></div>
+          <div class="cell"><div class="tile" style="width:48px;height:48px" data-mark="bracketb"></div><span>48 sidebar</span></div>
+          <div class="cell"><div class="tile" style="width:64px;height:64px" data-mark="bracketb"></div><span>64 app</span></div>
+          <div class="cell"><div class="on-paper" style="width:64px;height:64px" data-mark="bracketb" data-tone="light"></div><span>64 on paper</span></div>
+          <div class="cell">
+            <div class="lockup">
+              <div class="tile" style="width:32px;height:32px" data-mark="bracketb"></div>
+              <span class="word sm">Useful Brain</span>
+            </div>
+            <span>lockup 32</span>
+          </div>
+          <div class="cell">
+            <div class="lockup">
+              <div class="tile" style="width:40px;height:40px" data-mark="bracketb"></div>
+              <span class="word md">Useful Brain</span>
+            </div>
+            <span>lockup 40</span>
+          </div>
+          <div class="cell">
+            <span class="letter" style="font-size:48px">B</span>
+            <span>single letter</span>
+          </div>
+        </div>
+        <div class="uses" data-uses="bracketb"></div>
+      </section>
+
+      <!-- 5 UB monogram -->
+      <section class="concept">
+        <h2>5 · UB monogram</h2>
+        <p class="why">Useful + Brain as one drawn letterform. Works when the full name is too wide.</p>
+        <div class="row">
+          <div class="cell"><div class="tile" style="width:16px;height:16px" data-mark="ub"></div><span>16 favicon</span></div>
+          <div class="cell"><div class="tile" style="width:32px;height:32px" data-mark="ub"></div><span>32 tab</span></div>
+          <div class="cell"><div class="tile" style="width:48px;height:48px" data-mark="ub"></div><span>48 sidebar</span></div>
+          <div class="cell"><div class="tile" style="width:64px;height:64px" data-mark="ub"></div><span>64 app</span></div>
+          <div class="cell"><div class="on-paper" style="width:64px;height:64px" data-mark="ub" data-tone="light"></div><span>64 on paper</span></div>
+          <div class="cell">
+            <div class="lockup">
+              <div class="tile" style="width:32px;height:32px" data-mark="ub"></div>
+              <span class="word sm">Useful Brain</span>
+            </div>
+            <span>lockup 32</span>
+          </div>
+          <div class="cell">
+            <div class="lockup">
+              <div class="tile" style="width:40px;height:40px" data-mark="ub"></div>
+              <span class="word md">Useful Brain</span>
+            </div>
+            <span>lockup 40</span>
+          </div>
+          <div class="cell">
+            <span class="letter" style="font-size:40px">UB</span>
+            <span>letters only</span>
+          </div>
+        </div>
+        <div class="uses" data-uses="ub"></div>
+      </section>
+
+      <!-- 6 Single B -->
+      <section class="concept">
+        <h2>6 · Single B</h2>
+        <p class="why">One letter. Fastest at 16px. The wordmark carries the rest.</p>
+        <div class="row">
+          <div class="cell"><div class="tile" style="width:16px;height:16px" data-mark="b"></div><span>16 favicon</span></div>
+          <div class="cell"><div class="tile" style="width:32px;height:32px" data-mark="b"></div><span>32 tab</span></div>
+          <div class="cell"><div class="tile" style="width:48px;height:48px" data-mark="b"></div><span>48 sidebar</span></div>
+          <div class="cell"><div class="tile" style="width:64px;height:64px" data-mark="b"></div><span>64 app</span></div>
+          <div class="cell"><div class="on-paper" style="width:64px;height:64px" data-mark="b" data-tone="light"></div><span>64 on paper</span></div>
+          <div class="cell">
+            <div class="lockup">
+              <div class="tile" style="width:32px;height:32px" data-mark="b"></div>
+              <span class="word sm">Useful Brain</span>
+            </div>
+            <span>lockup 32</span>
+          </div>
+          <div class="cell">
+            <span class="letter" style="font-size:56px">B</span>
+            <span>single letter</span>
+          </div>
+          <div class="cell">
+            <span class="word lg tight">Brain</span>
+            <span>word only</span>
+          </div>
+        </div>
+        <div class="uses" data-uses="b"></div>
+      </section>
+
+      <!-- 7 Grounded -->
+      <section class="concept">
+        <h2>7 · Grounded</h2>
+        <p class="why">A node sitting on a baseline. The answer has to rest on evidence.</p>
+        <div class="row">
+          <div class="cell"><div class="tile" style="width:16px;height:16px" data-mark="ground"></div><span>16 favicon</span></div>
+          <div class="cell"><div class="tile" style="width:32px;height:32px" data-mark="ground"></div><span>32 tab</span></div>
+          <div class="cell"><div class="tile" style="width:48px;height:48px" data-mark="ground"></div><span>48 sidebar</span></div>
+          <div class="cell"><div class="tile" style="width:64px;height:64px" data-mark="ground"></div><span>64 app</span></div>
+          <div class="cell"><div class="on-paper" style="width:64px;height:64px" data-mark="ground" data-tone="light"></div><span>64 on paper</span></div>
+          <div class="cell">
+            <div class="lockup">
+              <div class="tile" style="width:32px;height:32px" data-mark="ground"></div>
+              <span class="word sm">Useful Brain</span>
+            </div>
+            <span>lockup 32</span>
+          </div>
+          <div class="cell">
+            <div class="lockup">
+              <div class="tile" style="width:40px;height:40px" data-mark="ground"></div>
+              <span class="word md">Useful Brain</span>
+            </div>
+            <span>lockup 40</span>
+          </div>
+          <div class="cell">
+            <span class="word lg tight">Useful Brain<span class="node">.</span></span>
+            <span>wordmark + period</span>
+          </div>
+        </div>
+        <div class="uses" data-uses="ground"></div>
+      </section>
+
+      <!-- 8 Wordmark -->
+      <section class="concept">
+        <h2>8 · Wordmark</h2>
+        <p class="why">No pictogram. Weight and tracking do the work. A small node only when a square is required.</p>
+        <div class="row">
+          <div class="cell"><span class="word sm">Useful Brain</span><span>15 sidebar</span></div>
+          <div class="cell"><span class="word md">Useful Brain</span><span>20 header</span></div>
+          <div class="cell"><span class="word lg tight">Useful Brain</span><span>32 display</span></div>
+          <div class="cell"><span class="word md tight">usefulbrain</span><span>solid</span></div>
+          <div class="cell">
+            <div class="lockup">
+              <span class="word md">Useful</span>
+              <span class="word md" style="font-weight:500;color:var(--ink-muted)">Brain</span>
+            </div>
+            <span>split weight</span>
+          </div>
+          <div class="cell"><div class="tile r8" style="width:32px;height:32px" data-mark="period"></div><span>favicon fallback</span></div>
+          <div class="cell">
+            <div class="stack">
+              <span class="word lg tight">Useful</span>
+              <span class="word lg tight">Brain</span>
+            </div>
+            <span>stacked name</span>
+          </div>
+        </div>
+        <div class="uses" data-uses="period"></div>
+      </section>
+    </main>
+
+    <footer>Local board. Open from the preview at /logo-board.html. Pick a number.</footer>
+
+    <script>
+      const ink = (tone) => (tone === "light" ? "#171717" : "#fafafa");
+
+      const marks = {
+        citation: (c) => `
+          <svg viewBox="0 0 64 64" fill="none" width="62%" height="62%">
+            <path d="M17 16v32M17 16h8M17 48h8" stroke="${c}" stroke-width="3.4" stroke-linecap="round"/>
+            <path d="M47 16v32M47 16h-8M47 48h-8" stroke="${c}" stroke-width="3.4" stroke-linecap="round"/>
+            <circle cx="32" cy="32" r="6.5" fill="${c}"/>
+          </svg>`,
+        cite1: (c) => `
+          <svg viewBox="0 0 64 64" fill="none" width="70%" height="70%">
+            <path d="M18 14v36M18 14h9M18 50h9" stroke="${c}" stroke-width="3.6" stroke-linecap="round"/>
+            <path d="M46 14v36M46 14h-9M46 50h-9" stroke="${c}" stroke-width="3.6" stroke-linecap="round"/>
+            <text x="32" y="40" text-anchor="middle" fill="${c}" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="26" font-weight="600">1</text>
+          </svg>`,
+        node: (c) => `
+          <svg viewBox="0 0 64 64" fill="none" width="62%" height="62%">
+            <circle cx="32" cy="32" r="18" stroke="${c}" stroke-width="3.2"/>
+            <circle cx="32" cy="32" r="7" fill="${c}"/>
+          </svg>`,
+        bracketb: (c) => `
+          <svg viewBox="0 0 64 64" fill="none" width="70%" height="70%">
+            <path d="M16 12v40M16 12h8M16 52h8" stroke="${c}" stroke-width="3.4" stroke-linecap="round"/>
+            <path d="M28 16h10c7 0 12 4 12 10s-4 9-9 10c6 1 11 5 11 12s-6 10-13 10H28" stroke="${c}" stroke-width="3.6" stroke-linejoin="round"/>
+          </svg>`,
+        ub: (c) => `
+          <svg viewBox="0 0 64 64" fill="none" width="72%" height="72%">
+            <path d="M16 16v22c0 10 7 16 16 16s16-6 16-16V16" stroke="${c}" stroke-width="4.2" stroke-linecap="round"/>
+            <path d="M40 16v32" stroke="${c}" stroke-width="4.2" stroke-linecap="round"/>
+            <path d="M40 28h10c5 0 8 3 8 8s-3 8-8 8H40" stroke="${c}" stroke-width="4.2" stroke-linejoin="round"/>
+          </svg>`,
+        b: (c) => `
+          <svg viewBox="0 0 64 64" fill="none" width="58%" height="58%">
+            <path d="M22 14h12c8 0 14 5 14 12 0 5-3 9-8 10 7 1 12 6 12 13 0 8-7 13-16 13H22V14z" stroke="${c}" stroke-width="4" stroke-linejoin="round"/>
+          </svg>`,
+        ground: (c) => `
+          <svg viewBox="0 0 64 64" fill="none" width="68%" height="68%">
+            <circle cx="32" cy="28" r="8" fill="${c}"/>
+            <path d="M14 44h36" stroke="${c}" stroke-width="3.6" stroke-linecap="round"/>
+          </svg>`,
+        period: (c) => `
+          <svg viewBox="0 0 64 64" fill="none" width="36%" height="36%">
+            <circle cx="32" cy="32" r="14" fill="${c}"/>
+          </svg>`,
+      };
+
+      function paint(el) {
+        const name = el.getAttribute("data-mark");
+        const tone = el.getAttribute("data-tone") || "dark";
+        el.innerHTML = marks[name](ink(tone));
+      }
+
+      document.querySelectorAll("[data-mark]").forEach(paint);
+
+      function uses(name) {
+        return `
+          <div class="use">
+            <p>Browser tab</p>
+            <div class="fake-tab">
+              <div class="tile" style="width:16px;height:16px" data-mark="${name}"></div>
+              <span class="word" style="font-size:12px;font-weight:500">Useful Brain</span>
+            </div>
+          </div>
+          <div class="use">
+            <p>Sidebar</p>
+            <div class="nav">
+              <div class="tile" style="width:32px;height:32px" data-mark="${name}"></div>
+              <span class="word sm">Useful Brain</span>
+            </div>
+          </div>
+          <div class="use">
+            <p>Avatar / thinking</p>
+            <div class="tile" style="width:32px;height:32px" data-mark="${name}"></div>
+          </div>
+          <div class="use">
+            <p>Social crop</p>
+            <div class="og">
+              <div class="tile" style="width:36px;height:36px;background:#2a2a2a" data-mark="${name}"></div>
+              <span class="word sm" style="color:#fafafa">Useful Brain</span>
+            </div>
+          </div>`;
+      }
+
+      document.querySelectorAll("[data-uses]").forEach((el) => {
+        el.innerHTML = uses(el.getAttribute("data-uses"));
+        el.querySelectorAll("[data-mark]").forEach(paint);
+      });
+    </script>
+  </body>
+</html>
