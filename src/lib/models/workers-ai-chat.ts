@@ -10,6 +10,7 @@ import {
 } from "@earendil-works/pi-ai";
 
 import { CHAT_MODEL_PROVIDER } from "../models/selection";
+import type { WorkersAiRunOptions } from "../embeddings/workers-ai-embed";
 
 export class ChatModelError extends Error {
   constructor(message: string) {
@@ -19,7 +20,11 @@ export class ChatModelError extends Error {
 }
 
 export type WorkersAiChatRunner = {
-  run(model: string, input: Record<string, unknown>): Promise<unknown>;
+  run(
+    model: string,
+    input: Record<string, unknown>,
+    options?: WorkersAiRunOptions,
+  ): Promise<unknown>;
 };
 
 type OpenAiChatMessage = {
@@ -139,7 +144,7 @@ async function runChat(
   if (tools.length > 0) {
     payload.tools = tools;
   }
-  const response = await ai.run(model.id, payload);
+  const response = await ai.run(model.id, payload, { signal: options?.signal });
   options?.signal?.throwIfAborted();
   const message = parseWorkersAiChatMessage(response, model.id);
   const doneReason = message.stopReason === "toolUse" ? ("toolUse" as const) : ("stop" as const);

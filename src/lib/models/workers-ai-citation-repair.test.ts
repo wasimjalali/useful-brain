@@ -57,7 +57,144 @@ describe("Workers AI citation repair", () => {
         max_completion_tokens: 1024,
         chat_template_kwargs: { enable_thinking: false },
       }),
+      { signal: undefined },
     );
+  });
+
+  it("forwards the abort signal into the ai.run options", async () => {
+    const controller = new AbortController();
+    const seen: Array<{ signal?: AbortSignal } | undefined> = [];
+    const run = vi.fn().mockImplementation(async (_model, _input, options) => {
+      seen.push(options);
+      return {
+        choices: [
+          {
+            finish_reason: "stop",
+            message: {
+              content: JSON.stringify({
+                quotes: [
+                  {
+                    quote: "P1 tickets have a first-response target of 1 hour.",
+                    citation: "[1]",
+                  },
+                ],
+              }),
+            },
+          },
+        ],
+      };
+    });
+    const repair = createWorkersAiCitationRepair({ run });
+
+    await expect(
+      repair({
+        question: "What is the first-response target for a P1 support ticket?",
+        evidence,
+        signal: controller.signal,
+      }),
+    ).resolves.toBe("P1 tickets have a first-response target of 1 hour. [1]");
+    expect(seen[0]?.signal).toBe(controller.signal);
+  });
+
+  it("rejects when the signal aborts during the repair call", async () => {
+    const controller = new AbortController();
+    const run = vi.fn().mockImplementation(async () => {
+      controller.abort();
+      return {
+        choices: [
+          {
+            finish_reason: "stop",
+            message: {
+              content: JSON.stringify({
+                quotes: [
+                  {
+                    quote: "P1 tickets have a first-response target of 1 hour.",
+                    citation: "[1]",
+                  },
+                ],
+              }),
+            },
+          },
+        ],
+      };
+    });
+    const repair = createWorkersAiCitationRepair({ run });
+
+    await expect(
+      repair({
+        question: "What is the first-response target for a P1 support ticket?",
+        evidence,
+        signal: controller.signal,
+      }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+  });
+
+  it("rejects without calling the model when the signal is already aborted", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const run = vi.fn();
+    const repair = createWorkersAiCitationRepair({ run });
+
+    await expect(
+      repair({
+        question: "What is the first-response target for a P1 support ticket?",
+        evidence,
+        signal: controller.signal,
+      }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it("forwards the abort signal into the coverage run options", async () => {
+    const controller = new AbortController();
+    const seen: Array<{ signal?: AbortSignal } | undefined> = [];
+    const run = vi.fn().mockImplementation(async (_model, _input, options) => {
+      seen.push(options);
+      return {
+        choices: [
+          {
+            finish_reason: "stop",
+            message: { content: JSON.stringify({ quotes: [] }) },
+          },
+        ],
+      };
+    });
+    const cover = createWorkersAiCoveragePass({ run });
+
+    await expect(
+      cover({
+        question: "What is the P1 response target?",
+        draft: "P1 tickets have a first-response target of 1 hour.[1]",
+        evidence,
+        signal: controller.signal,
+      }),
+    ).resolves.toBeNull();
+    expect(seen[0]?.signal).toBe(controller.signal);
+  });
+
+  it("rejects when the signal aborts during the coverage call", async () => {
+    const controller = new AbortController();
+    const run = vi.fn().mockImplementation(async () => {
+      controller.abort();
+      return {
+        choices: [
+          {
+            finish_reason: "stop",
+            message: { content: JSON.stringify({ quotes: [] }) },
+          },
+        ],
+      };
+    });
+    const cover = createWorkersAiCoveragePass({ run });
+
+    await expect(
+      cover({
+        question: "What is the P1 response target?",
+        draft: "P1 tickets have a first-response target of 1 hour.[1]",
+        evidence,
+        signal: controller.signal,
+      }),
+    ).rejects.toMatchObject({ name: "AbortError" });
   });
 
   it("fails closed when the repaired claim is not supported", async () => {
@@ -156,6 +293,7 @@ describe("Workers AI citation repair", () => {
     expect(run).toHaveBeenCalledWith(
       CHAT_MODEL_ID,
       expect.objectContaining({ stream: false, temperature: 0 }),
+      { signal: undefined },
     );
   });
 

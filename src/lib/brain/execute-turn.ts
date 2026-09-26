@@ -17,7 +17,7 @@ import {
   WorkerValidationError,
 } from "../cf/worker-errors";
 import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL } from "../embeddings/instructions";
-import type { WorkersAiRunner } from "../embeddings/workers-ai-embed";
+import type { WorkersAiRunner, WorkersAiRunOptions } from "../embeddings/workers-ai-embed";
 import { evalChatModel } from "../models/eval-override";
 import { glm53FlashModel } from "../models/glm-5-3-flash";
 import { createWorkersAiChatStream } from "../models/workers-ai-chat";
@@ -114,6 +114,7 @@ export async function executeTurn(input: ExecuteTurnInput): Promise<GroundedAnsw
       policyPrincipal,
       conversationId: input.conversationId ?? "eval-ephemeral",
       runtime,
+      captureMessages: false,
     });
     return withTurnDiagnostics(
       responseFromAgent(input.question, result.finalResponse, result.evidence, result.model),
@@ -219,12 +220,20 @@ export async function executeTurn(input: ExecuteTurnInput): Promise<GroundedAnsw
       priorMessages: historyToAgentMessages(history, resultModelId(runtime)),
       abort: runAbort,
       runtime,
+      captureMessages: false,
       onFirstSearchComplete: () => markStage("drafting"),
     });
     if (cancellationWatchError) {
       throw cancellationWatchError;
     }
     if (runAbort.signal.aborted || (await lock.cancelled())) {
+      throw new WorkerCancelledError();
+    }
+    // An internal abort (wall-time budget exhausted inside the run) must
+    // fail the turn the same way an external cancellation does: the run
+    // never produced a validated answer, so persisting one would store an
+    // unvalidated result as a completed answer.
+    if (result.aborted) {
       throw new WorkerCancelledError();
     }
     await markStage("checking_citations");
@@ -340,7 +349,10 @@ function liveRuntime(
     return undefined;
   }
   const model = evalModelOverride ? evalChatModel(evalModelOverride) : glm53FlashModel();
-  const runner = { run: (id: string, payload: Record<string, unknown>) => ai.run(id, payload) };
+  const runner = {
+    run: (id: string, payload: Record<string, unknown>, options?: WorkersAiRunOptions) =>
+      ai.run(id, payload, options),
+  };
   return {
     model,
     stream: createWorkersAiChatStream(runner),

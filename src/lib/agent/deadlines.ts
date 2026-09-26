@@ -8,18 +8,27 @@ export function toolDeadlineSignal(timeoutMs: number, signal?: AbortSignal): Abo
 
 export async function awaitWithDeadline<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
   if (signal.aborted) {
+    // The race is already lost, but the inner promise still settles: consume
+    // its outcome so a late rejection is never unhandled.
+    void promise.catch(() => undefined);
     throw abortError();
   }
   return new Promise<T>((resolve, reject) => {
-    const onAbort = () => reject(abortError());
-    signal.addEventListener("abort", onAbort, { once: true });
+    const onAbort = () => {
+      cleanup();
+      reject(abortError());
+    };
+    const cleanup = () => {
+      signal.removeEventListener("abort", onAbort);
+    };
+    signal.addEventListener("abort", onAbort);
     promise.then(
       (value) => {
-        signal.removeEventListener("abort", onAbort);
+        cleanup();
         resolve(value);
       },
       (error) => {
-        signal.removeEventListener("abort", onAbort);
+        cleanup();
         reject(error);
       },
     );

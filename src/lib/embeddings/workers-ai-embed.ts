@@ -7,8 +7,16 @@ export class EmbeddingError extends Error {
   }
 }
 
+export type WorkersAiRunOptions = {
+  signal?: AbortSignal;
+};
+
 export type WorkersAiRunner = {
-  run(model: string, input: Record<string, unknown>): Promise<unknown>;
+  run(
+    model: string,
+    input: Record<string, unknown>,
+    options?: WorkersAiRunOptions,
+  ): Promise<unknown>;
 };
 
 export function parseEmbeddingVectors(payload: unknown, expectedCount: number): number[][] {
@@ -32,9 +40,12 @@ export async function embedWithWorkersAi(
   ai: WorkersAiRunner,
   model: string,
   request: EmbeddingRequest,
+  signal?: AbortSignal,
 ): Promise<number[][]> {
+  signal?.throwIfAborted();
   const expected = request.kind === "documents" ? request.texts.length : 1;
-  const payload = await ai.run(model, embeddingPayload(request));
+  const payload = await ai.run(model, embeddingPayload(request), { signal });
+  signal?.throwIfAborted();
   return parseEmbeddingVectors(payload, expected);
 }
 

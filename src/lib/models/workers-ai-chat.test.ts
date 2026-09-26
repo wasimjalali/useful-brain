@@ -1,5 +1,5 @@
 import { Type } from "typebox";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   contextToWorkersAiMessages,
@@ -74,6 +74,71 @@ describe("Workers AI chat mapping", () => {
     expect(message.stopReason).toBe("stop");
     expect(inputs[0]?.temperature).toBe(0);
     expect(inputs[0]?.seed).toBe(7);
+  });
+
+  it("forwards the caller's abort signal into the ai.run options", async () => {
+    const controller = new AbortController();
+    const seen: Array<{ signal?: AbortSignal } | undefined> = [];
+    const stream = createWorkersAiChatStream({
+      run: async (_model, _input, options) => {
+        seen.push(options);
+        return { choices: [{ finish_reason: "stop", message: { content: "ok" } }] };
+      },
+    });
+    const message = await stream(
+      glm53FlashModel(),
+      {
+        systemPrompt: "Ground every answer.",
+        messages: [{ role: "user", content: "What is the refund window?", timestamp: 1 }],
+        tools: [],
+      },
+      { signal: controller.signal },
+    ).result();
+    expect(message.stopReason).toBe("stop");
+    expect(seen[0]?.signal).toBe(controller.signal);
+  });
+
+  it("ends the stream aborted when the signal fires mid-call and discards the late result", async () => {
+    const controller = new AbortController();
+    let releaseRun!: () => void;
+    const stream = createWorkersAiChatStream({
+      run: () =>
+        new Promise((resolve) => {
+          releaseRun = () =>
+            resolve({ choices: [{ finish_reason: "stop", message: { content: "late" } }] });
+        }),
+    });
+    const eventStream = stream(
+      glm53FlashModel(),
+      {
+        systemPrompt: "Ground every answer.",
+        messages: [{ role: "user", content: "What is the refund window?", timestamp: 1 }],
+        tools: [],
+      },
+      { signal: controller.signal },
+    );
+    controller.abort();
+    releaseRun();
+    const message = await eventStream.result();
+    expect(message.stopReason).toBe("aborted");
+  });
+
+  it("never calls the model when the signal is already aborted", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const run = vi.fn();
+    const stream = createWorkersAiChatStream({ run });
+    const message = await stream(
+      glm53FlashModel(),
+      {
+        systemPrompt: "Ground every answer.",
+        messages: [{ role: "user", content: "What is the refund window?", timestamp: 1 }],
+        tools: [],
+      },
+      { signal: controller.signal },
+    ).result();
+    expect(message.stopReason).toBe("aborted");
+    expect(run).not.toHaveBeenCalled();
   });
 
   it("parses tool_calls finish reason", () => {

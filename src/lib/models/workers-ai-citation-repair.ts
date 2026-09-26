@@ -34,10 +34,14 @@ export function createWorkersAiCitationRepair(
 ): GroundedAnswerRepair {
   return async ({ question, evidence, signal, strictTokens, lexicalFallback }) => {
     signal?.throwIfAborted();
-    const response = await ai.run(modelId, {
-      messages: citationRepairMessages(question, evidence),
-      ...extractionDecoding(modelId),
-    });
+    const response = await ai.run(
+      modelId,
+      {
+        messages: citationRepairMessages(question, evidence),
+        ...extractionDecoding(modelId),
+      },
+      { signal },
+    );
     signal?.throwIfAborted();
     const validated = validatedRepairText(response, evidence, modelId, strictTokens);
     if (strictTokens && strictTokens.length > 0) {
@@ -232,10 +236,14 @@ export function createWorkersAiCoveragePass(
 ): AnswerCoveragePass {
   return async ({ question, draft, evidence, signal }) => {
     signal?.throwIfAborted();
-    const response = await ai.run(modelId, {
-      messages: coverageMessages(question, draft, evidence),
-      ...extractionDecoding(modelId),
-    });
+    const response = await ai.run(
+      modelId,
+      {
+        messages: coverageMessages(question, draft, evidence),
+        ...extractionDecoding(modelId),
+      },
+      { signal },
+    );
     signal?.throwIfAborted();
     const message = parseWorkersAiChatMessage(response, modelId);
     const raw = message.content
