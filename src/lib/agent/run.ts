@@ -96,6 +96,21 @@ export type GroundedAnswerRepair = (input: {
    * recheck so a refusal is never overturned by mere word overlap.
    */
   lexicalFallback?: boolean;
+  /**
+   * Run-scoped store for identical extraction requests. The host creates a
+   * fresh map for every runKnowledgeAgent call, so reuse never crosses
+   * turns, principals or corpus generations. Implementations key it by the
+   * exact provider request; the acceptance options above are filters on one
+   * extraction output and stay out of the key.
+   */
+  extractionCache?: Map<string, unknown>;
+  /**
+   * Fires once per real provider invocation, immediately before it, and
+   * never on a cache reuse. The host charges model-call budgets through
+   * this callback; it may throw (for example BudgetExceededError) to stop
+   * the provider call before it starts.
+   */
+  noteModelCall?: () => void;
 }) => Promise<string | null>;
 
 export const LIVE_KNOWLEDGE_SYSTEM_PROMPT = [
@@ -269,6 +284,11 @@ export async function runKnowledgeAgent(input: {
 }): Promise<KnowledgeRunResult> {
   const budgets = new BudgetTracker();
   const evidenceLedger = createLedger();
+  // One extraction store per run: the repair passes below share it, so
+  // identical model requests invoke the provider once and reuse the
+  // response. A fresh map per call keeps reuse from ever crossing turns,
+  // principals or corpus generations.
+  const repairExtractionCache = new Map<string, unknown>();
   let firstSearchCompleted = false;
   let pendingApprovalBinding: ApprovalBinding | undefined;
   const tools: AgentTool[] =
@@ -530,10 +550,11 @@ export async function runKnowledgeAgent(input: {
   if (grounded === BRAIN_INVALID_CITATION && canRepair()) {
     try {
       budgets.assertWithinWallTime();
-      budgets.noteTurn();
       const repaired = await input.runtime!.repairGroundedAnswer!({
         question: input.question,
         evidence,
+        extractionCache: repairExtractionCache,
+        noteModelCall: () => budgets.noteTurn(),
         signal: toolDeadlineSignal(
           Math.min(AGENT_BUDGETS.modelTimeoutMs, budgets.remainingWallTimeMs()),
           input.abort?.signal,
@@ -567,11 +588,12 @@ export async function runKnowledgeAgent(input: {
     if (inEvidence.length > 0) {
       try {
         budgets.assertWithinWallTime();
-        budgets.noteTurn();
         const recovered = await input.runtime!.repairGroundedAnswer!({
           question: input.question,
           evidence,
           strictTokens: inEvidence,
+          extractionCache: repairExtractionCache,
+          noteModelCall: () => budgets.noteTurn(),
           signal: toolDeadlineSignal(
             Math.min(AGENT_BUDGETS.modelTimeoutMs, budgets.remainingWallTimeMs()),
             input.abort?.signal,
@@ -609,11 +631,12 @@ export async function runKnowledgeAgent(input: {
   ) {
     try {
       budgets.assertWithinWallTime();
-      budgets.noteTurn();
       const recovered = await input.runtime!.repairGroundedAnswer!({
         question: input.question,
         evidence,
         lexicalFallback: false,
+        extractionCache: repairExtractionCache,
+        noteModelCall: () => budgets.noteTurn(),
         signal: toolDeadlineSignal(
           Math.min(AGENT_BUDGETS.modelTimeoutMs, budgets.remainingWallTimeMs()),
           input.abort?.signal,

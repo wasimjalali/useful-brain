@@ -26,6 +26,7 @@ import {
 } from "./run";
 import { createSearchKnowledgeTool } from "./search-knowledge";
 import { redactToolResultForStorage } from "./redact-tool-result";
+import { createWorkersAiCitationRepair } from "../models/workers-ai-citation-repair";
 import {
   BRAIN_KNOWLEDGE_UNAVAILABLE,
   BRAIN_MUST_RETRIEVE,
@@ -1110,6 +1111,86 @@ describe("abstention and citation discipline", () => {
     expect(result.finalResponse).toBe("ERR-7702 means the export queue is stalled.[1]");
     expect(result.refusalReason).toBeUndefined();
   }, 20_000);
+
+  it("reuses one provider extraction across the strict retry and the abstention recheck", async () => {
+    const store = new MemoryChunkStore();
+    const embedder = new FakeEmbeddingProvider(8);
+    const text = "Export stalls page the on-call engineer. ERR-7702 means the export queue is stalled.";
+    const embeddings = await embedder.embedTexts([text]);
+    store.upsert([
+      {
+        chunkId: "errors__body__000",
+        documentId: "error-codes",
+        title: "Error Codes",
+        sourceName: "Error Codes",
+        sourcePath: "error-codes.md",
+        sectionHeading: "Export Errors",
+        content: text,
+        chunkIndex: 0,
+        charStart: 0,
+        charEnd: text.length,
+        accessScope: "public",
+        allowedRoles: [],
+        allowedDepartments: [],
+        ownerUserId: "",
+        embedding: embeddings[0],
+      },
+    ]);
+    const pipeline = new KnowledgePipeline({ store, embedder });
+    const faux = fauxProvider({ provider: "useful-brain-extraction-reuse" });
+    faux.setResponses([
+      fauxAssistantMessage(
+        [fauxText("Searching."), fauxToolCall(SEARCH_KNOWLEDGE_TOOL, { query: "ERR-7702" })],
+        { stopReason: "toolUse" },
+      ),
+      fauxAssistantMessage([fauxText("The evidence does not mention this error code.")], {
+        stopReason: "stop",
+      }),
+    ]);
+    // The strict retry rejects this extraction (the quote lacks ERR-7702);
+    // the abstention recheck accepts the same quote with no token filter.
+    // Without run-local extraction reuse this costs two identical ai.run
+    // calls.
+    const run = vi.fn().mockResolvedValue({
+      choices: [
+        {
+          finish_reason: "stop",
+          message: {
+            content: JSON.stringify({
+              quotes: [
+                { quote: "Export stalls page the on-call engineer.", citation: "[1]" },
+              ],
+            }),
+          },
+        },
+      ],
+    });
+    const repair = createWorkersAiCitationRepair({ run });
+    const repairGroundedAnswer = vi.fn(
+      (input: Parameters<typeof repair>[0]) => repair(input),
+    );
+
+    const result = await runKnowledgeAgent({
+      question: "What does error code ERR-7702 indicate?",
+      pipeline,
+      principal,
+      policyPrincipal,
+      conversationId: "c-extraction-reuse",
+      runtime: {
+        model: { ...faux.getModel(), api: "openai-completions" },
+        stream: (model, context, options) =>
+          faux.provider.streamSimple(model, context, options),
+        repairGroundedAnswer,
+      },
+    });
+
+    // Both repair passes ran (strict retry, then abstention recheck) but one
+    // run-local extraction fed them.
+    expect(repairGroundedAnswer).toHaveBeenCalledTimes(2);
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(result.finalResponse).toBe("Export stalls page the on-call engineer. [1]");
+    expect(result.refusalReason).toBeUndefined();
+  }, 20_000);
 });
 
 describe("multi-part coverage pass", () => {
@@ -1176,6 +1257,68 @@ describe("multi-part coverage pass", () => {
     );
     expect(result.finalResponse).toContain("Billing disputes open more than 30 days move to ESC-3.[1]");
     expect(result.finalResponse).toContain("ESC-3 complaints are owned by the VP of Support. [2]");
+  }, 20_000);
+
+  it("runs the coverage pass when one cited document answers only one of two asked facts", async () => {
+    const store = new MemoryChunkStore();
+    const embedder = new FakeEmbeddingProvider(8);
+    const texts = [
+      "P1 tickets have a first-response target of 1 hour. P2 tickets have a first-response target of 4 hours.",
+      "ESC-3 complaints are owned by the VP of Support.",
+    ];
+    const embeddings = await embedder.embedTexts(texts);
+    store.upsert(
+      texts.map((content, index) => ({
+        chunkId: `targets__body__00${index}`,
+        documentId: index === 0 ? "response-targets" : "complaint-escalation",
+        title: index === 0 ? "Response Targets" : "Complaint Escalation",
+        sourceName: index === 0 ? "Response Targets" : "Complaint Escalation",
+        sourcePath: index === 0 ? "response-targets.md" : "complaint-escalation.md",
+        sectionHeading: index === 0 ? "Targets" : "ESC-3: VP Support",
+        content,
+        chunkIndex: 0,
+        charStart: 0,
+        charEnd: content.length,
+        accessScope: "public" as const,
+        allowedRoles: [],
+        allowedDepartments: [],
+        ownerUserId: "",
+        embedding: embeddings[index],
+      })),
+    );
+    const pipeline = new KnowledgePipeline({ store, embedder });
+    const faux = fauxProvider({ provider: "useful-brain-coverage-same-doc" });
+    faux.setResponses([
+      fauxAssistantMessage(
+        [fauxText("Searching."), fauxToolCall(SEARCH_KNOWLEDGE_TOOL, { query: "P1 P2 first-response targets" })],
+        { stopReason: "toolUse" },
+      ),
+      // Both facts live in the one cited document; the draft states only the
+      // first, so coverage must still run and may re-cite the same label.
+      fauxAssistantMessage([fauxText("P1 tickets have a first-response target of 1 hour.[1]")], {
+        stopReason: "stop",
+      }),
+    ]);
+    const coverAnswerParts = vi
+      .fn()
+      .mockResolvedValue("P2 tickets have a first-response target of 4 hours. [1]");
+
+    const result = await runKnowledgeAgent({
+      question: "What are the first-response targets for P1 and P2 tickets?",
+      pipeline,
+      principal,
+      policyPrincipal,
+      conversationId: "c-coverage-same-doc",
+      runtime: {
+        model: { ...faux.getModel(), api: "openai-completions" },
+        stream: (model, context, options) => faux.provider.streamSimple(model, context, options),
+        coverAnswerParts,
+      },
+    });
+
+    expect(coverAnswerParts).toHaveBeenCalledTimes(1);
+    expect(result.finalResponse).toContain("P1 tickets have a first-response target of 1 hour.[1]");
+    expect(result.finalResponse).toContain("P2 tickets have a first-response target of 4 hours. [1]");
   }, 20_000);
 
   it("skips the coverage pass for a single-part question with no pointer hints", async () => {

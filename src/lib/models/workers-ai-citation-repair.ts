@@ -32,16 +32,25 @@ export function createWorkersAiCitationRepair(
   ai: WorkersAiChatRunner,
   modelId: string = CHAT_MODEL_ID,
 ): GroundedAnswerRepair {
-  return async ({ question, evidence, signal, strictTokens, lexicalFallback }) => {
+  return async ({
+    question,
+    evidence,
+    signal,
+    strictTokens,
+    lexicalFallback,
+    extractionCache,
+    noteModelCall,
+  }) => {
     signal?.throwIfAborted();
-    const response = await ai.run(
-      modelId,
-      {
-        messages: citationRepairMessages(question, evidence),
-        ...extractionDecoding(modelId),
-      },
-      { signal },
-    );
+    // Extraction is one provider request per (model, messages, decoding);
+    // strictTokens and lexicalFallback are acceptance filters applied to
+    // that output below, never different prompts, so they stay out of the
+    // reuse key.
+    const response = await extractQuoteResponse(ai, modelId, question, evidence, {
+      signal,
+      extractionCache,
+      noteModelCall,
+    });
     signal?.throwIfAborted();
     const validated = validatedRepairText(response, evidence, modelId, strictTokens);
     if (strictTokens && strictTokens.length > 0) {
@@ -58,6 +67,48 @@ export function createWorkersAiCitationRepair(
     }
     return validated ?? selectExactExtract(question, evidence);
   };
+}
+
+/**
+ * The provider half of citation repair, split from acceptance filtering so
+ * a run can reuse it. Reuse is pure: the key is the exact provider request
+ * (model id plus the serialized messages and decoding parameters, which
+ * encode the question and the evidence set in order), so a hit returns the
+ * same response a fresh identical call would have produced, and that
+ * response still flows through every acceptance filter unchanged. With
+ * identical inputs, reuse cannot change outputs.
+ *
+ * Only resolved, non-aborted responses are stored: a provider failure
+ * propagates before the write, and an abort that lands mid-request throws
+ * before the response is reachable, so a later attempt re-invokes the
+ * provider. The map itself is created per runKnowledgeAgent call by the
+ * host, so nothing is shared across turns, principals or corpus
+ * generations.
+ */
+async function extractQuoteResponse(
+  ai: WorkersAiChatRunner,
+  modelId: string,
+  question: string,
+  evidence: CitedRetrievalResult[],
+  options: {
+    signal?: AbortSignal;
+    extractionCache?: Map<string, unknown>;
+    noteModelCall?: () => void;
+  },
+): Promise<unknown> {
+  const request = {
+    messages: citationRepairMessages(question, evidence),
+    ...extractionDecoding(modelId),
+  };
+  const key = JSON.stringify([modelId, request]);
+  if (options.extractionCache?.has(key)) {
+    return options.extractionCache.get(key);
+  }
+  options.noteModelCall?.();
+  const response = await ai.run(modelId, request, { signal: options.signal });
+  options.signal?.throwIfAborted();
+  options.extractionCache?.set(key, response);
+  return response;
 }
 
 function validatedRepairText(
