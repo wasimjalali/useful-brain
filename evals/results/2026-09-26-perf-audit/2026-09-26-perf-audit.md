@@ -49,3 +49,21 @@ Cross-model consensus localized the hot path in three places: serial retrieval, 
 ## Untested-baseline caveat
 
 No end-to-end latency measurement exists yet (the app needs a live Workers AI stack for a real turn). The fixes remove measured-mechanism overhead with identical outputs; before/after timing on the live path remains open work for round 2.
+
+---
+
+# Round 2 record (2026-09-26, same day, autonomous execution)
+
+Plan finalized with GPT-6 Astra at xhigh effort through Codex CLI (the finalized plan text was produced in-session; summary in the phases below). Implementation: SWE-2 in the Devin CLI (swe-2-max or swe-2-high per phase). Review loop per PR: SWE-2-high plus the three-model panel from round 1 (space-bunny-free, deepseek-v4.1-flash, muse-spark-1.3-contributor) via opencode run --variant max. Administrator: Claude (GLM 5.3 Flash). Opus reviewer was explicitly dropped from this round by Wasim.
+
+| Phase | PR | Outcome |
+|---|---|---|
+| Visual verification technique | #49 | merged: cua-driver + winrec/framesheet + perf-guard reference recorded in AGENTS.md |
+| Round-1 fixes | #48 | merged: 6 hot-path reducts; 3-model review found 1 high + 2 medium, all fixed and re-reviewed (deterministic history-tail regression test, unhandled-rejection fix, memo eviction fix) |
+| 1 turn progress | #50 | merged: closed stage enum, Brain progress route, DO bounded stage writes, Next proxy, UI polling; live-verified searching→drafting→done through the installed app's stack |
+| 2 cancellation propagation | #51 | merged: signals to every Workers AI call, aborts propagate (never keyword-degrade), listener cleanup, captureMessages skips production transcript clones; deepseek high (internal abort persisted as success) fixed before merge |
+| 3 extraction reuse | #52 | merged: run-local extraction cache for repair passes, budget counts real invocations, ratchets unchanged; purity claim qualified per review |
+| 4 generation cap candidate | #53 | DISCARDED at the gate: 3-model review converged on 4 blockers (truncated drafts stored as grounded answers; cap == whole run budget on a model that cannot disable thinking; usage parsing arms the cumulative budget so a cap-saturating draft discards validated answers; uncaught parse of truncated tool args). Per the plan: a failed candidate does not ship. Findings archived in pr53-review-*.md |
+| Folder-import batching | — | not attempted (Astra blocker: no exact-inventory adapter for corpus reconciliation; merge gate blocked by design) |
+
+Live verification: progress states observed through the installed app stack (searching → drafting → done) with the frame recorder running; cua-driver element clicks go stale against this WKWebView (AX republish), so the rendered-label check relies on the component tests; known gap recorded in visual-verification.json. Logo: unchanged per Wasim's skip instruction.
