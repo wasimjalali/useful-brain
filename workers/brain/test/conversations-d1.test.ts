@@ -694,37 +694,43 @@ describe("operations conversation snapshots", () => {
         now,
       });
     await complete(seed, "req-tail-seed", "seed question", "Seed answer is stored first.", 201);
-    // Ten failing attempts interleaved with the completions: each failed
-    // turn leaves two rows (failed assistant + its user parent) that occupy
-    // the tail without contributing usable history.
-    for (let index = 0; index < 10; index += 1) {
-      const failed = await createPendingTurn(env.OPERATIONS_DB, {
-        ownerPrincipalId: "principal-alice",
-        conversationId: seed.conversationId,
-        requestId: `req-tail-failed-${index}`,
-        question: `strictly for failure ${index}`,
-        now: 210 + index * 2,
-      });
-      await failTurn(env.OPERATIONS_DB, {
-        assistantMessageId: failed.assistantMessageId,
-        ownerPrincipalId: "principal-alice",
-        errorCode: "CANCELLED",
-        now: 210 + index * 2 + 1,
-      });
+    // Six completed turns, then fourteen failed-only turns as the
+    // newest rows. The 14 failed pairs (28 rows) dominate the newest side,
+    // so the bounded 36-row tail holds at most 4 completed pairs even though
+    // older completions exist, which forces the full-scan fallback; against
+    // the pre-fix 22-row bound the tail held 0 completed turns at all, so
+    // this guard fails deterministically on the old code. The full scan's
+    // newest six completions are kept 0..5 (the seed pair is seventh).
+    for (let index = 0; index < 6; index += 1) {
       const kept = await createPendingTurn(env.OPERATIONS_DB, {
         ownerPrincipalId: "principal-alice",
         conversationId: seed.conversationId,
         requestId: `req-tail-kept-${index}`,
         question: `kept question ${index}`,
-        now: 211 + index * 2,
+        now: 210 + index * 2,
       });
       await complete(
         kept,
         `req-tail-kept-${index}`,
         `kept question ${index}`,
         `Kept answer ${index} is stored.`,
-        212 + index * 2,
+        211 + index * 2,
       );
+    }
+    for (let index = 0; index < 14; index += 1) {
+      const failed = await createPendingTurn(env.OPERATIONS_DB, {
+        ownerPrincipalId: "principal-alice",
+        conversationId: seed.conversationId,
+        requestId: `req-tail-failed-${index}`,
+        question: `strictly for failure ${index}`,
+        now: 240 + index * 2,
+      });
+      await failTurn(env.OPERATIONS_DB, {
+        assistantMessageId: failed.assistantMessageId,
+        ownerPrincipalId: "principal-alice",
+        errorCode: "CANCELLED",
+        now: 240 + index * 2 + 1,
+      });
     }
     const history = await loadBoundedHistory(
       env.OPERATIONS_DB,
@@ -732,8 +738,8 @@ describe("operations conversation snapshots", () => {
       "principal-alice",
     );
     expect(history).toHaveLength(6);
-    expect(history[5]?.question).toBe("kept question 9");
-    expect(history[5]?.answer).toContain("Kept answer 9 is stored.");
-    expect(history[0]?.question).toBe("kept question 4");
+    expect(history[5]?.question).toBe("kept question 5");
+    expect(history[5]?.answer).toContain("Kept answer 5 is stored.");
+    expect(history[0]?.question).toBe("kept question 0");
   });
 });

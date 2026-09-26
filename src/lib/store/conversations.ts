@@ -191,11 +191,21 @@ export function trimStoredHistory(
  * True when the bounded tail provably reached the trim target: a saturated
  * turn count or a hard char stop means older completions cannot change the
  * trimmed result, because both trim rules keep the newest turns first.
+ * Saturation requires every assistant in the tail to carry a parent id:
+ * legacy NULL-parent assistants pair positionally against pending users
+ * that may lie below the tail, so a tail containing one is never provably
+ * equivalent to the full scan.
  */
 function boundedTurnSaturated(
   bounded: StoredHistoryTurn[],
   tailRows: Array<HistoryMessageRow & { created_at: number }>,
 ): boolean {
+  if (tailRows.length === 0) {
+    return false;
+  }
+  if (tailRows.some((row) => row.role === "assistant" && !row.parent_user_message_id)) {
+    return false;
+  }
   if (bounded.length >= MAX_HISTORY_TURNS) {
     return true;
   }
@@ -203,7 +213,7 @@ function boundedTurnSaturated(
   for (const turn of bounded) {
     chars += turn.question.length + turn.answer.length;
   }
-  return chars >= MAX_HISTORY_CHARS || tailRows.length === 0;
+  return chars >= MAX_HISTORY_CHARS;
 }
 
 export function newBoundedId(prefix: string): string {
