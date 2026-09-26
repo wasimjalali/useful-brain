@@ -41,7 +41,9 @@ export class KnowledgePipeline {
     principal: Principal;
     topK?: number;
     candidateLimit?: number;
+    signal?: AbortSignal;
   }): Promise<SearchResponse> {
+    input.signal?.throwIfAborted();
     const topK = Math.max(1, Math.min(input.topK ?? 8, MAX_TOP_K));
     const candidateLimit = Math.max(1, Math.min(input.candidateLimit ?? 24, MAX_CANDIDATE_LIMIT));
     const fetchLimit = Math.max(candidateLimit, topK);
@@ -78,7 +80,7 @@ export class KnowledgePipeline {
       keywordWeight,
       keywordRescue: this.fingerprint.keywordRescue ?? 0,
     });
-    const reranked = await this.rerank(query, merged);
+    const reranked = await this.rerank(query, merged, input.signal);
     const final = reranked.slice(0, topK);
     void detectConflicts();
     const byDocument = this.store.chunksForDocuments([...new Set(final.map((item) => item.chunk.documentId))]);
@@ -135,7 +137,11 @@ export class KnowledgePipeline {
     };
   }
 
-  private async rerank(query: string, merged: ScoredChunk[]): Promise<ScoredChunk[]> {
+  private async rerank(
+    query: string,
+    merged: ScoredChunk[],
+    signal?: AbortSignal,
+  ): Promise<ScoredChunk[]> {
     if (!this.reranker) {
       return simpleRerank(
         merged,
@@ -154,7 +160,8 @@ export class KnowledgePipeline {
       rescueCount: this.fingerprint.keywordRescue ?? 0,
     });
     const passages = head.map((item) => rerankWithHeading(item.chunk.sectionHeading, item.chunk.content));
-    const scores = await this.reranker.rerank(query, passages);
+    const scores = await this.reranker.rerank(query, passages, signal);
+    signal?.throwIfAborted();
     if (scores.length !== head.length) {
       throw new Error(`reranker returned ${scores.length} scores for ${head.length} passages`);
     }

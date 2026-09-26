@@ -108,7 +108,9 @@ export class CloudflareKnowledgePipeline {
     principal: Principal;
     topK?: number;
     candidateLimit?: number;
+    signal?: AbortSignal;
   }): Promise<SearchResponse> {
+    input.signal?.throwIfAborted();
     const fingerprint: RetrievalFingerprint = this.input.fingerprint ?? REAL_STACK_FINGERPRINT;
     const topK = Math.max(1, Math.min(input.topK ?? 8, 50));
     const candidateLimit = Math.max(1, Math.min(input.candidateLimit ?? 24, 200));
@@ -152,10 +154,18 @@ export class CloudflareKnowledgePipeline {
     if (this.input.vectorize && aclKeys.length > 0) {
       const vectorQuery = await buildVectorizeQuery({ generationId, aclGroupKeys: aclKeys });
       try {
-        const queryEmbedding = await embedWithWorkersAi(this.input.ai, EMBEDDING_MODEL, {
-          kind: "query",
-          text: query,
-        });
+        const queryEmbedding = await embedWithWorkersAi(
+          this.input.ai,
+          EMBEDDING_MODEL,
+          {
+            kind: "query",
+            text: query,
+          },
+          input.signal,
+        );
+        // An aborted search never reaches Vectorize and never degrades to
+        // keyword-only: the cancellation propagates instead.
+        input.signal?.throwIfAborted();
         if (queryEmbedding[0]) {
           const vectorResult = await this.input.vectorize.query(queryEmbedding[0], {
             topK: fetchLimit,
@@ -163,11 +173,20 @@ export class CloudflareKnowledgePipeline {
             filter: vectorQuery.filter,
             returnMetadata: "indexed",
           });
+          // Vectorize has no cancellation support: a result landing after an
+          // abort is discarded rather than fused into the candidate set.
+          input.signal?.throwIfAborted();
           for (const match of vectorResult.matches ?? []) {
             vectorMatches.push({ vectorId: match.id, score: match.score });
           }
         }
-      } catch {
+      } catch (error) {
+        if (input.signal?.aborted) {
+          input.signal.throwIfAborted();
+        }
+        if (isAbortError(error)) {
+          throw error;
+        }
         vectorChannelError = true;
         vectorMatches.length = 0;
       }
@@ -188,6 +207,7 @@ export class CloudflareKnowledgePipeline {
     if ("keywordError" in rows) {
       throw rows.keywordError;
     }
+    input.signal?.throwIfAborted();
     const keywordHits = rows.results.map((row) => ({ chunkId: row.chunk_id, score: 0 }));
     const candidateIds = [...new Set([...vectorHits, ...keywordHits].map((hit) => hit.chunkId))].sort();
     const loaded = await loadChunks(this.input.db, candidateIds);
@@ -214,7 +234,13 @@ export class CloudflareKnowledgePipeline {
         : fingerprint.keywordWeight,
       keywordRescue: fingerprint.keywordRescue ?? 0,
     });
-    const reranked = await rerankMerged(query, merged, this.input.reranker, fingerprint);
+    const reranked = await rerankMerged(
+      query,
+      merged,
+      this.input.reranker,
+      fingerprint,
+      input.signal,
+    );
     const final = reranked.slice(0, topK);
     const byDocument = groupByDocument(allowed);
     const hits: SearchHit[] = final.map((item) => {
@@ -345,6 +371,7 @@ async function rerankMerged(
   merged: ScoredChunk[],
   reranker: Reranker,
   fingerprint: RetrievalFingerprint,
+  signal?: AbortSignal,
 ): Promise<ScoredChunk[]> {
   const ordered = simpleRerank(merged, merged.length, fingerprint.channelOverlapBonus);
   const head = selectRerankHead({
@@ -353,13 +380,27 @@ async function rerankMerged(
     rescueCount: fingerprint.keywordRescue ?? 0,
   });
   const passages = head.map((item) => rerankWithHeading(item.chunk.sectionHeading, item.chunk.content));
-  const scores = await reranker.rerank(query, passages);
+  const scores = await reranker.rerank(query, passages, signal);
+  // A late rerank result after cancellation is discarded: its scores never
+  // reach the fused list.
+  signal?.throwIfAborted();
   if (scores.length !== head.length) {
     throw new Error(`reranker returned ${scores.length} scores for ${head.length} passages`);
   }
   const scored = head.map((item, index) => ({ ...item, rerankScore: scores[index] }));
   scored.sort((left, right) => (right.rerankScore ?? 0) - (left.rerankScore ?? 0));
   return applyRelevanceFloor(scored, fingerprint.relevanceFloor);
+}
+
+function isAbortError(error: unknown): boolean {
+  // Name-based, not instanceof: jsdom's DOMException does not inherit from
+  // Error, and abort reasons may cross realms.
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    (error.name === "AbortError" || error.name === "TimeoutError")
+  );
 }
 
 function groupByDocument(chunks: ChunkRecord[]): Map<string, ChunkRecord[]> {

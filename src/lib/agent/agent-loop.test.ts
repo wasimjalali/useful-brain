@@ -488,6 +488,152 @@ describe("Pi knowledge agent", () => {
     expect(result.aborted || result.errorMessage).toBeTruthy();
   }, 20_000);
 
+  it("discards search results that land after the run aborts", async () => {
+    const pipeline = await tinyPipeline();
+    const abort = new AbortController();
+    const seenSignals: Array<AbortSignal | undefined> = [];
+    const result = await runKnowledgeAgent({
+      question: "how much leave per month",
+      pipeline: {
+        search: (input) => {
+          seenSignals.push(input.signal);
+          abort.abort();
+          return pipeline.search(input);
+        },
+      },
+      principal,
+      policyPrincipal,
+      conversationId: "c-late-search",
+      abort,
+    });
+
+    // The composed deadline signal reaches the pipeline, but the abort wins
+    // the race: no hit is appended to the evidence ledger.
+    expect(seenSignals[0]?.aborted).toBe(true);
+    expect(result.aborted).toBe(true);
+    expect(result.evidence).toEqual([]);
+  }, 20_000);
+
+  it("never starts a second repair call after an abort lands", async () => {
+    const pipeline = await tinyPipeline();
+    const abort = new AbortController();
+    const faux = fauxProvider({ provider: "useful-brain-abort-repair" });
+    faux.setResponses([
+      fauxAssistantMessage(
+        [fauxText("Searching."), fauxToolCall(SEARCH_KNOWLEDGE_TOOL, { query: "leave" })],
+        { stopReason: "toolUse" },
+      ),
+      fauxAssistantMessage([fauxText("Staff members gain 1.5 leave days every month.")], {
+        stopReason: "stop",
+      }),
+    ]);
+    const repairGroundedAnswer = vi.fn().mockImplementation(async () => {
+      abort.abort();
+      return "Employees accrue 1.5 days of leave per month.[1]";
+    });
+
+    const result = await runKnowledgeAgent({
+      question: "How much leave accrues each month?",
+      pipeline,
+      principal,
+      policyPrincipal,
+      conversationId: "c-abort-repair",
+      abort,
+      runtime: {
+        model: { ...faux.getModel(), api: "openai-completions" },
+        stream: (model, context, options) =>
+          faux.provider.streamSimple(model, context, options),
+        repairGroundedAnswer,
+      },
+    });
+
+    // The late repair result is not adopted and no further repair, recovery
+    // or coverage call starts once the run is cancelled.
+    expect(repairGroundedAnswer).toHaveBeenCalledTimes(1);
+    expect(result.aborted).toBe(true);
+    expect(result.finalResponse).not.toBe(
+      "Employees accrue 1.5 days of leave per month.[1]",
+    );
+  }, 20_000);
+
+  it("keeps the final answer and tool accounting when transcript capture is disabled", async () => {
+    const pipeline = await tinyPipeline();
+    const result = await runKnowledgeAgent({
+      question: "how much leave per month",
+      pipeline,
+      principal,
+      policyPrincipal,
+      conversationId: "c-nosnap",
+      captureMessages: false,
+    });
+
+    expect(result.finalResponse).toContain("[1]");
+    expect(result.messages).toEqual([]);
+    expect(result.aborted).toBe(false);
+    expect(result.pendingApproval).toBe(false);
+    expect(result.evidence.length).toBeGreaterThan(0);
+  }, 20_000);
+
+  it("keeps approval accounting when transcript capture is disabled", async () => {
+    const pipeline = await tinyPipeline();
+    const result = await runKnowledgeAgent({
+      question: "create a draft",
+      searchQuery: "alpha",
+      pipeline,
+      principal,
+      policyPrincipal,
+      conversationId: "c-nosnap-approval",
+      captureMessages: false,
+      tools: [
+        {
+          name: "create_draft",
+          label: "Unsafe draft",
+          description: "Test tool whose execute path omits the policy gateway.",
+          parameters: Type.Object({ query: Type.String() }),
+          executionMode: "sequential",
+          execute: async () => ({
+            content: [{ type: "text" as const, text: "draft" }],
+            details: {},
+          }),
+        },
+      ],
+    });
+
+    expect(result.messages).toEqual([]);
+    expect(result.pendingApproval).toBe(true);
+    expect(result.pendingApprovalBinding).toEqual(
+      expect.objectContaining({
+        principalId: "principal-alice",
+        tool: "create_draft",
+      }),
+    );
+  }, 20_000);
+
+  it("keeps captured snapshots detached from the evidence ledger", async () => {
+    const pipeline = await tinyPipeline();
+    const result = await runKnowledgeAgent({
+      question: "how much leave per month",
+      pipeline,
+      principal,
+      policyPrincipal,
+      conversationId: "c-detached",
+    });
+
+    const toolResult = result.messages.find((message) => message.role === "toolResult");
+    expect(toolResult).toBeTruthy();
+    if (toolResult && Array.isArray(toolResult.content)) {
+      const part = toolResult.content[0];
+      if (part && part.type === "text") {
+        part.text = "tampered after the fact";
+      }
+    }
+
+    expect(result.evidence[0]?.text).toBe(
+      "Employees accrue 1.5 days of leave per month.",
+    );
+    expect(result.finalResponse).toContain("[1]");
+  }, 20_000);
+
   it("host-grounds a tool error as knowledge unavailable", async () => {
     const result = await runKnowledgeAgent({
       question: "how much leave per month",

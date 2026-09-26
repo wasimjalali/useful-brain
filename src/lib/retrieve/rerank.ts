@@ -7,7 +7,11 @@ export const DEFAULT_RELEVANCE_FLOOR = 0.05;
 const TOKEN_RE = /[a-z0-9_]+/gi;
 
 export type Reranker = {
-  rerank(query: string, passages: string[]): Promise<number[]> | number[];
+  rerank(
+    query: string,
+    passages: string[],
+    signal?: AbortSignal,
+  ): Promise<number[]> | number[];
 };
 
 export class FakeReranker implements Reranker {

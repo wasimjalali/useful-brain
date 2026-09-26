@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { CloudflareKnowledgePipeline, type CorpusSql } from "./cloudflare-pipeline";
 
@@ -175,5 +175,132 @@ describe("CloudflareKnowledgePipeline failures", () => {
     expect(result.trace.keywordScores[chunkRow.chunk_id]).toBeGreaterThan(0);
     expect(result.trace.fusedScores[chunkRow.chunk_id]).toBeGreaterThan(0);
     expect(result.trace.rerankScores[chunkRow.chunk_id]).toBe(0.97);
+  });
+});
+
+describe("CloudflareKnowledgePipeline cancellation", () => {
+  it("rejects an already-aborted search before touching any provider", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const run = vi.fn();
+    const vectorizeQuery = vi.fn();
+    const pipeline = new CloudflareKnowledgePipeline({
+      db: keywordDatabase(),
+      vectorize: { query: vectorizeQuery },
+      ai: { run },
+      reranker: { rerank: async (_query, passages) => passages.map(() => 0.9) },
+      generationId: "g-1",
+    });
+
+    await expect(
+      pipeline.search({ query: "refund window", principal, signal: controller.signal }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    expect(run).not.toHaveBeenCalled();
+    expect(vectorizeQuery).not.toHaveBeenCalled();
+  });
+
+  it("skips Vectorize when the signal aborts during query embedding", async () => {
+    const controller = new AbortController();
+    const vectorizeQuery = vi.fn();
+    const pipeline = new CloudflareKnowledgePipeline({
+      db: keywordDatabase(),
+      vectorize: { query: vectorizeQuery },
+      ai: {
+        run: async () => {
+          controller.abort();
+          return { data: [Array.from({ length: 1024 }, () => 0.1)] };
+        },
+      },
+      reranker: { rerank: async (_query, passages) => passages.map(() => 0.9) },
+      generationId: "g-1",
+    });
+
+    await expect(
+      pipeline.search({ query: "refund window", principal, signal: controller.signal }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    expect(vectorizeQuery).not.toHaveBeenCalled();
+  });
+
+  it("propagates an abort-shaped provider error instead of degrading to keyword-only", async () => {
+    const pipeline = new CloudflareKnowledgePipeline({
+      db: keywordDatabase(),
+      vectorize: { query: async () => ({ matches: [] }) },
+      ai: {
+        run: async () => {
+          throw new DOMException("provider stream cancelled", "AbortError");
+        },
+      },
+      reranker: { rerank: async (_query, passages) => passages.map(() => 0.9) },
+      generationId: "g-1",
+    });
+
+    // An abort is not a degraded successful search: it must reject rather
+    // than return keyword hits with vectorChannelError set.
+    await expect(pipeline.search({ query: "refund window", principal })).rejects.toMatchObject({
+      name: "AbortError",
+    });
+  });
+
+  it("rethrows as an abort when the signal fired while the vector channel failed", async () => {
+    const controller = new AbortController();
+    const pipeline = new CloudflareKnowledgePipeline({
+      db: keywordDatabase(),
+      vectorize: { query: async () => ({ matches: [] }) },
+      ai: {
+        run: async () => {
+          controller.abort();
+          throw new Error("embedding unavailable");
+        },
+      },
+      reranker: { rerank: async (_query, passages) => passages.map(() => 0.9) },
+      generationId: "g-1",
+    });
+
+    await expect(
+      pipeline.search({ query: "refund window", principal, signal: controller.signal }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+  });
+
+  it("discards a late Vectorize result when the signal aborts after the query", async () => {
+    const controller = new AbortController();
+    const pipeline = new CloudflareKnowledgePipeline({
+      db: keywordDatabase(),
+      vectorize: {
+        query: async () => {
+          controller.abort();
+          return { matches: [{ id: "vector-1", score: 0.92 }] };
+        },
+      },
+      ai: { run: async () => ({ data: [Array.from({ length: 1024 }, () => 0.1)] }) },
+      reranker: { rerank: async (_query, passages) => passages.map(() => 0.9) },
+      generationId: "g-1",
+    });
+
+    await expect(
+      pipeline.search({ query: "refund window", principal, signal: controller.signal }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+  });
+
+  it("skips candidate fusion when the signal aborts during reranking", async () => {
+    const controller = new AbortController();
+    const seenSignals: Array<AbortSignal | undefined> = [];
+    const pipeline = new CloudflareKnowledgePipeline({
+      db: keywordDatabase(),
+      vectorize: { query: async () => ({ matches: [{ id: "vector-1", score: 0.92 }] }) },
+      ai: { run: async () => ({ data: [Array.from({ length: 1024 }, () => 0.1)] }) },
+      reranker: {
+        rerank: async (_query, passages, signal) => {
+          seenSignals.push(signal);
+          controller.abort();
+          return passages.map(() => 0.97);
+        },
+      },
+      generationId: "g-1",
+    });
+
+    await expect(
+      pipeline.search({ query: "refund window", principal, signal: controller.signal }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    expect(seenSignals[0]).toBe(controller.signal);
   });
 });

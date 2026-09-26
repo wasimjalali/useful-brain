@@ -254,6 +254,13 @@ export async function runKnowledgeAgent(input: {
   now?: number;
   runtime?: AgentRuntime;
   /**
+   * Deep-clone the full message history onto the result for diagnostics and
+   * tests. Production callers pass false: they never read the field, and the
+   * transcript for grounding and tool-call accounting is derived from live
+   * agent state either way. Defaults to true.
+   */
+  captureMessages?: boolean;
+  /**
    * Fires once, after the first search_knowledge call completes and before
    * the follow-up model call that drafts the answer. Host-level progress
    * hook; the callback carries no payload.
@@ -410,16 +417,24 @@ export async function runKnowledgeAgent(input: {
   const pending = agent.prompt(input.question);
   const abortNow = () => agent.abort();
   const wall = AbortSignal.timeout(AGENT_BUDGETS.wallTimeMs);
-  wall.addEventListener("abort", abortNow, { once: true });
+  wall.addEventListener("abort", abortNow);
   if (input.abort) {
     if (input.abort.signal.aborted) {
       abortNow();
     } else {
-      input.abort.signal.addEventListener("abort", abortNow, { once: true });
+      input.abort.signal.addEventListener("abort", abortNow);
     }
   }
-  await pending;
-  await agent.waitForIdle();
+  try {
+    await pending;
+    await agent.waitForIdle();
+  } finally {
+    // Detach on every settlement path: a completed run must not keep the
+    // agent (and its full message history) reachable through the caller's
+    // signal or the wall-time timer.
+    wall.removeEventListener("abort", abortNow);
+    input.abort?.signal.removeEventListener("abort", abortNow);
+  }
 
   let budgetErrorMessage: string | undefined;
   try {
@@ -505,12 +520,14 @@ export async function runKnowledgeAgent(input: {
     refusalReason = "model_abstained_with_evidence";
   }
 
-  const canRepair =
+  // Re-evaluated before every repair attempt: an abort landing between
+  // passes must not start another model call.
+  const canRepair = () =>
     Boolean(input.runtime?.repairGroundedAnswer) &&
     !input.abort?.signal.aborted &&
     !wall.aborted &&
     evidence.length > 0;
-  if (grounded === BRAIN_INVALID_CITATION && canRepair) {
+  if (grounded === BRAIN_INVALID_CITATION && canRepair()) {
     try {
       budgets.assertWithinWallTime();
       budgets.noteTurn();
@@ -539,7 +556,7 @@ export async function runKnowledgeAgent(input: {
   // quote must contain the identifier. Gated on the outcome not being a
   // valid grounded answer, so one can never be replaced.
   if (
-    canRepair &&
+    canRepair() &&
     ((refusalReason === "model_abstained_with_evidence" && isRefusal(grounded)) ||
       grounded === BRAIN_INVALID_CITATION)
   ) {
@@ -586,7 +603,7 @@ export async function runKnowledgeAgent(input: {
   // The lexical-overlap fallback stays off, so a refusal survives unless
   // the repair model itself returns an evidence-supported quote.
   if (
-    canRepair &&
+    canRepair() &&
     isRefusal(grounded) &&
     refusalReason === "model_abstained_with_evidence"
   ) {
@@ -677,7 +694,10 @@ export async function runKnowledgeAgent(input: {
     finalResponse:
       (budgetErrorMessage ? BRAIN_KNOWLEDGE_UNAVAILABLE : grounded) ??
       (searchErrored ? BRAIN_KNOWLEDGE_UNAVAILABLE : BRAIN_MUST_RETRIEVE),
-    messages: snapshotAgentMessages(agent.state.messages),
+    messages:
+      input.captureMessages === false
+        ? []
+        : snapshotAgentMessages(agent.state.messages),
     aborted:
       Boolean(agent.state.errorMessage) ||
       Boolean(budgetErrorMessage) ||

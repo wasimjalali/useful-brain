@@ -67,9 +67,14 @@ export function createSearchKnowledgeTool(input: {
             // the value is recorded in the retrieval config fingerprint.
             topK: REAL_STACK_FINGERPRINT.topK,
             candidateLimit: 24,
+            signal: deadline,
           }),
           deadline,
         );
+        // A result landing after the deadline is discarded, never appended:
+        // the ledger only records evidence from a search that finished
+        // inside its cancellation window.
+        deadline.throwIfAborted();
         const ledger = input.ledger ?? createLedger();
         if (response.trace.vectorChannelError) {
           ledger.vectorDegradedCount += 1;
@@ -125,7 +130,13 @@ export function createSearchKnowledgeTool(input: {
           ],
           details: { hitCount: response.hits.length },
         };
-      } catch {
+      } catch (error) {
+        // An agent-level abort propagates as an abort, never as a tool
+        // result the next model call could act on. A deadline that fired
+        // without the outer signal stays a graceful tool error.
+        if (signal?.aborted) {
+          throw error;
+        }
         return {
           content: [
             {

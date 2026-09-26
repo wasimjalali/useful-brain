@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { RERANKER_MODEL } from "./rerank";
 import { WorkersAiReranker } from "./workers-ai-reranker";
@@ -46,5 +46,45 @@ describe("WorkersAiReranker", () => {
       0.98,
       0.02,
     ]);
+  });
+
+  it("forwards the abort signal into the ai.run options", async () => {
+    const controller = new AbortController();
+    const seen: Array<{ signal?: AbortSignal } | undefined> = [];
+    const reranker = new WorkersAiReranker({
+      run: async (_model, _input, options) => {
+        seen.push(options);
+        return { response: [{ id: 0, score: 0.9 }] };
+      },
+    });
+
+    expect(await reranker.rerank("refund window", ["first"], controller.signal)).toEqual([0.9]);
+    expect(seen[0]?.signal).toBe(controller.signal);
+  });
+
+  it("rejects without calling the model when the signal is already aborted", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const run = vi.fn();
+    const reranker = new WorkersAiReranker({ run });
+
+    await expect(
+      reranker.rerank("refund window", ["first"], controller.signal),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it("rejects and discards scores when the signal aborts during the call", async () => {
+    const controller = new AbortController();
+    const reranker = new WorkersAiReranker({
+      run: async () => {
+        controller.abort();
+        return { response: [{ id: 0, score: 0.9 }] };
+      },
+    });
+
+    await expect(
+      reranker.rerank("refund window", ["first"], controller.signal),
+    ).rejects.toMatchObject({ name: "AbortError" });
   });
 });
