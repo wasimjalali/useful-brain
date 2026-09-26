@@ -9,6 +9,7 @@ import {
 import { parseBoundedId } from "../../../src/lib/cf/bounded-id";
 import { writeOperationalLog } from "../../../src/lib/cf/operational-log";
 import { resolveRequestId, withRequestId } from "../../../src/lib/cf/request-id";
+import { turnFailureCode, type TurnProgress } from "../../../src/lib/cf/turn-progress";
 import { assertWorkerStartup } from "../../../src/lib/cf/startup";
 import { toPublicWorkerError, WorkerForbiddenError, WorkerValidationError, workerErrorResponse } from "../../../src/lib/cf/worker-errors";
 import { isWorkflowAlreadyExists, workflowInstanceId } from "../../../src/lib/ingest/workflow-id";
@@ -23,6 +24,7 @@ import {
   ConversationStoreError,
   failTurn,
   loadOwnedTurnHandleByRequestId,
+  loadOwnedTurnProgressByRequestId,
   type OperationsDatabase,
 } from "../../../src/lib/store/conversations";
 import {
@@ -542,6 +544,50 @@ const brainWorker = {
           durationMs: Date.now() - started,
         });
         return json(answer, requestId);
+      }
+
+      const turnProgressMatch = path.match(/^\/turns\/([^/]+)\/progress$/);
+      if (turnProgressMatch && request.method === "GET") {
+        operation = "turn-progress";
+        const turnRequestId = parseBoundedId(turnProgressMatch[1], "request id");
+        // Ownership resolves through operations D1 alone; a request id owned
+        // by another principal is indistinguishable from an unknown one.
+        const handle = await loadOwnedTurnProgressByRequestId(
+          env.OPERATIONS_DB as OperationsDatabase,
+          turnRequestId,
+          principal.id,
+        );
+        if (!handle) {
+          return new Response("not found", {
+            status: 404,
+            headers: withRequestId(new Headers(), requestId),
+          });
+        }
+        let progress: TurnProgress;
+        if (handle.status === "completed") {
+          progress = { stage: "done" };
+        } else if (handle.status === "failed") {
+          progress = { stage: "failed", errorCode: turnFailureCode(handle.errorCode) };
+        } else {
+          // A pending turn reads the stage from the conversation lock only
+          // when the lock still belongs to this run; a missing or stale lock
+          // reports the earliest stage rather than another run's position.
+          const lock = await env.CONVERSATION.getByName(handle.conversationId).progress();
+          progress =
+            lock.runId === handle.runId && lock.stage
+              ? { stage: lock.stage }
+              : { stage: "searching" };
+        }
+        writeOperationalLog({
+          requestId,
+          principalKind: principal.kind,
+          operation,
+          status: "ok",
+          durationMs: Date.now() - started,
+        });
+        const response = json(progress, requestId);
+        response.headers.set("cache-control", "no-store");
+        return response;
       }
 
       if (path === "/conversations" && request.method === "GET") {

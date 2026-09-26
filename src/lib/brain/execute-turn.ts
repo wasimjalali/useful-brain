@@ -9,6 +9,7 @@ import {
   runKnowledgeAgent,
   type AgentRuntime,
 } from "../agent/run";
+import type { TurnStage } from "../cf/turn-progress";
 import {
   WorkerBusyError,
   WorkerCancelledError,
@@ -49,6 +50,12 @@ export type ConversationLockStub = {
   acquire(runId: string): Promise<{ ok: boolean; status?: number; runId?: string }>;
   cancelled(): Promise<boolean>;
   release(runId: string): Promise<{ ok: boolean }>;
+  /**
+   * Optional turn-progress write into the lock. Progress is best-effort: a
+   * lock without stage support simply skips reporting, and the write carries
+   * a stage enum only, never model output or evidence.
+   */
+  setStage?(runId: string, stage: TurnStage): Promise<unknown>;
 };
 
 export type ExecuteTurnInput = {
@@ -174,7 +181,25 @@ export async function executeTurn(input: ExecuteTurnInput): Promise<GroundedAnsw
     runAbort.abort();
   });
 
+  // Turn progress reports coarse, host-controlled stages to the conversation
+  // lock so a poller can see where the run is without ever seeing unvalidated
+  // model output. Stage writes are best-effort and bounded; a failed write
+  // must never fail the turn. Mid-run granularity stops at "drafting": the
+  // only observable seam without instrumenting pi-agent-core internals is
+  // the first completed search, while citation enforcement runs entirely
+  // inside runKnowledgeAgent. "checking_citations" therefore marks the
+  // post-run validate-and-persist phase, and "saving" stays reserved for a
+  // future durable-write seam.
+  const markStage = async (stage: TurnStage): Promise<void> => {
+    try {
+      await lock.setStage?.(pending.assistantMessageId, stage);
+    } catch {
+      // Progress is best-effort and must never fail a turn.
+    }
+  };
+
   try {
+    await markStage("searching");
     // A turn scoped to an assumed principal never receives prior answers in
     // its model context: earlier turns may have been retrieved under a
     // different principal's ACL scope.
@@ -194,6 +219,7 @@ export async function executeTurn(input: ExecuteTurnInput): Promise<GroundedAnsw
       priorMessages: historyToAgentMessages(history, resultModelId(runtime)),
       abort: runAbort,
       runtime,
+      onFirstSearchComplete: () => markStage("drafting"),
     });
     if (cancellationWatchError) {
       throw cancellationWatchError;
@@ -201,6 +227,7 @@ export async function executeTurn(input: ExecuteTurnInput): Promise<GroundedAnsw
     if (runAbort.signal.aborted || (await lock.cancelled())) {
       throw new WorkerCancelledError();
     }
+    await markStage("checking_citations");
     const rawModelJson = structuredJsonFromGroundedProse(result.finalResponse, result.evidence);
     const completed = await persistThenRelease({
       persist: () =>

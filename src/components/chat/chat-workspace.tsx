@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { LayersIcon, NewChatIcon } from "@/components/icons";
 import { UsefulBrainAvatar } from "@/components/useful-brain-logo";
+import type { TurnStage } from "@/lib/cf/turn-progress";
 import { DEFAULT_USEFUL_BRAIN_CONFIG } from "@/lib/useful-brain-config";
 import type { GroundedAnswerResponse } from "@/lib/rag/grounded-answer";
 import type { ChatTurn } from "@/lib/rag/chat-history";
@@ -53,6 +54,7 @@ type ChatWorkspaceProps = {
   stopError?: string | null;
   stopping?: boolean;
   turns: ChatTurn[];
+  turnStage?: TurnStage | null;
 };
 
 export function ChatWorkspace({
@@ -70,6 +72,7 @@ export function ChatWorkspace({
   stopError = null,
   stopping = false,
   turns,
+  turnStage = null,
 }: ChatWorkspaceProps) {
   const [question, setQuestion] = useState("");
   const [hoveredPrompt, setHoveredPrompt] = useState<string | null>(null);
@@ -173,7 +176,7 @@ export function ChatWorkspace({
                   {pendingQuestion ? (
                     <div className="flex flex-col gap-6">
                       <UserMessage text={pendingQuestion} />
-                      <ThinkingIndicator error={stopError} />
+                      <ThinkingIndicator error={stopError} stage={turnStage} />
                     </div>
                   ) : null}
                   <div aria-hidden="true" ref={bottomRef} />
@@ -248,7 +251,20 @@ function UserMessage({ text }: { text: string }) {
   );
 }
 
-function ThinkingIndicator({ error }: { error: string | null }) {
+const TURN_STAGE_LABELS: Record<TurnStage, string> = {
+  searching: "Searching sources.",
+  drafting: "Drafting the answer.",
+  checking_citations: "Checking citations.",
+  saving: "Saving the answer.",
+};
+
+function ThinkingIndicator({
+  error,
+  stage,
+}: {
+  error: string | null;
+  stage: TurnStage | null;
+}) {
   return (
     <div className="msg-in flex gap-3" role="status">
       <UsefulBrainAvatar />
@@ -258,7 +274,9 @@ function ThinkingIndicator({ error }: { error: string | null }) {
             aria-hidden="true"
             className="size-4 animate-spin rounded-full border-2 border-accent/30 border-t-accent"
           />
-          <span className="text-sm text-ink-muted">Retrieving evidence and checking citations.</span>
+          <span className="text-sm text-ink-muted">
+            {TURN_STAGE_LABELS[stage ?? "searching"]}
+          </span>
         </div>
         {error ? <p className="mt-2 text-sm text-danger" role="alert">{error}</p> : null}
       </div>

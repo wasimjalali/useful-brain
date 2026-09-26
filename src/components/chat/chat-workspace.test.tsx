@@ -334,6 +334,45 @@ describe("ChatWorkspace", () => {
     expect(screen.getByRole("button", { name: "Generate answer" })).toBeEnabled();
   });
 
+  it("shows the reported turn stage while an answer is pending", () => {
+    render(
+      <ChatWorkspace
+        askDisabled={false}
+        canReset
+        focusedEvidenceId={null}
+        onFocusEvidence={vi.fn()}
+        onNewChat={vi.fn()}
+        onOpenSources={vi.fn()}
+        onSubmit={vi.fn()}
+        pendingQuestion="What is the refund window?"
+        ready
+        turns={[]}
+        turnStage="drafting"
+      />,
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent("Drafting the answer.");
+  });
+
+  it("shows the search stage before the first progress poll lands", () => {
+    render(
+      <ChatWorkspace
+        askDisabled={false}
+        canReset
+        focusedEvidenceId={null}
+        onFocusEvidence={vi.fn()}
+        onNewChat={vi.fn()}
+        onOpenSources={vi.fn()}
+        onSubmit={vi.fn()}
+        pendingQuestion="What is the refund window?"
+        ready
+        turns={[]}
+      />,
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent("Searching sources.");
+  });
+
   it("keeps the composer compact with a smaller send mark in a 40px hit area", () => {
     render(<ChatWorkspaceHarness />);
 

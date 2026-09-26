@@ -35,6 +35,7 @@ import {
   type WorkspaceView,
 } from "@/components/workspace/workspace-shell";
 import { WorkspaceNav } from "@/components/workspace/workspace-nav";
+import { isTurnStage, type TurnStage } from "@/lib/cf/turn-progress";
 import {
   createId,
   deriveConversationTitle,
@@ -155,6 +156,10 @@ export function RagVisibilityDashboard({
   const [turns, setTurns] = useState<ChatTurn[]>(initialConversation?.turns ?? []);
   const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
   const [pendingRequestId, setPendingRequestId] = useState<string | null>(null);
+  const [turnStage, setTurnStage] = useState<{
+    requestId: string;
+    stage: TurnStage;
+  } | null>(null);
   const [isStopping, setIsStopping] = useState(false);
   const [stopError, setStopError] = useState<string | null>(null);
   const [activeTurnId, setActiveTurnId] = useState<string | null>(null);
@@ -184,6 +189,55 @@ export function RagVisibilityDashboard({
       window.location.reload();
     });
   }, [importLegacyConversationsAction]);
+
+  // Turn progress polling: one request in flight on a 2s loop while an
+  // answer is pending. Progress only ever moves the status label; the
+  // awaited askAction response remains the sole source of the final answer.
+  useEffect(() => {
+    if (!pendingRequestId) {
+      return;
+    }
+    const requestId = pendingRequestId;
+    let stopped = false;
+    let inFlight = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    async function poll() {
+      if (stopped || inFlight) {
+        return;
+      }
+      inFlight = true;
+      try {
+        const response = await fetch(
+          `/api/turns/${encodeURIComponent(requestId)}`,
+          { cache: "no-store" },
+        );
+        if (response.ok) {
+          const body: unknown = await response.json();
+          const stage =
+            body && typeof body === "object"
+              ? (body as { stage?: unknown }).stage
+              : null;
+          if (!stopped && isTurnStage(stage)) {
+            setTurnStage({ requestId, stage });
+          }
+        }
+      } catch {
+        // Progress is best-effort; a failed poll leaves the last stage shown.
+      } finally {
+        inFlight = false;
+      }
+      if (!stopped) {
+        timer = setTimeout(poll, 2000);
+      }
+    }
+    void poll();
+    return () => {
+      stopped = true;
+      if (timer !== undefined) {
+        clearTimeout(timer);
+      }
+    };
+  }, [pendingRequestId]);
 
   function assumePrincipal(key: string | null) {
     try {
@@ -542,6 +596,11 @@ export function RagVisibilityDashboard({
           stopError={stopError}
           stopping={isStopping}
           turns={turns}
+          turnStage={
+            pendingRequestId && turnStage?.requestId === pendingRequestId
+              ? turnStage.stage
+              : null
+          }
         />
       ) : (
         <ScrollView>
