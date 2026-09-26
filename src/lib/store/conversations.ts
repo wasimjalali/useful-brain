@@ -785,14 +785,25 @@ export async function loadBoundedHistory(
     parseBoundedId(conversationId, "conversation id"),
     parseBoundedId(ownerPrincipalId, "principal id"),
   );
-  const rows = await db
+  // Fetch a bounded tail from the end: the trim keeps at most
+  // MAX_HISTORY_TURNS completed turns, and each turn is a user+assistant
+  // message pair, so 2 * MAX_HISTORY_TURNS + slack rows from the newest side
+  // is enough to build exactly the same history the full-conversation scan
+  // produced. The tail is reversed back to chronological order before
+  // pairing.
+  const historyRows = await db
     .prepare(
-      `SELECT id, role, content, status, parent_user_message_id FROM messages
-       WHERE conversation_id = ? ORDER BY created_at ASC, id ASC`,
+      `SELECT id, role, content, status, parent_user_message_id FROM (
+         SELECT id, role, content, status, parent_user_message_id, created_at
+         FROM messages
+         WHERE conversation_id = ?
+         ORDER BY created_at DESC, id DESC
+         LIMIT ?
+       ) ORDER BY created_at ASC, id ASC`,
     )
-    .bind(conversationId)
+    .bind(conversationId, MAX_HISTORY_TURNS * 2 + 10)
     .all<HistoryMessageRow>();
-  return trimStoredHistory(pairCompletedHistoryTurns(rows.results));
+  return trimStoredHistory(pairCompletedHistoryTurns(historyRows.results));
 }
 
 export async function persistThenRelease<T>(input: {

@@ -21,10 +21,6 @@ type ChunkRow = {
   metadata: string;
 };
 
-type CountRow = {
-  n: number;
-};
-
 export type KnowledgeInventory = {
   documents: KnowledgeDocument[];
   chunks: DocumentChunk[];
@@ -100,19 +96,11 @@ export async function loadKnowledgeInventory(
     )
     .bind(generationId)
     .all<ChunkRow>();
-  const storedDocuments = await db
-    .prepare(
-      `SELECT COUNT(DISTINCT d.id) AS n
-       FROM documents d
-       JOIN chunks c ON c.document_id = d.id
-       WHERE c.generation_id = ?`,
-    )
-    .bind(generationId)
-    .first<CountRow>();
-  const storedChunks = await db
-    .prepare(`SELECT COUNT(*) AS n FROM chunks WHERE generation_id = ?`)
-    .bind(generationId)
-    .first<CountRow>();
+  // Counts come from the loaded arrays: both COUNT queries duplicated work
+  // this function already materialized, and the stored totals equal the
+  // visible totals for the no-principal case that supplies these numbers.
+  const storedDocuments = documents.results.length;
+  const storedChunks = chunks.results.length;
   const visibleDocumentIds = new Set<string>();
   for (const chunk of chunks.results) {
     if (!principal) {
@@ -155,9 +143,9 @@ export async function loadKnowledgeInventory(
     documents: knowledgeDocuments,
     chunks: knowledgeChunks,
     embeddingStorageStatus: {
-      storedDocuments: storedDocuments?.n ?? knowledgeDocuments.length,
-      storedChunks: storedChunks?.n ?? knowledgeChunks.length,
-      embeddedChunks: storedChunks?.n ?? knowledgeChunks.length,
+      storedDocuments,
+      storedChunks,
+      embeddedChunks: storedChunks,
       lastRunStatus: "succeeded",
       lastRunMessage: null,
       lastEmbeddedAt: Date.now(),

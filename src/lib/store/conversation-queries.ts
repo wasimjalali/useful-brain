@@ -101,6 +101,33 @@ export async function loadConversationForUi(
     )
     .bind(conversationId)
     .all<AssistantRow>();
+  const completed = assistants.results.filter(
+    (assistant) => assistant.status === "completed" && assistant.parent_user_message_id,
+  );
+  // One batched evidence read for all completed turns replaces the previous
+  // per-turn evidence_snapshots query (N+1). SQL keeps the 100-variable
+  // D1 bound-parameter budget intact through chunked IN lists; rank ordering
+  // within each message is preserved for the UI.
+  const evidenceByMessage = new Map<string, EvidenceRow[]>();
+  const EVIDENCE_BATCH = 90;
+  for (let start = 0; start < completed.length; start += EVIDENCE_BATCH) {
+    const batch = completed.slice(start, start + EVIDENCE_BATCH);
+    const placeholders = batch.map(() => "?").join(",");
+    const evidenceRows = await db
+      .prepare(
+        `SELECT message_id, rank, score, chunk_id, source, section, text, token_estimate,
+                citation_label, document_id, vector_score, keyword_score, fused_score, rerank_score
+         FROM evidence_snapshots WHERE message_id IN (${placeholders})
+         ORDER BY message_id ASC, rank ASC`,
+      )
+      .bind(...batch.map((assistant) => assistant.id))
+      .all<EvidenceRow & { message_id: string }>();
+    for (const row of evidenceRows.results) {
+      const list = evidenceByMessage.get(row.message_id) ?? [];
+      list.push(row);
+      evidenceByMessage.set(row.message_id, list);
+    }
+  }
   const byId = new Map(messages.results.map((row) => [row.id, row]));
   const turns: ChatTurn[] = [];
   for (const assistant of assistants.results) {
@@ -127,14 +154,9 @@ export async function loadConversationForUi(
     if (assistant.status !== "completed") {
       continue;
     }
-    const evidence = await db
-      .prepare(
-        `SELECT rank, score, chunk_id, source, section, text, token_estimate, citation_label, document_id,
-                vector_score, keyword_score, fused_score, rerank_score
-         FROM evidence_snapshots WHERE message_id = ? ORDER BY rank ASC`,
-      )
-      .bind(assistant.id)
-      .all<EvidenceRow>();
+    const evidence = {
+      results: evidenceByMessage.get(assistant.id) ?? [],
+    };
     let paragraphs: GroundedAnswerResponse["structuredAnswer"]["paragraphs"] = [];
     if (assistant.structured_paragraphs_json) {
       try {

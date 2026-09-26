@@ -43,28 +43,30 @@ export async function ensureLoopbackPrincipal(
     throw new Error("loopback subject must occupy the email namespace");
   }
   await db.prepare("PRAGMA foreign_keys = ON").run();
-  await db
-    .prepare(
-      `INSERT INTO principals (id, kind, subject, created_at)
-       VALUES (?, 'user', ?, ?)
-       ON CONFLICT(id) DO NOTHING`,
-    )
-    .bind(LOOPBACK_PRINCIPAL_ID, normalized, now)
-    .run();
-  for (const role of LOOPBACK_ROLES) {
-    await db
-      .prepare(`INSERT INTO roles (principal_id, role) VALUES (?, ?) ON CONFLICT(principal_id, role) DO NOTHING`)
-      .bind(LOOPBACK_PRINCIPAL_ID, role)
-      .run();
-  }
-  for (const department of LOOPBACK_DEPARTMENTS) {
-    await db
+  await db.batch([
+    db
       .prepare(
-        `INSERT INTO departments (principal_id, department) VALUES (?, ?)
-         ON CONFLICT(principal_id, department) DO NOTHING`,
+        `INSERT INTO principals (id, kind, subject, created_at)
+         VALUES (?, 'user', ?, ?)
+         ON CONFLICT(id) DO NOTHING`,
       )
-      .bind(LOOPBACK_PRINCIPAL_ID, department)
-      .run();
-  }
+      .bind(LOOPBACK_PRINCIPAL_ID, normalized, now),
+    ...LOOPBACK_ROLES.map((role) =>
+      db
+        .prepare(
+          `INSERT INTO roles (principal_id, role) VALUES (?, ?)
+           ON CONFLICT(principal_id, role) DO NOTHING`,
+        )
+        .bind(LOOPBACK_PRINCIPAL_ID, role),
+    ),
+    ...LOOPBACK_DEPARTMENTS.map((department) =>
+      db
+        .prepare(
+          `INSERT INTO departments (principal_id, department) VALUES (?, ?)
+           ON CONFLICT(principal_id, department) DO NOTHING`,
+        )
+        .bind(LOOPBACK_PRINCIPAL_ID, department),
+    ),
+  ]);
   return { id: LOOPBACK_PRINCIPAL_ID, subject: normalized };
 }
