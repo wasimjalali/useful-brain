@@ -714,9 +714,13 @@ export async function runKnowledgeAgent(input: {
   const pendingApproval = recorded.some((call) => call.status === "pending_approval");
   const searchErrored = recorded.some((call) => call.tool === SEARCH_KNOWLEDGE_TOOL && call.status === "error");
   return {
+    // A terminal model error (for example a generation that hit the
+    // completion cap with empty content) leaves no draft to ground: report
+    // the bounded failure instead of shipping the empty raw final.
     finalResponse:
-      (budgetErrorMessage ? BRAIN_KNOWLEDGE_UNAVAILABLE : grounded) ??
-      (searchErrored ? BRAIN_KNOWLEDGE_UNAVAILABLE : BRAIN_MUST_RETRIEVE),
+      (budgetErrorMessage || agent.state.errorMessage
+        ? BRAIN_KNOWLEDGE_UNAVAILABLE
+        : grounded) ?? (searchErrored ? BRAIN_KNOWLEDGE_UNAVAILABLE : BRAIN_MUST_RETRIEVE),
     messages:
       input.captureMessages === false
         ? []

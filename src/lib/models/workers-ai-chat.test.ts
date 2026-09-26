@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   contextToWorkersAiMessages,
   createWorkersAiChatStream,
+  GENERATION_BUDGET_POLICY,
   parseWorkersAiChatMessage,
 } from "./workers-ai-chat";
 import { glm53FlashModel } from "./glm-5-3-flash";
@@ -74,6 +75,87 @@ describe("Workers AI chat mapping", () => {
     expect(message.stopReason).toBe("stop");
     expect(inputs[0]?.temperature).toBe(0);
     expect(inputs[0]?.seed).toBe(7);
+  });
+
+  it("caps chat generation at the measured completion budget", async () => {
+    const inputs: Array<Record<string, unknown>> = [];
+    const stream = createWorkersAiChatStream({
+      run: async (_model, input) => {
+        inputs.push(input);
+        return { choices: [{ finish_reason: "stop", message: { content: "ok" } }] };
+      },
+    });
+    const message = await stream(glm53FlashModel(), {
+      systemPrompt: "Ground every answer.",
+      messages: [{ role: "user", content: "What is the refund window?", timestamp: 1 }],
+      tools: [],
+    }).result();
+    expect(message.stopReason).toBe("stop");
+    expect(inputs[0]?.max_completion_tokens).toBe(4_000);
+    expect(GENERATION_BUDGET_POLICY).toBe("cap-4000-v1");
+  });
+
+  it("populates usage counters from the provider response", () => {
+    const message = parseWorkersAiChatMessage(
+      {
+        choices: [{ finish_reason: "stop", message: { content: "ok" } }],
+        usage: { prompt_tokens: 120, completion_tokens: 30, total_tokens: 150 },
+      },
+      CHAT_MODEL_ID,
+    );
+    expect(message.usage.input).toBe(120);
+    expect(message.usage.output).toBe(30);
+    expect(message.usage.totalTokens).toBe(150);
+    expect(message.usage.cost.total).toBe(0);
+  });
+
+  it("reads usage nested under a result envelope", () => {
+    const message = parseWorkersAiChatMessage(
+      {
+        result: {
+          choices: [{ finish_reason: "stop", message: { content: "ok" } }],
+          usage: { prompt_tokens: 5, completion_tokens: 2, total_tokens: 7 },
+        },
+      },
+      CHAT_MODEL_ID,
+    );
+    expect(message.usage.input).toBe(5);
+    expect(message.usage.output).toBe(2);
+    expect(message.usage.totalTokens).toBe(7);
+  });
+
+  it("fails a length finish with empty content instead of completing an empty answer", async () => {
+    const stream = createWorkersAiChatStream({
+      run: async () => ({
+        choices: [{ finish_reason: "length", message: { content: "" } }],
+        usage: { prompt_tokens: 90, completion_tokens: 4_000, total_tokens: 4_090 },
+      }),
+    });
+    const message = await stream(glm53FlashModel(), {
+      systemPrompt: "Ground every answer.",
+      messages: [{ role: "user", content: "What is the refund window?", timestamp: 1 }],
+      tools: [],
+    }).result();
+    expect(message.stopReason).toBe("error");
+    expect(message.errorMessage).toBeTruthy();
+    expect(message.content).toEqual([]);
+    expect(message.usage.output).toBe(4_000);
+  });
+
+  it("keeps a length finish with content on the normal completion path", async () => {
+    const stream = createWorkersAiChatStream({
+      run: async () => ({
+        choices: [{ finish_reason: "length", message: { content: "partial grounded answer" } }],
+      }),
+    });
+    const message = await stream(glm53FlashModel(), {
+      systemPrompt: "Ground every answer.",
+      messages: [{ role: "user", content: "What is the refund window?", timestamp: 1 }],
+      tools: [],
+    }).result();
+    expect(message.stopReason).toBe("length");
+    expect(message.errorMessage).toBeUndefined();
+    expect(message.content).toEqual([{ type: "text", text: "partial grounded answer" }]);
   });
 
   it("forwards the caller's abort signal into the ai.run options", async () => {

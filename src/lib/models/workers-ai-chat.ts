@@ -19,6 +19,16 @@ export class ChatModelError extends Error {
   }
 }
 
+/**
+ * Measured generation-cap candidate: every chat call is capped at 4000
+ * completion tokens, matching AGENT_BUDGETS.maxOutputTokens. Bump the
+ * policy version when the cap changes so eval runs can name the budget
+ * policy that produced them. Extraction calls keep their own tighter cap
+ * in workers-ai-citation-repair.ts.
+ */
+export const GENERATION_BUDGET_POLICY = "cap-4000-v1";
+const GENERATION_MAX_COMPLETION_TOKENS = 4_000;
+
 export type WorkersAiChatRunner = {
   run(
     model: string,
@@ -74,7 +84,12 @@ export function parseWorkersAiChatMessage(payload: unknown, modelId: string): As
   for (const call of toolCalls) {
     content.push(parseToolCall(call));
   }
+  const usage = readUsage(payload);
   const finish = typeof choice.finish_reason === "string" ? choice.finish_reason : "stop";
+  // A generation that exhausts the completion cap without emitting any
+  // content is a bounded failure, not an answer: surfacing it as an error
+  // stops the turn instead of grounding an empty draft.
+  const emptyTruncation = finish === "length" && content.length === 0;
   return {
     role: "assistant",
     content,
@@ -82,14 +97,23 @@ export function parseWorkersAiChatMessage(payload: unknown, modelId: string): As
     provider: CHAT_MODEL_PROVIDER,
     model: modelId,
     usage: {
-      input: 0,
-      output: 0,
+      input: usage.input,
+      output: usage.output,
       cacheRead: 0,
       cacheWrite: 0,
-      totalTokens: 0,
+      totalTokens: usage.totalTokens,
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
     },
-    stopReason: finish === "tool_calls" || finish === "function_call" ? "toolUse" : "stop",
+    stopReason: emptyTruncation
+      ? "error"
+      : finish === "tool_calls" || finish === "function_call"
+        ? "toolUse"
+        : finish === "length"
+          ? "length"
+          : "stop",
+    ...(emptyTruncation
+      ? { errorMessage: "chat model hit the completion token cap without returning content" }
+      : {}),
     timestamp: Date.now(),
   };
 }
@@ -140,6 +164,8 @@ async function runChat(
     // The seed is best-effort per the Workers AI schema.
     temperature: 0,
     seed: 7,
+    // Bounded completion spend per chat call (GENERATION_BUDGET_POLICY).
+    max_completion_tokens: GENERATION_MAX_COMPLETION_TOKENS,
   };
   if (tools.length > 0) {
     payload.tools = tools;
@@ -147,7 +173,15 @@ async function runChat(
   const response = await ai.run(model.id, payload, { signal: options?.signal });
   options?.signal?.throwIfAborted();
   const message = parseWorkersAiChatMessage(response, model.id);
-  const doneReason = message.stopReason === "toolUse" ? ("toolUse" as const) : ("stop" as const);
+  if (message.stopReason === "error") {
+    stream.push({ type: "error", reason: "error", error: message });
+    stream.end(message);
+    return;
+  }
+  const doneReason =
+    message.stopReason === "toolUse" || message.stopReason === "length"
+      ? message.stopReason
+      : ("stop" as const);
   stream.push({ type: "start", partial: { ...message, content: [], stopReason: "pending" } });
   stream.push({ type: "done", reason: doneReason, message });
   stream.end(message);
@@ -182,6 +216,33 @@ function toOpenAiMessage(message: Message): OpenAiChatMessage {
     }));
   }
   return mapped;
+}
+
+function readUsage(payload: unknown): { input: number; output: number; totalTokens: number } {
+  const body = isRecord(payload) ? payload : {};
+  const envelope = isRecord(body.result) ? body.result : {};
+  const usage = isRecord(body.usage) ? body.usage : isRecord(envelope.usage) ? envelope.usage : {};
+  const input = usageNumber(usage, "prompt_tokens", "input_tokens");
+  const output = usageNumber(usage, "completion_tokens", "output_tokens");
+  return {
+    input,
+    output,
+    totalTokens: usageNumber(usage, "total_tokens") || input + output,
+  };
+}
+
+function usageNumber(usage: Record<string, unknown>, ...keys: string[]): number {
+  for (const key of keys) {
+    const value = usage[key];
+    if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+      return value;
+    }
+  }
+  return 0;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function readChoice(payload: unknown): {

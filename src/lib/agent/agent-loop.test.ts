@@ -26,6 +26,8 @@ import {
 } from "./run";
 import { createSearchKnowledgeTool } from "./search-knowledge";
 import { redactToolResultForStorage } from "./redact-tool-result";
+import { glm53FlashModel } from "../models/glm-5-3-flash";
+import { createWorkersAiChatStream } from "../models/workers-ai-chat";
 import { createWorkersAiCitationRepair } from "../models/workers-ai-citation-repair";
 import {
   BRAIN_KNOWLEDGE_UNAVAILABLE,
@@ -648,6 +650,56 @@ describe("Pi knowledge agent", () => {
       conversationId: "c-1",
     });
     expect(result.finalResponse).toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
+  }, 20_000);
+
+  it("fails the turn as a bounded failure when generation hits the cap with empty content", async () => {
+    const pipeline = await tinyPipeline();
+    let chatCalls = 0;
+    const runner = {
+      run: async () => {
+        chatCalls += 1;
+        if (chatCalls === 1) {
+          return {
+            choices: [
+              {
+                finish_reason: "tool_calls",
+                message: {
+                  tool_calls: [
+                    {
+                      id: "call-1",
+                      function: {
+                        name: SEARCH_KNOWLEDGE_TOOL,
+                        arguments: "{\"query\":\"leave\"}",
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          };
+        }
+        return {
+          choices: [{ finish_reason: "length", message: { content: "" } }],
+          usage: { prompt_tokens: 900, completion_tokens: 4_000, total_tokens: 4_900 },
+        };
+      },
+    };
+    const result = await runKnowledgeAgent({
+      question: "How much leave accrues each month?",
+      pipeline,
+      principal,
+      policyPrincipal,
+      conversationId: "c-length-empty",
+      runtime: {
+        model: glm53FlashModel(),
+        stream: createWorkersAiChatStream(runner),
+        systemPrompt: LIVE_KNOWLEDGE_SYSTEM_PROMPT,
+      },
+    });
+    expect(result.aborted).toBe(true);
+    expect(result.errorMessage).toBeTruthy();
+    expect(result.finalResponse).toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
+    expect(result.finalResponse).not.toContain("1.5 days");
   }, 20_000);
 
   it("ends a mutating tool at pending_approval without executing the side effect", async () => {
