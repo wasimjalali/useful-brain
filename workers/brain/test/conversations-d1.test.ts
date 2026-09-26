@@ -650,4 +650,96 @@ describe("operations conversation snapshots", () => {
       "Legacy answer is stored without a parent.",
     );
   });
+
+  it("recovers the newest six completed turns even when failed turns fill the bounded tail", async () => {
+    await seedPrincipals();
+    const seed = await createPendingTurn(env.OPERATIONS_DB, {
+      ownerPrincipalId: "principal-alice",
+      requestId: "req-tail-seed",
+      question: "seed question",
+      now: 200,
+    });
+    const complete = (
+      pending: { assistantMessageId: string },
+      requestId: string,
+      question: string,
+      text: string,
+      now: number,
+    ) =>
+      completeTurn(env.OPERATIONS_DB, {
+        ownerPrincipalId: "principal-alice",
+        assistantMessageId: pending.assistantMessageId,
+        requestId,
+        rawModelJson: JSON.stringify({
+          answerType: "grounded",
+          paragraphs: [{ text, citations: ["[1]"] }],
+        }),
+        evidence: addCitationLabels([
+          {
+            rank: 1,
+            score: 0.9,
+            chunkId: `chunk-${requestId}`,
+            source: `${requestId}.md`,
+            section: "Body",
+            text,
+            tokenEstimate: 4,
+          },
+        ]),
+        answerModel: "test-model",
+        embeddingModel: "fake-embed",
+        embeddingDimensions: 8,
+        promptVersion: PROMPT_VERSION,
+        retrievalConfigVersion: "fake-provider",
+        corpusGenerationId: "gen-1",
+        now,
+      });
+    await complete(seed, "req-tail-seed", "seed question", "Seed answer is stored first.", 201);
+    // Six completed turns, then fourteen failed-only turns as the
+    // newest rows. The 14 failed pairs (28 rows) dominate the newest side,
+    // so the bounded 36-row tail holds at most 4 completed pairs even though
+    // older completions exist, which forces the full-scan fallback; against
+    // the pre-fix 22-row bound the tail held 0 completed turns at all, so
+    // this guard fails deterministically on the old code. The full scan's
+    // newest six completions are kept 0..5 (the seed pair is seventh).
+    for (let index = 0; index < 6; index += 1) {
+      const kept = await createPendingTurn(env.OPERATIONS_DB, {
+        ownerPrincipalId: "principal-alice",
+        conversationId: seed.conversationId,
+        requestId: `req-tail-kept-${index}`,
+        question: `kept question ${index}`,
+        now: 210 + index * 2,
+      });
+      await complete(
+        kept,
+        `req-tail-kept-${index}`,
+        `kept question ${index}`,
+        `Kept answer ${index} is stored.`,
+        211 + index * 2,
+      );
+    }
+    for (let index = 0; index < 14; index += 1) {
+      const failed = await createPendingTurn(env.OPERATIONS_DB, {
+        ownerPrincipalId: "principal-alice",
+        conversationId: seed.conversationId,
+        requestId: `req-tail-failed-${index}`,
+        question: `strictly for failure ${index}`,
+        now: 240 + index * 2,
+      });
+      await failTurn(env.OPERATIONS_DB, {
+        assistantMessageId: failed.assistantMessageId,
+        ownerPrincipalId: "principal-alice",
+        errorCode: "CANCELLED",
+        now: 240 + index * 2 + 1,
+      });
+    }
+    const history = await loadBoundedHistory(
+      env.OPERATIONS_DB,
+      seed.conversationId,
+      "principal-alice",
+    );
+    expect(history).toHaveLength(6);
+    expect(history[5]?.question).toBe("kept question 5");
+    expect(history[5]?.answer).toContain("Kept answer 5 is stored.");
+    expect(history[0]?.question).toBe("kept question 0");
+  });
 });

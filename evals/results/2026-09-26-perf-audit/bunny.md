@@ -1,0 +1,282 @@
+I'll start by exploring the repository structure and reading the key files in scope.
+I've read the chat path, retrieval pipeline, persistence, ingestion and UI render paths. Summary and findings below.
+
+**Summary**
+- The chat page ships the entire corpus to the browser: `/knowledge` returns every chunk's text plus the same text joined per document (~1.5 MB for 65 docs / 734 KB of body), and `loadWorkspaceSnapshot` serializes it into the RSC payload on every workspace page load, every `router.refresh()`, and again on `router.replace('/chat/<id>')` right after each answer lands. Chat never renders it.
+- In the local loopback deployment every Brain Worker request pays ~20 sequential D1 round trips before routing: `ensureLoopbackPrincipal` issues a PRAGMA plus 18 serialized upserts in `for` loops, and the router runs a second `PRAGMA foreign_keys = ON` on top.
+- Retrieval is a fully serialized chain (4 D1 reads + embed + Vectorize + rerank). The keyword branch has no data dependency on the vector branch, and `loadAclShapes` recomputes a per-generation `SELECT DISTINCT` over all chunks on every `search()`.
+- Answer-side latency is dominated by up to four strictly sequential extra Workers AI calls (citation repair, strict identifier recovery, abstention recheck, coverage pass), each re-sending the whole evidence set. Nothing streams, so all of it lands as one spinner.
+- Persistence adds ~9 serial operations-D1 round trips before any model work (three provably redundant), reads conversation history with no `LIMIT` and trims in JS, re-reads everything it just wrote, and conversation open runs one `evidence_snapshots` query per turn.
+- Ingestion re-chunks and re-embeds all ~450 chunks sequentially (57 serial model calls) for a single-document upload or delete.
+- Two leads did not pan out: read tools never touch the approval path (`policyGateway` returns `allow` for `risk: "read"` with no hashing), and `agent-runs.ts` is not on the chat hot path at all. There is no UI polling anywhere.
+
+```json
+[
+  {
+    "id": "A-01",
+    "title": "Every workspace page load ships the whole corpus (~1.5 MB) to the browser, including on the chat view",
+    "file": "src/lib/store/knowledge-inventory.ts",
+    "lines": "95-153",
+    "area": "ui",
+    "mechanism": "`loadKnowledgeInventory` runs `SELECT ... content ... FROM chunks WHERE generation_id = ?` and returns every chunk body twice: once joined per document into `documents[].text` (line 140-145) and again as `chunks[].text` (line 146-153). `loadWorkspaceSnapshot` (src/app/actions.ts:286-330) forwards both into `RagVisibilityDashboard` for every view. `WorkspacePage` is `force-dynamic` and calls the snapshot unconditionally (src/components/workspace/workspace-page.tsx:26-29), so the RSC flight payload carries ~734 KB of seed body duplicated to ~1.5 MB before escaping. `rag-visibility-dashboard.tsx:289-299` then calls `router.replace('/chat/<id>')` after every successful answer, which re-runs the server component and re-fetches the entire inventory a second time seconds after the answer arrives. `KnowledgeWorkspace` is only mounted when `activeView === 'knowledge'` (rag-visibility-dashboard.tsx:548-562), so /chat pays for data it never renders.",
+    "user_visible_effect": "Chat, sources and evaluations page loads pay a multi-megabyte HTML/flight transfer and the associated JSON parse on every navigation and every `router.refresh()`; the second fetch lands right as the answer appears.",
+    "fix": "Stop sending corpus text with the page shell. Have `/knowledge` return only document metadata and per-document chunk counts, and load chunk text through a server action (`/knowledge/chunks?documentId=`) when the detail dialog or chunk preview needs it. Short-term: pass a view-appropriate slice from `loadWorkspaceSnapshot` (counts only for `chat`), and drop `documents[].text` entirely since it is a pure duplicate of `chunks[].text`.",
+    "risk": "The chunk preview and document detail dialog currently read text from props; they need a loading state and a fetch call. `countWords(document.text)` in knowledge-workspace.tsx:116 depends on the duplicate field, so word counts need another source or must be precomputed server-side.",
+    "impact": "high",
+    "confidence": "high",
+    "how_to_verify": "Load /chat with the Northwind generation active and check the HTML response size (`curl -s http://127.0.0.1:PORT/chat | wc -c`). Compare against a generation with 2 documents. Then answer one question and watch the network panel for a second `/knowledge` request issued by `router.replace`."
+  },
+  {
+    "id": "A-02",
+    "title": "Loopback identity runs ~20 sequential D1 round trips on every Brain Worker request",
+    "file": "workers/brain/src/index.ts",
+    "lines": "238-244",
+    "area": "db",
+    "mechanism": "In `loopback` identity mode (wrangler.jsonc:17 sets `IDENTITY_MODE: loopback` for the local deployment) every authenticated request awaits `ensureLoopbackPrincipal`, which issues `PRAGMA foreign_keys = ON` (loopback-principal.ts:45), one `INSERT INTO principals`, then 9 role inserts and 8 department inserts, each `await`ed individually inside `for` loops (loopback-principal.ts:54-68). That is 19 serialized round trips. Line 244 then runs a second, redundant `PRAGMA foreign_keys = ON` for every request in every identity mode. D1 has foreign keys enforced by default, so the PRAGMA is a no-op that still costs a round trip. `loadWorkspaceSnapshot` fires four brain requests concurrently, so one page load pays ~80 round trips.",
+    "user_visible_effect": "Every chat turn and every page load is delayed by 20 serialized D1 round trips before routing. On local miniflare D1 this is single-digit milliseconds; on a real D1 endpoint (staging/production, where the 19-write path does not apply but the PRAGMA does) each round trip is a network hop.",
+    "fix": "Move the loopback bootstrap out of the request path: run it once per isolate behind a module-level `let bootstrapped: Promise<void> | undefined` memo, or gate it on a `SELECT 1 FROM principals WHERE id = 'principal-dev'` that is itself cached for the isolate lifetime. Delete the duplicated `PRAGMA` at line 244 and the one at loopback-principal.ts:45 (D1 enforces them). If the grants must be re-asserted, replace the 17 individual inserts with one `db.batch([...])`.",
+    "risk": "Memoizing means a principal deleted mid-session is not recreated until isolate restart. Keeping the 17 upserts in a single batch preserves idempotency while cutting 17 round trips to 1.",
+    "impact": "high",
+    "confidence": "high",
+    "how_to_verify": "Add a temporary counter to the brain worker's operational log for D1 statements per request and hit `/whoami` once in loopback mode; the count should be ~20. Then delete the PRAGMAs and re-measure. Compare `/chat` server-component time before and after."
+  },
+  {
+    "id": "A-03",
+    "title": "Up to four extra Workers AI calls per answer, all strictly sequential after the agent loop",
+    "file": "src/lib/agent/run.ts",
+    "lines": "497-660",
+    "area": "latency",
+    "mechanism": "After the agent loop finishes, four independent model passes can fire one after another: the citation repair (502-523), strict identifier recovery (530-568), the abstention recheck (577-604) and the coverage pass (628-660). Each calls `input.runtime.repairGroundedAnswer` / `coverAnswerParts`, which are `createWorkersAiCitationRepair` / `createWorkersAiCoveragePass` (src/lib/models/workers-ai-citation-repair.ts:31, 229) and each re-serializes the entire evidence set through `formatEvidenceForPrompt` (contract.ts:100-112) - up to 32 chunks of ~1800 chars per turn at `maxSearchKnowledge: 4` x `topK: 8`. Repair and identifier recovery are mutually exclusive only in outcome, not in scheduling: identifier recovery and the abstention recheck can both fire on the same refusal. The coverage gate (628-634) is easy to enter, because `isMultiPartQuestion` (run.ts:124) matches any question with two interrogatives or an `and`/`both`/`two` cue, and the system prompt at run.ts:103 explicitly tells the model to call `search_knowledge` twice for two-topic questions, which makes 2-document evidence the expected case.",
+    "user_visible_effect": "A question that needs a repair or a coverage pass pays one to three additional full model round trips after the answer is already drafted, with no streaming, so the user stares at one spinner for the whole chain.",
+    "fix": "Fold the identifier recovery and the abstention recheck into a single repair call: they use the same model, the same prompt shape and the same evidence, and differ only in `strictTokens` / `lexicalFallback`. Issue the coverage pass concurrently with the repair call via `Promise.all` and apply repairs before coverage so the combined answer is validated once, instead of validating the draft, then the repair, then the combined text. Cache `formatEvidenceForPrompt(evidence)` once per turn and pass the pre-formatted string to both passes.",
+    "risk": "Merging the two repairs changes which candidate is accepted when a token-strict quote and an abstention recheck would both return text. Validate the merged result against the ledger as strictly as today. Running coverage in parallel means its prompt no longer sees a repaired draft, which could change pointer-following quality; measure against the existing Northwind eval set before shipping.",
+    "impact": "high",
+    "confidence": "high",
+    "how_to_verify": "Instrument the brain worker to log every `ai.run(model)` call with the model id per `/turns` request, then run the 120 Northwind questions and count model calls per question. Currently expect 3 for a clean answer, 4-7 for repair and multi-part questions. Re-run after the change and confirm the eval replay results are unchanged."
+  },
+  {
+    "id": "A-04",
+    "title": "Retrieval search() is a fully serialized chain; the keyword branch has no dependency on the vector branch",
+    "file": "src/lib/retrieve/cloudflare-pipeline.ts",
+    "lines": "92-170",
+    "area": "latency",
+    "mechanism": "Eight steps are awaited one after another: `loadAclShapes` (D1) -> `enumerateAllowedAclGroups` (CPU + serial SHA-256) -> `buildVectorizeQuery` -> embed (Workers AI) -> `vectorize.query` (network) -> `loadVectorChunkIds` (D1) -> FTS keyword query (D1) -> `loadChunks` (D1) -> rerank (Workers AI). That is 4 D1 round trips and 2 model calls on one critical path. The FTS branch (138-144) reads only the query, the generation and the ACL SQL, and enforces authorization inside SQL via `aclSqlAndParams` (acl/access.ts:172-194) plus a second host-side `filterChunks` pass at line 147. It therefore has no data dependency on the embedding, the Vectorize query or `loadVectorChunkIds`, and the 'authorization before fusion' rule is unaffected because fusion still happens after `filterChunks`.",
+    "user_visible_effect": "One extra D1 round trip sits between the Vectorize response and fusion on every `search_knowledge` call, and up to four searches per turn multiply it.",
+    "fix": "Start the FTS promise at the top of `search()`, before `loadAclShapes`, and await it alongside the vector branch rather than after `loadVectorChunkIds`. Keep `loadChunks` as the join point so it still runs after both channels and after host-side ACL filtering. Do not parallelize anything across `filterChunks`.",
+    "risk": "The keyword query would now be in flight while the vector channel is still running, so a `vectorChannelError` fallback no longer avoids issuing it. The FTS query is read-only and ACL-scoped, so a wasted query on the degraded path is harmless, but the error trace flag semantics in the comment at 94-100 should be updated to say so.",
+    "impact": "medium",
+    "confidence": "high",
+    "how_to_verify": "Add per-step timing around the awaits in `search()` and log the breakdown per call. Confirm the FTS duration currently appears after the vector duration on the same timeline, then confirm the two overlap after the change and that `fingerprintId` and returned `trace` are byte-identical for a fixed query."
+  },
+  {
+    "id": "A-05",
+    "title": "loadAclShapes re-derives the per-generation ACL shape set on every search()",
+    "file": "src/lib/retrieve/cloudflare-pipeline.ts",
+    "lines": "92-93",
+    "area": "db",
+    "mechanism": "`loadAclShapes` (215-234) runs `SELECT DISTINCT access_scope, allowed_roles, allowed_departments, metadata FROM chunks WHERE generation_id = ?` on every call. `idx_chunks_generation` (migrations/corpus/0003_fts5.sql:36) makes this an index range scan, but SQLite still reads every chunk row of the generation (~450 for the Northwind corpus) and dedupes a 4-column key that includes the full `metadata` JSON blob. `enumerateAllowedAclGroups` (acl/access.ts:137-159) then awaits `aclGroupKey` per distinct shape, and each `aclGroupKey` is a separate `await sha256Hex(...)` (acl/acl-group.ts:26-34), so the digests are serialized rather than issued together. Both results depend only on `generationId`, which changes only on promote (`promoteGeneration`, corpus-d1.ts:105).",
+    "user_visible_effect": "A full generation scan plus a handful of serial crypto digests runs before retrieval can start, on every `search_knowledge` call, up to four times per turn.",
+    "fix": "Memoize per isolate: `const aclShapeCache = new Map<string, AclShape[]>()` keyed by `generationId`, populated on first use. Evicting is not needed because a generation's chunks are immutable once written (`UPSERT_CHUNK_SQL` writes under a generation-scoped chunk id). Even better, cache the derived `aclKeys` keyed by `${generationId}:${userId}:${sortedRoles}:${sortedDepartments}` so the principal-dependent step is skipped too.",
+    "risk": "A generation that is mutated after its first retrieval would serve stale shapes. `seedNorthwindCorpus` writes a fresh generation id per build and never mutates an existing generation, so this holds today; add a size cap to the map so a long-lived isolate cannot grow without bound.",
+    "impact": "medium",
+    "confidence": "high",
+    "how_to_verify": "Run `EXPLAIN QUERY PLAN` for the shapes query against the local corpus D1 and log the row count. Time `search()` with and without the cache and confirm identical `aclGroupKeys` and identical returned hits for a fixed query and principal."
+  },
+  {
+    "id": "A-06",
+    "title": "activeGenerationId is queried twice per turn with identical SQL",
+    "file": "src/lib/brain/execute-turn.ts",
+    "lines": "196, 265, 425-430",
+    "area": "db",
+    "mechanism": "`knowledgePipeline()` calls `activeGenerationId(input.corpus)` at line 265 to build the pipeline, and `activeGenerationIdFor(input)` calls the same function again at line 196 to stamp `corpusGenerationId` on the persisted turn. Both run `SELECT active_generation_id FROM corpus_state WHERE singleton = 1` (corpus-d1.ts:68-73) against the same database. Between the two calls the conversation lock is held (line 135-144) and only the model loop runs, which cannot promote a generation.",
+    "user_visible_effect": "One redundant D1 round trip on the critical path of every chat turn, plus a redundant read in the ephemeral eval path.",
+    "fix": "Have `knowledgePipeline()` return `{ pipeline, generationId }` and pass that `generationId` to `completeTurn` instead of calling `activeGenerationIdFor`. Note the `?? \"none\"` fallback at line 196 already handles the no-corpus case, which the pipeline also handles at 262-264, so the two paths can be unified.",
+    "risk": "Very low. The only behavioural difference is that a generation promoted mid-turn would be reported as the pre-turn id, which is the correct value for the evidence that was actually retrieved.",
+    "impact": "medium",
+    "confidence": "high",
+    "how_to_verify": "Count D1 statements per `/turns` request before and after; the count should drop by exactly one. Confirm `corpus_generation_id` on the stored message row is unchanged for a replayed turn."
+  },
+  {
+    "id": "A-07",
+    "title": "loadBoundedHistory reads every message in the conversation, then trims to 6 turns in JavaScript",
+    "file": "src/lib/store/conversations.ts",
+    "lines": "788-795",
+    "area": "db",
+    "mechanism": "The query is `SELECT id, role, content, status, parent_user_message_id FROM messages WHERE conversation_id = ? ORDER BY created_at ASC, id ASC` with no `LIMIT`. It returns every user question and every assistant answer ever written to the conversation, including the full answer text. `trimStoredHistory` (162-180) then keeps at most `MAX_HISTORY_TURNS = 6` turns and `MAX_HISTORY_CHARS = 6000` characters, and `pairCompletedHistoryTurns` (24-65) walks the whole result set to pair them. The model only ever sees 6 turns, so the rows beyond that are pure waste. Growth is unbounded for the life of the conversation.",
+    "user_visible_effect": "Turn latency and the operations-D1 row scan grow with conversation age, not with the 6-turn context window the model actually needs.",
+    "fix": "Select newest-first with a bounded limit and reverse in JS: `ORDER BY created_at DESC, id DESC LIMIT 24` (2 messages per turn x 6 turns, plus slack for pending and orphaned rows), then `.reverse()` before pairing. Because `messages_by_conversation_created` is `(conversation_id, created_at)` (migrations/operations/0002_conversations.sql:43), the reversed scan is index-ordered. Verify the `trimStoredHistory` output is byte-identical for a set of seeded conversations before shipping.",
+    "risk": "Low-medium. A conversation with pending or orphaned messages could pair differently if the limit truncates a user message whose assistant row is pending. Keep the slack and add a test that compares old and new output across the 120-question eval conversations.",
+    "impact": "medium",
+    "confidence": "high",
+    "how_to_verify": "Create a conversation with 30 turns, then log the row count and byte size returned by the history query on the next turn. Confirm it drops to 24 rows and that `historyToAgentMessages` output is unchanged for a fixed set of conversations."
+  },
+  {
+    "id": "A-08",
+    "title": "Nine sequential operations-D1 round trips before any model work, three of them redundant",
+    "file": "src/lib/store/conversations.ts",
+    "lines": "368-481",
+    "area": "db",
+    "mechanism": "The happy path for a new turn runs: (1) `SELECT ... FROM messages WHERE request_id = ?` at 368; (2) `loadRequestIdClaim` at 375/392; (3) `assertConversationOwner` at 420 when a conversation id was supplied; (4) `INSERT INTO request_id_claims` at 426; (5) `loadRequestIdClaim` again at 444 to learn who won the race; (6) `materializeClaimedTurn`'s `db.batch` of 4 statements at 314-352; (7) `SELECT id, conversation_id FROM messages WHERE request_id = ?` at 463; (8) `assertConversationOwner` again at 468 or 475. `execute-turn.ts:146-154` then calls `loadOwnedTurnHandleByRequestId`, which runs the same `WHERE m.request_id = ? AND m.role = 'assistant'` query as step (1) for the request id `createPendingTurn` was just called with. Steps (3) and (8) are the same query against the same conversation inside one call, and step (5) re-reads a row whose values the caller already holds whenever the insert succeeded.",
+    "user_visible_effect": "Nine serialized D1 round trips sit between the submit and the first model call on every chat turn.",
+    "fix": "Use the insert's `meta.changes` to detect the claim winner instead of re-reading at 444: `changes === 1` means this caller wrote the row and already knows every field; only re-read on a conflict. Hoist `assertConversationOwner` so it runs once and its result is passed to the duplicate branch. Drop the `loadOwnedTurnHandleByRequestId` re-read in execute-turn by having `createPendingTurn` return the status it already fetched in step (1).",
+    "risk": "The claim-winner race is the reason steps (5) and (7) exist. `ON CONFLICT DO NOTHING` plus `meta.changes` is the standard way to resolve it, but it changes concurrent-retry behaviour, so run the existing duplicate-request and concurrency tests before merging.",
+    "impact": "medium",
+    "confidence": "high",
+    "how_to_verify": "Count operations-D1 statements per `/turns` request in the worker log. Then fire two concurrent identical `/turns` requests with the same `requestId` and confirm exactly one conversation and one assistant message are created, same as before."
+  },
+  {
+    "id": "A-09",
+    "title": "loadConversationForUi runs one evidence_snapshots query per turn, inside the loop",
+    "file": "src/lib/store/conversation-queries.ts",
+    "lines": "130-137",
+    "area": "db",
+    "mechanism": "The function first does `assertConversationOwner`, a header select, a messages select and an assistants select (78-103) - four round trips - and then, inside `for (const assistant of assistants.results)`, awaits a separate `SELECT ... FROM evidence_snapshots WHERE message_id = ?` for every completed assistant message. This is a textbook N+1 on a sequential await: a 20-turn conversation is 24 round trips before the page can render, and each returns full chunk text.",
+    "user_visible_effect": "Opening or switching to any conversation with history pays N sequential D1 round trips, so older chats open progressively more slowly.",
+    "fix": "Collect the assistant message ids first, then issue one `WHERE message_id IN (?, ?, ...)` query and group the rows by `message_id` into a `Map` before the loop. The ids are already bounded by the conversation, and the primary key `(message_id, rank)` makes the grouped read a single index range scan. If a conversation can exceed the D1 bind-parameter limit, chunk the `IN` list.",
+    "risk": "Low. Ordering must be preserved, so keep the existing `ORDER BY rank ASC` inside the combined query. The fallback branch at 186-203 is unaffected.",
+    "impact": "medium",
+    "confidence": "high",
+    "how_to_verify": "Seed a conversation with 20 completed turns, time `GET /conversations/<id>` before and after, and confirm the round trip count is constant instead of linear. Diff the returned JSON to confirm byte-identical turns."
+  },
+  {
+    "id": "A-10",
+    "title": "A single document change re-embeds the entire corpus in strictly sequential batches",
+    "file": "src/lib/store/corpus-seed.ts",
+    "lines": "164-198",
+    "area": "throughput",
+    "mechanism": "`seedNorthwindCorpus` writes every document, then loops `for (let index = 0; index < pending.length; index += EMBED_BATCH)` with an `await embedWithWorkersAi(...)` inside (166-181), so ~450 chunks become ~57 strictly sequential Workers AI calls, followed by ~23 sequential `vectorize.upsert` calls of 20. The trigger is any corpus change: `addSyntheticDocumentAction` posts `merge: true` (src/app/actions.ts:255), which makes the worker call `loadSeedDocumentsFromGeneration` (corpus-seed.ts:287-337) to re-read every chunk of the generation, rejoin the bodies with `\"\\n\\n\"`, and re-chunk all 65 documents. Because the rejoined text is re-split at fresh 1800-character boundaries, every chunk id, every `char_start`/`char_end` and every content digest changes, so no chunk can be reused. Delete (`workers/brain/src/index.ts:753`) and reindex (708) do the same.",
+    "user_visible_effect": "Uploading a 1 KB document or deleting one document costs a full 65-document re-chunk, ~57 sequential embedding calls and a full Vectorize rewrite, inside a single Worker request. The Sources panel shows 'Re-indexing' for the whole duration.",
+    "fix": "Two changes, in order of value. First, parallelize the embedding loop with a bounded concurrency window (4-8 in flight) instead of one at a time. Second, stop the rejoin: persist document bodies in `document_versions` (the table already exists with an `r2_key`, migrations/corpus/0002_lifecycle.sql:55-66) and re-seed from those bodies rather than from concatenated chunks, so unchanged documents keep byte-identical bodies and their chunk digests and vector ids can be carried over instead of recomputed. Skip the upsert for chunks whose `content_digest` already matches a vector in the current generation.",
+    "risk": "Parallel embedding raises the Workers AI request rate and may hit per-account concurrency limits; cap the window and keep the existing failure path that marks the generation `failed` at 195. Persisting bodies changes the `document_versions` write path, so re-check the migration contract test (src/lib/store/migrations-contract.test.ts).",
+    "impact": "high",
+    "confidence": "high",
+    "how_to_verify": "Time one single-document upload end to end and count the `ai.run` calls on the embedding model (should be ~57 today). After the change, confirm the count is unchanged but wall time drops, then confirm after the body-persistence change that uploads of a new document issue embedding calls only for the new document's chunks."
+  },
+  {
+    "id": "A-11",
+    "title": "Load-knowledge-inventory runs seven strictly sequential D1 queries, two of them redundant counts",
+    "file": "src/lib/store/knowledge-inventory.ts",
+    "lines": "66-115, 146-153",
+    "area": "db",
+    "mechanism": "`activeGenerationId` (66) and the ready-generation select (67-71) run in sequence although they are independent, then `getGeneration` (84), the `SELECT DISTINCT d.id, d.path` documents query (85-94), the full chunks query (95-102) and two COUNT queries (103-115) each run in sequence - seven round trips. Both COUNT queries (`storedDocuments`, `storedChunks`) are computable from the chunk rows already fetched at 95-102, and the `DISTINCT` documents query is computable from the same rows plus the `path` column. Separately, line 148 calls `visibleDocuments.find((doc) => doc.id === row.document_id)` inside a per-chunk `map`, so the chunk-to-document path mapping is O(chunks x documents) - roughly 450 x 65 string comparisons.",
+    "user_visible_effect": "Seven serialized D1 round trips plus an O(n*m) mapping on every workspace page load, four times over per navigation because `loadWorkspaceSnapshot` fires the request alongside three others.",
+    "fix": "Run (66) and (67-71) with `Promise.all`, then (84), (85-94) and (95-102) with `Promise.all`, and derive `storedDocuments`, `storedChunks`, the document list and the chunk-to-path map from the chunk rows in JS. Replace the `find` at 148 with a `Map<string, string>` built once from the document rows.",
+    "risk": "`storedChunks` currently counts chunks the principal cannot see, while the derived count would only cover visible chunks. Preserve the distinction: keep `storedChunks` as a count over the unfiltered query, or count from a separate `COUNT(*)` if the exact stored semantics matter to the Sources panel copy. Do not change which generation is selected - the `ready ?? active` precedence at 72 is load-bearing.",
+    "impact": "medium",
+    "confidence": "high",
+    "how_to_verify": "Log D1 statement count for `GET /knowledge` (should be 7) and compare the returned JSON byte-for-byte before and after, field by field including `embeddingStorageStatus.storedDocuments` and `storedChunks`."
+  },
+  {
+    "id": "A-12",
+    "title": "Abort and read-tool deadlines reject the caller but never cancel the underlying work",
+    "file": "src/lib/agent/deadlines.ts",
+    "lines": "9-27",
+    "area": "io",
+    "mechanism": "`awaitWithDeadline` rejects on abort but the promise it wraps keeps running to completion. `search_knowledge` (search-knowledge.ts:39-72) accepts a `signal`, checks it once at line 40, then calls `input.pipeline.search({query, principal, topK, candidateLimit})` - a signature (cloudflare-pipeline.ts:79-84) that has no signal field, so a search that outlives `readToolTimeoutMs = 10_000` keeps paying for the embedding, the Vectorize query and the rerank. The same pattern holds for the answer-side passes: `createWorkersAiCitationRepair` (workers-ai-citation-repair.ts:35-41) and `createWorkersAiCoveragePass` (233-239) call `signal?.throwIfAborted()` before and after `ai.run` but never pass the signal into it, and `runChat` (workers-ai-chat.ts:142) does the same for the chat completion. `agent.abort()` therefore changes the outcome, not the cost.",
+    "user_visible_effect": "Cancelling a turn or hitting a deadline gives no speed-up, and a stuck or slow search keeps consuming Workers AI and Vectorize calls after the user has already moved on.",
+    "fix": "Thread an `AbortSignal` through `KnowledgePipeline.search` into the Workers AI and Vectorize calls, and pass `options.signal` into the `ai.run` payloads where the Workers AI binding supports it. Keep the existing post-abort `throwIfAborted` guards so an aborted run still cannot return unvalidated prose (the comment at run.ts:514-516 depends on this).",
+    "risk": "Medium. The Workers AI binding's abort support must be confirmed against current Cloudflare docs before relying on it, and the degrade path at cloudflare-pipeline.ts:121-124 swallows errors, so an abort-induced rejection must not be recorded as `vectorChannelError` and silently turned into a keyword-only answer.",
+    "impact": "medium",
+    "confidence": "high",
+    "how_to_verify": "Cancel a turn while retrieval is in flight and count `ai.run` invocations on the embedding and rerank models for that request id. Today the count matches an uncancelled run; after the change it should stop at the abort."
+  },
+  {
+    "id": "A-13",
+    "title": "toolExecution: 'sequential' contradicts the policy registry and doubles retrieval for two-topic questions",
+    "file": "src/lib/agent/run.ts",
+    "lines": "103, 319",
+    "area": "latency",
+    "mechanism": "The Agent is configured with `toolExecution: \"sequential\"` (319), so multiple tool calls in a single assistant message run one after another. The live system prompt at line 103 instructs the model to do exactly that: 'When the question involves two different policies, processes or documents, call search_knowledge once for each of them before answering.' Each call costs an embedding, a Vectorize query and a rerank. The policy registry already disagrees: `search_knowledge: { risk: \"read\", executionMode: \"parallel\" }` (policy.ts:35), and `evaluateToolPolicy` returns `allow` for `risk: \"read\"` without any hashing or approval (policy.ts:75-77), so nothing on the authorization side requires sequencing.",
+    "user_visible_effect": "A two-policy question pays two serialized retrieval pipelines - roughly double the retrieval wall time - for evidence the model asked for in a single turn.",
+    "fix": "Do not simply flip the flag. `appendSearchHit` (host-grounding.ts:343-349) assigns citation labels in execution order via `addIdentity` and `nextSequentialLabel` (517-563), so parallel execution would make `[1]`/`[2]` nondeterministic and could set `labelConflict`, which fails the draft to `BRAIN_INVALID_CITATION` in `markersValidForLedger` (111-136). Instead, make the label assignment deterministic independent of completion order: pre-assign labels from the tool-call array index in the assistant message, pass that index into the tool, and let `addIdentity` use the supplied label. Then set `toolExecution: \"parallel\"` for read tools and keep it sequential for the mutating tools the registry marks as such.",
+    "risk": "Medium-high. This touches the citation-label contract that the whole grounding layer validates against. The existing label-conflict tests in host-grounding.test.ts and the 120 Northwind questions must pass unchanged, and the returned `trace` ordering must be stable across repeated runs of the same question.",
+    "impact": "medium",
+    "confidence": "medium",
+    "how_to_verify": "Ask a question that matches two policies and count sequential `ai.run` calls on the rerank model. After the change, confirm two rerank calls overlap in time, that labels are stable across ten identical runs, and that the Northwind eval replay results are byte-identical."
+  },
+  {
+    "id": "A-14",
+    "title": "completeTurn writes the turn, then reads all of it back, and the answer is structured three times",
+    "file": "src/lib/store/conversations.ts",
+    "lines": "488, 506, 643-648",
+    "area": "db",
+    "mechanism": "`completeTurn` opens with `loadReplay` (488) which always returns null on the happy path because the turn is still pending, costing at least one wasted query. It then runs a pending-status select (493-504), calls `answerFromEvidence` (506), and after the batch write calls `loadReplay` again (644), which re-reads the message row, the parent user row and every evidence row and re-parses `structured_paragraphs_json` (727-737) that was serialized at 586. Layered on top, `execute-turn.ts:195` calls `structuredJsonFromGroundedProse` (a build plus `JSON.stringify`), `conversations.ts:506` parses and validates that string back, and both `structuredAnswerFromGroundedProse` (prose-to-structured.ts:44) and `parseStructuredGroundedAnswer` (contract.ts:159) independently call `addSupportedCitations`, which runs `normalizeSupportText` over every evidence text once per paragraph (contract.ts:242).",
+    "user_visible_effect": "Five extra operations-D1 round trips and two redundant full passes over the evidence set sit between the drafted answer and the response returned to the browser.",
+    "fix": "Build the `ReplayedTurn` once in `completeTurn` from the values already in hand - `content`, `structured.paragraphs`, `answerModel` and `input.evidence` - instead of re-reading, keeping `loadReplay` only for the genuine duplicate-request path. Drop the `loadReplay` at 488 and instead check `pending.status` from the select that already follows. Have `executeTurn` pass the already-structured answer into `completeTurn` instead of a JSON string, so `answerFromEvidence` is not re-run over text it just produced.",
+    "risk": "Medium. `loadReplay` is the read path that guarantees the response matches what was stored, including the `answer_type` normalization at 745-751 and the `buildInsufficientEvidenceAnswer` fallback. Any hand-built replay must reproduce that exactly, including for a zero-evidence turn.",
+    "impact": "medium",
+    "confidence": "high",
+    "how_to_verify": "Count operations-D1 statements per `/turns` request before and after. Then assert the response returned by `executeTurn` is deep-equal to the row read back by a direct `loadReplay` for a fixed set of conversations covering grounded, insufficient-evidence and cancelled turns."
+  },
+  {
+    "id": "A-15",
+    "title": "fts5MatchQuery emits an unbounded number of OR terms, so the ACL subquery runs on every matched row",
+    "file": "src/lib/acl/access.ts",
+    "lines": "259-286",
+    "area": "db",
+    "mechanism": "`fts5MatchQuery` extracts every `[\\p{L}\\p{N}_]+` token, drops stopwords, and joins the remainder with ` OR ` (285). There is no cap. A question is accepted up to 2000 characters (`workers/brain/src/index.ts:497`) and `search()` slices to 4096 (cloudflare-pipeline.ts:89), so a long question becomes a 200-300 term FTS5 OR. `keywordSearchSql` (259-261) then joins `chunks` and evaluates the ACL predicate - three `json_each` subqueries plus two `json_extract` calls per row - for every row the OR matches, before `ORDER BY bm25(...)` and `LIMIT 24` (which is `ftsCandidateFetchLimit(min(24, keywordCandidates=6))` = 24) can cut anything. Common terms such as 'policy' make the OR match a large fraction of the corpus.",
+    "user_visible_effect": "Keyword-channel cost scales with question length rather than being bounded, and it scales against the full corpus once real content is loaded rather than the 65-document synthetic set.",
+    "fix": "Cap the term list: keep identifier tokens (which are already extracted first at 270-275) and then add content words until a fixed budget such as 16-24 terms, preferring rarer terms. D1 exposes no term statistics, so rank by length as a cheap proxy for rarity, or precompute a term-frequency table at generation build time. Keep the current behaviour when the term list is short so single-fact questions are untouched.",
+    "risk": "High for retrieval quality, not for safety. Dropping terms changes which chunks reach the reranker, so this is a retrieval-parameter change and per the RAG rules in AGENTS.md it must land as a recorded configuration version and be validated against the 120-question Northwind eval set before promotion. Do not ship it as a pure perf change.",
+    "impact": "medium",
+    "confidence": "medium",
+    "how_to_verify": "Log the FTS term count per query for the 120 Northwind questions and the longest eval questions. After the change, re-run the eval and compare grounded-answer rate and hit@k against the recorded baseline; accept only if they are equal or better."
+  },
+  {
+    "id": "A-16",
+    "title": "knowledge-workspace recomputes word counts over the whole corpus on every indexing-state toggle",
+    "file": "src/components/knowledge/knowledge-workspace.tsx",
+    "lines": "96-119, 147-150",
+    "area": "ui",
+    "mechanism": "The `inventory` memo depends on `isEmbedding` and `isReindexing` (119), so toggling either state rebuilds the whole inventory: it re-groups every chunk by source (97-102), then for each of the 65 documents computes `sectionCount` via a new `Set` over all its sections and `wordCount: countWords(document.text)` (115-116), where `countWords` is `text.trim().split(/\\s+/).filter(Boolean).length` (1145-1147) over the full 11 KB average document body. That is ~734 KB of string splitting and roughly 130,000 array elements allocated per toggle, and `handleEmbed`/`handleReindex` each flip the flag twice (159/163, 187/194), so it runs four times per indexing action. Separately, `documentStatusBySource` (147-150) builds a new `Map` on every `inventory` change and is read inside the chunk-preview loop at 403, so the preview subtree re-renders whenever a status flips even though no status value changed.",
+    "user_visible_effect": "A visible hitch on the Sources panel at the start and end of every indexing run, and unnecessary re-renders of the chunk preview list.",
+    "fix": "Split the memo: keep the chunk grouping and per-document derived counts (including word count) in a memo keyed only on `[chunks, documents]`, and compute the status string separately keyed on the status inputs. Since `isEmbedding` only feeds `getDocumentStatus`, that is a small pure function over already-memoized inputs. Separately, pass the status map down once as a prop the preview reads directly rather than through a per-item lookup that changes identity on every status change.",
+    "risk": "Low. The status rules themselves must not change, so keep `getDocumentStatus` byte-identical and verify the rendered status label for each document before and after an indexing run.",
+    "impact": "low",
+    "confidence": "high",
+    "how_to_verify": "Record a performance profile of the Sources panel while clicking 'Seed Northwind corpus' and look for the scripting time attributable to `countWords`. After the change, confirm the memo does not recompute on a status toggle and that the rendered statuses are unchanged."
+  },
+  {
+    "id": "A-17",
+    "title": "enforce() re-parses the whole transcript and re-normalizes all evidence, up to six times per turn",
+    "file": "src/lib/agent/host-grounding.ts",
+    "lines": "390-414, 446-484",
+    "area": "latency",
+    "mechanism": "`enforceBrainGrounding` calls `buildTurnLedger` (390-414), which walks the transcript backwards and `JSON.parse`s the payload of every `search_knowledge` tool result (612-631) - each payload is the full `UNTRUSTED_EVIDENCE` JSON with every hit's content, so up to 4 x ~14 KB per turn. It then runs `markersValidForLedger` (111-136), which per paragraph calls `textSupportedByPassages` and re-normalizes each cited evidence text. `run.ts` wraps this in a closure (438-448) and calls it at lines 449, 461, 481, 518, 559, 596 and 653 - once on the happy path, up to six on the repair path. The ledger is rebuilt from scratch every time even though the evidence ledger from `runKnowledgeAgent` is already in scope and is what `evidenceFromLedger` uses at 686-704.",
+    "user_visible_effect": "Repeated transcript parsing and evidence normalization after the model loop finishes, on the critical path between the last model response and the answer the user sees.",
+    "fix": "Memoize the ledger per run. `buildTurnLedger` derives from `input.messages`, which is only mutated when `rewriteTranscript` is true - and `run.ts:447` already passes `rewriteTranscript: false`, so within a run the ledger is stable. Compute it once and pass it in, or key the memo on the transcript reference so the rewrite path still recomputes. Reuse the existing `evidenceLedger` for `markersValidForLedger` rather than rebuilding identities from the tool payloads.",
+    "risk": "Medium. The transcript-scoped ledger and the `evidenceLedger` maintained by `appendSearchHit` must be proven equivalent, including the `labelConflict` flag that `markersValidForLedger` short-circuits on (115-117). Keep `buildTurnLedger` as the fallback and cross-check the two in a test before switching.",
+    "impact": "low",
+    "confidence": "medium",
+    "how_to_verify": "Time the post-loop section of `runKnowledgeAgent` with and without memoization on the 120 Northwind questions, and assert the returned `finalResponse` and `evidence` are deep-equal for every question."
+  },
+  {
+    "id": "A-18",
+    "title": "The full turns array including all evidence text is duplicated into client conversation state on every answer",
+    "file": "src/components/rag-visibility-dashboard.tsx",
+    "lines": "216-233, 289-299",
+    "area": "memory",
+    "mechanism": "After each answer, `setTurns(nextTurns)` stores the new turn (293) and then `upsertConversationSummary(backendConversationId, nextTurns)` (298) writes the entire `nextTurns` array - every prior turn with its complete `retrieval.results`, each carrying the full chunk `text` - into the `conversations` state array. The two arrays then hold the same evidence objects. At `topK: 8` and ~1800 chars per chunk, each turn carries roughly 14 KB of duplicated evidence. Only `title` is ever rendered from `conversations` (`workspace-nav.tsx:176`) and only `title` is used by the search dialog (`chat-search-dialog.tsx:27`), so the turn data is retained and re-copied on every keystroke-free turn without being used.",
+    "user_visible_effect": "Browser memory grows by the full evidence set twice per turn, and every answer reallocates the whole array. Not visible at 5-10 turns; noticeable in a long session.",
+    "fix": "Store only the conversation summary in `conversations` - `{id, title, turns: [], createdAt, updatedAt}` - and keep the authoritative turn list in the existing `turns` state, which is what `ChatWorkspace` and `EvidenceInspector` already read. Switching conversations is a route change to `/chat/<id>`, and `WorkspacePage` already loads the full conversation server-side, so no turn data is needed in the list.",
+    "risk": "Low. The only readers of `conversations[].turns` need checking first - `selectConversation` and `deleteConversation` use `id` only, and `stopQuestion` already re-derives turns from `turns`. Verify nothing relies on the copy before removing it.",
+    "impact": "low",
+    "confidence": "high",
+    "how_to_verify": "Run a 30-turn session and inspect the React DevTools heap snapshot for `ChatTurn` objects. After the change, the count should match the `turns` array only, with no second copy inside `conversations`."
+  },
+  {
+    "id": "A-19",
+    "title": "No streaming or progress signal, so the whole serial turn chain lands as one spinner",
+    "file": "src/components/chat/chat-workspace.tsx",
+    "lines": "251-267",
+    "area": "ui",
+    "mechanism": "`submitQuestion` (rag-visibility-dashboard.tsx:252-264) awaits a single server action for the entire turn, and the UI shows one `ThinkingIndicator` (chat-workspace.tsx:251-267) for its whole duration. Every cost in A-03, A-04, A-08 and A-12 is therefore serialized behind one opaque wait. There is no polling anywhere in the app (I checked: no `setInterval` in any component, and the only `setTimeout` uses are the evidence flash and scroll chrome), and the existing `/stream` WebSocket route (workers/brain/src/index.ts:281-292) plus `ConversationRunLock` (workers/brain/src/conversation-lock.ts:123-125, 187-194) already provide a broadcast channel that nothing publishes retrieval progress to.",
+    "user_visible_effect": "A 3-call turn and a 7-call turn look identical from the outside. The user cannot tell retrieval from synthesis from repair, so every millisecond of the serial chain reads as one undifferentiated wait.",
+    "fix": "Cheapest version: have the turn emit coarse phase events over the existing `ConversationRunLock.broadcast` - 'retrieving', 'answering', 'validating' - and render them as the indicator label. This needs no streaming of model tokens, only three `broadcast` calls that already exist on the DO. Fixing A-03 and A-04 first is what actually reduces the wait; the progress signal only makes the remainder legible.",
+    "risk": "Low for the UI, medium for the plumbing. The DO broadcast fan-out is per-WebSocket (187-194) and the `/stream` route requires a WebSocket upgrade, so the client must hold a socket open for the whole turn, which adds a connection lifecycle to cancel on unmount and on conversation switch. The `conversationRef` guard at 170 and 265 already exists for exactly this kind of in-flight invalidation, so reuse it.",
+    "impact": "low",
+    "confidence": "high",
+    "how_to_verify": "Ask a question that triggers the coverage pass, record the window at 30 fps, and confirm the spinner is a single undifferentiated state for the full duration. After the change, confirm the label transitions match the phases and that switching conversations mid-turn does not strand a socket."
+  }
+]
+```

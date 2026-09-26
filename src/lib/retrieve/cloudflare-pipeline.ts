@@ -9,6 +9,7 @@ import {
   principalHasFullDocumentAccess,
   type Principal,
 } from "../acl/access";
+import type { AclShape } from "../acl/acl-group";
 import { EMBEDDING_MODEL } from "../embeddings/instructions";
 import { embedWithWorkersAi, type WorkersAiRunner } from "../embeddings/workers-ai-embed";
 import { buildVectorizeQuery } from "./cloudflare-query";
@@ -64,7 +65,33 @@ type ChunkRow = {
   path: string | null;
 };
 
+/**
+ * ACL shapes for a generation are immutable once the generation is built, so
+ * per-pipeline-instance memoization removes one full chunk-table scan from
+ * every search after the first within a turn. Only settled successes are
+ * cached: a rejected load stays uncached so a transient D1 failure can
+ * succeed on the next search instead of poisoning the rest of the turn.
+ */
+function memoizedAclShapes(
+  db: CorpusSql,
+  generationId: string,
+  cache: Map<string, Promise<AclShape[]>>,
+): Promise<AclShape[]> {
+  const existing = cache.get(generationId);
+  if (existing) {
+    return existing;
+  }
+  const shapes = loadAclShapes(db, generationId).catch((error) => {
+    cache.delete(generationId);
+    throw error;
+  });
+  cache.set(generationId, shapes);
+  return shapes;
+}
+
 export class CloudflareKnowledgePipeline {
+  private readonly aclShapes: Map<string, Promise<AclShape[]>> = new Map();
+
   constructor(
     private readonly input: {
       db: CorpusSql;
@@ -89,8 +116,15 @@ export class CloudflareKnowledgePipeline {
     const query = input.query.slice(0, 4096);
     const acl = aclFilterFor(input.principal);
     const generationId = this.input.generationId;
-    const shapes = await loadAclShapes(this.input.db, generationId);
-    const aclKeys = await enumerateAllowedAclGroups(acl, shapes);
+    const aclKeys = await enumerateAllowedAclGroups(
+      acl,
+      await memoizedAclShapes(this.input.db, generationId, this.aclShapes),
+    );
+    // The two channels run concurrently: the keyword FTS query carries its
+    // own ACL predicate in SQL and never depends on vector results. Vector
+    // hits still go through the same post-load authorization (filterChunks)
+    // and the fusion inputs stay identical, so ordering guarantees
+    // ("authorization before fusion", D1 as authority) are unchanged.
     // The vector channel degrades to keyword-only on embedding or Vectorize
     // transport failures. The degradation is recorded on the trace, never
     // hidden: one Vectorize internal error must not blank out the keyword
@@ -100,6 +134,21 @@ export class CloudflareKnowledgePipeline {
     // always propagate.
     let vectorChannelError = false;
     const vectorMatches: Array<{ vectorId: string; score: number }> = [];
+    const { sql, params } = aclSqlAndParams(acl);
+    // The keyword promise is always settled exactly once, even when the
+    // vector path throws first: the catch swallows the expected error and
+    // the await below re-raises the real keyword failure. Without this, an
+    // in-flight FTS rejection on a vector-throwing path would be unhandled.
+    const keywordRows = this.input.db
+      .prepare(keywordSearchSql(sql))
+      .bind(
+        fts5MatchQuery(query),
+        generationId,
+        ...params,
+        ftsCandidateFetchLimit(Math.min(fetchLimit, fingerprint.keywordCandidates)),
+      )
+      .all<{ chunk_id: string }>()
+      .catch((error) => ({ keywordError: error }));
     if (this.input.vectorize && aclKeys.length > 0) {
       const vectorQuery = await buildVectorizeQuery({ generationId, aclGroupKeys: aclKeys });
       try {
@@ -135,12 +184,10 @@ export class CloudflareKnowledgePipeline {
       }
       return { chunkId, score: match.score };
     });
-    const { sql, params } = aclSqlAndParams(acl);
-    const match = fts5MatchQuery(query);
-    const rows = await this.input.db
-      .prepare(keywordSearchSql(sql))
-      .bind(match, generationId, ...params, ftsCandidateFetchLimit(Math.min(fetchLimit, fingerprint.keywordCandidates)))
-      .all<{ chunk_id: string }>();
+    const rows = await keywordRows;
+    if ("keywordError" in rows) {
+      throw rows.keywordError;
+    }
     const keywordHits = rows.results.map((row) => ({ chunkId: row.chunk_id, score: 0 }));
     const candidateIds = [...new Set([...vectorHits, ...keywordHits].map((hit) => hit.chunkId))].sort();
     const loaded = await loadChunks(this.input.db, candidateIds);

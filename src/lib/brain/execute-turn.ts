@@ -87,7 +87,16 @@ export async function executeTurn(input: ExecuteTurnInput): Promise<GroundedAnsw
     departments: input.principal.departments,
   };
   const policyPrincipal = { id: input.principal.id };
-  const pipeline = await knowledgePipeline(input);
+  // Resolved once per turn: the corpus state row does not move during a turn
+  // (promotion is an explicit separate request), so both the pipeline and the
+  // completion record read the same value without a second query. The
+  // nullable value drives the empty-pipeline decision; "none" is only the
+  // storage stamp for turns without a corpus, so a corpus with no active
+  // generation still builds an empty pipeline rather than a real one bound
+  // to a sentinel id.
+  const generationIdValue = await knowledgeGenerationId(input);
+  const corpusGenerationId = generationIdValue ?? "none";
+  const pipeline = knowledgePipelineFor(input, generationIdValue);
   const runtime = liveRuntime(input.ai, input.evalModelOverride);
 
   if (!persist) {
@@ -193,7 +202,6 @@ export async function executeTurn(input: ExecuteTurnInput): Promise<GroundedAnsw
       throw new WorkerCancelledError();
     }
     const rawModelJson = structuredJsonFromGroundedProse(result.finalResponse, result.evidence);
-    const corpusGenerationId = (await activeGenerationIdFor(input)) ?? "none";
     const completed = await persistThenRelease({
       persist: () =>
         completeTurn(input.operations, {
@@ -256,14 +264,18 @@ function waitForCancellationPoll(stop: AbortSignal): Promise<void> {
   });
 }
 
-async function knowledgePipeline(
-  input: ExecuteTurnInput,
-): Promise<Pick<KnowledgePipeline, "search">> {
+function knowledgeGenerationId(input: ExecuteTurnInput): Promise<string | null> {
   if (!input.corpus) {
-    return emptyPipeline();
+    return Promise.resolve(null);
   }
-  const generationId = await activeGenerationId(input.corpus as unknown as SqlExecutor);
-  if (!generationId) {
+  return activeGenerationId(input.corpus as unknown as SqlExecutor);
+}
+
+function knowledgePipelineFor(
+  input: ExecuteTurnInput,
+  generationId: string | null,
+): Pick<KnowledgePipeline, "search"> {
+  if (!input.corpus || !generationId) {
     return emptyPipeline();
   }
   return new CloudflareKnowledgePipeline({
@@ -420,11 +432,4 @@ function mapStoreError(error: unknown): unknown {
     return new WorkerValidationError();
   }
   return error;
-}
-
-async function activeGenerationIdFor(input: ExecuteTurnInput): Promise<string | null> {
-  if (!input.corpus) {
-    return null;
-  }
-  return activeGenerationId(input.corpus as unknown as SqlExecutor);
 }
