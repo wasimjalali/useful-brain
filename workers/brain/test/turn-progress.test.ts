@@ -183,7 +183,7 @@ describe("turn progress route", () => {
     expect(response.status).toBe(404);
   });
 
-  it("returns 404 for a request id owned by another principal", async () => {
+  it("returns 404 for a request id owned by another principal even when the claim row exists", async () => {
     await env.OPERATIONS_DB.batch([
       env.OPERATIONS_DB.prepare(
         `INSERT OR IGNORE INTO principals (id, kind, subject, created_at) VALUES (?, ?, ?, ?)`,
@@ -192,17 +192,29 @@ describe("turn progress route", () => {
         `INSERT OR IGNORE INTO roles (principal_id, role) VALUES (?, ?)`,
       ).bind("principal-bob", "standard"),
     ]);
+    // The staged insert makes the claim owner (alice) and the conversation
+    // owner (bob) deliberately different principals: proving the
+    // conversation-owner join is a real deciding predicate, not defence in
+    // depth that could be removed without failing this test.
     await createPendingTurn(env.OPERATIONS_DB, {
       ownerPrincipalId: "principal-alice",
       requestId: "req-cross-owner",
       question: "Private question",
       now: 10,
     });
+    await env.OPERATIONS_DB.prepare(
+      `UPDATE conversations SET owner_principal_id = 'principal-bob'
+       WHERE id = (SELECT conversation_id FROM request_id_claims WHERE request_id = 'req-cross-owner')`,
+    ).run();
 
     const response = await authed("/turns/req-cross-owner/progress", {
       email: "bob@karkoai.com",
     });
     expect(response.status).toBe(404);
+    // And the conversation owner herself gets 404 too: the claim row still
+    // names alice as the claim owner, so neither principal passes both joins.
+    const asAlice = await authed("/turns/req-cross-owner/progress");
+    expect(asAlice.status).toBe(404);
   });
 
   it("reports the lock stage for the owning pending run", async () => {

@@ -201,8 +201,16 @@ export function RagVisibilityDashboard({
     let stopped = false;
     let inFlight = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    const scheduleNext = () => {
+      if (!stopped) {
+        timer = setTimeout(poll, 2000);
+      }
+    };
     async function poll() {
       if (stopped || inFlight) {
+        // An overlapping call skips its own tick and reschedules so one slow
+        // response cannot silently end the whole loop.
+        scheduleNext();
         return;
       }
       inFlight = true;
@@ -226,9 +234,7 @@ export function RagVisibilityDashboard({
       } finally {
         inFlight = false;
       }
-      if (!stopped) {
-        timer = setTimeout(poll, 2000);
-      }
+      scheduleNext();
     }
     void poll();
     return () => {
@@ -443,6 +449,14 @@ export function RagVisibilityDashboard({
 
   function selectConversation(id: string) {
     stoppedConversationRouteRef.current = null;
+    // Switching conversations abandons any in-flight turn in the old one:
+    // both polls and the pending state stop here, and the in-flight askAction
+    // response is dropped by the conversationRef guard on arrival.
+    conversationRef.current += 1;
+    setPendingQuestion(null);
+    setPendingRequestId(null);
+    setStopError(null);
+    setIsStopping(false);
     router.push(`/chat/${id}`);
   }
 

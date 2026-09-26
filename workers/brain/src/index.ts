@@ -560,7 +560,10 @@ const brainWorker = {
         if (!handle) {
           return new Response("not found", {
             status: 404,
-            headers: withRequestId(new Headers(), requestId),
+            headers: withRequestId(
+              new Headers({ "cache-control": "no-store" }),
+              requestId,
+            ),
           });
         }
         let progress: TurnProgress;
