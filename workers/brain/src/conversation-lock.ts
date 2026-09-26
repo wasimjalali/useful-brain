@@ -6,9 +6,18 @@ import {
   type ConversationEvent,
 } from "../../../src/lib/cf/conversation-events";
 import { acquireRunLock, releaseRunLock } from "../../../src/lib/cf/run-lock";
+import {
+  canAdvanceTurnStage,
+  isTurnStage,
+  type TurnStage,
+} from "../../../src/lib/cf/turn-progress";
 
 export type ConversationLockResult =
   | { ok: true; runId: string }
+  | { ok: false; status: 400 | 409 };
+
+export type TurnStageWriteResult =
+  | { ok: true; runId: string; changed: boolean }
   | { ok: false; status: 400 | 409 };
 
 const SCHEMA = `CREATE TABLE IF NOT EXISTS run_lock (
@@ -29,6 +38,11 @@ export class ConversationRunLock extends DurableObject {
       if (!columns.includes("cancelled")) {
         this.ctx.storage.sql.exec(
           "ALTER TABLE run_lock ADD COLUMN cancelled INTEGER NOT NULL DEFAULT 0",
+        );
+      }
+      if (!columns.includes("stage")) {
+        this.ctx.storage.sql.exec(
+          "ALTER TABLE run_lock ADD COLUMN stage TEXT",
         );
       }
     });
@@ -58,8 +72,8 @@ export class ConversationRunLock extends DurableObject {
         return result;
       }
       this.ctx.storage.sql.exec(
-        `INSERT INTO run_lock (id, run_id, acquired_at, cancelled) VALUES (1, ?, ?, 0)
-         ON CONFLICT(id) DO UPDATE SET run_id = excluded.run_id, acquired_at = excluded.acquired_at, cancelled = 0`,
+        `INSERT INTO run_lock (id, run_id, acquired_at, cancelled, stage) VALUES (1, ?, ?, 0, NULL)
+         ON CONFLICT(id) DO UPDATE SET run_id = excluded.run_id, acquired_at = excluded.acquired_at, cancelled = 0, stage = NULL`,
         result.runId,
         Date.now(),
       );
@@ -118,6 +132,62 @@ export class ConversationRunLock extends DurableObject {
     );
     this.fanOut({ type: "cancelled", runId: requested });
     return { ok: true, runId: requested };
+  }
+
+  /**
+   * Record the owning run's progress stage. Only the run holding the lock may
+   * write; the stage must be a known value and may only advance or repeat.
+   * Storage is written only when the stage actually changes, so repeat marks
+   * stay read-only. The payload is the stage enum alone: no model text, tool
+   * arguments or evidence ever reaches this method.
+   */
+  async setStage(runId: string, stage: string): Promise<TurnStageWriteResult> {
+    let requested: string;
+    try {
+      requested = parseBoundedId(runId, "run id");
+    } catch (error) {
+      if (error instanceof BoundedIdError) {
+        return { ok: false, status: 400 };
+      }
+      throw error;
+    }
+    if (!isTurnStage(stage)) {
+      return { ok: false, status: 400 };
+    }
+    return this.ctx.storage.transactionSync(() => {
+      const row = this.ctx.storage.sql
+        .exec<{ run_id: string; stage: string | null }>(
+          "SELECT run_id, stage FROM run_lock WHERE id = 1",
+        )
+        .toArray()[0];
+      if (!row || row.run_id !== requested) {
+        return { ok: false as const, status: 409 as const };
+      }
+      const current = isTurnStage(row.stage) ? row.stage : null;
+      if (!canAdvanceTurnStage(current, stage)) {
+        return { ok: false as const, status: 409 as const };
+      }
+      if (current === stage) {
+        return { ok: true as const, runId: requested, changed: false };
+      }
+      this.ctx.storage.sql.exec(
+        "UPDATE run_lock SET stage = ? WHERE id = 1",
+        stage,
+      );
+      return { ok: true as const, runId: requested, changed: true };
+    });
+  }
+
+  async progress(): Promise<{ runId: string | null; stage: TurnStage | null }> {
+    const row = this.ctx.storage.sql
+      .exec<{ run_id: string; stage: string | null }>(
+        "SELECT run_id, stage FROM run_lock WHERE id = 1",
+      )
+      .toArray()[0];
+    return {
+      runId: row?.run_id ?? null,
+      stage: isTurnStage(row?.stage) ? (row?.stage as TurnStage) : null,
+    };
   }
 
   async broadcast(event: ConversationEvent): Promise<void> {

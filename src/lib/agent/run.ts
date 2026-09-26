@@ -253,9 +253,16 @@ export async function runKnowledgeAgent(input: {
   approval?: ApprovalBinding | null;
   now?: number;
   runtime?: AgentRuntime;
+  /**
+   * Fires once, after the first search_knowledge call completes and before
+   * the follow-up model call that drafts the answer. Host-level progress
+   * hook; the callback carries no payload.
+   */
+  onFirstSearchComplete?: () => void | Promise<void>;
 }): Promise<KnowledgeRunResult> {
   const budgets = new BudgetTracker();
   const evidenceLedger = createLedger();
+  let firstSearchCompleted = false;
   let pendingApprovalBinding: ApprovalBinding | undefined;
   const tools: AgentTool[] =
     input.tools ??
@@ -388,6 +395,10 @@ export async function runKnowledgeAgent(input: {
           return { terminate: true };
         }
         throw error;
+      }
+      if (!firstSearchCompleted && context.toolCall.name === SEARCH_KNOWLEDGE_TOOL) {
+        firstSearchCompleted = true;
+        await input.onFirstSearchComplete?.();
       }
       const redacted = redactToolResultForStorage(JSON.stringify(context.result.details ?? {}));
       return {

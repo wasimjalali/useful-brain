@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -491,6 +491,144 @@ describe("RagVisibilityDashboard", () => {
         "Customers can return opened products within the policy window.",
       ).length,
     ).toBeGreaterThan(0);
+  });
+
+  it("polls turn progress on a 2s loop while an answer is pending", async () => {
+    const fetchMock = vi.fn<(input: string, init?: RequestInit) => Promise<Response>>(
+      async () =>
+        new Response(JSON.stringify({ stage: "drafting" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    vi.useFakeTimers();
+    try {
+      const askAction = vi.fn(
+        () => new Promise<ReturnType<typeof successfulAnswer>>(() => undefined),
+      );
+      render(<RagVisibilityDashboard {...baseProps} askAction={askAction} />);
+
+      askQuestion("Can customers return opened products?");
+      await act(async () => {});
+
+      expect(fetchMock).toHaveBeenCalled();
+      expect(String(fetchMock.mock.calls[0]?.[0])).toMatch(/^\/api\/turns\//);
+      expect(screen.getByRole("status")).toHaveTextContent("Drafting the answer.");
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(2);
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("stops polling when the component unmounts mid-turn", async () => {
+    const askAction = vi.fn(
+      () =>
+        new Promise<ReturnType<typeof successfulAnswer>>(() => undefined),
+    );
+    const fetchMock = vi.fn<(input: string, init?: RequestInit) => Promise<Response>>(
+      async () =>
+        new Response(JSON.stringify({ stage: "searching" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    vi.useFakeTimers();
+    try {
+      const { unmount } = render(
+        <RagVisibilityDashboard {...baseProps} askAction={askAction} />,
+      );
+      askQuestion("Can customers return opened products?");
+      await act(async () => {});
+
+      const pollsBeforeUnmount = fetchMock.mock.calls.length;
+      expect(pollsBeforeUnmount).toBeGreaterThan(0);
+      unmount();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(8000);
+      });
+      expect(fetchMock.mock.calls.length).toBe(pollsBeforeUnmount);
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("keeps at most one progress request in flight even when responses are slow", async () => {
+    let resolvePoll: ((response: Response) => void) | undefined;    const fetchMock = vi.fn<(input: string, init?: RequestInit) => Promise<Response>>(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolvePoll = resolve;
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    vi.useFakeTimers();
+    try {
+      const askAction = vi.fn(
+        () => new Promise<ReturnType<typeof successfulAnswer>>(() => undefined),
+      );
+      render(<RagVisibilityDashboard {...baseProps} askAction={askAction} />);
+      askQuestion("Can customers return opened products?");
+      await act(async () => {});
+      expect(fetchMock.mock.calls.length).toBe(1);
+      // Two timer windows elapse while the first response is still pending:
+      // the loop must not stack a second in-flight request on top of it.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(4000);
+      });
+      expect(fetchMock.mock.calls.length).toBe(1);
+      resolvePoll?.(
+        new Response(JSON.stringify({ stage: "drafting" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      expect(fetchMock.mock.calls.length).toBe(2);
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("never lets a terminal progress snapshot complete the answer", async () => {
+    const fetchMock = vi.fn<(input: string, init?: RequestInit) => Promise<Response>>(
+      async () =>
+        new Response(JSON.stringify({ stage: "done" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    vi.useFakeTimers();
+    try {
+      const askAction = vi.fn(
+        () => new Promise<ReturnType<typeof successfulAnswer>>(() => undefined),
+      );
+      render(<RagVisibilityDashboard {...baseProps} askAction={askAction} />);
+
+      askQuestion("Can customers return opened products?");
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+
+      expect(fetchMock).toHaveBeenCalled();
+      expect(screen.getByRole("status")).toBeInTheDocument();
+      expect(
+        screen.queryByText("Opened products may be returned within 30 days."),
+      ).toBeNull();
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
   });
 
   it("stops an in-flight answer by its request id", async () => {

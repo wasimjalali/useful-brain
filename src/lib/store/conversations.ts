@@ -159,6 +159,56 @@ export async function loadOwnedTurnHandleByRequestId(
   };
 }
 
+/**
+ * Progress ownership lookup for the turns progress endpoint. Resolves the
+ * turn through the request id claim joined to the owning conversation, so a
+ * request id belonging to another principal is indistinguishable from an
+ * unknown one. A claim whose assistant message is not materialized yet reads
+ * as still pending; an unrecognized stored status fails closed.
+ */
+export async function loadOwnedTurnProgressByRequestId(
+  db: OperationsDatabase,
+  requestIdInput: string,
+  ownerPrincipalIdInput: string,
+): Promise<{
+  conversationId: string;
+  runId: string;
+  status: "pending" | "completed" | "failed";
+  errorCode: string | null;
+} | null> {
+  const requestId = parseBoundedId(requestIdInput, "request id");
+  const ownerPrincipalId = parseBoundedId(ownerPrincipalIdInput, "principal id");
+  const row = await db
+    .prepare(
+      `SELECT cl.conversation_id, cl.assistant_message_id, m.status, m.error_code
+       FROM request_id_claims cl
+       JOIN conversations c
+         ON c.id = cl.conversation_id AND c.owner_principal_id = ?
+       LEFT JOIN messages m
+         ON m.id = cl.assistant_message_id AND m.role = 'assistant'
+       WHERE cl.request_id = ? AND cl.owner_principal_id = ?`,
+    )
+    .bind(ownerPrincipalId, requestId, ownerPrincipalId)
+    .first<{
+      conversation_id: string;
+      assistant_message_id: string;
+      status: string | null;
+      error_code: string | null;
+    }>();
+  if (!row) {
+    return null;
+  }
+  if (row.status !== null && !["pending", "completed", "failed"].includes(row.status)) {
+    return null;
+  }
+  return {
+    conversationId: row.conversation_id,
+    runId: row.assistant_message_id,
+    status: (row.status ?? "pending") as "pending" | "completed" | "failed",
+    errorCode: row.error_code,
+  };
+}
+
 export function deriveServerConversationTitle(question: string) {
   const normalized = question.trim().replace(/\s+/g, " ");
   if (!normalized) {
