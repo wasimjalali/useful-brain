@@ -71,12 +71,16 @@ export function createWorkersAiCitationRepair(
 
 /**
  * The provider half of citation repair, split from acceptance filtering so
- * a run can reuse it. Reuse is pure: the key is the exact provider request
- * (model id plus the serialized messages and decoding parameters, which
- * encode the question and the evidence set in order), so a hit returns the
- * same response a fresh identical call would have produced, and that
- * response still flows through every acceptance filter unchanged. With
- * identical inputs, reuse cannot change outputs.
+ * a run can reuse it. Reuse is deterministic by construction, not by
+ * provider contract: the key is the exact provider request (model id plus
+ * the serialized messages and decoding parameters, which encode the
+ * question and the evidence set in order). With the pinned decoding
+ * (temperature 0, seed 7) a fresh identical call is expected to return the
+ * same output a cached hit returns; if the provider ever returned different
+ * outputs for identical requests, a hit removes one recovery sample the
+ * uncached path would have had - the live Northwind eval gate after merge
+ * is the check for that. A hit still flows through every acceptance filter
+ * unchanged, so reuse cannot alter label selection or ordering.
  *
  * Only resolved, non-aborted responses are stored: a provider failure
  * propagates before the write, and an abort that lands mid-request throws
