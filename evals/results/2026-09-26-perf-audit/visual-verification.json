@@ -1,0 +1,8 @@
+{
+  "date": "2026-09-26",
+  "feature": "authenticated turn progress (PR #50)",
+  "method": "server action (askGroundedQuestion 40d985fc...) POST to /chat on the app-installed stack at 127.0.0.1:8790, plus concurrent GET /api/turns/<requestId> polls",
+  "observed_states": ["searching", "drafting", "done"],
+  "notes": "Stage transitions observed live through the real Brain service binding with loopback identity on the installed macOS app's own server. Frame recording captured the app window; the UI spinner label change itself requires a UI-initiated turn (the server-action path bypasses client state), so the rendered label per stage is asserted by the component tests (27 pass) and the live API states are verified here.",
+  "known_gap": "cua-driver 0.29.1 element clicks go stale against this WKWebView (AX tree republishes continuously); interactive UI-driven turn recording is pending either a cua-driver fix or the in-app perf harness."
+}
