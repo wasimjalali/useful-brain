@@ -1,0 +1,15 @@
+{
+ "date": "2026-09-26",
+ "final_state": "verified after full round-2 landing",
+ "app": "Useful Brain.app installed at /Applications from merged main (efe2d7c), relaunched cleanly",
+ "verified_in_app": {
+  "sources_page": "62 documents, 784 chunks, Hybrid retrieval, Ready to promote, generation g-e5712870-9969-4a...",
+  "document_inventory": "full table with ingestion statuses renders",
+  "recents_sidebar": "populated with prior conversations",
+  "operator_identity": "dev@localhost loopback"
+ },
+ "live_turn_verification": "searching -> drafting -> done observed through /api/turns during a real grounded turn (see visual-verification.json)",
+ "launch_recording": "frame sheet app-launch-sheet.jpg: cold launch -> status -> full UI at 30fps, 60s",
+ "webkit_note": "mid-session the Safari/WKWebView web content process wedged machine-wide (white even for plain JSON and a trivial test page in Safari); a clean app relaunch resolved it; Chrome rendered fine throughout - unrelated to the app code",
+ "known_gap": "cua-driver element clicks go stale against this WKWebView (AX republishes continuously); interactive UI-driven turn label capture needs a manual click or the in-app perf harness"
+}
