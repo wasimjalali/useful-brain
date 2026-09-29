@@ -89,8 +89,6 @@ header.nav[data-scrolled="true"] { border-color: var(--rule); }
   background-size: 96px 96px; background-position: center -1px;
   -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 30%, transparent 62%); mask-image: linear-gradient(to bottom, #000 0, #000 30%, transparent 62%); }
 .hero-inner { position: relative; width: min(100%, 1248px); margin-inline: auto; padding: 80px 24px 0; }
-.kicker { display: inline-flex; align-items: center; gap: 10px; margin: 0 0 26px; color: var(--night-muted); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
-.kicker::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--night-ink); }
 h1 { max-width: 13em; margin: 0; font-size: clamp(40px, 6vw, 84px); font-weight: 500; line-height: 0.98; letter-spacing: -0.045em; text-wrap: balance; }
 .hero-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 64px; align-items: start; margin-top: 34px; }
 .lede { max-width: 46ch; margin: 0; color: #bdbdbd; font-size: 18px; line-height: 1.55; text-wrap: pretty; }
@@ -138,18 +136,6 @@ h1 { max-width: 13em; margin: 0; font-size: clamp(40px, 6vw, 84px); font-weight:
 @keyframes shot-in { from { opacity: 0; transform: translateY(60px) scale(0.96); } to { opacity: 1; transform: none; } }
 @keyframes head-in { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
 
-/* Coded illustration, labelled, where no clean real capture exists yet. */
-.ill { position: relative; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 20px; padding: 36px; border: 1px solid var(--rule); border-radius: 16px; background: var(--paper-bright);
-  background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px; }
-.ill-tag { position: absolute; top: 14px; right: 16px; color: var(--ink-muted); font-family: var(--font-mono); font-size: 11px; }
-.ill-chat, .ill-doc { display: grid; align-content: start; gap: 12px; padding: 20px; border: 1px solid var(--rule); border-radius: 12px; background: var(--paper-bright); box-shadow: 0 18px 36px -28px rgb(23 23 23 / 0.35); font-size: 15px; line-height: 1.45; }
-.ill-q { justify-self: end; max-width: 85%; margin: 0; padding: 10px 14px; border-radius: 12px 12px 4px 12px; background: var(--paper-deep); }
-.ill-a { display: grid; gap: 10px; max-width: 92%; padding: 12px 14px; border: 1px solid var(--rule); border-radius: 12px 12px 12px 4px; }
-.ill-a p, .ill-doc p { margin: 0; }
-.ill-src { justify-self: start; padding: 2px 8px; border: 1px solid var(--ink); border-radius: 6px; font-family: var(--font-mono); font-size: 12px; }
-.ill-doc-title { color: var(--ink-muted); font-family: var(--font-mono); font-size: 12px; }
-.ill-doc p { color: var(--ink-muted); }
-.ill-doc .hl { padding: 8px 10px; border-left: 2px solid var(--ink); background: var(--paper-deep); color: var(--ink); }
 
 /* Spec sheet: the plain facts. */
 .spec-wrap { padding: 72px 0 120px; }
@@ -217,7 +203,6 @@ h1 { max-width: 13em; margin: 0; font-size: clamp(40px, 6vw, 84px); font-weight:
   .window { border-radius: 10px 10px 0 0; }
   .chapters { padding-top: 72px; }
   .spec { grid-template-columns: 1fr; }
-  .ill { grid-template-columns: 1fr; padding: 40px 14px 14px; }
   .spec-wrap { padding: 40px 0 72px; }
   .cta { padding-block: 64px 56px; }
   .strip { gap: 3px; margin-bottom: 40px; }
@@ -262,7 +247,6 @@ h1 { max-width: 13em; margin: 0; font-size: clamp(40px, 6vw, 84px); font-weight:
         <div class="sheet">
           <div class="sheet-grid" aria-hidden="true"></div>
           <div class="hero-inner">
-            <p class="kicker" data-rise style="--i:0">Knowledge assistant · Built by Useful Build</p>
             <h1 data-rise style="--i:0">Answers from your company's documents, with the source attached.</h1>
             <div class="hero-row" data-rise style="--i:1">
               <p class="lede">Ask about a policy or a process. Read the answer, then check the exact page it came from. When the documents don't cover a question, Brain says so instead of guessing.</p>
@@ -271,12 +255,12 @@ h1 { max-width: 13em; margin: 0; font-size: clamp(40px, 6vw, 84px); font-weight:
                   <a class="btn btn-light" href="https://cal.com/usefulbuild/free-audit">Book a free audit</a>
                   <a class="link-light" href="https://github.com/wasimjalali/useful-brain">View the code on GitHub <span aria-hidden="true">&nearr;</span></a>
                 </div>
-                <p class="facts">Portfolio product · Demonstrated on 65 sample documents · Company setups are scoped separately</p>
+                <p class="facts">Portfolio product · Demonstrated on sample company documents · Company setups are scoped separately</p>
               </div>
             </div>
             <div class="stage" data-rise style="--i:2">
               <figure>
-                <div class="window"><img alt="Useful Brain source library showing document names and processing status." src="/open/sources.png" width="1440" height="900" fetchpriority="high" /></div>
+                <div class="window"><img alt="Useful Brain source library showing document names and processing status." src="/open/sources.png" width="2880" height="1800" fetchpriority="high" /></div>
                 <figcaption>The real product: every document it reads, with its status. A new version is checked before it replaces the active one.</figcaption>
               </figure>
             </div>
@@ -294,29 +278,17 @@ h1 { max-width: 13em; margin: 0; font-size: clamp(40px, 6vw, 84px); font-weight:
               <p>Each answer carries the documents it used. Open one and read the passage before you act on it. Important answers still deserve a human check.</p>
             </div>
             <figure class="shot">
-              <div class="ill" role="img" aria-label="Illustration based on sample documents: the question What's our first-response target for P1 tickets, answered as first response within 1 hour and a fix or workaround within 24 hours, citing the support SLA policy, section 2.">
-                <span class="ill-tag">Illustration based on sample documents</span>
-                <div class="ill-chat">
-                  <p class="ill-q">What's our first-response target for P1 tickets?</p>
-                  <div class="ill-a"><p>P1 tickets get a first response within 1 hour, and a fix or workaround within 24 hours.</p><span class="ill-src">[1] Support SLA policy &middot; section 2</span></div>
-                </div>
-                <div class="ill-doc">
-                  <span class="ill-doc-title">support-sla-policy.md</span>
-                  <p>2. Response targets</p>
-                  <p class="hl">P1: first response within 1 hour. Resolution or workaround within 24 hours.</p>
-                  <p>P2: first response within 4 business hours.</p>
-                </div>
-              </div>
+              <div class="frame"><img alt="A Useful Brain answer on sample documents: sixteen weeks of paid parental leave, with the evidence panel showing the cited passage from parental-leave-policy.md and its retrieval scores." src="/open/answer.png" width="2880" height="1800" loading="lazy" decoding="async" /></div>
             </figure>
           </article>
           <article class="chapter">
             <div class="ch-copy">
               <span class="n">02</span>
               <h2>Tested on real questions, including the hard ones.</h2>
-              <p>We test it with 120 questions over 65 sample documents, including ones it should decline. The latest run passed 118 of 120; the dashboard shows an earlier run at 114. A benchmark on sample data, not a customer result.</p>
+              <p>We test it with 120 questions over a set of sample documents, including ones it should decline. The latest run passed 118 of 120. A benchmark on sample data, not a customer result.</p>
             </div>
             <figure class="shot">
-              <div class="frame"><img alt="Useful Brain evaluations dashboard showing a recorded run of 114 of 120 checks on the Northwind test set." src="/open/evals.png" width="1440" height="900" loading="lazy" decoding="async" /></div>
+              <div class="frame"><img alt="Useful Brain evaluations dashboard showing the latest run: 118 of 120 checks on the Northwind test set, by category." src="/open/evals.png" width="2880" height="1800" loading="lazy" decoding="async" /></div>
             </figure>
           </article>
         </div>
@@ -330,7 +302,7 @@ h1 { max-width: 13em; margin: 0; font-size: clamp(40px, 6vw, 84px); font-weight:
             <ul class="spec">
               <li><span>What it does</span><strong>Answers questions from a document collection and cites its sources</strong></li>
               <li><span>When it can't answer</span><strong>It says the documents don't cover the question</strong></li>
-              <li><span>Tested on</span><strong>120 questions over 65 synthetic documents. Latest recorded run: 118 passed</strong></li>
+              <li><span>Tested on</span><strong>120 questions over synthetic documents. Latest recorded run: 118 passed</strong></li>
               <li><span>Runs on</span><strong>Cloudflare Workers, D1, Vectorize and Workers AI</strong></li>
               <li><span>Status</span><strong>A portfolio product on sample data, not a public service</strong></li>
               <li><span>For your company</span><strong>Useful Build scopes a setup around your documents and tools</strong></li>
@@ -362,9 +334,10 @@ h1 { max-width: 13em; margin: 0; font-size: clamp(40px, 6vw, 84px); font-weight:
           <div class="footer-nav">
             <nav aria-label="Product links">
               <span>Products</span>
-              <a href="https://usefulapply.com">Useful Apply</a>
+              <a href="https://bot.usefulbuild.com">Useful Bot</a>
               <a href="https://brain.usefulbuild.com" aria-current="page">Useful Brain</a>
               <a href="https://voice.usefulbuild.com">Useful Voice</a>
+              <a href="https://usefulapply.com">Useful Apply</a>
             </nav>
             <nav aria-label="Site links">
               <span>Useful Build</span>

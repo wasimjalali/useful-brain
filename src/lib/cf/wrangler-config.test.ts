@@ -225,14 +225,14 @@ describe("protected Worker configuration", () => {
       "utf8",
     );
     expect(html).toContain("/brand/useful-brain-mark.svg");
-    // The recorded chat capture shows a raw table row; until a fresh capture
-    // exists the answer is a labelled illustration of that same data.
+    // The old chat capture showed a raw table row; the answer is now a real
+    // capture of a cited answer with its evidence panel.
     expect(html).not.toContain("/open/chat.png");
+    expect(html).toContain("/open/answer.png");
     expect(html).toContain("/open/sources.png");
     expect(html).toContain("/open/evals.png");
     // The benchmark names the run the screenshot shows and the latest run.
     expect(html).toContain("The latest run passed 118 of 120");
-    expect(html).toContain("Illustration based on sample documents");
     expect(html).toContain("/fonts/geist-variable.woff2");
     expect(html).toContain("https://usefulbuild.com");
     expect(html).toContain("https://cal.com/usefulbuild/free-audit");
@@ -254,7 +254,7 @@ describe("protected Worker configuration", () => {
     expect(html).toContain("Useful Voice, by Useful Build");
     expect(html).toContain('class="sheet-grid"');
     expect(html).toContain("Deepgram");
-    expect(html).toContain("/open/dictate-live.jpg");
+    expect(html).toContain("/open/dictate-live.png");
     expect(html).toContain('aria-current="page">Useful Voice');
     expect(html).toContain("https://usefulbuild.com");
     expect(html).not.toContain(">Kursfind</a>");
