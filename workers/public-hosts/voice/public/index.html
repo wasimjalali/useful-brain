@@ -89,8 +89,6 @@ header.nav[data-scrolled="true"] { border-color: var(--rule); }
   background-size: 96px 96px; background-position: center -1px;
   -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 30%, transparent 62%); mask-image: linear-gradient(to bottom, #000 0, #000 30%, transparent 62%); }
 .hero-inner { position: relative; width: min(100%, 1248px); margin-inline: auto; padding: 80px 24px 0; }
-.kicker { display: inline-flex; align-items: center; gap: 10px; margin: 0 0 26px; color: var(--night-muted); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
-.kicker::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--night-ink); }
 h1 { max-width: 13em; margin: 0; font-size: clamp(40px, 6vw, 84px); font-weight: 500; line-height: 0.98; letter-spacing: -0.045em; text-wrap: balance; }
 .hero-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 64px; align-items: start; margin-top: 34px; }
 .lede { max-width: 46ch; margin: 0; color: #bdbdbd; font-size: 18px; line-height: 1.55; text-wrap: pretty; }
@@ -262,7 +260,6 @@ h1 { max-width: 13em; margin: 0; font-size: clamp(40px, 6vw, 84px); font-weight:
         <div class="sheet">
           <div class="sheet-grid" aria-hidden="true"></div>
           <div class="hero-inner">
-            <p class="kicker" data-rise style="--i:0">Native Mac app · Built by Useful Build</p>
             <h1 data-rise style="--i:0">Type with your voice, anywhere on your Mac.</h1>
             <div class="hero-row" data-rise style="--i:1">
               <p class="lede">Tap Right Command, speak English or German, and the words appear wherever you're typing. Keep searchable notes and teach it the names and terms you use.</p>
