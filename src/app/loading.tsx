@@ -1,23 +1,23 @@
+import "@/components/shell/shell.css";
+import { Skeleton } from "@/components/ui/skeleton";
+
 export default function Loading() {
   return (
-    <div className="flex h-screen bg-canvas" role="status">
-      <aside className="hidden w-[264px] border-r border-border bg-surface p-5 lg:block">
-        <div className="skeleton h-8 w-36" />
-        <div className="mt-8 space-y-3">
-          <div className="skeleton h-10" />
-          <div className="skeleton h-10" />
-          <div className="skeleton h-10" />
-          <div className="skeleton h-10" />
+    <div className="ub-shell" role="status">
+      <aside className="ub-rail">
+        <div className="ub-rail-logo">
+          <Skeleton height={22} width={20} />
+          <Skeleton height={14} width={92} />
+        </div>
+        <div className="ub-rail-group" style={{ marginTop: 14, gap: 10, padding: "0 10px" }}>
+          <Skeleton height={14} width="70%" />
+          <Skeleton height={14} width="55%" />
+          <Skeleton height={14} width="62%" />
         </div>
       </aside>
-      <main className="flex flex-1 flex-col">
-        <div className="h-14 border-b border-border bg-surface" />
-        <div className="mx-auto w-full max-w-3xl space-y-4 px-5 py-10">
-          <div className="skeleton h-7 w-48" />
-          <div className="skeleton h-24" />
-          <div className="skeleton h-24" />
-        </div>
-      </main>
+      <div className="ub-main">
+        <main className="ub-stage" />
+      </div>
       <span className="sr-only">Loading workspace</span>
     </div>
   );

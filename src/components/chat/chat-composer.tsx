@@ -2,40 +2,40 @@
 
 import { useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 
-import { SendIcon, StopIcon } from "@/components/icons";
+import { ArrowUpIcon, SquareIcon } from "@/components/icons";
 
-const COMPACT_HEIGHT = 40;
-const EXPANDED_MAX_HEIGHT = 192;
+const LINE_HEIGHT = 24;
+const MAX_HEIGHT = 192;
 
 type ChatComposerProps = {
-  disabled: boolean;
-  flush?: boolean;
+  disabled?: boolean;
   onChange: (value: string) => void;
   onSend: () => void;
   onStop?: () => void;
   pending: boolean;
-  preview?: string | null;
+  placeholder: string;
   stopping?: boolean;
   value: string;
 };
 
+/**
+ * A 52px pill that grows into a 22px-radius box when the text wraps. The
+ * button is Send (36px circle), and Stop while an answer is running.
+ */
 export function ChatComposer({
-  disabled,
-  flush = false,
+  disabled = false,
   onChange,
   onSend,
   onStop,
   pending,
-  preview = null,
+  placeholder,
   stopping = false,
   value,
 }: ChatComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [boxHeight, setBoxHeight] = useState(COMPACT_HEIGHT);
-  const displayValue = value || preview || "";
-  const isPreview = !value && Boolean(preview);
-  const expanded = boxHeight > COMPACT_HEIGHT + 8;
-  const canScroll = boxHeight >= EXPANDED_MAX_HEIGHT;
+  const [height, setHeight] = useState(LINE_HEIGHT);
+  const expanded = height > LINE_HEIGHT + 4;
+  const hasText = value.trim().length > 0;
 
   useLayoutEffect(() => {
     const field = textareaRef.current;
@@ -43,99 +43,83 @@ export function ChatComposer({
       return;
     }
     field.style.height = "0px";
-    const next = Math.min(
-      Math.max(field.scrollHeight, COMPACT_HEIGHT),
-      EXPANDED_MAX_HEIGHT,
-    );
+    const next = Math.min(Math.max(field.scrollHeight, LINE_HEIGHT), MAX_HEIGHT);
     field.style.height = `${next}px`;
-    setBoxHeight(next);
-  }, [displayValue]);
+    setHeight(next);
+  }, [value]);
 
   function submit() {
-    if (disabled || pending || !value.trim()) {
+    if (disabled || pending || !hasText) {
       return;
     }
     onSend();
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key === "Enter" && !event.shiftKey) {
+    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault();
       submit();
     }
   }
 
+  const stopMode = pending && onStop;
+
   return (
-    <div className={flush ? "w-full" : "px-4 pb-3 pt-2 sm:px-6 sm:pb-6"}>
-      <form
-        className={flush ? "w-full" : "mx-auto w-full max-w-2xl"}
-        onSubmit={(event) => {
-          event.preventDefault();
-          submit();
-        }}
-      >
-        <div
-          className={[
-            "field-input bg-surface shadow-raise",
-            expanded
-              ? "flex flex-col rounded-2xl px-2 pb-2 pt-1"
-              : "flex items-center gap-1.5 rounded-full py-0 pl-2.5 pr-1",
-          ].join(" ")}
-        >
-          <label className="sr-only" htmlFor="chat-question">
-            Question
-          </label>
-          <textarea
-            className={[
-              "uv-scroll composer-scroll min-h-[40px] w-full resize-none border-0 bg-transparent px-2 py-2 text-[15px] leading-6 outline-none placeholder:text-ink-faint focus:outline-none focus-visible:outline-none disabled:text-ink-faint",
-              isPreview ? "text-ink-muted" : "text-ink",
-              canScroll ? "overflow-y-auto" : "overflow-hidden",
-            ].join(" ")}
-            disabled={disabled}
-            id="chat-question"
-            maxLength={2000}
-            name="question"
-            onChange={(event) => onChange(event.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={
-              disabled
-                ? "Promote a generation to start"
-                : "Ask Useful Brain"
-            }
-            ref={textareaRef}
-            rows={1}
-            value={displayValue}
-          />
-          <div
-            className={
-              expanded
-                ? "flex justify-end px-1"
-                : "grid size-10 shrink-0 place-items-center"
-            }
+    <form
+      className={`flex w-full bg-bubble shadow-[0_0_0_1px_var(--edge),var(--lift)] transition-shadow duration-[120ms] focus-within:shadow-[0_0_0_1px_var(--border-strong),var(--lift)] ${
+        expanded
+          ? "flex-col rounded-[22px] pb-2 pl-5 pr-2 pt-3.5"
+          : "min-h-[52px] items-center rounded-full pl-5 pr-2"
+      }`}
+      onSubmit={(event) => {
+        event.preventDefault();
+        submit();
+      }}
+    >
+      <label className="sr-only" htmlFor="chat-question">
+        Question
+      </label>
+      <textarea
+        className={`w-full min-w-0 flex-1 resize-none border-0 bg-transparent p-0 text-[15px] leading-6 text-ink outline-none placeholder:text-ink-faint-text focus:outline-none disabled:text-ink-faint-text ${
+          height >= MAX_HEIGHT ? "overflow-y-auto" : "overflow-hidden"
+        }`}
+        disabled={disabled}
+        id="chat-question"
+        maxLength={2000}
+        name="question"
+        onChange={(event) => onChange(event.target.value)}
+        onKeyDown={handleKeyDown}
+        placeholder={placeholder}
+        ref={textareaRef}
+        rows={1}
+        value={value}
+      />
+      <div className={expanded ? "flex justify-end pt-1.5" : "flex shrink-0"}>
+        {stopMode ? (
+          <button
+            aria-label="Stop"
+            className="ub-ring grid size-9 place-items-center rounded-full bg-accent text-accent-ink transition-opacity duration-[120ms] hover:opacity-[0.86] disabled:opacity-60"
+            disabled={stopping}
+            onClick={onStop}
+            type="button"
           >
-            {pending && onStop ? (
-              <button
-                aria-label="Stop"
-                className="btn btn-secondary size-9 shrink-0 rounded-full p-0"
-                disabled={stopping}
-                onClick={onStop}
-                type="button"
-              >
-                <StopIcon className="size-3.5" />
-              </button>
-            ) : (
-              <button
-                aria-label="Generate answer"
-                className="btn btn-primary size-7 shrink-0 rounded-full p-0"
-                disabled={disabled || pending || value.trim().length === 0}
-                type="submit"
-              >
-                <SendIcon className="size-3.5" />
-              </button>
-            )}
-          </div>
-        </div>
-      </form>
-    </div>
+            <SquareIcon className="size-3.5" />
+          </button>
+        ) : (
+          <button
+            aria-label="Send"
+            className={`ub-ring grid size-9 place-items-center rounded-full transition-colors duration-[120ms] ${
+              hasText && !disabled && !pending
+                ? "bg-accent text-accent-ink hover:opacity-[0.86]"
+                : "cursor-not-allowed bg-sunken text-ink-faint"
+            }`}
+            disabled={disabled || pending || !hasText}
+            type="submit"
+          >
+            <ArrowUpIcon className="size-4" />
+          </button>
+        )}
+      </div>
+    </form>
   );
 }

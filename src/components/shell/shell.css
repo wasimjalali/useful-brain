@@ -1,0 +1,453 @@
+/* App shell: flat rail on the canvas, white stage, optional second stage.
+   Tokens only. Breakpoints: >=1200 rail + stage + panel, 768-1199 slide-over
+   rail and right sheet, <768 mobile with a bottom sheet. */
+
+.ub-shell {
+  display: flex;
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-ui);
+}
+
+/* Rail */
+.ub-rail {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  width: 248px;
+  min-height: 0;
+  padding: 10px;
+  background: var(--canvas);
+}
+.ub-rail:focus-visible {
+  outline: none;
+}
+.ub-rail-logo {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 40px;
+  padding: 0 10px;
+}
+.ub-rail-mark {
+  width: 20px;
+  height: 22px;
+  flex: none;
+  color: var(--ink);
+}
+.ub-rail-wordmark {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.ub-rail-close {
+  margin-right: -10px;
+}
+.ub-rail-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+nav.ub-rail-group {
+  margin-top: 10px;
+}
+.ub-rail-section {
+  margin-top: 18px;
+}
+.ub-rail-label {
+  margin: 0;
+  padding: 0 10px 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-faint-text);
+}
+.ub-rail-chats {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 18px;
+}
+.ub-rail-chats > .ub-rail-section {
+  margin-top: 0;
+}
+.ub-rail-empty {
+  margin: 0;
+  padding: 0 10px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--ink-faint-text);
+}
+.ub-rail-error {
+  margin: 0;
+  padding: 0 10px;
+  font-size: 12px;
+  color: var(--danger);
+}
+
+.ub-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color var(--dur-tone) var(--ease-out), color var(--dur-tone) var(--ease-out);
+}
+.ub-row:hover {
+  background: var(--hover);
+}
+.ub-row[aria-current="page"] {
+  background: var(--bubble);
+  box-shadow: var(--sel);
+  font-weight: 500;
+}
+.ub-row-icon {
+  display: inline-flex;
+  color: var(--ink-muted);
+}
+.ub-row-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ub-row-kbd {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-faint-text);
+}
+.ub-chat-wrap {
+  position: relative;
+}
+.ub-chat-row {
+  height: 32px;
+  color: var(--ink-muted);
+}
+.ub-chat-row:hover,
+.ub-chat-row[aria-current="page"] {
+  color: var(--ink);
+}
+.ub-chat-delete {
+  position: absolute;
+  top: 0;
+  right: 2px;
+  display: none;
+}
+.ub-chat-delete .ub-iconbtn {
+  width: 28px;
+  height: 28px;
+  margin-top: 2px;
+}
+.ub-chat-wrap:hover .ub-chat-delete,
+.ub-chat-wrap:focus-within .ub-chat-delete {
+  display: block;
+}
+
+.ub-rail-profile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 48px;
+  padding: 0 4px 0 8px;
+  margin-top: 8px;
+}
+.ub-avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: var(--border-strong);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+.ub-profile-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.ub-profile-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 16px;
+}
+.ub-profile-role {
+  font-size: 12px;
+  line-height: 15px;
+  color: var(--ink-faint-text);
+}
+
+/* Stage and panel */
+.ub-main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  gap: 10px;
+  margin: 10px 10px 10px 0;
+}
+.ub-stage,
+.ub-panel {
+  min-width: 0;
+  min-height: 0;
+  border-radius: 24px;
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--edge), var(--stage-shadow);
+  overflow: hidden;
+}
+.ub-stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.ub-panel {
+  flex: none;
+  width: 380px;
+  display: flex;
+  flex-direction: column;
+}
+.ub-panel-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.ub-page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  animation: ub-page-in var(--dur-rise) var(--ease-out) both;
+  transition: opacity 120ms var(--ease-out);
+}
+.ub-page[data-leaving="true"] {
+  opacity: 0;
+}
+@keyframes ub-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* Header shown where the rail is a slide-over */
+.ub-header {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  height: 52px;
+  flex: none;
+  padding: 0 6px;
+}
+.ub-header-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 15px;
+  font-weight: 500;
+}
+.ub-header .ub-iconbtn {
+  width: 44px;
+  height: 44px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.ub-rail-close .ub-iconbtn {
+  width: 44px;
+  height: 44px;
+}
+.ub-rail-close {
+  display: none;
+}
+
+/* Scrim, sheets */
+.ub-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  border: 0;
+  padding: 0;
+  background: var(--scrim);
+  cursor: default;
+  animation: ub-fade 160ms var(--ease-out) both;
+}
+@keyframes ub-fade {
+  from {
+    opacity: 0;
+  }
+}
+.ub-sheet-right,
+.ub-sheet-bottom {
+  position: fixed;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--edge), var(--stage-shadow);
+  overflow: hidden;
+}
+.ub-sheet-right:focus-visible,
+.ub-sheet-bottom:focus-visible {
+  outline: none;
+}
+.ub-sheet-right {
+  top: 10px;
+  right: 10px;
+  bottom: 10px;
+  width: 380px;
+  max-width: calc(100vw - 20px);
+  border-radius: 24px;
+  animation: ub-slide-left 260ms var(--ease-out) both;
+}
+.ub-sheet-bottom {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: min(612px, 92dvh);
+  border-radius: 24px 24px 0 0;
+  animation: ub-slide-up 260ms var(--ease-out) both;
+}
+.ub-grabber {
+  flex: none;
+  align-self: center;
+  width: 36px;
+  height: 4px;
+  margin: 8px 0 4px;
+  border-radius: 999px;
+  background: var(--border-strong);
+}
+@keyframes ub-slide-left {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+}
+@keyframes ub-slide-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+
+/* Page header (admin and library pages) */
+.ub-page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 36px 48px 0;
+}
+.ub-page-header h1 {
+  margin: 0;
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.ub-page-header p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+.ub-page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Tablet and mobile: the rail becomes a slide-over */
+@media (max-width: 1199px) {
+  .ub-rail {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 50;
+    width: 308px;
+    max-width: calc(100vw - 48px);
+    padding: 10px 12px;
+    border-radius: 0 24px 24px 0;
+    box-shadow: var(--stage-shadow), 0 0 0 1px var(--edge);
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition: transform 260ms var(--ease-out), visibility 0s linear 260ms;
+  }
+  .ub-rail[role="dialog"] {
+    transform: none;
+    visibility: visible;
+    transition: transform 260ms var(--ease-out);
+  }
+  .ub-rail-close {
+    display: block;
+  }
+  .ub-rail .ub-row {
+    height: 44px;
+    font-size: 15px;
+    gap: 12px;
+  }
+  .ub-rail .ub-chat-row {
+    height: 44px;
+  }
+  .ub-rail-logo {
+    height: 52px;
+  }
+  .ub-header {
+    display: flex;
+  }
+  .ub-main {
+    margin: 10px;
+  }
+}
+
+@media (max-width: 767px) {
+  .ub-main {
+    margin: 0;
+  }
+  .ub-stage {
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .ub-page-header {
+    padding: 20px 16px 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ub-page,
+  .ub-scrim,
+  .ub-sheet-right,
+  .ub-sheet-bottom,
+  .ub-rail {
+    animation: none;
+    transition: none;
+  }
+}

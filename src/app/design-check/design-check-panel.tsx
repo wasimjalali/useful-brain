@@ -26,6 +26,7 @@ import {
   TableRow,
   TableRowActions,
 } from "@/components/ui/table";
+import { DesignCheckGallery } from "./design-check-gallery";
 
 /* Forced states for review only. Real components use :hover, :active and
    :focus-visible; these attribute selectors mirror them so the sheet can show
@@ -253,6 +254,8 @@ export function DesignCheckPanel({ theme }: { theme: "light" | "dark" }) {
             <Button onClick={() => setOpen(true)}>Open dialog</Button>
           </Row>
         </Group>
+
+        <DesignCheckGallery />
       </div>
       {open ? (
         <Dialog ariaLabel="Example dialog" onClose={() => setOpen(false)} top={96} width={480}>
