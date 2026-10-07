@@ -1,5 +1,16 @@
-import type { Conversation, ChatTurn } from "../rag/chat-history";
+import type {
+  ChatEvidenceRow,
+  ChatTurnView,
+  ConversationAnswerType,
+  ConversationView,
+  FeedbackValue,
+} from "../contracts/chat";
+import type { ApprovalView } from "../contracts/approvals";
+import type { Conversation } from "../rag/chat-history";
 import type { GroundedAnswerResponse } from "../rag/grounded-answer";
+import type { SqlExecutor } from "./corpus-d1";
+import { loadApprovalViewForMessage } from "./approval-view";
+import { normalizeRequestQuestion } from "./document-requests";
 import {
   assertConversationOwner,
   ConversationStoreError,
@@ -28,6 +39,8 @@ type AssistantRow = {
   parent_user_message_id: string | null;
   corpus_generation_id: string | null;
   retrieval_config_version: string | null;
+  latency_ms: number | null;
+  passages_retrieved: number | null;
   created_at: number;
 };
 
@@ -41,6 +54,7 @@ type EvidenceRow = {
   token_estimate: number;
   citation_label: string;
   document_id: string | null;
+  generation_id: string | null;
   vector_score: number | null;
   keyword_score: number | null;
   fused_score: number | null;
@@ -70,11 +84,62 @@ export async function listRecentConversations(
   }));
 }
 
+const ANSWER_TYPES: readonly string[] = [
+  "grounded",
+  "insufficient_evidence",
+  "unavailable",
+  "must_retrieve",
+  "invalid_citation",
+] satisfies ConversationAnswerType[];
+
+const IN_LIST_BATCH = 90;
+
+/**
+ * Titles from the document catalog for the documents an answer cited, keyed
+ * `generation|document`. Titles only: evidence text always comes from the
+ * stored snapshot. A missing catalog or row simply yields no title.
+ */
+async function loadDocumentTitles(
+  corpus: SqlExecutor | undefined,
+  evidence: Iterable<EvidenceRow>,
+): Promise<Map<string, string>> {
+  const titles = new Map<string, string>();
+  if (!corpus) {
+    return titles;
+  }
+  const idsByGeneration = new Map<string, Set<string>>();
+  for (const row of evidence) {
+    if (row.document_id && row.generation_id) {
+      const ids = idsByGeneration.get(row.generation_id) ?? new Set<string>();
+      ids.add(row.document_id);
+      idsByGeneration.set(row.generation_id, ids);
+    }
+  }
+  for (const [generationId, idSet] of idsByGeneration) {
+    const ids = [...idSet];
+    for (let start = 0; start < ids.length; start += IN_LIST_BATCH) {
+      const batch = ids.slice(start, start + IN_LIST_BATCH);
+      const rows = await corpus
+        .prepare(
+          `SELECT document_id, title FROM document_catalog
+           WHERE generation_id = ? AND document_id IN (${batch.map(() => "?").join(",")})`,
+        )
+        .bind(generationId, ...batch)
+        .all<{ document_id: string; title: string }>();
+      for (const row of rows.results) {
+        titles.set(`${generationId}|${row.document_id}`, row.title);
+      }
+    }
+  }
+  return titles;
+}
+
 export async function loadConversationForUi(
   db: OperationsDatabase,
   conversationId: string,
   ownerPrincipalId: string,
-): Promise<Conversation> {
+  corpus?: SqlExecutor,
+): Promise<ConversationView> {
   await assertConversationOwner(db, conversationId, ownerPrincipalId);
   const header = await db
     .prepare(
@@ -96,7 +161,7 @@ export async function loadConversationForUi(
     .prepare(
       `SELECT id, content, status, answer_type, answer_model, embedding_model, embedding_dimensions,
               structured_paragraphs_json, error_code, parent_user_message_id, corpus_generation_id,
-              retrieval_config_version, created_at
+              retrieval_config_version, latency_ms, passages_retrieved, created_at
        FROM messages WHERE conversation_id = ? AND role = 'assistant' ORDER BY created_at ASC, id ASC`,
     )
     .bind(conversationId)
@@ -116,7 +181,7 @@ export async function loadConversationForUi(
     const evidenceRows = await db
       .prepare(
         `SELECT message_id, rank, score, chunk_id, source, section, text, token_estimate,
-                citation_label, document_id, vector_score, keyword_score, fused_score, rerank_score
+                citation_label, document_id, generation_id, vector_score, keyword_score, fused_score, rerank_score
          FROM evidence_snapshots WHERE message_id IN (${placeholders})
          ORDER BY message_id ASC, rank ASC`,
       )
@@ -128,8 +193,90 @@ export async function loadConversationForUi(
       evidenceByMessage.set(row.message_id, list);
     }
   }
+  const documentTitles = await loadDocumentTitles(
+    corpus,
+    [...evidenceByMessage.values()].flat(),
+  );
   const byId = new Map(messages.results.map((row) => [row.id, row]));
-  const turns: ChatTurn[] = [];
+  // The caller's own feedback, and whether a document was already requested
+  // for the same normalized question (a request covers every ask of it).
+  const feedbackByMessage = new Map<string, FeedbackValue>();
+  const requestedQuestions = new Set<string>();
+  const completedIds = completed.map((assistant) => assistant.id);
+  for (let start = 0; start < completedIds.length; start += IN_LIST_BATCH) {
+    const batch = completedIds.slice(start, start + IN_LIST_BATCH);
+    const feedbackRows = await db
+      .prepare(
+        `SELECT message_id, value FROM message_feedback
+         WHERE principal_id = ? AND message_id IN (${batch.map(() => "?").join(",")})`,
+      )
+      .bind(ownerPrincipalId, ...batch)
+      .all<{ message_id: string; value: FeedbackValue }>();
+    for (const row of feedbackRows.results) {
+      feedbackByMessage.set(row.message_id, row.value);
+    }
+  }
+  // Proposed actions of the caller's own assistant messages. One indexed read
+  // finds the messages that have a run; the owner-only view is loaded for those.
+  const approvalByMessage = new Map<string, ApprovalView>();
+  for (let start = 0; start < completedIds.length; start += IN_LIST_BATCH) {
+    const batch = completedIds.slice(start, start + IN_LIST_BATCH);
+    const withRuns = await db
+      .prepare(
+        `SELECT DISTINCT r.evidence_message_id AS id FROM agent_runs r
+         JOIN approvals a ON a.run_id = r.id
+         WHERE r.principal_id = ? AND r.evidence_message_id IN (${batch.map(() => "?").join(",")})`,
+      )
+      .bind(ownerPrincipalId, ...batch)
+      .all<{ id: string }>();
+    for (const row of withRuns.results) {
+      const view = await loadApprovalViewForMessage(db, row.id, { id: ownerPrincipalId });
+      if (view) {
+        approvalByMessage.set(row.id, view);
+      }
+    }
+  }
+  const insufficientQuestions = [
+    ...new Set(
+      completed
+        .filter((assistant) => assistant.answer_type === "insufficient_evidence")
+        .map((assistant) => byId.get(assistant.parent_user_message_id ?? ""))
+        .filter((parent) => parent?.role === "user")
+        .map((parent) => normalizeRequestQuestion(parent?.content ?? ""))
+        .filter(Boolean),
+    ),
+  ];
+  for (let start = 0; start < insufficientQuestions.length; start += IN_LIST_BATCH) {
+    const batch = insufficientQuestions.slice(start, start + IN_LIST_BATCH);
+    const requestRows = await db
+      .prepare(
+        `SELECT question_normalized FROM document_requests
+         WHERE principal_id = ? AND question_normalized IN (${batch.map(() => "?").join(",")})`,
+      )
+      .bind(ownerPrincipalId, ...batch)
+      .all<{ question_normalized: string }>();
+    for (const row of requestRows.results) {
+      requestedQuestions.add(row.question_normalized);
+    }
+  }
+  // A failed attempt that was retried is replaced by the retry: the retry
+  // answers the same saved user message, so only the latest attempt shows.
+  const retriedUserIds = new Set(
+    assistants.results
+      .filter(
+        (assistant) =>
+          assistant.parent_user_message_id &&
+          assistants.results.some(
+            (later) =>
+              later.id !== assistant.id &&
+              later.parent_user_message_id === assistant.parent_user_message_id &&
+              (later.created_at > assistant.created_at ||
+                (later.created_at === assistant.created_at && later.id > assistant.id)),
+          ),
+      )
+      .map((assistant) => assistant.id),
+  );
+  const turns: ChatTurnView[] = [];
   for (const assistant of assistants.results) {
     const parent = assistant.parent_user_message_id
       ? byId.get(assistant.parent_user_message_id)
@@ -139,6 +286,9 @@ export async function loadConversationForUi(
       continue;
     }
     if (assistant.status === "failed") {
+      if (retriedUserIds.has(assistant.id)) {
+        continue;
+      }
       const cancelled = assistant.error_code === "CANCELLED";
       turns.push({
         id: assistant.id,
@@ -148,6 +298,11 @@ export async function loadConversationForUi(
         errorRetryable:
           assistant.error_code === "RATE_LIMITED" || assistant.error_code === "PROVIDER_TEMPORARY",
         cancelled,
+        answerType: null,
+        latencyMs: null,
+        passagesRetrieved: null,
+        feedback: null,
+        documentRequested: false,
       });
       continue;
     }
@@ -170,8 +325,18 @@ export async function loadConversationForUi(
     }
     const answerType =
       assistant.answer_type === "grounded" ? "grounded" : "insufficient_evidence";
-    turns.push({
+    const storedAnswerType = ANSWER_TYPES.includes(assistant.answer_type ?? "")
+      ? (assistant.answer_type as ConversationAnswerType)
+      : null;
+    const completedTurn: ChatTurnView = {
       id: assistant.id,
+      answerType: storedAnswerType,
+      latencyMs: assistant.latency_ms,
+      passagesRetrieved: assistant.passages_retrieved,
+      feedback: feedbackByMessage.get(assistant.id) ?? null,
+      documentRequested:
+        assistant.answer_type === "insufficient_evidence" &&
+        requestedQuestions.has(normalizeRequestQuestion(question)),
       question,
       answer: {
         question,
@@ -191,11 +356,15 @@ export async function loadConversationForUi(
             tokenEstimate: item.token_estimate,
             citationLabel: item.citation_label,
             documentId: item.document_id,
+            documentTitle:
+              item.document_id && item.generation_id
+                ? (documentTitles.get(`${item.generation_id}|${item.document_id}`) ?? null)
+                : null,
             vectorScore: item.vector_score,
             keywordScore: item.keyword_score,
             fusedScore: item.fused_score,
             rerankScore: item.rerank_score,
-          })),
+          })) satisfies ChatEvidenceRow[],
         },
         conversationId,
         assistantMessageId: assistant.id,
@@ -203,7 +372,12 @@ export async function loadConversationForUi(
         retrievalConfigVersion: assistant.retrieval_config_version,
       },
       error: null,
-    });
+    };
+    const approval = approvalByMessage.get(assistant.id);
+    if (approval) {
+      completedTurn.approval = approval;
+    }
+    turns.push(completedTurn);
   }
   if (turns.length === 0) {
     const paired = pairCompletedHistoryTurns(messages.results);
@@ -220,6 +394,11 @@ export async function loadConversationForUi(
           conversationId,
         },
         error: null,
+        answerType: null,
+        latencyMs: null,
+        passagesRetrieved: null,
+        feedback: null,
+        documentRequested: false,
       });
     }
   }
@@ -240,6 +419,20 @@ export async function deleteConversation(
   await assertConversationOwner(db, conversationId, ownerPrincipalId);
   await db.prepare("PRAGMA foreign_keys = ON").run();
   await db.batch([
+    db
+      .prepare(
+        `DELETE FROM message_feedback WHERE message_id IN (
+           SELECT id FROM messages WHERE conversation_id = ?
+         )`,
+      )
+      .bind(conversationId),
+    db
+      .prepare(
+        `DELETE FROM document_requests WHERE message_id IN (
+           SELECT id FROM messages WHERE conversation_id = ?
+         )`,
+      )
+      .bind(conversationId),
     db
       .prepare(
         `DELETE FROM evidence_snapshots WHERE message_id IN (
@@ -264,6 +457,13 @@ export async function deleteConversation(
     db.prepare(`DELETE FROM approvals WHERE conversation_id = ?`).bind(conversationId),
     db.prepare(`DELETE FROM agent_runs WHERE conversation_id = ?`).bind(conversationId),
     db.prepare(`DELETE FROM request_id_claims WHERE conversation_id = ?`).bind(conversationId),
+    db
+      .prepare(
+        `DELETE FROM turn_steps WHERE message_id IN (
+           SELECT id FROM messages WHERE conversation_id = ?
+         )`,
+      )
+      .bind(conversationId),
     db.prepare(`DELETE FROM messages WHERE conversation_id = ?`).bind(conversationId),
     db
       .prepare(`DELETE FROM conversations WHERE id = ? AND owner_principal_id = ?`)

@@ -63,6 +63,8 @@ describe("Web-to-Brain identity", () => {
       id: "principal-alice",
       kind: "user",
       subject: "alice@karkoai.com",
+      name: null,
+      email: null,
       roles: ["operator"],
       departments: ["engineering"],
       isAdmin: false,

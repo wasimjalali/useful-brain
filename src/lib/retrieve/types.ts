@@ -47,6 +47,9 @@ export type SearchHit = {
   citation: SearchCitation;
 };
 
+/** Best candidate the relevance floor dropped. ACL-allowed for the asker; admin data only. */
+export type BestBelowFloor = { chunkId: string; documentId: string; score: number };
+
 export type RetrievalTrace = {
   query: string;
   finalChunkIds: string[];
@@ -55,6 +58,9 @@ export type RetrievalTrace = {
   fusedScores: Record<string, number>;
   rerankScores: Record<string, number>;
   fingerprint: string;
+  /** Candidates after authorization and fusion, before the rerank head and the floor. */
+  candidateCount?: number;
+  bestBelowFloor?: BestBelowFloor;
   /** Set when the vector channel failed and this response is keyword-only. */
   vectorChannelError?: boolean;
 };

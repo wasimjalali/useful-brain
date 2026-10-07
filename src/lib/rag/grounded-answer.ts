@@ -17,6 +17,8 @@ export type CitedRetrievalResult = {
 export type GroundedAnswerParagraph = {
   text: string;
   citations: string[];
+  /** Host-typed paragraph (see ACTION_NOTE_TEXT); absent on grounded paragraphs. */
+  kind?: "action_note";
 };
 
 export type StructuredGroundedAnswer = {

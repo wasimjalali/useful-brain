@@ -49,6 +49,8 @@ export type KnowledgeRunResult = {
   aborted: boolean;
   pendingApproval: boolean;
   pendingApprovalBinding?: ApprovalBinding;
+  /** Tool calls of this run as stored for replay: arguments, redacted result and status. */
+  toolCalls: StoredToolCall[];
   model: string;
   promptVersion: string;
   errorMessage?: string;
@@ -122,6 +124,7 @@ export const LIVE_KNOWLEDGE_SYSTEM_PROMPT = [
   "Every evidence item names its document. When more than one item states a fact, quote and cite the item from the dedicated policy document for that topic rather than a handbook, guide or neighboring policy, or cite both labels.",
   "Do not paraphrase, infer or combine separate evidence spans into one sentence. Every paragraph must include a citation label from this turn.",
   "Answer only the exact fact the question asks. A sentence about a different program, plan, metric, document or policy than the one asked is not an answer, even when it looks similar. A number, timeframe or rule stated for one named process is not evidence for a different process: a patch-availability window for supported product versions does not answer an internal remediation deadline, a hiring referral bonus does not answer a customer referral payout, and a neighboring policy restating another document's rule does not replace that document. When evidence states that two similar-sounding programs, policies or processes are different, treat them as different: answer each only from its own document, never from the other's numbers or rules. A deadline that tells customers what they receive is not our internal deadline to act. Follow attribution pointers: when a document says its rule or window comes from another policy, quote and cite that policy, not the restating document. When the evidence states the asked number or rule only for a different program or process than the one asked about, reply exactly with the not-enough-evidence sentence.",
+  "When the user asks you to open a support ticket, first call search_knowledge for the rule that decides the priority, then call create_ticket in the same message as the cited sentences that explain the priority. Never invent create_ticket arguments: use only the customer, priority and subject the user gave or the evidence states, and if one is missing do not call create_ticket. Never call create_ticket for a question.",
   `Do not invent facts. A related or similar document is not evidence for a fact it does not state. If no evidence states the specific program, benefit, policy, amount or rule the question asks about, reply exactly: ${BRAIN_NOT_ENOUGH_EVIDENCE}`,
   `Prompt version ${PROMPT_VERSION}.`,
 ].join(" ");
@@ -265,6 +268,12 @@ export async function runKnowledgeAgent(input: {
   abort?: AbortController;
   searchQuery?: string;
   tools?: AgentTool[];
+  /**
+   * Tools offered next to search_knowledge (which stays first and is always
+   * present). Ignored when `tools` replaces the list. They join the allowed
+   * set, so beforeToolCall still runs the policy gateway for every call.
+   */
+  extraTools?: AgentTool[];
   approval?: ApprovalBinding | null;
   now?: number;
   runtime?: AgentRuntime;
@@ -302,6 +311,7 @@ export async function runKnowledgeAgent(input: {
         budgets,
         ledger: evidenceLedger,
       }),
+      ...(input.extraTools ?? []),
     ];
   const faux = fauxProvider({ provider: "useful-brain-phase5-faux" });
   const query = input.searchQuery ?? input.question;
@@ -728,6 +738,7 @@ export async function runKnowledgeAgent(input: {
       wall.aborted,
     pendingApproval,
     pendingApprovalBinding,
+    toolCalls: recorded,
     model: agent.state.model.id,
     promptVersion: PROMPT_VERSION,
     errorMessage: agent.state.errorMessage ?? budgetErrorMessage,

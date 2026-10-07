@@ -1,0 +1,571 @@
+import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test";
+import { env } from "cloudflare:workers";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+
+import worker from "../src";
+import { aclGroupKey } from "../../../src/lib/acl/acl-group";
+import type {
+  DraftActionResponse,
+  SourcesResponse,
+  UploadCreated,
+  UploadStatus,
+} from "../../../src/lib/contracts/sources";
+import { activeGenerationId } from "../../../src/lib/store/corpus-d1";
+import { seedCorpus, seedPersonas, seedPrincipals, CORPUS_DOCUMENT_IDS, type PersonaId } from "./seed";
+
+const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
+
+type Sent = { jobId: string; idempotencyKey: string };
+let sent: Sent[] = [];
+let deletedVectors: string[] = [];
+let failQueue = false;
+
+const fakeQueue = {
+  async send(message: Sent) {
+    if (failQueue) {
+      throw new Error("queue down");
+    }
+    sent.push(message);
+  },
+};
+const fakeVectorize = {
+  async deleteByIds(ids: string[]) {
+    deletedVectors.push(...ids);
+    return { mutationId: `del-${deletedVectors.length}` };
+  },
+};
+
+const sessionEnv = {
+  ...env,
+  IDENTITY_MODE: "session",
+  LOOPBACK_RUNTIME: "false",
+  LOOPBACK_SUBJECT: "",
+  INGEST_QUEUE: fakeQueue,
+  VECTORIZE: fakeVectorize,
+} as unknown as typeof env;
+
+async function call(
+  path: string,
+  cookie: string | undefined,
+  init: { method?: string; json?: unknown; body?: Uint8Array; length?: number } = {},
+): Promise<Response> {
+  const ctx = createExecutionContext();
+  const headers: Record<string, string> = {};
+  if (cookie) headers.cookie = cookie;
+  let body: BodyInit | undefined;
+  if (init.json !== undefined) {
+    body = JSON.stringify(init.json);
+    headers["content-type"] = "application/json";
+  } else if (init.body) {
+    body = init.body;
+    headers["content-length"] = String(init.length ?? init.body.byteLength);
+  }
+  const response = await worker.fetch(
+    new IncomingRequest(`https://brain.internal${path}`, {
+      method: init.method ?? (body === undefined ? "GET" : "POST"),
+      headers,
+      body,
+    }),
+    sessionEnv,
+    ctx,
+  );
+  await waitOnExecutionContext(ctx);
+  return response;
+}
+
+let cookies: Record<PersonaId, string>;
+let activeId: string;
+
+async function resetPipeline() {
+  await env.CORPUS_DB.batch([
+    env.CORPUS_DB.prepare("DELETE FROM upload_files"),
+    env.CORPUS_DB.prepare("DELETE FROM upload_batches"),
+    env.CORPUS_DB.prepare("DELETE FROM draft_checks"),
+    env.CORPUS_DB.prepare("DELETE FROM drafts"),
+  ]);
+  sent = [];
+  deletedVectors = [];
+  failQueue = false;
+}
+
+beforeAll(async () => {
+  await seedPrincipals();
+  cookies = await seedPersonas();
+  activeId = (await seedCorpus()).generationId;
+});
+
+beforeEach(resetPipeline);
+
+const admin = () => cookies["member-jordan"];
+const member = () => cookies["member-maya"];
+
+const baseBody = (overrides: Record<string, unknown> = {}) => ({
+  readers: { kind: "departments", names: ["hr"] },
+  idempotencyKey: `key-${crypto.randomUUID()}`,
+  files: [{ name: "Leave Policy.md", size: 20 }],
+  ...overrides,
+});
+
+async function createBatch(overrides: Record<string, unknown> = {}): Promise<UploadCreated> {
+  const response = await call("/admin/uploads", admin(), { json: baseBody(overrides) });
+  expect(response.status).toBe(200);
+  return (await response.json()) as UploadCreated;
+}
+
+const bytes = (length: number) => new TextEncoder().encode("x".repeat(length));
+
+describe("admin gate", () => {
+  const routes: Array<[string, string, Record<string, unknown>?]> = [
+    ["POST", "/admin/uploads", { json: baseBody() }],
+    ["PUT", "/admin/uploads/ub-x/files/uf-x", { body: bytes(5) }],
+    ["GET", "/admin/uploads/ub-x"],
+    ["GET", "/admin/sources"],
+    ["POST", "/admin/drafts/g-x/promote", {}],
+    ["POST", "/admin/drafts/g-x/discard", {}],
+    ["POST", "/admin/reindex", {}],
+  ];
+
+  it.each(routes)("%s %s answers 401 with no session and 403 for a member", async (method, path, init) => {
+    const anonymous = await call(path, undefined, { method, ...(init as object) });
+    expect(anonymous.status).toBe(401);
+    const asMember = await call(path, member(), { method, ...(init as object) });
+    expect(asMember.status).toBe(403);
+  });
+
+  it("creates nothing for a member who tries", async () => {
+    await call("/admin/uploads", member(), { json: baseBody() });
+    const drafts = await env.CORPUS_DB.prepare("SELECT COUNT(*) AS n FROM drafts").first<{ n: number }>();
+    expect(drafts?.n).toBe(0);
+    expect(sent).toEqual([]);
+  });
+});
+
+describe("POST /admin/uploads validation", () => {
+  const invalid: Array<[string, Record<string, unknown>]> = [
+    ["unsupported type", { files: [{ name: "run.exe", size: 10 }] }],
+    ["html", { files: [{ name: "page.html", size: 10 }] }],
+    ["over 25 MB", { files: [{ name: "big.pdf", size: 25 * 1024 * 1024 + 1 }] }],
+    ["path in name", { files: [{ name: "../x.md", size: 10 }] }],
+    ["no files", { files: [] }],
+    ["unknown department", { readers: { kind: "departments", names: ["pirates"] } }],
+    ["admin role", { readers: { kind: "roles", names: ["admin"] } }],
+    ["empty names", { readers: { kind: "roles", names: [] } }],
+    ["private readers", { readers: { kind: "private" } }],
+    ["bad key", { idempotencyKey: "has spaces" }],
+  ];
+
+  it.each(invalid)("rejects %s and creates no draft, batch or job", async (_label, overrides) => {
+    const response = await call("/admin/uploads", admin(), { json: baseBody(overrides) });
+    expect(response.status).toBe(400);
+    for (const table of ["drafts", "upload_batches", "upload_files"]) {
+      const row = await env.CORPUS_DB.prepare(`SELECT COUNT(*) AS n FROM ${table}`).first<{ n: number }>();
+      expect(row?.n).toBe(0);
+    }
+    expect(sent).toEqual([]);
+  });
+
+  it("rejects non-JSON and oversized bodies", async () => {
+    const ctx = createExecutionContext();
+    const bad = await worker.fetch(
+      new IncomingRequest("https://brain.internal/admin/uploads", {
+        method: "POST",
+        headers: { cookie: admin() },
+        body: "not json{",
+      }),
+      sessionEnv,
+      ctx,
+    );
+    await waitOnExecutionContext(ctx);
+    expect(bad.status).toBe(400);
+  });
+});
+
+describe("POST /admin/uploads", () => {
+  it("maps readers to access scope and creates one draft, one job and the file rows", async () => {
+    const created = await createBatch({
+      readers: { kind: "departments", names: ["hr", "finance"] },
+      files: [
+        { name: "a.pdf", size: 10 },
+        { name: "b.docx", size: 11 },
+      ],
+    });
+    expect(created.files.map((file) => file.name)).toEqual(["a.pdf", "b.docx"]);
+    const batch = await env.CORPUS_DB.prepare(
+      "SELECT generation_id, access_scope, allowed_roles, allowed_departments FROM upload_batches WHERE id = ?",
+    )
+      .bind(created.batchId)
+      .first<{ generation_id: string; access_scope: string; allowed_roles: string; allowed_departments: string }>();
+    expect(batch).toMatchObject({
+      access_scope: "department",
+      allowed_roles: "[]",
+      allowed_departments: '["finance","hr"]',
+    });
+    const draft = await env.CORPUS_DB.prepare(
+      "SELECT kind, base_generation_id, closed_at FROM drafts WHERE generation_id = ?",
+    )
+      .bind(batch!.generation_id)
+      .first<Record<string, unknown>>();
+    expect(draft).toEqual({ kind: "upload", base_generation_id: activeId, closed_at: null });
+    // The draft job is enqueued once, with identifiers only.
+    expect(sent).toEqual([{ jobId: batch!.generation_id, idempotencyKey: batch!.generation_id }]);
+    // The ACL group a worker will compute from this row matches the selection.
+    const key = await aclGroupKey({
+      accessScope: "department",
+      allowedRoles: [],
+      allowedDepartments: JSON.parse(batch!.allowed_departments) as string[],
+      ownerUserId: "",
+    });
+    expect(key).toBe(
+      await aclGroupKey({ accessScope: "department", allowedRoles: [], allowedDepartments: ["hr", "finance"], ownerUserId: "" }),
+    );
+  });
+
+  it("maps everyone to public and roles to role scope", async () => {
+    const everyone = await createBatch({ readers: { kind: "everyone" }, files: [{ name: "x.md", size: 5 }] });
+    const roles = await createBatch({
+      readers: { kind: "roles", names: ["manager", "director"] },
+      files: [{ name: "y.md", size: 5 }],
+    });
+    const rows = await env.CORPUS_DB.prepare(
+      "SELECT id, access_scope, allowed_roles, allowed_departments FROM upload_batches WHERE id IN (?, ?)",
+    )
+      .bind(everyone.batchId, roles.batchId)
+      .all<{ id: string; access_scope: string; allowed_roles: string; allowed_departments: string }>();
+    const byId = Object.fromEntries(rows.results.map((row) => [row.id, row]));
+    expect(byId[everyone.batchId]).toMatchObject({ access_scope: "public", allowed_roles: "[]", allowed_departments: "[]" });
+    expect(byId[roles.batchId]).toMatchObject({ access_scope: "role", allowed_roles: '["director","manager"]', allowed_departments: "[]" });
+  });
+
+  it("is idempotent per key: same files return the same ids, different files are refused", async () => {
+    const body = baseBody({ idempotencyKey: "idem-key-1" });
+    const first = (await (await call("/admin/uploads", admin(), { json: body })).json()) as UploadCreated;
+    const second = (await (await call("/admin/uploads", admin(), { json: body })).json()) as UploadCreated;
+    expect(second).toEqual(first);
+    const different = await call("/admin/uploads", admin(), {
+      json: { ...body, files: [{ name: "other.md", size: 3 }] },
+    });
+    expect(different.status).toBe(400);
+    const counts = await env.CORPUS_DB.prepare(
+      "SELECT (SELECT COUNT(*) FROM upload_batches) AS batches, (SELECT COUNT(*) FROM drafts) AS drafts",
+    ).first<{ batches: number; drafts: number }>();
+    expect(counts).toEqual({ batches: 1, drafts: 1 });
+    expect(sent).toHaveLength(1);
+  });
+
+  it("puts a second batch into the same single draft without a second job", async () => {
+    await createBatch();
+    await createBatch({ files: [{ name: "second.md", size: 5 }] });
+    const drafts = await env.CORPUS_DB.prepare("SELECT COUNT(*) AS n FROM drafts").first<{ n: number }>();
+    expect(drafts?.n).toBe(1);
+    expect(sent).toHaveLength(1);
+  });
+
+  it("refuses new files once the draft started its checks", async () => {
+    await createBatch();
+    await env.CORPUS_DB.prepare("UPDATE corpus_generations SET state = 'reconciling' WHERE id IN (SELECT generation_id FROM drafts)").run();
+    const response = await call("/admin/uploads", admin(), { json: baseBody() });
+    expect(response.status).toBe(400);
+  });
+
+  it("fails the draft it just created if the job cannot be queued", async () => {
+    failQueue = true;
+    const response = await call("/admin/uploads", admin(), { json: baseBody() });
+    expect(response.status).toBeGreaterThanOrEqual(500);
+    const draft = await env.CORPUS_DB.prepare(
+      "SELECT d.closed_at, g.state, g.error_code FROM drafts d JOIN corpus_generations g ON g.id = d.generation_id",
+    ).first<{ closed_at: number | null; state: string; error_code: string }>();
+    expect(draft?.state).toBe("failed");
+    expect(draft?.error_code).toBe("ENQUEUE_FAILED");
+    expect(draft?.closed_at).not.toBeNull();
+    expect(await activeGenerationId(env.CORPUS_DB as never)).toBe(activeId);
+  });
+});
+
+describe("PUT /admin/uploads/:batchId/files/:fileId", () => {
+  it("streams the body into R2, keeps stage parsing and enqueues the file job", async () => {
+    const created = await createBatch({ files: [{ name: "doc.md", size: 2048 }] });
+    sent = [];
+    const file = created.files[0];
+    const payload = bytes(2048);
+    const response = await call(`/admin/uploads/${created.batchId}/files/${file.id}`, admin(), {
+      method: "PUT",
+      body: payload,
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, stage: "parsing" });
+    const row = await env.CORPUS_DB.prepare("SELECT r2_key, stage FROM upload_files WHERE id = ?")
+      .bind(file.id)
+      .first<{ r2_key: string; stage: string }>();
+    expect(row?.stage).toBe("parsing");
+    const object = await env.SOURCES.get(row!.r2_key);
+    expect(object?.size).toBe(2048);
+    expect(sent).toEqual([{ jobId: file.id, idempotencyKey: file.id }]);
+  });
+
+  it("rejects a length that differs from the declared size and stores nothing", async () => {
+    const created = await createBatch({ files: [{ name: "doc.md", size: 100 }] });
+    sent = [];
+    const file = created.files[0];
+    const wrong = await call(`/admin/uploads/${created.batchId}/files/${file.id}`, admin(), {
+      method: "PUT",
+      body: bytes(99),
+    });
+    expect(wrong.status).toBe(400);
+    const row = await env.CORPUS_DB.prepare("SELECT r2_key FROM upload_files WHERE id = ?").bind(file.id).first<{ r2_key: string | null }>();
+    expect(row?.r2_key).toBeNull();
+    expect(sent).toEqual([]);
+  });
+
+  it("removes the object when the body is shorter than its declared length", async () => {
+    const created = await createBatch({ files: [{ name: "doc.md", size: 100 }] });
+    const file = created.files[0];
+    const short = await call(`/admin/uploads/${created.batchId}/files/${file.id}`, admin(), {
+      method: "PUT",
+      body: bytes(40),
+      length: 100,
+    });
+    expect(short.status).toBe(400);
+    const listed = await env.SOURCES.list({ prefix: "uploads/" });
+    expect(listed.objects.filter((object) => object.key.endsWith(file.id))).toEqual([]);
+  });
+
+  it("returns 404 for an unknown file or a file from another batch, and 400 once it left parsing", async () => {
+    const created = await createBatch({ files: [{ name: "doc.md", size: 10 }] });
+    const other = await createBatch({ files: [{ name: "other.md", size: 10 }] });
+    const unknown = await call(`/admin/uploads/${created.batchId}/files/uf-nope`, admin(), { method: "PUT", body: bytes(10) });
+    expect(unknown.status).toBe(404);
+    const crossed = await call(`/admin/uploads/${created.batchId}/files/${other.files[0].id}`, admin(), { method: "PUT", body: bytes(10) });
+    expect(crossed.status).toBe(404);
+    await env.CORPUS_DB.prepare("UPDATE upload_files SET stage = 'embedding' WHERE id = ?").bind(created.files[0].id).run();
+    const late = await call(`/admin/uploads/${created.batchId}/files/${created.files[0].id}`, admin(), { method: "PUT", body: bytes(10) });
+    expect(late.status).toBe(400);
+  });
+
+  it("refuses a body for a discarded draft", async () => {
+    const created = await createBatch({ files: [{ name: "doc.md", size: 10 }] });
+    const draft = await env.CORPUS_DB.prepare("SELECT generation_id FROM drafts").first<{ generation_id: string }>();
+    const discard = await call(`/admin/drafts/${draft!.generation_id}/discard`, admin(), { method: "POST", json: {} });
+    expect(discard.status).toBe(200);
+    const response = await call(`/admin/uploads/${created.batchId}/files/${created.files[0].id}`, admin(), { method: "PUT", body: bytes(10) });
+    expect(response.status).toBe(400);
+  });
+});
+
+describe("GET /admin/uploads/:batchId", () => {
+  it("reports per-file stage and a human message from the closed error code", async () => {
+    const created = await createBatch({
+      files: [
+        { name: "bomb.docx", size: 10 },
+        { name: "fine.md", size: 10 },
+        { name: "odd.md", size: 10 },
+      ],
+    });
+    await env.CORPUS_DB.batch([
+      env.CORPUS_DB.prepare("UPDATE upload_files SET stage = 'failed', error_code = 'ARCHIVE_TOO_LARGE' WHERE id = ?").bind(created.files[0].id),
+      env.CORPUS_DB.prepare("UPDATE upload_files SET stage = 'embedding' WHERE id = ?").bind(created.files[1].id),
+      env.CORPUS_DB.prepare("UPDATE upload_files SET stage = 'failed', error_code = 'made-up-code' WHERE id = ?").bind(created.files[2].id),
+    ]);
+    const status = (await (await call(`/admin/uploads/${created.batchId}`, admin())).json()) as UploadStatus;
+    expect(status.files.map((file) => file.stage)).toEqual(["failed", "embedding", "failed"]);
+    expect(status.files[0].errorMessage).toMatch(/expands to far more/);
+    expect(status.files[1].errorMessage).toBeUndefined();
+    // An unknown code never leaks through; it maps to the generic message.
+    expect(status.files[2].errorMessage).toBe("Something went wrong while processing this file.");
+    expect((await call("/admin/uploads/ub-unknown", admin())).status).toBe(404);
+  });
+});
+
+describe("GET /admin/sources", () => {
+  it("summarizes the active generation and hides private-owner titles", async () => {
+    const view = (await (await call("/admin/sources", admin())).json()) as SourcesResponse;
+    expect(view.active).toMatchObject({ id: activeId, documents: CORPUS_DOCUMENT_IDS.length, retrieval: "keyword" });
+    expect(view.active!.chunks).toBeGreaterThan(0);
+    expect(view.draft).toBeNull();
+    expect(view.documents).toHaveLength(CORPUS_DOCUMENT_IDS.length);
+    const privateRow = view.documents.find((document) => document.id === "doc-private-maya");
+    expect(privateRow).toMatchObject({
+      title: "Private document",
+      fileName: "",
+      department: null,
+      readers: { kind: "private", names: [] },
+      status: "active",
+    });
+    expect(privateRow!.chunks).toBeGreaterThan(0);
+    // Neither the title nor the file name of the private document is exposed.
+    expect(JSON.stringify(view)).not.toMatch(/Private Notes|maya-notes/);
+    expect(view.documents.filter((document) => document.readers.kind === "private")).toHaveLength(1);
+  });
+
+  it("shows the draft with progress, new documents and failed files", async () => {
+    const created = await createBatch({
+      files: [
+        { name: "Leave Policy.md", size: 10 },
+        { name: "broken.docx", size: 10 },
+      ],
+    });
+    await env.CORPUS_DB.batch([
+      env.CORPUS_DB.prepare("UPDATE upload_files SET chunks_total = 58, chunks_embedded = 41, stage = 'embedding' WHERE id = ?").bind(created.files[0].id),
+      env.CORPUS_DB.prepare("UPDATE upload_files SET stage = 'failed', error_code = 'NO_TEXT' WHERE id = ?").bind(created.files[1].id),
+    ]);
+    const view = (await (await call("/admin/sources", admin())).json()) as SourcesResponse;
+    expect(view.draft).toMatchObject({
+      kind: "upload",
+      state: "building",
+      embeddedChunks: 41,
+      totalChunks: 58,
+      documents: 1,
+      failedFiles: 1,
+    });
+    const draftRow = view.documents.find((document) => document.status === "draft");
+    expect(draftRow).toMatchObject({ title: "Leave Policy.md", chunks: 58, readers: { kind: "departments", names: ["hr"] } });
+    const failedRow = view.documents.find((document) => document.status === "failed");
+    expect(failedRow).toMatchObject({ title: "broken.docx" });
+    expect(failedRow!.errorMessage).toMatch(/No readable text/);
+    // Active documents stay listed as active while a draft is open.
+    expect(view.documents.filter((document) => document.status === "active")).toHaveLength(CORPUS_DOCUMENT_IDS.length);
+  });
+
+  it("derives the draft state from the generation and its checks", async () => {
+    await createBatch();
+    const draft = await env.CORPUS_DB.prepare("SELECT generation_id FROM drafts").first<{ generation_id: string }>();
+    const id = draft!.generation_id;
+    const stateOf = async () =>
+      ((await (await call("/admin/sources", admin())).json()) as SourcesResponse).draft!;
+    const setGeneration = (state: string) =>
+      env.CORPUS_DB.prepare("UPDATE corpus_generations SET state = ? WHERE id = ?").bind(state, id).run();
+    await setGeneration("reconciling");
+    expect((await stateOf()).state).toBe("checking");
+    await env.CORPUS_DB.prepare("INSERT INTO draft_checks (generation_id, status, started_at) VALUES (?, 'paused', 1)").bind(id).run();
+    expect((await stateOf()).state).toBe("checks_paused");
+    await env.CORPUS_DB.prepare("UPDATE draft_checks SET status = 'failed', reconciled = 0, acl_leaks = 0, finished_at = 2 WHERE generation_id = ?").bind(id).run();
+    const failed = await stateOf();
+    expect(failed.state).toBe("checks_failed");
+    expect(failed.checks).toMatchObject({ reconciled: false, aclLeaks: 0 });
+    await env.CORPUS_DB.prepare("UPDATE draft_checks SET status = 'passed', reconciled = 1, live_recall = 0.995 WHERE generation_id = ?").bind(id).run();
+    await setGeneration("ready");
+    const passed = await stateOf();
+    expect(passed.state).toBe("checks_passed");
+    expect(passed.checks).toMatchObject({ reconciled: true, aclLeaks: 0, liveRecall: 0.995 });
+  });
+});
+
+describe("draft promote and discard", () => {
+  async function draftId(): Promise<string> {
+    await createBatch();
+    const row = await env.CORPUS_DB.prepare("SELECT generation_id FROM drafts").first<{ generation_id: string }>();
+    return row!.generation_id;
+  }
+  const promote = (id: string) => call(`/admin/drafts/${id}/promote`, admin(), { method: "POST", json: {} });
+  const discard = (id: string) => call(`/admin/drafts/${id}/discard`, admin(), { method: "POST", json: {} });
+
+  it("refuses to promote until the checks passed, and never moves the pointer when it refuses", async () => {
+    const id = await draftId();
+    expect((await promote(id)).status).toBe(400); // still building
+    await env.CORPUS_DB.prepare("UPDATE corpus_generations SET state = 'ready' WHERE id = ?").bind(id).run();
+    expect((await promote(id)).status).toBe(400); // ready but no check row
+    await env.CORPUS_DB.prepare("INSERT INTO draft_checks (generation_id, status, reconciled, acl_leaks, started_at) VALUES (?, 'failed', 1, 0, 1)").bind(id).run();
+    expect((await promote(id)).status).toBe(400); // checks failed
+    await env.CORPUS_DB.prepare("UPDATE draft_checks SET status = 'passed', acl_leaks = 2 WHERE generation_id = ?").bind(id).run();
+    expect((await promote(id)).status).toBe(400); // passed but leaks
+    await env.CORPUS_DB.prepare("UPDATE draft_checks SET acl_leaks = 0, reconciled = 0 WHERE generation_id = ?").bind(id).run();
+    expect((await promote(id)).status).toBe(400); // not reconciled
+    await env.CORPUS_DB.prepare("UPDATE draft_checks SET acl_leaks = NULL, reconciled = 1 WHERE generation_id = ?").bind(id).run();
+    expect((await promote(id)).status).toBe(400); // leak count unknown
+    expect(await activeGenerationId(env.CORPUS_DB as never)).toBe(activeId);
+  });
+
+  it("promotes a ready draft whose checks passed with zero leaks, then is idempotent", async () => {
+    const id = await draftId();
+    await env.CORPUS_DB.prepare("UPDATE corpus_generations SET state = 'ready' WHERE id = ?").bind(id).run();
+    await env.CORPUS_DB.prepare("INSERT INTO draft_checks (generation_id, status, reconciled, acl_leaks, started_at) VALUES (?, 'passed', 1, 0, 1)").bind(id).run();
+    const response = await promote(id);
+    expect(response.status).toBe(200);
+    expect((await response.json()) as DraftActionResponse).toEqual({ ok: true, generationId: id });
+    expect(await activeGenerationId(env.CORPUS_DB as never)).toBe(id);
+    const old = await env.CORPUS_DB.prepare("SELECT state FROM corpus_generations WHERE id = ?").bind(activeId).first<{ state: string }>();
+    expect(old?.state).toBe("archived");
+    const draft = await env.CORPUS_DB.prepare("SELECT closed_at FROM drafts WHERE generation_id = ?").bind(id).first<{ closed_at: number | null }>();
+    expect(draft?.closed_at).not.toBeNull();
+    expect((await promote(id)).status).toBe(200);
+    // restore the original generation for the following tests
+    await env.CORPUS_DB.prepare("UPDATE corpus_generations SET state = 'archived' WHERE id = ?").bind(id).run();
+    await env.CORPUS_DB.prepare("UPDATE corpus_generations SET state = 'active' WHERE id = ?").bind(activeId).run();
+    await env.CORPUS_DB.prepare("UPDATE corpus_state SET active_generation_id = ? WHERE singleton = 1").bind(activeId).run();
+  });
+
+  it("promote and discard of an unknown draft is 404", async () => {
+    expect((await promote("g-unknown")).status).toBe(404);
+    expect((await discard("g-unknown")).status).toBe(404);
+  });
+
+  it("discard fails the draft, removes its rows and vectors, and leaves the active generation untouched", async () => {
+    const id = await draftId();
+    const activeChunks = await env.CORPUS_DB.prepare("SELECT COUNT(*) AS n FROM chunks WHERE generation_id = ?").bind(activeId).first<{ n: number }>();
+    const activeCatalog = await env.CORPUS_DB.prepare("SELECT COUNT(*) AS n FROM document_catalog WHERE generation_id = ?").bind(activeId).first<{ n: number }>();
+    // Give the draft staged rows to remove: a copy of one active chunk under the draft id.
+    await env.CORPUS_DB.prepare(
+      `INSERT INTO document_versions (id, document_id, generation_id, r2_key, content_digest, byte_size, created_at)
+       SELECT id || '-d', document_id, ?, r2_key, content_digest, byte_size, created_at
+       FROM document_versions WHERE generation_id = ? LIMIT 1`,
+    ).bind(id, activeId).run();
+    await env.CORPUS_DB.prepare(
+      `INSERT INTO chunks (chunk_id, document_id, document_version_id, generation_id, heading, chunk_index, content,
+         start_offset, end_offset, content_digest, vector_id, acl_group, access_scope, allowed_roles, allowed_departments, metadata, created_at)
+       SELECT chunk_id || '-d', document_id, (SELECT id FROM document_versions WHERE generation_id = ? LIMIT 1), ?, heading, chunk_index, content,
+         start_offset, end_offset, content_digest, vector_id || '-d', acl_group, access_scope, allowed_roles, allowed_departments, metadata, created_at
+       FROM chunks WHERE generation_id = ? LIMIT 1`,
+    ).bind(id, id, activeId).run();
+    const response = await discard(id);
+    expect(response.status).toBe(200);
+    expect(await activeGenerationId(env.CORPUS_DB as never)).toBe(activeId);
+    expect((await env.CORPUS_DB.prepare("SELECT state FROM corpus_generations WHERE id = ?").bind(activeId).first<{ state: string }>())?.state).toBe("active");
+    expect((await env.CORPUS_DB.prepare("SELECT COUNT(*) AS n FROM chunks WHERE generation_id = ?").bind(activeId).first<{ n: number }>())?.n).toBe(activeChunks?.n);
+    expect((await env.CORPUS_DB.prepare("SELECT COUNT(*) AS n FROM document_catalog WHERE generation_id = ?").bind(activeId).first<{ n: number }>())?.n).toBe(activeCatalog?.n);
+    const draft = await env.CORPUS_DB.prepare(
+      "SELECT g.state, g.error_code, d.closed_at FROM corpus_generations g JOIN drafts d ON d.generation_id = g.id WHERE g.id = ?",
+    ).bind(id).first<{ state: string; error_code: string; closed_at: number | null }>();
+    expect(draft).toMatchObject({ state: "failed", error_code: "DISCARDED" });
+    expect(draft?.closed_at).not.toBeNull();
+    expect((await env.CORPUS_DB.prepare("SELECT COUNT(*) AS n FROM chunks WHERE generation_id = ?").bind(id).first<{ n: number }>())?.n).toBe(0);
+    expect(deletedVectors).toHaveLength(1);
+    // A discarded draft disappears from Sources and a new upload opens a fresh one.
+    const view = (await (await call("/admin/sources", admin())).json()) as SourcesResponse;
+    expect(view.draft).toBeNull();
+    await createBatch();
+    const open = await env.CORPUS_DB.prepare("SELECT generation_id FROM drafts WHERE closed_at IS NULL").first<{ generation_id: string }>();
+    expect(open?.generation_id).not.toBe(id);
+  });
+
+  it("discard twice is harmless and cannot discard a live generation", async () => {
+    const id = await draftId();
+    expect((await discard(id)).status).toBe(200);
+    expect((await discard(id)).status).toBe(200);
+    const live = await call(`/admin/drafts/${activeId}/discard`, admin(), { method: "POST", json: {} });
+    expect(live.status).toBe(404); // the live generation has no draft row at all
+    expect(await activeGenerationId(env.CORPUS_DB as never)).toBe(activeId);
+  });
+});
+
+describe("POST /admin/reindex", () => {
+  it("opens a reindex draft and queues one job; a second request is refused while it is open", async () => {
+    const response = await call("/admin/reindex", admin(), { method: "POST", json: {} });
+    expect(response.status).toBe(200);
+    const { generationId } = (await response.json()) as { generationId: string };
+    expect(sent).toEqual([{ jobId: generationId, idempotencyKey: generationId }]);
+    const draft = await env.CORPUS_DB.prepare("SELECT kind, base_generation_id FROM drafts WHERE generation_id = ?").bind(generationId).first();
+    expect(draft).toEqual({ kind: "reindex", base_generation_id: activeId });
+    expect((await call("/admin/reindex", admin(), { method: "POST", json: {} })).status).toBe(400);
+    expect(sent).toHaveLength(1);
+    // Uploads cannot join a reindex draft.
+    expect((await call("/admin/uploads", admin(), { json: baseBody() })).status).toBe(400);
+    expect(await activeGenerationId(env.CORPUS_DB as never)).toBe(activeId);
+  });
+
+  it("fails the reindex draft if the job cannot be queued", async () => {
+    failQueue = true;
+    const response = await call("/admin/reindex", admin(), { method: "POST", json: {} });
+    expect(response.status).toBeGreaterThanOrEqual(500);
+    const open = await env.CORPUS_DB.prepare("SELECT COUNT(*) AS n FROM drafts WHERE closed_at IS NULL").first<{ n: number }>();
+    expect(open?.n).toBe(0);
+  });
+});

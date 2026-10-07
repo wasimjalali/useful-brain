@@ -5,8 +5,10 @@ import {
   AssumedPrincipalInvalid,
   authenticateWorkerRequest,
   parseAssumedPrincipal,
+  parseAssumePrincipalId,
 } from "../../../src/lib/auth/worker-identity";
 import { hasOperatorAccess, isAdminPrincipal, requireAdmin } from "../../../src/lib/auth/admin";
+import { runViewAsTurn } from "../../../src/lib/brain/view-as-turn";
 import { parseBoundedId } from "../../../src/lib/cf/bounded-id";
 import { writeOperationalLog } from "../../../src/lib/cf/operational-log";
 import { resolveRequestId, withRequestId } from "../../../src/lib/cf/request-id";
@@ -68,6 +70,11 @@ import { backfillDocumentCatalog } from "../../../src/lib/store/document-catalog
 import { SELECTED_MODELS } from "../../../src/lib/models/selection";
 import { REAL_STACK_FINGERPRINT, fingerprintId } from "../../../src/lib/retrieve/fingerprint";
 import { ConversationRunLock } from "./conversation-lock";
+import { handleChatRoute, pendingTurnProgress, resolveTurnRetry } from "./routes/chat";
+import { handleAdminPeopleRoute } from "./routes/admin-people";
+import { handleAdminMetricsRoute, campaignView } from "./routes/admin-metrics";
+import { handleLibraryRoute } from "./routes/documents";
+import { handleAdminSourcesRoute } from "./routes/admin-sources";
 import { ApprovalWorkflow } from "./approval-workflow";
 import {
   DURABLE_RESUME_TOOLS,
@@ -204,6 +211,8 @@ function turnDeps(env: BrainEnv, principal: DirectoryRecord) {
   };
 }
 
+const SERVICE_HEALTH_RETENTION_MS = 24 * 60 * 60 * 1000;
+
 const brainWorker = {
   async fetch(request: Request, env: BrainEnv, _ctx?: unknown): Promise<Response> {
     const started = Date.now();
@@ -287,6 +296,30 @@ const brainWorker = {
           durationMs: Date.now() - started,
         });
         return json({ generationId: activeId, added }, requestId);
+      }
+
+      const adminMetricsResponse = await handleAdminMetricsRoute({
+        request,
+        path,
+        env,
+        principal,
+        requestId,
+        started,
+      });
+      if (adminMetricsResponse) {
+        return adminMetricsResponse;
+      }
+
+      const libraryResponse = await handleLibraryRoute({
+        request,
+        path,
+        env,
+        principal,
+        requestId,
+        started,
+      });
+      if (libraryResponse) {
+        return libraryResponse;
       }
 
       if (path === "/config" && request.method === "GET") {
@@ -378,6 +411,14 @@ const brainWorker = {
             });
           }
         }
+        // Only session accounts have a name and email; loopback and service tokens get null.
+        const account =
+          principal.kind === "user" && env.OPERATIONS_DB
+            ? await (env.OPERATIONS_DB as OperationsDatabase)
+                .prepare(`SELECT name, email FROM auth_users WHERE id = ?`)
+                .bind(principal.id)
+                .first<{ name: string; email: string }>()
+            : null;
         writeOperationalLog({
           requestId,
           principalKind: principal.kind,
@@ -390,6 +431,8 @@ const brainWorker = {
             id: principal.id,
             kind: principal.kind,
             subject: principal.subject,
+            name: account?.name ?? null,
+            email: account?.email ?? null,
             roles: principal.roles,
             departments: principal.departments,
             isAdmin: isAdminPrincipal(principal),
@@ -608,16 +651,74 @@ const brainWorker = {
           requestId?: string;
           persistConversation?: boolean;
           assumePrincipal?: unknown;
+          assumePrincipalId?: unknown;
+          scopeDocumentId?: unknown;
           evalModel?: unknown;
+          retryOfMessageId?: unknown;
         };
         try {
           body = (await request.json()) as typeof body;
         } catch {
           throw new WorkerValidationError();
         }
-        const question = typeof body.question === "string" ? body.question.trim() : "";
+        // A retry re-runs the saved user message of the caller's failed turn;
+        // any question or conversation id sent with it is ignored.
+        const retry =
+          body.retryOfMessageId === undefined
+            ? null
+            : await resolveTurnRetry(env, principal, body.retryOfMessageId);
+        const question = retry
+          ? retry.question
+          : typeof body.question === "string"
+            ? body.question.trim()
+            : "";
         if (!question || question.length > 2000) {
           throw new WorkerValidationError();
+        }
+        let scopeDocumentId: string | undefined;
+        if (body.scopeDocumentId !== undefined && body.scopeDocumentId !== null) {
+          scopeDocumentId = parseBoundedId(body.scopeDocumentId, "document id");
+        }
+        let assumePrincipalId: string | undefined;
+        try {
+          assumePrincipalId = parseAssumePrincipalId(identityMode, body.assumePrincipalId);
+        } catch (error) {
+          if (error instanceof AssumedPrincipalForbidden) {
+            throw new WorkerForbiddenError();
+          }
+          if (error instanceof AssumedPrincipalInvalid) {
+            throw new WorkerValidationError();
+          }
+          throw error;
+        }
+        if (assumePrincipalId !== undefined) {
+          // View as another person: admin only, checked before the id is looked
+          // up so a non-admin cannot probe which ids exist. Grants always come
+          // from the directory; a client grant list next to the id is refused
+          // in loopback mode and ignored in session mode.
+          requireAdmin(principal);
+          if (retry || body.evalModel !== undefined || body.persistConversation === true) {
+            throw new WorkerValidationError();
+          }
+          if (identityMode === "loopback" && body.assumePrincipal !== undefined) {
+            throw new WorkerValidationError();
+          }
+          const viewAsAnswer = await runViewAsTurn({
+            ...turnDeps(env, principal),
+            admin: principal,
+            assumePrincipalId,
+            question,
+            requestId: parseBoundedId(body.requestId ?? requestId, "request id"),
+            scopeDocumentId,
+          });
+          writeOperationalLog({
+            requestId,
+            principalKind: principal.kind,
+            operation,
+            status: "ok",
+            durationMs: Date.now() - started,
+          });
+          return json(viewAsAnswer, requestId);
         }
         let assumedPrincipal;
         try {
@@ -644,17 +745,21 @@ const brainWorker = {
           throw error;
         }
         const turnRequestId = parseBoundedId(body.requestId ?? requestId, "request id");
-        const conversationId = body.conversationId
-          ? parseBoundedId(body.conversationId, "conversation id")
-          : undefined;
+        const conversationId = retry
+          ? retry.conversationId
+          : body.conversationId
+            ? parseBoundedId(body.conversationId, "conversation id")
+            : undefined;
         const answer = await executeTurn({
           ...turnDeps(env, principal),
           assumedPrincipal,
           evalModelOverride,
+          scopeDocumentId,
           question,
           conversationId,
+          reuseUserMessageId: retry?.userMessageId,
           requestId: turnRequestId,
-          persistConversation: body.persistConversation,
+          persistConversation: retry ? true : body.persistConversation,
         });
         writeOperationalLog({
           requestId,
@@ -695,11 +800,7 @@ const brainWorker = {
           // A pending turn reads the stage from the conversation lock only
           // when the lock still belongs to this run; a missing or stale lock
           // reports the earliest stage rather than another run's position.
-          const lock = await env.CONVERSATION.getByName(handle.conversationId).progress();
-          progress =
-            lock.runId === handle.runId && lock.stage
-              ? { stage: lock.stage }
-              : { stage: "searching" };
+          progress = await pendingTurnProgress(env, principal, handle);
         }
         writeOperationalLog({
           requestId,
@@ -737,6 +838,7 @@ const brainWorker = {
           env.OPERATIONS_DB as OperationsDatabase,
           conversationId,
           principal.id,
+          env.CORPUS_DB as SqlExecutor | undefined,
         );
         writeOperationalLog({
           requestId,
@@ -979,6 +1081,14 @@ const brainWorker = {
 
       if (path === "/evaluations" && request.method === "GET") {
         operation = "evaluations";
+        const view = new URL(request.url).searchParams.get("view");
+        if (view !== null) {
+          if (view !== "campaign") {
+            throw new WorkerValidationError();
+          }
+          requireAdmin(principal);
+          return json(await campaignView(env), requestId);
+        }
         const runs = await listRecentEvalRuns(env.OPERATIONS_DB as OperationsDatabase, principal.id);
         writeOperationalLog({
           requestId,
@@ -1011,6 +1121,28 @@ const brainWorker = {
           durationMs: Date.now() - started,
         });
         return json(result, requestId);
+      }
+
+      const peopleResponse = await handleAdminPeopleRoute({
+        request,
+        path,
+        env,
+        principal,
+        requestId,
+        started,
+      });
+      if (peopleResponse) {
+        return peopleResponse;
+      }
+
+      const sourcesResponse = await handleAdminSourcesRoute({ request, path, env, principal, requestId, started });
+      if (sourcesResponse) {
+        return sourcesResponse;
+      }
+
+      const chatResponse = await handleChatRoute({ request, path, env, principal, requestId, started });
+      if (chatResponse) {
+        return chatResponse;
       }
 
       return new Response("not found", {
@@ -1053,6 +1185,14 @@ const brainWorker = {
   },
   async scheduled(_controller: unknown, env: BrainEnv): Promise<void> {
     assertWorkerStartup(env);
+    try {
+      await env.OPERATIONS_DB
+        .prepare(`DELETE FROM service_health_events WHERE at < ?`)
+        .bind(Date.now() - SERVICE_HEALTH_RETENTION_MS)
+        .run();
+    } catch {
+      console.error("service_health_prune_failed");
+    }
     if (!env.APPROVAL_RESUME_QUEUE) {
       return;
     }

@@ -130,6 +130,7 @@ export async function upsertApproval(
   binding: ApprovalBinding,
   status: "pending" | "approved" | "rejected" | "expired",
   now: number,
+  displayArgumentsJson: string | null = null,
 ): Promise<ApprovalBinding> {
   const runId = parseBoundedId(runIdInput, "run id");
   const key = parseMutatingIdempotencyKey(binding.idempotencyKey);
@@ -181,8 +182,8 @@ export async function upsertApproval(
       .prepare(
         `INSERT INTO approvals (
            idempotency_key, principal_id, conversation_id, tool, argument_fingerprint,
-           expires_at, status, created_at, run_id
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+           expires_at, status, created_at, run_id, display_arguments_json
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT DO NOTHING`,
       )
       .bind(
@@ -195,6 +196,7 @@ export async function upsertApproval(
         status,
         now,
         runId,
+        displayArgumentsJson,
       )
       .run();
   }

@@ -124,8 +124,10 @@ describe("protected Worker configuration", () => {
     expect(source).toMatch(/IDENTITY_MODE/);
     expect(source).toMatch(/redirect\("\/open"\)/);
     expect(source).toMatch(/redirect\("\/login"\)/);
-    expect(source).toMatch(/\/chat/);
-    expect(source).toMatch(/\/knowledge/);
+    expect(source).toMatch(/loadHomeDestination/);
+    const shellData = readFileSync(path.join(process.cwd(), "src/app/shell-data.ts"), "utf8");
+    expect(shellData).toMatch(/"\/chat"/);
+    expect(shellData).toMatch(/"\/admin\/sources"/);
   });
 
   it("web whoami route forwards only through the Brain Service Binding helper", () => {

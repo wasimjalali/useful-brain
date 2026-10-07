@@ -92,6 +92,8 @@ export type ConversationAnswerType =
   | "invalid_citation";
 
 export type CompleteTurnInput = {
+  /** Host-set when the run ended with a recorded pending approval. */
+  actionNote?: boolean;
   ownerPrincipalId: string;
   requestId: string;
   rawModelJson: string;
@@ -102,8 +104,19 @@ export type CompleteTurnInput = {
   promptVersion: string;
   retrievalConfigVersion: string;
   corpusGenerationId: string;
+  /**
+   * Turn metrics. Stored on the assistant message in the same guarded update
+   * and deliberately left out of the completion digest, so an idempotent
+   * replay of a completed turn is unchanged by them.
+   */
+  latencyMs?: number;
+  passagesRetrieved?: number;
   now: number;
 };
+
+function metricOrNull(value: number | undefined): number | null {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : null;
+}
 
 export type ReplayedTurn = {
   conversationId: string;
@@ -446,6 +459,8 @@ export async function createPendingTurn(
     conversationId?: string;
     requestId: string;
     question: string;
+    /** Retry: answer this existing user message again instead of inserting a new one. */
+    reuseUserMessageId?: string;
     now: number;
   },
 ): Promise<{ conversationId: string; assistantMessageId: string; duplicate: boolean }> {
@@ -508,7 +523,21 @@ export async function createPendingTurn(
   } else {
     conversationId = newBoundedId("c");
   }
-  const userId = newBoundedId("m");
+  let userId: string;
+  if (input.reuseUserMessageId) {
+    userId = parseBoundedId(input.reuseUserMessageId, "message id");
+    const reusable = await db
+      .prepare(
+        `SELECT 1 AS ok FROM messages WHERE id = ? AND role = 'user' AND conversation_id = ?`,
+      )
+      .bind(userId, conversationId)
+      .first<{ ok: number }>();
+    if (!reusable) {
+      throw new ConversationStoreError("FORBIDDEN");
+    }
+  } else {
+    userId = newBoundedId("m");
+  }
   const assistantMessageId = newBoundedId("m");
   await db
     .prepare(
@@ -590,7 +619,9 @@ export async function completeTurn(
     throw new ConversationStoreError("assistant turn is not pending");
   }
 
-  const structured = answerFromEvidence(input.rawModelJson, input.evidence);
+  const structured = answerFromEvidence(input.rawModelJson, input.evidence, {
+    actionNote: input.actionNote,
+  });
   const content = structuredAnswerToText(structured);
   const completionDigest = await sha256Hex(
     JSON.stringify({
@@ -654,7 +685,7 @@ export async function completeTurn(
          SET content = ?, status = 'completed', answer_type = ?, answer_model = ?,
              embedding_model = ?, embedding_dimensions = ?, structured_paragraphs_json = ?,
              prompt_version = ?, retrieval_config_version = ?, corpus_generation_id = ?,
-             completion_token = ?, updated_at = ?
+             completion_token = ?, latency_ms = ?, passages_retrieved = ?, updated_at = ?
          WHERE id = ? AND status = 'pending'
            AND conversation_id IN (
              SELECT id FROM conversations WHERE owner_principal_id = ?
@@ -675,6 +706,8 @@ export async function completeTurn(
         input.retrievalConfigVersion,
         input.corpusGenerationId,
         completionToken,
+        metricOrNull(input.latencyMs),
+        metricOrNull(input.passagesRetrieved),
         input.now,
         assistantMessageId,
         parseBoundedId(input.ownerPrincipalId, "principal id"),

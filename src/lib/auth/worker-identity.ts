@@ -31,8 +31,8 @@ const MAX_GRANT_LENGTH = 64;
 
 /**
  * Parse an optional caller-supplied retrieval principal for ACL demos and
- * evals. Fails closed: any presence outside loopback identity mode is
- * forbidden, and a malformed shape (missing userId, missing grant arrays,
+ * evals. Fails closed: any presence outside loopback and session identity
+ * mode is forbidden (session mode ignores it, see below), and a malformed shape (missing userId, missing grant arrays,
  * non-string or oversized values) is rejected rather than defaulted.
  *
  * In loopback mode the assumed principal may be any synthetic principal,
@@ -45,6 +45,11 @@ export function parseAssumedPrincipal(
   raw: unknown,
 ): Principal | undefined {
   if (raw === undefined || raw === null) {
+    return undefined;
+  }
+  if (identityMode === "session") {
+    // Session mode never trusts a client-supplied grant list: it is ignored,
+    // and a turn runs as the caller. View-as uses assumePrincipalId instead.
     return undefined;
   }
   if (identityMode !== "loopback") {
@@ -85,6 +90,27 @@ function parseGrantList(raw: unknown, field: string): string[] {
     throw new AssumedPrincipalInvalid(`assumed principal carries too many ${field}`);
   }
   return values;
+}
+
+/**
+ * View-as input: a principals.id. Allowed only in loopback and session identity
+ * modes. The caller must also be an admin (checked by the route); roles and
+ * departments are then resolved server-side from the operations directory.
+ */
+export function parseAssumePrincipalId(
+  identityMode: IdentityMode,
+  raw: unknown,
+): string | undefined {
+  if (raw === undefined || raw === null) {
+    return undefined;
+  }
+  if (identityMode !== "loopback" && identityMode !== "session") {
+    throw new AssumedPrincipalForbidden();
+  }
+  if (typeof raw !== "string" || !raw.trim() || raw.length > MAX_SUBJECT_LENGTH) {
+    throw new AssumedPrincipalInvalid("assumePrincipalId must be a bounded string");
+  }
+  return raw.trim();
 }
 
 export type WorkerDirectoryLookup = (
