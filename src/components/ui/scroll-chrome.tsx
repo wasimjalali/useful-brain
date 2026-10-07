@@ -32,8 +32,8 @@ export function ScrollChrome() {
     }
 
     function onScroll(event: Event) {
-      const target = event.target as Element | null;
-      if (target && target.classList.contains("uv-scroll")) {
+      const target = event.target;
+      if (target instanceof Element && target.classList.contains("uv-scroll")) {
         reveal(target);
       }
     }

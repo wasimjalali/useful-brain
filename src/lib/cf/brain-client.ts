@@ -77,9 +77,11 @@ export async function brainJson<T>(
           ? "FORBIDDEN"
           : record.code === "AUTH_REQUIRED"
             ? "AUTH_REQUIRED"
-            : record.code === "UNAVAILABLE"
-              ? "PROVIDER_TEMPORARY"
-              : "INTERNAL_ERROR";
+            : record.code === "NOT_FOUND"
+              ? "NOT_FOUND"
+              : record.code === "UNAVAILABLE"
+                ? "PROVIDER_TEMPORARY"
+                : "INTERNAL_ERROR";
     throw new AppError(
       code,
       typeof record.message === "string" ? record.message : "The request could not be completed.",

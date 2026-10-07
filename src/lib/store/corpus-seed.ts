@@ -14,6 +14,12 @@ import {
   recordAudit,
   type SqlExecutor,
 } from "./corpus-d1";
+import {
+  fileNameOf,
+  optionalMetadataText,
+  UPSERT_BODY_SQL,
+  UPSERT_CATALOG_SQL,
+} from "./document-catalog";
 import { canMarkReady, UPSERT_CHUNK_SQL } from "./generations";
 import { newBoundedId } from "./conversations";
 
@@ -157,6 +163,27 @@ export async function seedNorthwindCorpus(input: {
     if (chunkWrites.length > 0) {
       await input.db.batch(chunkWrites);
     }
+    // The body is the full original text: chunk start_offset/end_offset index
+    // into it, which the chunk-join reconstruction cannot guarantee.
+    await input.db.batch([
+      input.db.prepare(UPSERT_CATALOG_SQL).bind(
+        document.documentId,
+        generationId,
+        document.title,
+        optionalMetadataText(document.metadata, "department"),
+        optionalMetadataText(document.metadata, "version"),
+        optionalMetadataText(document.metadata, "effective_date"),
+        JSON.stringify([...new Set(chunks.map((chunk) => chunk.sectionHeading).filter(Boolean))]),
+        document.accessScope,
+        JSON.stringify(document.allowedRoles),
+        JSON.stringify(document.allowedDepartments),
+        metadata,
+        chunks.length,
+        fileNameOf(document.sourcePath),
+        now,
+      ),
+      input.db.prepare(UPSERT_BODY_SQL).bind(document.documentId, generationId, document.body, 0),
+    ]);
   }
 
   let vectorizeStatus: "upserted" | "skipped" = "skipped";

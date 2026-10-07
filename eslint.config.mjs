@@ -16,6 +16,8 @@ const eslintConfig = defineConfig([
     "spikes/**",
     "workers/**",
     ".open-next/**",
+    // Design handoff bundles are reference HTML and a vendored prototype runtime.
+    "docs/design/handoff-*/**",
     ".wrangler/**",
   ]),
 ]);

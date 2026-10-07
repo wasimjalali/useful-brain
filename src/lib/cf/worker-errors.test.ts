@@ -6,11 +6,23 @@ import {
   toPublicWorkerError,
   WorkerBusyError,
   WorkerCancelledError,
+  WorkerNotFoundError,
   WorkerValidationError,
   workerErrorResponse,
 } from "./worker-errors";
 
 describe("worker error contracts", () => {
+  it("maps not-found to a 404 NOT_FOUND with no resource detail", async () => {
+    expect(toPublicWorkerError(new WorkerNotFoundError(), "req-nf")).toEqual({
+      code: "NOT_FOUND",
+      message: "That resource was not found.",
+      retryable: false,
+      requestId: "req-nf",
+    });
+    const response = workerErrorResponse(new WorkerNotFoundError(), "req-nf");
+    expect(response.status).toBe(404);
+  });
+
   it("maps a bad token to AUTH_REQUIRED without leaking verifier detail", () => {
     expect(toPublicWorkerError(new AccessJwtError("invalid issuer"), "req-1")).toEqual({
       code: "AUTH_REQUIRED",

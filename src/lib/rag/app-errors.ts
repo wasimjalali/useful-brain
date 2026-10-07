@@ -1,6 +1,7 @@
 export type AppErrorCode =
   | "AUTH_REQUIRED"
   | "FORBIDDEN"
+  | "NOT_FOUND"
   | "RATE_LIMITED"
   | "CORPUS_NOT_READY"
   | "PROVIDER_TEMPORARY"

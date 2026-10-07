@@ -260,6 +260,29 @@ export function keywordSearchSql(aclSql: string): string {
   return `SELECT c.chunk_id AS chunk_id, 0.0 AS rank FROM chunks_fts JOIN chunks c ON c.id = chunks_fts.rowid WHERE chunks_fts MATCH ? AND c.generation_id = ? AND ${aclSql} ORDER BY bm25(chunks_fts), c.chunk_id LIMIT ?`;
 }
 
+/**
+ * Documents of one generation the principal may read. Same predicate as the
+ * FTS channel (aclSqlAndParams), so the number a person is shown equals what
+ * retrieval can reach.
+ */
+export async function countReadableDocuments(
+  db: { prepare(query: string): { bind(...values: Array<string | number>): { first<T>(): Promise<T | null> } } },
+  generationId: string,
+  principal: Principal,
+): Promise<number> {
+  const { sql, params } = aclSqlAndParams(aclFilterFor(principal));
+  const row = await db
+    .prepare(
+      `SELECT COUNT(DISTINCT c.document_id) AS n FROM chunks c WHERE c.generation_id = ? AND ${sql}`,
+    )
+    .bind(generationId, ...params)
+    .first<{ n: number }>();
+  if (!row) {
+    throw new Error("readable document count returned no row");
+  }
+  return Number(row.n);
+}
+
 function quoteFtsTerm(term: string): string {
   return `"${term.replaceAll('"', '""')}"`;
 }

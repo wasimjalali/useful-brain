@@ -35,16 +35,16 @@ function mockJwks(keys: object[]): void {
   };
 }
 
-async function fetchWorker(request: Request): Promise<Response> {
+async function fetchWorker(request: Request, workerEnv: typeof env = env): Promise<Response> {
   const ctx = createExecutionContext();
-  const response = await worker.fetch(request, env, ctx);
+  const response = await worker.fetch(request, workerEnv, ctx);
   await waitOnExecutionContext(ctx);
   return response;
 }
 
 async function authed(
   path: string,
-  init: { method?: string; json?: unknown; email?: string } = {},
+  init: { method?: string; json?: unknown; email?: string; withoutCorpus?: boolean } = {},
 ): Promise<Response> {
   const token = await signToken(signing.privateKey, signing.kid, {
     email: init.email ?? "alice@karkoai.com",
@@ -57,6 +57,7 @@ async function authed(
       method: init.method ?? (body ? "POST" : "GET"),
       body,
     }),
+    init.withoutCorpus ? ({ ...env, CORPUS_DB: undefined } as unknown as typeof env) : env,
   );
 }
 
@@ -146,7 +147,7 @@ describe("Brain UI APIs", () => {
   });
 
   it("returns an empty knowledge inventory without CORPUS_DB", async () => {
-    const response = await authed("/knowledge");
+    const response = await authed("/knowledge", { withoutCorpus: true });
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
       documents: [],
@@ -157,13 +158,14 @@ describe("Brain UI APIs", () => {
   });
 
   it("rejects corpus re-indexing without a corpus database", async () => {
-    const response = await authed("/knowledge/reindex", { method: "POST" });
+    const response = await authed("/knowledge/reindex", { method: "POST", withoutCorpus: true });
     expect(response.status).toBe(400);
   });
 
   it("rejects corpus seed without a corpus database", async () => {
     const response = await authed("/knowledge/seed", {
       method: "POST",
+      withoutCorpus: true,
       json: {
         documents: [
           {

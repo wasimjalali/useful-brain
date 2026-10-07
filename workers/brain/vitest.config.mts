@@ -11,12 +11,14 @@ export default defineConfig({
   plugins: [
     cloudflareTest(async () => {
       const migrations = await readD1Migrations(path.join(root, "../../migrations/operations"));
+      const corpusMigrations = await readD1Migrations(path.join(root, "../../migrations/corpus"));
       return {
         wrangler: { configPath: "./wrangler.test.jsonc" },
         remoteBindings: false,
         miniflare: {
           bindings: {
             TEST_MIGRATIONS: migrations,
+            TEST_CORPUS_MIGRATIONS: corpusMigrations,
             IDENTITY_MODE: "access",
             LOOPBACK_RUNTIME: "false",
             ACCESS_TEAM_DOMAIN: "https://karkoai.cloudflareaccess.com",

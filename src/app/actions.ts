@@ -30,6 +30,9 @@ export type WorkspaceIdentity = {
   subject?: string;
   roles: string[];
   departments: string[];
+  isAdmin: boolean;
+  department: string | null;
+  readableDocumentCount: number;
 };
 
 function revalidateWorkspace() {

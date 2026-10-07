@@ -14,6 +14,9 @@ describe("SettingsWorkspace", () => {
           kind: "user",
           roles: ["operator", "standard"],
           departments: ["support"],
+          isAdmin: false,
+          department: "support",
+          readableDocumentCount: 0,
         }}
         onAssumePrincipal={vi.fn()}
         retrievalMode="keyword"

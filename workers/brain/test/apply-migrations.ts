@@ -3,3 +3,5 @@ import { env } from "cloudflare:workers";
 
 await applyD1Migrations(env.OPERATIONS_DB, env.TEST_MIGRATIONS);
 await env.OPERATIONS_DB.prepare("PRAGMA foreign_keys = ON").run();
+await applyD1Migrations(env.CORPUS_DB, env.TEST_CORPUS_MIGRATIONS);
+await env.CORPUS_DB.prepare("PRAGMA foreign_keys = ON").run();

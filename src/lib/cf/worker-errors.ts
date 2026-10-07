@@ -28,6 +28,13 @@ export class WorkerForbiddenError extends Error {
   }
 }
 
+export class WorkerNotFoundError extends Error {
+  constructor() {
+    super("NOT_FOUND");
+    this.name = "WorkerNotFoundError";
+  }
+}
+
 export class WorkerBusyError extends Error {
   constructor(message = "An answer is already in progress.") {
     super(message);
@@ -45,6 +52,7 @@ export class WorkerCancelledError extends Error {
 export type WorkerErrorCode =
   | "AUTH_REQUIRED"
   | "FORBIDDEN"
+  | "NOT_FOUND"
   | "UNAVAILABLE"
   | "VALIDATION_FAILED"
   | "INTERNAL_ERROR"
@@ -65,6 +73,14 @@ export function toPublicWorkerError(error: unknown, requestId: string): PublicWo
     return {
       code: "FORBIDDEN",
       message: "You cannot access that resource.",
+      retryable: false,
+      requestId,
+    };
+  }
+  if (error instanceof WorkerNotFoundError) {
+    return {
+      code: "NOT_FOUND",
+      message: "That resource was not found.",
       retryable: false,
       requestId,
     };
@@ -192,7 +208,7 @@ export function workerErrorResponse(error: unknown, requestId: string): Response
               ? 409
           : 500;
   return Response.json(body, {
-    status: body.code === "FORBIDDEN" ? 403 : status,
+    status: body.code === "FORBIDDEN" ? 403 : body.code === "NOT_FOUND" ? 404 : status,
     headers: { "x-request-id": requestId },
   });
 }

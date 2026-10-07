@@ -216,6 +216,9 @@ const baseProps = {
     kind: "user" as const,
     roles: ["operator"],
     departments: ["engineering"],
+    isAdmin: false,
+    department: "engineering",
+    readableDocumentCount: 0,
   },
   reindexAction: async () => {},
 };
