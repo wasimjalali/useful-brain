@@ -229,7 +229,7 @@ body {
   /* Ring: 2px gap in the surface behind, 2px ink, following the element radius.
      Set --ring-bg on a subtree whose ground is not --surface (rail, canvas). */
   :focus-visible {
-    outline: none;
+    outline: 2px solid transparent; /* forced-colors mode still shows focus */
     box-shadow: 0 0 0 2px var(--ring-bg, var(--surface)), 0 0 0 4px var(--ink);
   }
 
@@ -921,7 +921,7 @@ body {
  * ------------------------------------------------------------------ */
 @layer components {
 .ub-ring:focus-visible {
-  outline: none;
+  outline: 2px solid transparent;
   box-shadow: 0 0 0 2px var(--ring-bg, var(--surface)), 0 0 0 4px var(--ink);
 }
 
@@ -944,14 +944,6 @@ body {
 .ub-btn[data-size="34"] { height: 34px; padding: 0 14px; }
 .ub-btn[data-size="36"] { height: 36px; padding: 0 14px; }
 .ub-btn[data-icon="true"] { padding-left: 12px; }
-.ub-btn:disabled {
-  background: var(--sunken);
-  color: var(--ink-faint-text);
-  box-shadow: none;
-  cursor: not-allowed;
-  opacity: 1;
-  transform: none;
-}
 .ub-btn[data-variant="primary"] { background: var(--accent); color: var(--accent-ink); }
 .ub-btn[data-variant="primary"]:not(:disabled):hover { opacity: 0.86; }
 .ub-btn[data-variant="primary"]:not(:disabled):active { opacity: 0.76; transform: scale(0.98); }
@@ -968,7 +960,15 @@ body {
 .ub-btn[data-variant="ghost"] { background: transparent; color: var(--ink); }
 .ub-btn[data-variant="ghost"]:not(:disabled):hover { background: var(--sunken); }
 .ub-btn[data-variant="ghost"]:not(:disabled):active { background: var(--border-strong); transform: scale(0.98); }
-.ub-btn[data-variant="ghost"]:disabled { background: transparent; }
+.ub-btn:disabled,
+.ub-btn[data-variant]:disabled {
+  background: var(--sunken);
+  color: var(--ink-faint-text);
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 1;
+  transform: none;
+}
 
 .ub-iconbtn {
   display: inline-grid;
@@ -1186,6 +1186,12 @@ body {
   line-height: 20px;
 }
 
+.ub-alert .ub-btn { background: var(--bubble); box-shadow: var(--sel); }
+.ub-alert .ub-btn:not(:disabled):hover { background: var(--bubble); opacity: 0.86; }
+.ub-alert .ub-btn:focus-visible {
+  box-shadow: var(--sel), 0 0 0 2px var(--ring-bg, var(--surface)), 0 0 0 4px var(--ink);
+}
+
 .ub-pill {
   display: inline-flex;
   align-items: center;
@@ -1199,4 +1205,29 @@ body {
 .ub-pill[data-tone="active"] { background: var(--success-soft); color: var(--success); }
 .ub-pill[data-tone="draft"] { background: var(--sunken); color: var(--ink-muted); }
 .ub-pill[data-tone="failed"] { background: var(--danger-soft); color: var(--danger); }
+}
+
+/* Legacy focusables keep an outline ring: their component-layer shadows would
+   otherwise cover the box-shadow ring. Remove as each class migrates. */
+@layer components {
+.btn:focus-visible,
+.btn-primary:focus-visible,
+.btn-secondary:focus-visible,
+.icon-btn:focus-visible,
+.field-input:focus-visible,
+.chip:focus-visible,
+.suggestion-button:focus-visible,
+.evidence-card:focus-visible,
+.cite:focus-visible,
+.nav-item:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+}
+
+/* /open is light-only: keep its ground and form controls light under OS dark. */
+body:has(.open-scope) {
+  background: #f8f8f8;
+  color-scheme: light;
 }

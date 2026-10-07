@@ -5,11 +5,11 @@ import {
   applyTheme,
   readTheme,
   resolveTheme,
-  THEME_INIT_SCRIPT,
   THEME_STORAGE_KEY,
   useTheme,
   writeTheme,
 } from "./theme";
+import { THEME_INIT_SCRIPT } from "./theme-init";
 
 type Listener = (event: { matches: boolean }) => void;
 
@@ -114,5 +114,13 @@ describe("useTheme", () => {
     });
     expect(result.current.choice).toBe("dark");
     expect(document.documentElement.dataset.theme).toBe("dark");
+  });
+});
+
+describe("THEME_INIT_SCRIPT module", () => {
+  it("is a non-empty string containing the storage key", () => {
+    expect(typeof THEME_INIT_SCRIPT).toBe("string");
+    expect(THEME_INIT_SCRIPT.length).toBeGreaterThan(0);
+    expect(THEME_INIT_SCRIPT).toContain(THEME_STORAGE_KEY);
   });
 });

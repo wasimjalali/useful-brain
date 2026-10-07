@@ -32,7 +32,7 @@ import {
   LOAD_PRINCIPAL_SQL,
   type PrincipalDirectoryRow,
 } from "../../../src/lib/store/principal-directory";
-import { nonReadToolPolicies, type ApprovalBinding } from "../../../src/lib/agent/policy";
+import { evaluateToolPolicy, nonReadToolPolicies, type ApprovalBinding } from "../../../src/lib/agent/policy";
 import {
   EvalModelOverrideForbidden,
   EvalModelOverrideInvalid,
@@ -70,6 +70,7 @@ import { REAL_STACK_FINGERPRINT, fingerprintId } from "../../../src/lib/retrieve
 import { ConversationRunLock } from "./conversation-lock";
 import { ApprovalWorkflow } from "./approval-workflow";
 import {
+  DURABLE_RESUME_TOOLS,
   enqueueRecoverableApprovalResumes,
   parseApprovalResumeMessage,
   resumeApprovedAgentRun,
@@ -266,8 +267,26 @@ const brainWorker = {
 
       // One gate for every /admin/ route, before any handler. Fails closed:
       // a handler added later cannot forget it.
-      if (path.startsWith("/admin/")) {
+      if (path === "/admin" || path.startsWith("/admin/")) {
         requireAdmin(principal);
+      }
+
+      if (path === "/admin/catalog/backfill" && request.method === "POST") {
+        operation = "catalog-backfill";
+        if (!env.CORPUS_DB) {
+          throw new WorkerValidationError();
+        }
+        const corpus = env.CORPUS_DB as SqlExecutor;
+        const activeId = await activeGenerationId(corpus);
+        const added = activeId ? await backfillDocumentCatalog(corpus, activeId) : 0;
+        writeOperationalLog({
+          requestId,
+          principalKind: principal.kind,
+          operation,
+          status: "ok",
+          durationMs: Date.now() - started,
+        });
+        return json({ generationId: activeId, added }, requestId);
       }
 
       if (path === "/config" && request.method === "GET") {
@@ -297,12 +316,25 @@ const brainWorker = {
           status: "active",
         }));
         for (const tool of nonReadToolPolicies()) {
+          const decision = evaluateToolPolicy({
+            tool: tool.name,
+            principal: { id: principal.id },
+            conversationId: "config",
+            args: {},
+            idempotencyKey: "config",
+            now: started,
+          });
           connectors.push({
             id: `tool-${tool.name}`,
             label: tool.name,
             kind: "action",
-            approval: tool.risk === "external_write",
-            status: tool.risk === "high_risk" ? "not_connected" : "active",
+            approval: decision.action === "pending_approval",
+            // Connected only when policy allows it and the durable
+            // approval-resume dispatcher can execute it.
+            status:
+              decision.action !== "deny" && DURABLE_RESUME_TOOLS.has(tool.name)
+                ? "connected"
+                : "not_connected",
           });
         }
         writeOperationalLog({
@@ -339,7 +371,6 @@ const brainWorker = {
           const corpus = env.CORPUS_DB as SqlExecutor;
           const activeId = await activeGenerationId(corpus);
           if (activeId) {
-            await backfillDocumentCatalog(corpus, activeId);
             readableDocumentCount = await countReadableDocuments(corpus, activeId, {
               userId: principal.id,
               roles: principal.roles,
@@ -934,6 +965,7 @@ const brainWorker = {
             throw new WorkerForbiddenError();
           }
         }
+        await backfillDocumentCatalog(env.CORPUS_DB as SqlExecutor, generationId);
         await promoteGeneration(env.CORPUS_DB as SqlExecutor, generationId);
         writeOperationalLog({
           requestId,
@@ -960,9 +992,7 @@ const brainWorker = {
 
       if (path === "/evaluations/run" && request.method === "POST") {
         operation = "evaluations-run";
-        if (!hasOperatorAccess(principal.roles)) {
-          throw new WorkerForbiddenError();
-        }
+        requireAdmin(principal);
         const result = await runManualEvaluations({
           operations: env.OPERATIONS_DB as OperationsDatabase,
           principal,

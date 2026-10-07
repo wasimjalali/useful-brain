@@ -16,7 +16,7 @@ export function InlineAlert({
       <CircleAlertIcon className="size-4 shrink-0 text-danger" />
       <span className="flex-1">{children}</span>
       {action ? (
-        <span className="shrink-0 [&_.ub-btn]:bg-bubble [&_.ub-btn]:shadow-sel">
+        <span className="shrink-0">
           <Button onClick={action.onClick} size={32} variant="secondary">
             {action.label}
           </Button>

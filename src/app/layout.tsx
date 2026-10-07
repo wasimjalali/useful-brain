@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { Geist_Mono } from "next/font/google";
 
 import { ScrollChrome } from "@/components/ui/scroll-chrome";
-import { THEME_INIT_SCRIPT } from "@/lib/theme";
+import { ThemeSync } from "@/components/ui/theme-sync";
+import { THEME_INIT_SCRIPT } from "@/lib/theme-init";
 
 import "./globals.css";
 
@@ -34,6 +35,7 @@ export default function RootLayout({
       </head>
       <body className="flex min-h-full flex-col">
         <ScrollChrome />
+        <ThemeSync />
         {children}
       </body>
     </html>

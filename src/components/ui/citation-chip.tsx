@@ -17,6 +17,10 @@ export function CitationChip({
   onHover,
   onClick,
   type = "button",
+  onBlur,
+  onFocus,
+  onMouseEnter,
+  onMouseLeave,
   ...props
 }: CitationChipProps) {
   return (
@@ -24,13 +28,25 @@ export function CitationChip({
       aria-label={`Citation ${n}`}
       className="ub-cite ub-ring"
       data-active={active ? "true" : undefined}
-      onBlur={() => onHover?.(false)}
-      onClick={onClick}
-      onFocus={() => onHover?.(true)}
-      onMouseEnter={() => onHover?.(true)}
-      onMouseLeave={() => onHover?.(false)}
-      type={type}
       {...props}
+      onBlur={(event) => {
+        onBlur?.(event);
+        onHover?.(false);
+      }}
+      onClick={onClick}
+      onFocus={(event) => {
+        onFocus?.(event);
+        onHover?.(true);
+      }}
+      onMouseEnter={(event) => {
+        onMouseEnter?.(event);
+        onHover?.(true);
+      }}
+      onMouseLeave={(event) => {
+        onMouseLeave?.(event);
+        onHover?.(false);
+      }}
+      type={type}
     >
       {n}
     </button>

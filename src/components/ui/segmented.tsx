@@ -26,7 +26,22 @@ export function Segmented({
   const refs = useRef<Array<HTMLButtonElement | null>>([]);
   const optionRole = mode === "tablist" ? "tab" : "radio";
 
+  const enabled = options.filter((o) => !o.disabled);
+  const stopValue = enabled.find((o) => o.value === value)?.value ?? enabled[0]?.value;
+
   function onKeyDown(event: KeyboardEvent, index: number) {
+    if (event.key === "Home" || event.key === "End") {
+      event.preventDefault();
+      const target =
+        event.key === "Home"
+          ? options.findIndex((o) => !o.disabled)
+          : options.map((o) => !o.disabled).lastIndexOf(true);
+      if (target >= 0) {
+        onChange(options[target].value);
+        refs.current[target]?.focus();
+      }
+      return;
+    }
     const step =
       event.key === "ArrowRight" || event.key === "ArrowDown"
         ? 1
@@ -65,7 +80,7 @@ export function Segmented({
               refs.current[index] = node;
             }}
             role={optionRole}
-            tabIndex={selected ? 0 : -1}
+            tabIndex={option.value === stopValue ? 0 : -1}
             type="button"
           >
             {option.icon}

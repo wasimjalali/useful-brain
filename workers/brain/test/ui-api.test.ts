@@ -184,6 +184,33 @@ describe("Brain UI APIs", () => {
     expect(response.status).toBe(400);
   });
 
+  it("rejects an oversize body (UTF-8 bytes) and an admin allowed role before any write", async () => {
+    const base = {
+      documentId: "nw-test",
+      title: "Test",
+      sourceName: "Test",
+      sourcePath: "northwind/test.md",
+      accessScope: "public",
+      allowedRoles: [] as string[],
+      allowedDepartments: [] as string[],
+    };
+    const generations = async () =>
+      (await env.CORPUS_DB.prepare(`SELECT COUNT(*) AS n FROM corpus_generations`).first<{ n: number }>())!.n;
+    const before = await generations();
+    // 400,000 three-byte characters: under 1,000,000 characters, over 1,000,000 bytes.
+    const oversize = await authed("/knowledge/seed", {
+      method: "POST",
+      json: { documents: [{ ...base, body: "\u20ac".repeat(400_000) }] },
+    });
+    expect(oversize.status).toBe(400);
+    const adminRole = await authed("/knowledge/seed", {
+      method: "POST",
+      json: { documents: [{ ...base, accessScope: "role", allowedRoles: ["admin"], body: "Hello." }] },
+    });
+    expect(adminRole.status).toBe(400);
+    expect(await generations()).toBe(before);
+  });
+
   it("forbids corpus seed for a non-operator", async () => {
     await env.OPERATIONS_DB.prepare(
       `INSERT OR IGNORE INTO principals (id, kind, subject, created_at) VALUES (?, ?, ?, ?)`,

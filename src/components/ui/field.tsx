@@ -18,6 +18,7 @@ export function Field({
   trailing,
   id,
   disabled,
+  "aria-describedby": describedBy,
   ...props
 }: FieldProps) {
   const generated = useId();
@@ -35,12 +36,14 @@ export function Field({
         data-size={size}
       >
         <input
-          aria-describedby={error ? errorId : undefined}
+          {...props}
+          aria-describedby={
+            [describedBy, error ? errorId : undefined].filter(Boolean).join(" ") || undefined
+          }
           aria-invalid={error ? true : undefined}
           className="ub-field-input"
           disabled={disabled}
           id={inputId}
-          {...props}
         />
         {trailing}
       </div>

@@ -1,3 +1,4 @@
+import { ADMIN_ROLE } from "../auth/admin";
 import { aclGroupKey, ownerOf, type AccessScope, type AclShape } from "./acl-group";
 import { MAX_CANDIDATE_LIMIT, type ChunkRecord } from "../retrieve/types";
 import { VECTORIZE_FILTER_MAX_BYTES } from "../store/vectorize-projection";
@@ -32,7 +33,8 @@ export type AccessControlled = {
 };
 
 export function aclFilterFor(principal: Principal): AclFilter {
-  const roles = [...new Set(principal.roles)];
+  // admin is an operator capability, never a document read grant.
+  const roles = [...new Set(principal.roles)].filter((role) => role !== ADMIN_ROLE);
   const departments = [...new Set(principal.departments)];
   if (roles.length > MAX_FILTER_TERMS || departments.length > MAX_FILTER_TERMS) {
     throw new AclTooWide(
@@ -70,7 +72,7 @@ export function canAccessChunk(
     if (!chunk.allowedRoles.length) {
       return { allowed: false, reason: "role_scope_empty" };
     }
-    if (chunk.allowedRoles.some((role) => principal.roles.includes(role))) {
+    if (chunk.allowedRoles.some((role) => role !== ADMIN_ROLE && principal.roles.includes(role))) {
       return { allowed: true, reason: null };
     }
     return { allowed: false, reason: "role_denied" };

@@ -40,69 +40,74 @@ export function fileNameOf(path: string): string {
 }
 
 type BackfillChunkRow = {
-  document_id: string;
-  path: string;
   heading: string;
   content: string;
   access_scope: string;
   allowed_roles: string;
   allowed_departments: string;
+  acl_group: string;
   metadata: string;
 };
 
-const repaired = new Set<string>();
-
-export function resetCatalogRepairCache(): void {
-  repaired.clear();
-}
+const BACKFILL_PAGE = 100;
 
 /**
  * Idempotent: rebuilds catalog and body rows for documents of a generation
  * that lack them. The original text is not stored for such generations, so the
  * body is reconstructed from chunk text (overlap repeated) and marked
  * `reconstructed = 1`; offsets do not index into a reconstructed body.
- * Existing rows are never overwritten. Returns the number of documents added.
+ * Existing rows are never overwritten. Chunks are read one document at a time,
+ * a page at a time. Throws if the chunks of a document disagree on their ACL.
+ * Returns the number of documents added.
  */
 export async function backfillDocumentCatalog(
   db: SqlExecutor,
   generationId: string,
   now = Date.now(),
 ): Promise<number> {
-  if (repaired.has(generationId)) {
-    return 0;
-  }
-  const counts = await db
+  const missing = await db
     .prepare(
-      `SELECT
-         (SELECT COUNT(DISTINCT document_id) FROM chunks WHERE generation_id = ?) AS chunked,
-         (SELECT COUNT(*) FROM document_catalog WHERE generation_id = ?) AS cataloged,
-         (SELECT COUNT(*) FROM document_bodies WHERE generation_id = ?) AS bodies`,
-    )
-    .bind(generationId, generationId, generationId)
-    .first<{ chunked: number; cataloged: number; bodies: number }>();
-  if (counts && counts.cataloged >= counts.chunked && counts.bodies >= counts.chunked) {
-    repaired.add(generationId);
-    return 0;
-  }
-  const rows = await db
-    .prepare(
-      `SELECT c.document_id, d.path, c.heading, c.content, c.access_scope,
-              c.allowed_roles, c.allowed_departments, c.metadata
+      `SELECT DISTINCT c.document_id, d.path
        FROM chunks c JOIN documents d ON d.id = c.document_id
        WHERE c.generation_id = ?
-       ORDER BY c.document_id, c.chunk_index`,
+         AND (
+           NOT EXISTS (SELECT 1 FROM document_catalog k
+                       WHERE k.document_id = c.document_id AND k.generation_id = c.generation_id)
+           OR NOT EXISTS (SELECT 1 FROM document_bodies b
+                          WHERE b.document_id = c.document_id AND b.generation_id = c.generation_id)
+         )
+       ORDER BY c.document_id`,
     )
     .bind(generationId)
-    .all<BackfillChunkRow>();
-  const grouped = new Map<string, BackfillChunkRow[]>();
-  for (const row of rows.results) {
-    const list = grouped.get(row.document_id) ?? [];
-    list.push(row);
-    grouped.set(row.document_id, list);
-  }
-  const statements: Array<ReturnType<SqlExecutor["prepare"]>> = [];
-  for (const [documentId, chunks] of grouped) {
+    .all<{ document_id: string; path: string }>();
+  let added = 0;
+  for (const { document_id: documentId, path } of missing.results) {
+    const chunks: BackfillChunkRow[] = [];
+    for (let offset = 0; ; offset += BACKFILL_PAGE) {
+      const page = await db
+        .prepare(
+          `SELECT heading, content, access_scope, allowed_roles, allowed_departments, acl_group, metadata
+           FROM chunks WHERE generation_id = ? AND document_id = ?
+           ORDER BY chunk_index LIMIT ? OFFSET ?`,
+        )
+        .bind(generationId, documentId, BACKFILL_PAGE, offset)
+        .all<BackfillChunkRow>();
+      chunks.push(...page.results);
+      if (page.results.length < BACKFILL_PAGE) {
+        break;
+      }
+    }
     const first = chunks[0];
+    for (const chunk of chunks) {
+      if (
+        chunk.access_scope !== first.access_scope ||
+        chunk.allowed_roles !== first.allowed_roles ||
+        chunk.allowed_departments !== first.allowed_departments ||
+        chunk.acl_group !== first.acl_group
+      ) {
+        throw new Error(`document ${documentId} has chunks with inconsistent ACL`);
+      }
+    }
     let metadata: Record<string, unknown> = {};
     try {
       const parsed: unknown = JSON.parse(first.metadata);
@@ -112,9 +117,9 @@ export async function backfillDocumentCatalog(
     } catch {
       metadata = {};
     }
-    const file = fileNameOf(first.path);
+    const file = fileNameOf(path);
     const headings = [...new Set(chunks.map((chunk) => chunk.heading).filter(Boolean))];
-    statements.push(
+    await db.batch([
       db.prepare(INSERT_MISSING_CATALOG_SQL).bind(
         documentId,
         generationId,
@@ -137,11 +142,8 @@ export async function backfillDocumentCatalog(
         chunks.map((chunk) => chunk.content).join("\n\n"),
         1,
       ),
-    );
+    ]);
+    added += 1;
   }
-  for (let index = 0; index < statements.length; index += 50) {
-    await db.batch(statements.slice(index, index + 50));
-  }
-  repaired.add(generationId);
-  return grouped.size;
+  return added;
 }

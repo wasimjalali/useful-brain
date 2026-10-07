@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
+import { CitationChip } from "./citation-chip";
 import { Field, SearchField } from "./field";
 import { Segmented } from "./segmented";
 import {
@@ -65,6 +66,73 @@ describe("Segmented", () => {
   });
 });
 
+describe("Segmented extras", () => {
+  it("keeps one tab stop when the value matches nothing and skips a disabled first option", () => {
+    render(
+      <Segmented
+        label="x"
+        onChange={() => {}}
+        options={[
+          { value: "a", label: "A", disabled: true },
+          { value: "b", label: "B" },
+          { value: "c", label: "C" },
+        ]}
+        value="none"
+      />,
+    );
+    const stops = screen.getAllByRole("radio").filter((r) => r.tabIndex === 0);
+    expect(stops).toHaveLength(1);
+    expect(stops[0]).toHaveTextContent("B");
+  });
+
+  it("Home and End jump to the first and last enabled option", () => {
+    const onChange = vi.fn();
+    render(
+      <Segmented
+        label="x"
+        onChange={onChange}
+        options={[
+          { value: "a", label: "A", disabled: true },
+          { value: "b", label: "B" },
+          { value: "c", label: "C" },
+          { value: "d", label: "D", disabled: true },
+        ]}
+        value="b"
+      />,
+    );
+    const b = screen.getByRole("radio", { name: "B" });
+    fireEvent.keyDown(b, { key: "End" });
+    expect(onChange).toHaveBeenLastCalledWith("c");
+    fireEvent.keyDown(b, { key: "Home" });
+    expect(onChange).toHaveBeenLastCalledWith("b");
+  });
+});
+
+describe("CitationChip caller handlers", () => {
+  it("chains caller focus and mouse handlers with onHover", () => {
+    const onFocus = vi.fn();
+    const onMouseEnter = vi.fn();
+    const onHover = vi.fn();
+    render(<CitationChip n={1} onFocus={onFocus} onHover={onHover} onMouseEnter={onMouseEnter} />);
+    const chip = screen.getByRole("button", { name: "Citation 1" });
+    fireEvent.focus(chip);
+    fireEvent.mouseEnter(chip);
+    expect(onFocus).toHaveBeenCalledTimes(1);
+    expect(onMouseEnter).toHaveBeenCalledTimes(1);
+    expect(onHover).toHaveBeenCalledWith(true);
+  });
+});
+
+describe("Field describedby", () => {
+  it("merges a caller aria-describedby with the error id", () => {
+    render(<Field aria-describedby="hint" error="Bad" label="Name" />);
+    const input = screen.getByLabelText("Name");
+    const ids = input.getAttribute("aria-describedby")?.split(" ");
+    expect(ids?.[0]).toBe("hint");
+    expect(ids).toHaveLength(2);
+  });
+});
+
 describe("Field", () => {
   it("links the label to the input", () => {
     render(<Field label="Email" />);
@@ -93,6 +161,22 @@ describe("SearchField", () => {
     rerender(<SearchField label="Search titles" onChange={onChange} value="leave" />);
     fireEvent.click(screen.getByRole("button", { name: "Clear search" }));
     expect(onChange).toHaveBeenCalledWith("");
+  });
+});
+
+describe("TableCell", () => {
+  it("exposes the full text via title, with an explicit override", () => {
+    render(
+      <Table columns="1fr" label="t">
+        <TableRow>
+          <TableCell>Long text</TableCell>
+          <TableCell title="Full">short</TableCell>
+        </TableRow>
+      </Table>,
+    );
+    const cells = screen.getAllByRole("cell");
+    expect(cells[0]).toHaveAttribute("title", "Long text");
+    expect(cells[1]).toHaveAttribute("title", "Full");
   });
 });
 

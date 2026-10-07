@@ -48,9 +48,13 @@ export function TableRow({
   );
 }
 
-export function TableCell({ children }: { children: ReactNode }) {
+export function TableCell({ children, title }: { children: ReactNode; title?: string }) {
   return (
-    <div className="min-w-0 truncate text-[13px] leading-5" role="cell">
+    <div
+      className="min-w-0 truncate text-[13px] leading-5"
+      role="cell"
+      title={title ?? (typeof children === "string" ? children : undefined)}
+    >
       {children}
     </div>
   );

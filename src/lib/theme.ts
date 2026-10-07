@@ -5,7 +5,8 @@ import { useCallback, useSyncExternalStore } from "react";
 export type ThemeChoice = "system" | "light" | "dark";
 export type ResolvedTheme = "light" | "dark";
 
-export const THEME_STORAGE_KEY = "useful-brain.theme";
+export { THEME_STORAGE_KEY } from "./theme-key";
+import { THEME_STORAGE_KEY } from "./theme-key";
 const DARK_QUERY = "(prefers-color-scheme: dark)";
 
 function isChoice(value: unknown): value is ThemeChoice {
@@ -50,11 +51,6 @@ export function applyTheme(choice: ThemeChoice): void {
     root.dataset.theme = choice;
   }
 }
-
-/** Inline script for <head>: runs before first paint. Must match readTheme/applyTheme. */
-export const THEME_INIT_SCRIPT = `try{var t=localStorage.getItem(${JSON.stringify(
-  THEME_STORAGE_KEY,
-)});if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}`;
 
 const CHOICE_EVENT = "useful-brain:theme";
 

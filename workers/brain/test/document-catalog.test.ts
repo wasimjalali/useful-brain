@@ -2,10 +2,7 @@ import { env } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { workerErrorResponse, WorkerNotFoundError } from "../../../src/lib/cf/worker-errors";
-import {
-  backfillDocumentCatalog,
-  resetCatalogRepairCache,
-} from "../../../src/lib/store/document-catalog";
+import { backfillDocumentCatalog } from "../../../src/lib/store/document-catalog";
 import { CORPUS_DOCUMENT_IDS, seedCorpus } from "./seed";
 
 let generationId: string;
@@ -114,9 +111,8 @@ describe("catalog backfill", () => {
       env.CORPUS_DB.prepare(`DELETE FROM document_catalog WHERE generation_id = ? AND document_id <> 'doc-public-security'`).bind(gen),
       env.CORPUS_DB.prepare(`DELETE FROM document_bodies WHERE generation_id = ? AND document_id <> 'doc-public-security'`).bind(gen),
     ]);
-    resetCatalogRepairCache();
     const added = await backfillDocumentCatalog(env.CORPUS_DB, gen);
-    expect(added).toBe(CORPUS_DOCUMENT_IDS.length);
+    expect(added).toBe(CORPUS_DOCUMENT_IDS.length - 1);
     const bodies = await env.CORPUS_DB.prepare(
       `SELECT document_id, reconstructed FROM document_bodies WHERE generation_id = ? ORDER BY document_id`,
     )
@@ -134,8 +130,29 @@ describe("catalog backfill", () => {
     expect(rebuilt!.title).toBe("Incident Runbook");
     expect(JSON.parse(rebuilt!.headings_json)).toEqual(["Paging", "Rollback", "Postmortem"]);
     expect(rebuilt!.access_scope).toBe("department");
-    resetCatalogRepairCache();
     expect(await backfillDocumentCatalog(env.CORPUS_DB, gen)).toBe(0);
+  });
+});
+
+describe("catalog backfill ACL consistency", () => {
+  it("throws when chunks of one document disagree on ACL instead of copying the first chunk's", async () => {
+    const seeded = await seedCorpus();
+    const gen = seeded.generationId;
+    await env.CORPUS_DB.batch([
+      env.CORPUS_DB.prepare(`DELETE FROM document_catalog WHERE generation_id = ?`).bind(gen),
+      env.CORPUS_DB.prepare(`DELETE FROM document_bodies WHERE generation_id = ?`).bind(gen),
+      env.CORPUS_DB.prepare(
+        `UPDATE chunks SET access_scope = 'public'
+         WHERE generation_id = ? AND document_id = 'doc-eng-runbook' AND chunk_index = 1`,
+      ).bind(gen),
+    ]);
+    await expect(backfillDocumentCatalog(env.CORPUS_DB, gen)).rejects.toThrow(/ACL/);
+    const rows = await env.CORPUS_DB.prepare(
+      `SELECT COUNT(*) AS n FROM document_catalog WHERE generation_id = ? AND document_id = 'doc-eng-runbook'`,
+    )
+      .bind(gen)
+      .first<{ n: number }>();
+    expect(rows!.n).toBe(0);
   });
 });
 
@@ -158,7 +175,6 @@ describe("migration 0004 over an existing 0001-0003 database", () => {
     }
     const chunksAfter = await env.CORPUS_DB.prepare(`SELECT COUNT(*) AS n FROM chunks`).first<{ n: number }>();
     expect(chunksAfter!.n).toBe(chunksBefore!.n);
-    resetCatalogRepairCache();
     expect(await backfillDocumentCatalog(env.CORPUS_DB, seeded.generationId)).toBe(CORPUS_DOCUMENT_IDS.length);
     const hits = await env.CORPUS_DB.prepare(
       `SELECT c.document_id FROM document_catalog_fts f JOIN document_catalog c ON c.id = f.rowid

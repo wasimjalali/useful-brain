@@ -26,7 +26,7 @@ export function parseApprovalResumeMessage(value: unknown): ApprovalResumeMessag
   };
 }
 
-const DURABLE_RESUME_TOOLS = new Set(["create_draft", "action_sink_write", "mcp_create_ticket"]);
+export const DURABLE_RESUME_TOOLS = new Set(["create_draft", "action_sink_write", "mcp_create_ticket"]);
 
 function assertSupportedArguments(tool: string, value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {

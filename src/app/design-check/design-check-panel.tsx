@@ -144,7 +144,6 @@ export function DesignCheckPanel({ theme }: { theme: "light" | "dark" }) {
             <CitationChip data-force="hover" n={2} />
             <CitationChip data-force="focus" n={3} />
             <CitationChip active={pinned} n={4} onClick={() => setPinned((v) => !v)} />
-            <span className="text-xs text-ink-faint-text">click 4 to pin</span>
           </Row>
           <Row name="status">
             <StatusPill tone="active">Active</StatusPill>
@@ -244,7 +243,6 @@ export function DesignCheckPanel({ theme }: { theme: "light" | "dark" }) {
           <div className="dialog-panel" style={{ width: 360, maxWidth: "100%", animation: "none" }}>
             <div className="flex flex-col gap-3 p-5">
               <h3 className="text-base font-semibold">Upload documents</h3>
-              <p className="text-[13px] text-ink-muted">Panel treatment: radius 16, edge, lift.</p>
               <div className="flex justify-end gap-2">
                 <Button variant="ghost">Cancel</Button>
                 <Button variant="primary">Add to draft</Button>
