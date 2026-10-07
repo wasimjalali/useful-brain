@@ -1,3 +1,4 @@
+import { hasOperatorAccess } from "../auth/admin";
 import type { SeedDocumentInput } from "./corpus-seed";
 import { seedDocumentOwnerId } from "./owned-seed";
 
@@ -12,7 +13,7 @@ export function mayPromoteGeneration(
   documents: SeedDocumentInput[],
   principal: { id: string; roles: string[] },
 ): boolean {
-  if (principal.roles.includes("operator")) {
+  if (hasOperatorAccess(principal.roles)) {
     return true;
   }
   if (documents.length === 0) {

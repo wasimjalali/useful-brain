@@ -65,6 +65,9 @@ describe("Web-to-Brain identity", () => {
       subject: "alice@karkoai.com",
       roles: ["operator"],
       departments: ["engineering"],
+      isAdmin: false,
+      department: "engineering",
+      readableDocumentCount: 0,
     });
   });
 

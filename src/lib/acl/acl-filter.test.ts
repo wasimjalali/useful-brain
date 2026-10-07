@@ -101,3 +101,17 @@ describe("ACL predicate equivalence", () => {
     expect(() => assertSerializedFilterSize("x".repeat(2048))).toThrow(/2048/);
   });
 });
+
+describe("admin role is never a document read grant", () => {
+  it("strips admin from the filter and the oracle", () => {
+    const principal = { userId: "u1", roles: ["admin", "manager"], departments: [] };
+    expect(aclFilterFor(principal).roles).toEqual(["manager"]);
+    const chunk = {
+      accessScope: "role" as AccessScope,
+      allowedRoles: ["admin"],
+      allowedDepartments: [],
+    };
+    expect(canAccessChunk(principal, chunk).allowed).toBe(false);
+    expect(chunkMatchesFilter(aclFilterFor(principal), chunk)).toBe(false);
+  });
+});

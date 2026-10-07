@@ -6,6 +6,7 @@ import {
   authenticateWorkerRequest,
   parseAssumedPrincipal,
 } from "../../../src/lib/auth/worker-identity";
+import { hasOperatorAccess, isAdminPrincipal, requireAdmin } from "../../../src/lib/auth/admin";
 import { parseBoundedId } from "../../../src/lib/cf/bounded-id";
 import { writeOperationalLog } from "../../../src/lib/cf/operational-log";
 import { resolveRequestId, withRequestId } from "../../../src/lib/cf/request-id";
@@ -31,7 +32,7 @@ import {
   LOAD_PRINCIPAL_SQL,
   type PrincipalDirectoryRow,
 } from "../../../src/lib/store/principal-directory";
-import type { ApprovalBinding } from "../../../src/lib/agent/policy";
+import { evaluateToolPolicy, nonReadToolPolicies, type ApprovalBinding } from "../../../src/lib/agent/policy";
 import {
   EvalModelOverrideForbidden,
   EvalModelOverrideInvalid,
@@ -59,12 +60,17 @@ import {
   type SeedDocumentInput,
 } from "../../../src/lib/store/corpus-seed";
 import { listRecentEvalRuns } from "../../../src/lib/store/eval-runs";
-import { getGeneration, promoteGeneration, type SqlExecutor } from "../../../src/lib/store/corpus-d1";
+import { activeGenerationId, getGeneration, promoteGeneration, type SqlExecutor } from "../../../src/lib/store/corpus-d1";
 import type { WorkersAiRunner } from "../../../src/lib/embeddings/workers-ai-embed";
 import type { CorpusSql, VectorizeIndex } from "../../../src/lib/retrieve/cloudflare-pipeline";
+import { aclFilterFor, countReadableDocuments } from "../../../src/lib/acl/access";
+import { backfillDocumentCatalog } from "../../../src/lib/store/document-catalog";
+import { SELECTED_MODELS } from "../../../src/lib/models/selection";
+import { REAL_STACK_FINGERPRINT, fingerprintId } from "../../../src/lib/retrieve/fingerprint";
 import { ConversationRunLock } from "./conversation-lock";
 import { ApprovalWorkflow } from "./approval-workflow";
 import {
+  DURABLE_RESUME_TOOLS,
   enqueueRecoverableApprovalResumes,
   parseApprovalResumeMessage,
   resumeApprovedAgentRun,
@@ -182,7 +188,7 @@ async function requireConversationOwner(
 }
 
 function requireOperator(roles: string[]): void {
-  if (!roles.includes("operator")) {
+  if (!hasOperatorAccess(roles)) {
     throw new WorkerForbiddenError();
   }
 }
@@ -259,8 +265,119 @@ const brainWorker = {
         throw new AccessJwtUnavailable("Access is not configured");
       }
 
+      // One gate for every /admin/ route, before any handler. Fails closed:
+      // a handler added later cannot forget it.
+      if (path === "/admin" || path.startsWith("/admin/")) {
+        requireAdmin(principal);
+      }
+
+      if (path === "/admin/catalog/backfill" && request.method === "POST") {
+        operation = "catalog-backfill";
+        if (!env.CORPUS_DB) {
+          throw new WorkerValidationError();
+        }
+        const corpus = env.CORPUS_DB as SqlExecutor;
+        const activeId = await activeGenerationId(corpus);
+        const added = activeId ? await backfillDocumentCatalog(corpus, activeId) : 0;
+        writeOperationalLog({
+          requestId,
+          principalKind: principal.kind,
+          operation,
+          status: "ok",
+          durationMs: Date.now() - started,
+        });
+        return json({ generationId: activeId, added }, requestId);
+      }
+
+      if (path === "/config" && request.method === "GET") {
+        operation = "config";
+        requireAdmin(principal);
+        const activeId = env.CORPUS_DB
+          ? await activeGenerationId(env.CORPUS_DB as SqlExecutor)
+          : null;
+        const sourceKinds = env.CORPUS_DB
+          ? (
+              await (env.CORPUS_DB as SqlExecutor)
+                .prepare(`SELECT DISTINCT kind FROM sources ORDER BY kind`)
+                .all<{ kind: string }>()
+            ).results.map((row) => row.kind)
+          : [];
+        const connectors: Array<{
+          id: string;
+          label: string;
+          kind: "upload" | "github" | "http" | "action";
+          approval: boolean;
+          status: "active" | "connected" | "not_connected";
+        }> = sourceKinds.map((kind) => ({
+          id: `source-${kind}`,
+          label: kind,
+          kind: kind === "github" || kind === "http" || kind === "upload" ? kind : "upload",
+          approval: false,
+          status: "active",
+        }));
+        for (const tool of nonReadToolPolicies()) {
+          const decision = evaluateToolPolicy({
+            tool: tool.name,
+            principal: { id: principal.id },
+            conversationId: "config",
+            args: {},
+            idempotencyKey: "config",
+            now: started,
+          });
+          connectors.push({
+            id: `tool-${tool.name}`,
+            label: tool.name,
+            kind: "action",
+            approval: decision.action === "pending_approval",
+            // Connected only when policy allows it and the durable
+            // approval-resume dispatcher can execute it.
+            status:
+              decision.action !== "deny" && DURABLE_RESUME_TOOLS.has(tool.name)
+                ? "connected"
+                : "not_connected",
+          });
+        }
+        writeOperationalLog({
+          requestId,
+          principalKind: principal.kind,
+          operation,
+          status: "ok",
+          durationMs: Date.now() - started,
+        });
+        return json(
+          {
+            models: {
+              answer: SELECTED_MODELS.chat.id,
+              embedding: SELECTED_MODELS.embedding.id,
+              reranker: SELECTED_MODELS.rerank.id,
+            },
+            retrieval: {
+              mode: env.VECTORIZE ? "hybrid" : "keyword",
+              passages: REAL_STACK_FINGERPRINT.topK,
+              rerankFloor: REAL_STACK_FINGERPRINT.relevanceFloor,
+              configVersion: fingerprintId(REAL_STACK_FINGERPRINT),
+            },
+            activeGenerationId: activeId,
+            connectors,
+          },
+          requestId,
+        );
+      }
+
       if (path === "/whoami") {
         operation = "whoami";
+        let readableDocumentCount = 0;
+        if (env.CORPUS_DB) {
+          const corpus = env.CORPUS_DB as SqlExecutor;
+          const activeId = await activeGenerationId(corpus);
+          if (activeId) {
+            readableDocumentCount = await countReadableDocuments(corpus, activeId, {
+              userId: principal.id,
+              roles: principal.roles,
+              departments: principal.departments,
+            });
+          }
+        }
         writeOperationalLog({
           requestId,
           principalKind: principal.kind,
@@ -275,6 +392,9 @@ const brainWorker = {
             subject: principal.subject,
             roles: principal.roles,
             departments: principal.departments,
+            isAdmin: isAdminPrincipal(principal),
+            department: principal.departments[0] ?? null,
+            readableDocumentCount,
           },
           requestId,
         );
@@ -699,7 +819,7 @@ const brainWorker = {
         }
         const incoming = Array.isArray(body.documents) ? body.documents : [];
         let ownedIncoming = incoming;
-        if (!principal.roles.includes("operator")) {
+        if (!hasOperatorAccess(principal.roles)) {
           ownedIncoming = incoming.map((document) => stampPrivateOwner(principal.id, document));
         }
         let documents = ownedIncoming;
@@ -792,7 +912,7 @@ const brainWorker = {
           throw new WorkerValidationError();
         }
         const ownerId = seedDocumentOwnerId(target);
-        if (!principal.roles.includes("operator") && ownerId !== principal.id) {
+        if (!hasOperatorAccess(principal.roles) && ownerId !== principal.id) {
           throw new WorkerForbiddenError();
         }
         const remaining = removeSeedDocument(documents, documentId);
@@ -827,7 +947,7 @@ const brainWorker = {
           throw new WorkerValidationError();
         }
         const generationId = parseBoundedId(body.generationId, "generation id");
-        if (!principal.roles.includes("operator")) {
+        if (!hasOperatorAccess(principal.roles)) {
           const generation = await getGeneration(env.CORPUS_DB as SqlExecutor, generationId);
           if (!generation || generation.state !== "ready") {
             throw new WorkerValidationError();
@@ -845,6 +965,7 @@ const brainWorker = {
             throw new WorkerForbiddenError();
           }
         }
+        await backfillDocumentCatalog(env.CORPUS_DB as SqlExecutor, generationId);
         await promoteGeneration(env.CORPUS_DB as SqlExecutor, generationId);
         writeOperationalLog({
           requestId,
@@ -871,6 +992,7 @@ const brainWorker = {
 
       if (path === "/evaluations/run" && request.method === "POST") {
         operation = "evaluations-run";
+        requireAdmin(principal);
         const result = await runManualEvaluations({
           operations: env.OPERATIONS_DB as OperationsDatabase,
           principal,

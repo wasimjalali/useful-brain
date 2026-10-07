@@ -51,6 +51,10 @@ export function toolPolicy(name: string): ToolPolicy {
   return policy;
 }
 
+export function nonReadToolPolicies(): ToolPolicy[] {
+  return Object.values(REGISTRY).filter((policy) => policy.risk !== "read");
+}
+
 export function assertMutatingToolsSequential(name: string): void {
   const policy = toolPolicy(name);
   if (policy.risk !== "read" && policy.executionMode !== "sequential") {

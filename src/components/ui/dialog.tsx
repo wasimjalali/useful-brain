@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 const FOCUSABLE =
@@ -11,13 +11,25 @@ export function Dialog({
   children,
   maxWidth,
   onClose,
+  top,
+  width,
 }: {
   ariaLabel: string;
   children: ReactNode;
-  maxWidth: string;
+  /** Legacy Tailwind max-width class, e.g. "max-w-2xl". Prefer `width`. */
+  maxWidth?: string;
   onClose: () => void;
+  /** Distance from the top of the viewport in px. Omit to centre vertically. */
+  top?: number;
+  /** Panel width in px. Shrinks to fit narrow viewports. */
+  width?: number;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
 
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
@@ -27,7 +39,7 @@ export function Dialog({
 
     function onKey(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (event.key !== "Tab" || !panel) {
@@ -55,24 +67,31 @@ export function Dialog({
       document.removeEventListener("keydown", onKey);
       previous?.focus?.();
     };
-  }, [onClose]);
+  }, []);
 
   if (typeof document === "undefined") {
     return null;
   }
 
+  const panelStyle: CSSProperties | undefined = width
+    ? { width, maxWidth: "100%" }
+    : undefined;
+
   return createPortal(
     <div
-      className="dialog-overlay fixed inset-0 z-50 grid place-items-center p-4"
-      onClick={onClose}
+      className="dialog-overlay"
+      data-top={top === undefined ? undefined : "true"}
+      onClick={() => onCloseRef.current()}
+      style={top === undefined ? undefined : { paddingTop: top }}
     >
       <div
         aria-label={ariaLabel}
         aria-modal="true"
-        className={`dialog-panel ${maxWidth}`}
+        className={`dialog-panel ${maxWidth ?? ""}`.trim()}
         onClick={(event) => event.stopPropagation()}
         ref={panelRef}
         role="dialog"
+        style={panelStyle}
         tabIndex={-1}
       >
         {children}
