@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><script src="./ub-icon.js"></script></helmet>
+<aside style="width:248px; height:100%; flex-shrink:0; display:flex; flex-direction:column; padding:12px 12px 12px; box-sizing:border-box; background:var(--canvas); color:var(--ink); font-family:var(--sans);">
+  <div style="display:flex; align-items:center; gap:9px; height:40px; padding:0 10px;">
+    <svg viewBox="0 0 220 242" fill="none" aria-hidden="true" style="height:22px; width:20px; color:var(--ink); flex-shrink:0;">
+      <path fill="currentColor" fill-rule="evenodd" d="M17 0h116l52 52v173a17 17 0 0 1-17 17H17A17 17 0 0 1 0 225V17A17 17 0 0 1 17 0ZM17 10h113V48l8 8H175V225a7 7 0 0 1-7 7H17a7 7 0 0 1-7-7V17a7 7 0 0 1 7-7Z"></path>
+      <g fill="currentColor" transform="translate(110 121) scale(2) translate(-181.5 -153)">
+        <path d="M164.2 139h11.6c1.7 0 2.8 1.2 2.8 2.9v9.4c0 1.1-.7 2-1.8 2.3c1.2.6 1.6 2.2 1.4 3.8-.5 4-3.4 8.2-8.2 10-2.2.8-5 .2-5.6-1.8-.5-1.4.2-2.8 1.4-3.4 1.6 1.6 4.6 1.4 5.4-1 .6-1.8-.4-3.6-2.2-4.4l-1.2-1.2h-5.2c-1.3 0-2.4-1.1-2.4-2.4V142c0-1.7 1.2-3 2.9-3z"></path>
+        <path d="M164.2 139h11.6c1.7 0 2.8 1.2 2.8 2.9v9.4c0 1.1-.7 2-1.8 2.3c1.2.6 1.6 2.2 1.4 3.8-.5 4-3.4 8.2-8.2 10-2.2.8-5 .2-5.6-1.8-.5-1.4.2-2.8 1.4-3.4 1.6 1.6 4.6 1.4 5.4-1 .6-1.8-.4-3.6-2.2-4.4l-1.2-1.2h-5.2c-1.3 0-2.4-1.1-2.4-2.4V142c0-1.7 1.2-3 2.9-3z" transform="translate(25 0)"></path>
+      </g>
+    </svg>
+    <span style="font-size:14px; font-weight:650; letter-spacing:-0.02em; line-height:1;">Useful Brain</span>
+  </div>
+
+  <nav style="display:flex; flex-direction:column; gap:1px; margin-top:10px;">
+    <sc-for list="{{ top }}" as="it" hint-placeholder-count="3">
+      <sc-if value="{{ it.on }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex; align-items:center; gap:10px; height:34px; padding:0 10px; border-radius:10px; font-size:13px; font-weight:500; color:var(--ink); background:var(--bubble); box-shadow:var(--sel); cursor:default;">
+          <ub-icon name="{{ it.icon }}" size="16"></ub-icon>
+          <span style="flex:1;">{{ it.label }}</span>
+          <span style="font-family:var(--mono); font-size:11px; color:var(--ink-faint-text);">{{ it.kbd }}</span>
+        </div>
+      </sc-if>
+      <sc-if value="{{ it.off }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex; align-items:center; gap:10px; height:34px; padding:0 10px; border-radius:10px; font-size:13px; color:var(--ink); cursor:pointer; transition:background-color 120ms cubic-bezier(0.22,1,0.36,1);" style-hover="background:var(--hover);">
+          <span style="display:inline-flex; color:var(--ink-muted);"><ub-icon name="{{ it.icon }}" size="16"></ub-icon></span>
+          <span style="flex:1;">{{ it.label }}</span>
+          <span style="font-family:var(--mono); font-size:11px; color:var(--ink-faint-text);">{{ it.kbd }}</span>
+        </div>
+      </sc-if>
+    </sc-for>
+  </nav>
+
+  <sc-if value="{{ isAdmin }}" hint-placeholder-val="{{ false }}">
+    <div style="margin-top:18px;">
+      <div style="font-size:12px; font-weight:500; color:var(--ink-faint-text); padding:0 10px 6px;">Admin</div>
+      <div style="display:flex; flex-direction:column; gap:1px;">
+        <sc-for list="{{ adminItems }}" as="it" hint-placeholder-count="5">
+          <sc-if value="{{ it.on }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex; align-items:center; gap:10px; height:34px; padding:0 10px; border-radius:10px; font-size:13px; font-weight:500; color:var(--ink); background:var(--bubble); box-shadow:var(--sel);">
+              <ub-icon name="{{ it.icon }}" size="16"></ub-icon>
+              <span style="flex:1;">{{ it.label }}</span>
+            </div>
+          </sc-if>
+          <sc-if value="{{ it.off }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex; align-items:center; gap:10px; height:34px; padding:0 10px; border-radius:10px; font-size:13px; color:var(--ink); cursor:pointer; transition:background-color 120ms cubic-bezier(0.22,1,0.36,1);" style-hover="background:var(--hover);">
+              <span style="display:inline-flex; color:var(--ink-muted);"><ub-icon name="{{ it.icon }}" size="16"></ub-icon></span>
+              <span style="flex:1;">{{ it.label }}</span>
+            </div>
+          </sc-if>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <div style="flex:1; min-height:0; overflow:hidden; margin-top:18px; display:flex; flex-direction:column; gap:16px;">
+    <div>
+      <div style="font-size:12px; font-weight:500; color:var(--ink-faint-text); padding:0 10px 6px;">Today</div>
+      <div style="display:flex; flex-direction:column; gap:1px;">
+        <sc-for list="{{ today }}" as="it" hint-placeholder-count="3">
+          <sc-if value="{{ it.on }}" hint-placeholder-val="{{ false }}">
+            <div style="height:32px; display:flex; align-items:center; padding:0 10px; border-radius:10px; font-size:13px; font-weight:500; color:var(--ink); background:var(--bubble); box-shadow:var(--sel); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ it.label }}</div>
+          </sc-if>
+          <sc-if value="{{ it.off }}" hint-placeholder-val="{{ true }}">
+            <div style="height:32px; display:flex; align-items:center; padding:0 10px; border-radius:10px; font-size:13px; color:var(--ink-muted); white-space:nowrap; overflow:hidden; cursor:pointer; transition:background-color 120ms cubic-bezier(0.22,1,0.36,1), color 120ms cubic-bezier(0.22,1,0.36,1);" style-hover="background:var(--hover); color:var(--ink);">{{ it.label }}</div>
+          </sc-if>
+        </sc-for>
+      </div>
+    </div>
+    <div>
+      <div style="font-size:12px; font-weight:500; color:var(--ink-faint-text); padding:0 10px 6px;">Previous 7 days</div>
+      <div style="display:flex; flex-direction:column; gap:1px;">
+        <sc-for list="{{ previous }}" as="it" hint-placeholder-count="5">
+          <sc-if value="{{ it.on }}" hint-placeholder-val="{{ false }}">
+            <div style="height:32px; display:flex; align-items:center; padding:0 10px; border-radius:10px; font-size:13px; font-weight:500; color:var(--ink); background:var(--bubble); box-shadow:var(--sel); white-space:nowrap; overflow:hidden;">{{ it.label }}</div>
+          </sc-if>
+          <sc-if value="{{ it.off }}" hint-placeholder-val="{{ true }}">
+            <div style="height:32px; display:flex; align-items:center; padding:0 10px; border-radius:10px; font-size:13px; color:var(--ink-muted); white-space:nowrap; overflow:hidden; cursor:pointer; transition:background-color 120ms cubic-bezier(0.22,1,0.36,1), color 120ms cubic-bezier(0.22,1,0.36,1);" style-hover="background:var(--hover); color:var(--ink);">{{ it.label }}</div>
+          </sc-if>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex; align-items:center; gap:10px; height:48px; padding:0 4px 0 8px; margin-top:8px;">
+    <span style="width:28px; height:28px; flex-shrink:0; display:grid; place-items:center; background:var(--border-strong); color:var(--ink); font-size:10px; font-weight:600; letter-spacing:-0.03em; border-radius:999px;">{{ initials }}</span>
+    <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:1px;">
+      <span style="font-size:13px; font-weight:500; color:var(--ink); line-height:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ name }}</span>
+      <span style="font-size:12px; color:var(--ink-faint-text); line-height:15px;">{{ role }}</span>
+    </div>
+    <span style="width:30px; height:30px; border-radius:10px; display:grid; place-items:center; color:var(--ink-muted); cursor:pointer; transition:background-color 120ms cubic-bezier(0.22,1,0.36,1);" style-hover="background:var(--hover); color:var(--ink);"><ub-icon name="settings" size="16"></ub-icon></span>
+  </div>
+</aside>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:248,&quot;height&quot;:900},&quot;active&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;new&quot;,&quot;search&quot;,&quot;library&quot;,&quot;overview&quot;,&quot;sources&quot;,&quot;people&quot;,&quot;evals&quot;,&quot;activity&quot;,&quot;none&quot;],&quot;default&quot;:&quot;new&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;chat&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;admin&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;name&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Maya Chen&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;role&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Engineering&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;initials&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;MC&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const a = this.props.active ?? 'new';
+    const c = this.props.chat ?? '';
+    const mk = (rows, cur) => rows.map(([id, label, icon, kbd]) => ({ id, label, icon, kbd: kbd || '', on: id === cur, off: id !== cur }));
+    return {
+      top: mk([['new', 'New chat', 'square-pen', '⌘N'], ['search', 'Search', 'search', '⌘K'], ['library', 'Library', 'library']], a),
+      adminItems: mk([['overview', 'Overview', 'layout-dashboard'], ['sources', 'Sources', 'database'], ['people', 'People', 'users'], ['evals', 'Evals', 'clipboard-check'], ['activity', 'Activity', 'activity']], a),
+      isAdmin: !!this.props.admin,
+      today: mk([['parental', 'Parental leave eligibility'], ['p1', 'P1 first-response target'], ['holiday', '2027 holiday calendar']], c),
+      previous: mk([['ticket', 'Halvorsen sync ticket'], ['card', 'Corporate card monthly limit'], ['perdiem', 'Berlin travel per diem'], ['err', 'ERR-7702 handoff'], ['discount', 'Discount approval over 20%']], c),
+      name: this.props.name ?? (this.props.admin ? 'Jordan Ellis' : 'Maya Chen'),
+      role: this.props.role ?? (this.props.admin ? 'Admin' : 'Engineering'),
+      initials: this.props.initials ?? (this.props.admin ? 'JE' : 'MC'),
+    };
+  }
+}
+</script>
+</body>
+</html>

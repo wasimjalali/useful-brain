@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><script src="./ub-icon.js"></script><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&amp;display=swap"><style>@keyframes ub-pulse{0%,100%{opacity:.3}50%{opacity:1}}@keyframes ub-rise{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}</style></helmet>
+<div style="width:1440px; height:900px; display:flex; position:relative; overflow:hidden; background:var(--canvas); color:var(--ink); font-family:var(--sans); -webkit-font-smoothing:antialiased; font-variant-numeric:tabular-nums;">
+  <dc-import name="Rail" active="{{ railActive }}" chat="{{ railChat }}" admin="{{ isAdmin }}" hint-size="248px,900px"></dc-import>
+
+  <main style="flex:1; min-width:0; margin:10px 10px 10px 0; display:flex; flex-direction:column; background:var(--surface); border-radius:24px; box-shadow:0 0 0 1px var(--edge), var(--stage-shadow); overflow:hidden; position:relative;">
+    <sc-if value="{{ isViewing }}" hint-placeholder-val="{{ false }}">
+      <div style="height:44px; flex-shrink:0; display:flex; align-items:center; gap:10px; padding:0 8px 0 20px; background:var(--accent); color:var(--accent-ink); font-size:13px;">
+        <ub-icon name="eye" size="15"></ub-icon>
+        <span style="flex:1; min-width:0;"><span style="font-weight:600;">Viewing as Priya Shah</span> · Support · 34 documents</span>
+        <button style="height:30px; padding:0 12px; border:0; border-radius:10px; background:var(--accent-ink); color:var(--accent); font:500 13px/1 var(--sans); cursor:pointer;">Exit</button>
+      </div>
+    </sc-if>
+
+    <header style="height:52px; flex-shrink:0; display:flex; align-items:center; gap:8px; padding:0 12px 0 24px;">
+      <span style="flex:1; min-width:0; font-size:14px; font-weight:500; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ title }}</span>
+      <sc-if value="{{ hasThread }}" hint-placeholder-val="{{ true }}">
+        <sc-if value="{{ panelOpen }}" hint-placeholder-val="{{ true }}">
+          <button aria-label="Hide evidence" style="width:32px; height:32px; border:0; border-radius:10px; display:grid; place-items:center; background:var(--sunken); color:var(--ink); cursor:pointer;"><ub-icon name="panel-right-close" size="16"></ub-icon></button>
+        </sc-if>
+        <sc-if value="{{ panelClosed }}" hint-placeholder-val="{{ false }}">
+          <button aria-label="Show evidence" style="width:32px; height:32px; border:0; border-radius:10px; display:grid; place-items:center; background:transparent; color:var(--ink-muted); cursor:pointer; transition:background-color 120ms cubic-bezier(0.22,1,0.36,1);" style-hover="background:var(--sunken); color:var(--ink);"><ub-icon name="panel-right" size="16"></ub-icon></button>
+        </sc-if>
+      </sc-if>
+    </header>
+
+    <sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1; min-height:0; padding:0 32px;">
+        <div style="max-width:768px; margin:0 auto; padding-top:176px; display:flex; flex-direction:column;">
+          <h1 style="margin:0; font-size:24px; line-height:32px; font-weight:600; letter-spacing:-0.02em; color:var(--ink);">Ask about Northwind</h1>
+          <p style="margin:6px 0 0; font-size:15px; line-height:24px; color:var(--ink-muted);">Every answer cites the documents you can read.</p>
+          <div style="margin-top:28px; height:52px; box-sizing:border-box; display:flex; align-items:center; gap:8px; padding:0 8px 0 20px; border-radius:999px; background:var(--bubble); box-shadow:0 0 0 1px var(--edge), var(--lift);">
+            <span style="flex:1; font-size:15px; color:var(--ink-faint-text);">Ask a question</span>
+            <span aria-label="Send" style="width:36px; height:36px; border-radius:999px; display:grid; place-items:center; background:var(--sunken); color:var(--ink-faint);"><ub-icon name="arrow-up" size="18" stroke="2"></ub-icon></span>
+          </div>
+          <div style="margin-top:24px; display:flex; flex-direction:column;">
+            <sc-for list="{{ suggestions }}" as="q" hint-placeholder-count="4">
+              <button style="height:44px; display:flex; align-items:center; gap:12px; padding:0 14px; margin:0 -14px; border:0; border-radius:10px; background:transparent; font:400 14px/20px var(--sans); color:var(--ink-muted); text-align:left; cursor:pointer; transition:background-color 120ms cubic-bezier(0.22,1,0.36,1), color 120ms cubic-bezier(0.22,1,0.36,1);" style-hover="background:var(--sunken); color:var(--ink);">
+                <span style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ q.text }}</span>
+                <span style="font-size:12px; color:var(--ink-faint-text);">{{ q.dept }}</span>
+              </button>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ hasThread }}" hint-placeholder-val="{{ true }}">
+      <div style="flex:1; min-height:0; overflow:hidden; padding:20px 32px 32px;">
+        <div style="max-width:768px; margin:0 auto; display:flex; flex-direction:column; gap:28px;">
+
+          <sc-if value="{{ isAnswer }}" hint-placeholder-val="{{ true }}">
+            <div style="align-self:flex-end; max-width:640px; padding:10px 16px; border-radius:14px; background:var(--sunken); font-size:15px; line-height:24px; color:var(--ink); text-wrap:pretty;">How much parental leave do I get, and when am I eligible?</div>
+            <div style="display:flex; flex-direction:column; gap:16px;">
+              <p style="margin:0; font-size:15px; line-height:24px; color:var(--ink); text-wrap:pretty;">You get sixteen weeks of fully paid parental leave per child, at 100% of base salary <span role="button" tabindex="0" aria-label="Citation 1" onMouseEnter="{{ hov1 }}" onMouseLeave="{{ hovOff }}" style="display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; padding:0 5px; box-sizing:border-box; margin:0 1px; border-radius:6px; vertical-align:2px; font-family:var(--mono); font-size:11px; font-weight:500; line-height:1; cursor:pointer; background:{{ c1Bg }}; color:{{ c1Fg }}; transition:background-color 160ms cubic-bezier(0.22,1,0.36,1), color 160ms cubic-bezier(0.22,1,0.36,1);">1</span>. You're eligible after six months of continuous service <span role="button" tabindex="0" aria-label="Citation 2" onMouseEnter="{{ hov2 }}" onMouseLeave="{{ hovOff }}" style="display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; padding:0 5px; box-sizing:border-box; margin:0 1px; border-radius:6px; vertical-align:2px; font-family:var(--mono); font-size:11px; font-weight:500; line-height:1; cursor:pointer; background:{{ c2Bg }}; color:{{ c2Fg }}; transition:background-color 160ms cubic-bezier(0.22,1,0.36,1), color 160ms cubic-bezier(0.22,1,0.36,1);">2</span>. It's on top of your annual leave, so it doesn't reduce your vacation or sick days <span role="button" tabindex="0" aria-label="Citation 2" onMouseEnter="{{ hov2 }}" onMouseLeave="{{ hovOff }}" style="display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; padding:0 5px; box-sizing:border-box; margin:0 1px; border-radius:6px; vertical-align:2px; font-family:var(--mono); font-size:11px; font-weight:500; line-height:1; cursor:pointer; background:{{ c2Bg }}; color:{{ c2Fg }}; transition:background-color 160ms cubic-bezier(0.22,1,0.36,1), color 160ms cubic-bezier(0.22,1,0.36,1);">2</span>.</p>
+              <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                <button onMouseEnter="{{ hov1 }}" onMouseLeave="{{ hovOff }}" style="height:32px; display:inline-flex; align-items:center; gap:8px; padding:0 12px 0 7px; white-space:nowrap; border:0; border-radius:10px; background:var(--sunken); box-shadow:inset 0 0 0 1px var(--edge); font:400 13px/1 var(--sans); color:var(--ink); cursor:pointer; transition:background-color 120ms cubic-bezier(0.22,1,0.36,1);" style-hover="background:var(--border-strong);">
+                  <span style="min-width:18px; height:18px; padding:0 5px; box-sizing:border-box; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:11px; font-weight:500; background:{{ s1Bg }}; color:{{ c1Fg }}; transition:background-color 160ms cubic-bezier(0.22,1,0.36,1);">1</span>
+                  <span style="font-weight:500;">Parental Leave Policy</span><span style="font-size:12px; color:var(--ink-faint-text);">Paid Leave Duration</span>
+                </button>
+                <button onMouseEnter="{{ hov2 }}" onMouseLeave="{{ hovOff }}" style="height:32px; display:inline-flex; align-items:center; gap:8px; padding:0 12px 0 7px; white-space:nowrap; border:0; border-radius:10px; background:var(--sunken); box-shadow:inset 0 0 0 1px var(--edge); font:400 13px/1 var(--sans); color:var(--ink); cursor:pointer; transition:background-color 120ms cubic-bezier(0.22,1,0.36,1);" style-hover="background:var(--border-strong);">
+                  <span style="min-width:18px; height:18px; padding:0 5px; box-sizing:border-box; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:11px; font-weight:500; background:{{ s2Bg }}; color:{{ c2Fg }}; transition:background-color 160ms cubic-bezier(0.22,1,0.36,1);">2</span>
+                  <span style="font-weight:500;">Parental Leave Policy</span><span style="font-size:12px; color:var(--ink-faint-text);">Overview and Eligibility</span>
+                </button>
+              </div>
+              <div style="display:flex; align-items:center; gap:2px; margin-left:-7px;">
+                <button aria-label="Copy" style="width:32px; height:32px; border:0; border-radius:10px; display:grid; place-items:center; background:transparent; color:var(--ink-muted); cursor:pointer;" style-hover="background:var(--sunken); color:var(--ink);"><ub-icon name="copy" size="15"></ub-icon></button>
+                <button aria-label="Retry" style="width:32px; height:32px; border:0; border-radius:10px; display:grid; place-items:center; background:transparent; color:var(--ink-muted); cursor:pointer;" style-hover="background:var(--sunken); color:var(--ink);"><ub-icon name="rotate-ccw" size="15"></ub-icon></button>
+                <button aria-label="Good answer" style="width:32px; height:32px; border:0; border-radius:10px; display:grid; place-items:center; background:transparent; color:var(--ink-muted); cursor:pointer;" style-hover="background:var(--sunken); color:var(--ink);"><ub-icon name="thumbs-up" size="15"></ub-icon></button>
+                <button aria-label="Bad answer" style="width:32px; height:32px; border:0; border-radius:10px; display:grid; place-items:center; background:transparent; color:var(--ink-muted); cursor:pointer;" style-hover="background:var(--sunken); color:var(--ink);"><ub-icon name="thumbs-down" size="15"></ub-icon></button>
+                <span style="margin-left:10px; font-family:var(--mono); font-size:11px; color:var(--ink-faint-text);">8 passages · 2.1 s</span>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isWorking }}" hint-placeholder-val="{{ false }}">
+            <div style="align-self:flex-end; max-width:640px; padding:10px 16px; border-radius:14px; background:var(--sunken); font-size:15px; line-height:24px; color:var(--ink);">What's the first-response target for a P1 ticket?</div>
+            <sc-if value="{{ statusOn }}" hint-placeholder-val="{{ true }}">
+              <div role="status" aria-live="polite" style="height:24px; display:flex; align-items:center; gap:10px; font-size:15px; color:var(--ink-muted);">{{ pulse }}{{ statusEl }}</div>
+            </sc-if>
+            <sc-if value="{{ streaming }}" hint-placeholder-val="{{ false }}">
+              <p style="margin:0; font-size:15px; line-height:24px; color:var(--ink);">{{ streamEl }}</p>
+            </sc-if>
+          </sc-if>
+
+          <sc-if value="{{ isNoEv }}" hint-placeholder-val="{{ false }}">
+            <div style="align-self:flex-end; max-width:640px; padding:10px 16px; border-radius:14px; background:var(--sunken); font-size:15px; line-height:24px; color:var(--ink);">When is the 2027 company holiday calendar published?</div>
+            <div style="display:flex; flex-direction:column; align-items:flex-start; gap:14px;">
+              <p style="margin:0; font-size:15px; line-height:24px; color:var(--ink);">I couldn't find this in the documents you can read, so I won't guess.</p>
+              <div style="display:flex; align-items:center; gap:14px;">
+                <sc-if value="{{ notRequested }}" hint-placeholder-val="{{ true }}">
+                  <button onClick="{{ request }}" style="height:34px; display:inline-flex; align-items:center; gap:7px; padding:0 14px 0 12px; border:0; border-radius:10px; background:var(--sunken); box-shadow:inset 0 0 0 1px var(--edge); font:500 13px/1 var(--sans); color:var(--ink); cursor:pointer; transition:background-color 120ms cubic-bezier(0.22,1,0.36,1);" style-hover="background:var(--border-strong);"><ub-icon name="file-plus" size="15"></ub-icon>Request this document</button>
+                </sc-if>
+                <sc-if value="{{ requested }}" hint-placeholder-val="{{ false }}">
+                  <span aria-disabled="true" style="height:34px; display:inline-flex; align-items:center; gap:7px; padding:0 14px 0 12px; border-radius:10px; background:var(--sunken); font-size:13px; font-weight:500; color:var(--ink-muted);"><span style="display:inline-flex; color:var(--success);"><ub-icon name="check" size="15" stroke="2"></ub-icon></span>Requested</span>
+                  <span style="font-size:12px; color:var(--ink-faint-text);">Admins see it under Unanswered questions.</span>
+                </sc-if>
+                <sc-if value="{{ notRequested }}" hint-placeholder-val="{{ true }}">
+                  <span style="font-family:var(--mono); font-size:11px; color:var(--ink-faint-text);">Searched 34 documents · 1.4 s</span>
+                </sc-if>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isApproval }}" hint-placeholder-val="{{ false }}">
+            <div style="align-self:flex-end; max-width:640px; padding:10px 16px; border-radius:14px; background:var(--sunken); font-size:15px; line-height:24px; color:var(--ink); text-wrap:pretty;">Open a P1 ticket for Halvorsen Freight. Atlas sync has been stalled since 06:10 and their orders aren't flowing.</div>
+            <div style="display:flex; flex-direction:column; gap:16px;">
+              <p style="margin:0; font-size:15px; line-height:24px; color:var(--ink); text-wrap:pretty;">That fits P1: a major feature is down for the customer <span style="display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; padding:0 5px; box-sizing:border-box; margin:0 1px; border-radius:6px; vertical-align:2px; font-family:var(--mono); font-size:11px; font-weight:500; line-height:1; background:var(--sunken); color:var(--ink-muted);">1</span>. P1 tickets get a 1-hour first response, around the clock <span style="display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; padding:0 5px; box-sizing:border-box; margin:0 1px; border-radius:6px; vertical-align:2px; font-family:var(--mono); font-size:11px; font-weight:500; line-height:1; background:var(--sunken); color:var(--ink-muted);">2</span>. I've prepared the ticket for the Support desk.</p>
+
+              <sc-if value="{{ apprPending }}" hint-placeholder-val="{{ true }}">
+                <div style="max-width:640px; border-radius:16px; background:var(--bubble); box-shadow:0 0 0 1px var(--edge), var(--lift); overflow:hidden;">
+                  <div style="display:flex; align-items:center; gap:10px; padding:14px 16px 10px 18px;">
+                    <span style="display:inline-flex; color:var(--ink-muted);"><ub-icon name="ticket" size="16"></ub-icon></span>
+                    <span style="font-size:14px; font-weight:600; color:var(--ink);">Needs your approval</span>
+                    <span style="margin-left:auto; font-family:var(--mono); font-size:12px; color:var(--ink-muted);">create_ticket</span>
+                  </div>
+                  <div style="padding:4px 18px 16px; display:grid; grid-template-columns:88px minmax(0,1fr); row-gap:8px; column-gap:16px; font-family:var(--mono); font-size:13px; line-height:20px;">
+                    <span style="color:var(--ink-faint-text);">desk</span><span style="color:var(--ink);">Support</span>
+                    <span style="color:var(--ink-faint-text);">priority</span><span style="color:var(--ink);">P1</span>
+                    <span style="color:var(--ink-faint-text);">customer</span><span style="color:var(--ink);">Halvorsen Freight</span>
+                    <span style="color:var(--ink-faint-text);">subject</span><span style="color:var(--ink);">Atlas sync stalled since 06:10, orders not flowing</span>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:8px; padding:12px 12px 12px 18px; border-top:1px solid var(--border);">
+                    <span style="flex:1; display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--ink-faint-text);"><ub-icon name="lock" size="13"></ub-icon>Approves these exact arguments only</span>
+                    <button onClick="{{ deny }}" style="height:34px; padding:0 14px; border:0; border-radius:10px; background:var(--sunken); box-shadow:inset 0 0 0 1px var(--edge); font:500 13px/1 var(--sans); color:var(--ink); cursor:pointer; transition:background-color 120ms cubic-bezier(0.22,1,0.36,1);" style-hover="background:var(--border-strong);">Deny</button>
+                    <button onClick="{{ approve }}" style="height:34px; padding:0 14px; border:0; border-radius:10px; background:var(--accent); font:500 13px/1 var(--sans); color:var(--accent-ink); cursor:pointer; transition:opacity 120ms cubic-bezier(0.22,1,0.36,1);" style-hover="opacity:0.86;">Approve and run</button>
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ apprDone }}" hint-placeholder-val="{{ false }}">
+                <div style="max-width:640px; display:flex; align-items:center; gap:10px; padding:10px 8px 10px 16px; border-radius:16px; background:var(--bubble); box-shadow:0 0 0 1px var(--edge), var(--lift);">
+                  <span style="display:inline-flex; color:var(--success);"><ub-icon name="circle-check" size="16"></ub-icon></span>
+                  <span style="font-size:14px; font-weight:500; color:var(--ink);">Ticket SUP-4821 created</span>
+                  <span style="flex:1; font-family:var(--mono); font-size:11px; color:var(--ink-faint-text);">create_ticket · P1 · 09:42</span>
+                  <button style="height:32px; display:inline-flex; align-items:center; gap:6px; padding:0 10px; border:0; border-radius:10px; background:transparent; font:500 13px/1 var(--sans); color:var(--ink-muted); cursor:pointer;" style-hover="background:var(--sunken); color:var(--ink);">Open ticket<ub-icon name="external-link" size="13"></ub-icon></button>
+                </div>
+                <p style="margin:0; font-size:15px; line-height:24px; color:var(--ink); text-wrap:pretty;">SUP-4821 is on the Support desk as P1, so the 1-hour first-response clock is running <span style="display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; padding:0 5px; box-sizing:border-box; margin:0 1px; border-radius:6px; vertical-align:2px; font-family:var(--mono); font-size:11px; font-weight:500; line-height:1; background:var(--sunken); color:var(--ink-muted);">2</span>.</p>
+              </sc-if>
+
+              <sc-if value="{{ apprDenied }}" hint-placeholder-val="{{ false }}">
+                <div style="max-width:640px; display:flex; align-items:center; gap:10px; padding:12px 16px; border-radius:16px; background:var(--sunken);">
+                  <span style="display:inline-flex; color:var(--ink-muted);"><ub-icon name="circle-x" size="16"></ub-icon></span>
+                  <span style="font-size:14px; color:var(--ink);">Denied. Nothing was run.</span>
+                  <span style="font-family:var(--mono); font-size:11px; color:var(--ink-faint-text);">create_ticket</span>
+                </div>
+              </sc-if>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isError }}" hint-placeholder-val="{{ false }}">
+            <div style="align-self:flex-end; max-width:640px; padding:10px 16px; border-radius:14px; background:var(--sunken); font-size:15px; line-height:24px; color:var(--ink);">What's the travel per diem for a trip to Berlin?</div>
+            <div style="display:flex; flex-direction:column; gap:14px;">
+              <p style="margin:0; font-size:15px; line-height:24px; color:var(--ink-muted);">Per diems are set by destination in the Travel Expense Policy. For Berlin, the daily rate covers</p>
+              <sc-if value="{{ errShown }}" hint-placeholder-val="{{ true }}">
+                <div role="alert" style="display:flex; align-items:center; gap:12px; padding:8px 8px 8px 14px; border-radius:14px; background:var(--danger-soft);">
+                  <span style="display:inline-flex; color:var(--danger);"><ub-icon name="circle-alert" size="16"></ub-icon></span>
+                  <span style="flex:1; font-size:14px; line-height:20px; color:var(--ink);">The answer stopped before it finished. Your question is saved.</span>
+                  <button onClick="{{ retry }}" style="height:32px; display:inline-flex; align-items:center; gap:6px; padding:0 12px 0 10px; border:0; border-radius:10px; background:var(--bubble); box-shadow:var(--sel); font:500 13px/1 var(--sans); color:var(--ink); cursor:pointer;"><ub-icon name="rotate-ccw" size="14"></ub-icon>Retry</button>
+                </div>
+              </sc-if>
+              <sc-if value="{{ retrying }}" hint-placeholder-val="{{ false }}">
+                <div role="status" style="height:24px; display:flex; align-items:center; gap:10px; font-size:15px; color:var(--ink-muted);">{{ pulse }}<span>Searching 34 documents</span></div>
+              </sc-if>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isViewing }}" hint-placeholder-val="{{ false }}">
+            <div style="align-self:flex-end; max-width:640px; padding:10px 16px; border-radius:14px; background:var(--sunken); font-size:15px; line-height:24px; color:var(--ink);">What's the first-response target for a P1 ticket?</div>
+            <div style="display:flex; flex-direction:column; gap:14px;">
+              <p style="margin:0; font-size:15px; line-height:24px; color:var(--ink);">One hour, around the clock. P1 tickets also have a 24-hour resolution target <span style="display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; padding:0 5px; box-sizing:border-box; margin:0 1px; border-radius:6px; vertical-align:2px; font-family:var(--mono); font-size:11px; font-weight:500; line-height:1; background:var(--sunken); color:var(--ink-muted);">1</span>.</p>
+              <div style="display:flex; align-items:center; gap:12px;">
+                <span style="height:32px; display:inline-flex; align-items:center; gap:8px; padding:0 12px 0 7px; white-space:nowrap; border-radius:10px; background:var(--sunken); box-shadow:inset 0 0 0 1px var(--edge); font-size:13px; color:var(--ink);"><span style="min-width:18px; height:18px; padding:0 5px; box-sizing:border-box; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:11px; font-weight:500; background:var(--bubble); color:var(--ink-muted);">1</span><span style="font-weight:500;">Support SLA Policy</span><span style="font-size:12px; color:var(--ink-faint-text);">P0 and P1 Tickets</span></span>
+                <span style="font-family:var(--mono); font-size:11px; color:var(--ink-faint-text);">6 passages · 1.8 s</span>
+              </div>
+            </div>
+            <div style="align-self:flex-end; max-width:640px; padding:10px 16px; border-radius:14px; background:var(--sunken); font-size:15px; line-height:24px; color:var(--ink);">What are the salary bands for a senior support engineer?</div>
+            <div style="display:flex; flex-direction:column; gap:12px;">
+              <p style="margin:0; font-size:15px; line-height:24px; color:var(--ink);">I couldn't find this in the documents you can read, so I won't guess.</p>
+              <div style="display:flex; align-items:center; gap:8px; font-size:12px; line-height:16px; color:var(--ink-faint-text);"><ub-icon name="eye-off" size="13"></ub-icon><span>Only you see this: Salary Bands exists, but only HR can read it.</span></div>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+
+      <div style="flex-shrink:0; padding:0 32px 20px;">
+        <div style="max-width:768px; margin:0 auto; height:52px; box-sizing:border-box; display:flex; align-items:center; gap:8px; padding:0 8px 0 20px; border-radius:999px; background:var(--bubble); box-shadow:0 0 0 1px var(--edge), var(--lift);">
+          <span style="flex:1; font-size:15px; color:var(--ink-faint-text);">{{ placeholder }}</span>
+          <sc-if value="{{ isWorking }}" hint-placeholder-val="{{ false }}">
+            <button aria-label="Stop" style="width:36px; height:36px; border:0; border-radius:999px; display:grid; place-items:center; background:var(--accent); color:var(--accent-ink); cursor:pointer;"><ub-icon name="square" size="13" stroke="2.5"></ub-icon></button>
+          </sc-if>
+          <sc-if value="{{ notWorking }}" hint-placeholder-val="{{ true }}">
+            <span aria-label="Send" aria-disabled="true" style="width:36px; height:36px; border-radius:999px; display:grid; place-items:center; background:var(--sunken); color:var(--ink-faint);"><ub-icon name="arrow-up" size="18" stroke="2"></ub-icon></span>
+          </sc-if>
+        </div>
+      </div>
+    </sc-if>
+  </main>
+
+  <sc-if value="{{ panelOpen }}" hint-placeholder-val="{{ true }}">
+    <div style="margin:10px 10px 10px 0; display:flex;">
+      <dc-import name="Evidence Panel" hover="{{ hov }}" admin="{{ isAdmin }}" view="{{ panelView }}" tab="{{ tab }}" hint-size="380px,880px"></dc-import>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;state&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;empty&quot;,&quot;answer&quot;,&quot;working&quot;,&quot;noevidence&quot;,&quot;approval&quot;,&quot;approved&quot;,&quot;error&quot;,&quot;viewing&quot;,&quot;reader&quot;],&quot;default&quot;:&quot;answer&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;admin&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;hover&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[0,1,2],&quot;default&quot;:0,&quot;tsType&quot;:&quot;number&quot;},&quot;tab&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;cited&quot;,&quot;retrieved&quot;],&quot;default&quot;:&quot;cited&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;step&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[0,1,2,3],&quot;default&quot;:null,&quot;tsType&quot;:&quot;number&quot;}}">
+class Component extends DCLogic {
+  state = { hov: null, appr: null, requested: false, tick: 0, retry: false, panel: null };
+  componentDidMount() {
+    this.timer = setInterval(() => {
+      if ((this.props.state ?? 'answer') === 'working' && this.props.step == null) this.setState(s => ({ tick: (s.tick + 1) % 6 }));
+    }, 1300);
+  }
+  componentWillUnmount() { clearInterval(this.timer); }
+  renderVals() {
+    const s = this.props.state ?? 'answer';
+    const hov = this.state.hov ?? Number(this.props.hover ?? 0);
+    const on = n => hov === n;
+    const appr = this.state.appr ?? (s === 'approved' ? 'approved' : 'pending');
+    const step = this.props.step != null ? Number(this.props.step) : [0, 1, 2, 3, 3, 3][this.state.tick];
+    const labels = ['Searching 34 documents', 'Reading 8 passages', 'Writing a cited answer'];
+    const ease = 'cubic-bezier(0.22,1,0.36,1)';
+    const isAnswer = s === 'answer' || s === 'reader';
+    const titles = { empty: '', answer: 'Parental leave eligibility', reader: 'Parental leave eligibility', working: 'P1 first-response target', noevidence: '2027 holiday calendar', approval: 'Halvorsen sync ticket', approved: 'Halvorsen sync ticket', error: 'Berlin travel per diem', viewing: 'Access check' };
+    const chats = { answer: 'parental', reader: 'parental', working: 'p1', noevidence: 'holiday', approval: 'ticket', approved: 'ticket', error: 'perdiem' };
+    const panelOpen = isAnswer && (this.state.panel ?? true);
+    return {
+      title: titles[s] ?? '',
+      railActive: this.props.rail ?? (s === 'empty' ? 'new' : 'none'),
+      railChat: chats[s] ?? '',
+      isAdmin: !!this.props.admin || s === 'viewing',
+      isEmpty: s === 'empty', hasThread: s !== 'empty',
+      isAnswer, isWorking: s === 'working', notWorking: s !== 'working', isNoEv: s === 'noevidence',
+      isApproval: s === 'approval' || s === 'approved', isError: s === 'error', isViewing: s === 'viewing',
+      panelOpen, panelClosed: !panelOpen && isAnswer,
+      panelView: s === 'reader' ? 'document' : 'evidence',
+      tab: this.props.tab ?? 'cited',
+      hov,
+      hov1: () => this.setState({ hov: 1 }), hov2: () => this.setState({ hov: 2 }), hovOff: () => this.setState({ hov: null }),
+      c1Bg: on(1) ? 'var(--accent)' : 'var(--sunken)', c1Fg: on(1) ? 'var(--accent-ink)' : 'var(--ink-muted)',
+      c2Bg: on(2) ? 'var(--accent)' : 'var(--sunken)', c2Fg: on(2) ? 'var(--accent-ink)' : 'var(--ink-muted)',
+      s1Bg: on(1) ? 'var(--accent)' : 'var(--bubble)', s2Bg: on(2) ? 'var(--accent)' : 'var(--bubble)',
+      suggestions: [
+        ['How much parental leave do I get, and when am I eligible?', 'HR'],
+        ['What is the first-response target for a P1 ticket?', 'Support'],
+        ['How long are system logs kept?', 'Engineering'],
+        ['Can I keep my laptop when I leave Northwind?', 'Operations'],
+      ].map(([text, dept]) => ({ text, dept })),
+      statusOn: step < 3, streaming: step >= 3,
+      pulse: React.createElement('span', { style: { width: 6, height: 6, borderRadius: 999, background: 'var(--ink)', flexShrink: 0, animation: `ub-pulse 1.2s ${ease} infinite` } }),
+      statusEl: React.createElement('span', { key: 'st' + step, style: { animation: `ub-rise 260ms ${ease} both` } }, labels[Math.min(step, 2)]),
+      streamEl: React.createElement('span', { key: 'stream', style: { animation: `ub-rise 260ms ${ease} both` } }, 'P1 tickets get a 1-hour first response and a 24-hour resolution'),
+      requested: this.state.requested, notRequested: !this.state.requested,
+      request: () => this.setState({ requested: true }),
+      apprPending: appr === 'pending', apprDone: appr === 'approved', apprDenied: appr === 'denied',
+      approve: () => this.setState({ appr: 'approved' }), deny: () => this.setState({ appr: 'denied' }),
+      errShown: !this.state.retry, retrying: this.state.retry, retry: () => this.setState({ retry: true }),
+      placeholder: s === 'viewing' ? 'Ask as Priya Shah' : 'Ask a follow-up',
+    };
+  }
+}
+</script>
+</body>
+</html>

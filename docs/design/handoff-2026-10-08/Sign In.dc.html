@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><script src="./ub-icon.js"></script><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&amp;display=swap"></helmet>
+<div style="width:1440px; height:900px; display:flex; overflow:hidden; background:var(--canvas); color:var(--ink); font-family:var(--sans); -webkit-font-smoothing:antialiased; font-variant-numeric:tabular-nums;">
+  <div style="width:560px; flex-shrink:0; box-sizing:border-box; padding:36px 72px 32px 72px; display:flex; flex-direction:column;">
+    <div style="display:flex; align-items:center; gap:9px; height:40px;">
+      <svg viewBox="0 0 220 242" fill="none" aria-hidden="true" style="height:22px; width:20px; color:var(--ink); flex-shrink:0;">
+        <path fill="currentColor" fill-rule="evenodd" d="M17 0h116l52 52v173a17 17 0 0 1-17 17H17A17 17 0 0 1 0 225V17A17 17 0 0 1 17 0ZM17 10h113V48l8 8H175V225a7 7 0 0 1-7 7H17a7 7 0 0 1-7-7V17a7 7 0 0 1 7-7Z"></path>
+        <g fill="currentColor" transform="translate(110 121) scale(2) translate(-181.5 -153)">
+          <path d="M164.2 139h11.6c1.7 0 2.8 1.2 2.8 2.9v9.4c0 1.1-.7 2-1.8 2.3c1.2.6 1.6 2.2 1.4 3.8-.5 4-3.4 8.2-8.2 10-2.2.8-5 .2-5.6-1.8-.5-1.4.2-2.8 1.4-3.4 1.6 1.6 4.6 1.400 5.4-1 .6-1.8-.4-3.6-2.2-4.4l-1.2-1.2h-5.2c-1.3 0-2.4-1.1-2.4-2.4V142c0-1.7 1.2-3 2.9-3z"></path>
+          <path d="M164.2 139h11.6c1.7 0 2.8 1.2 2.8 2.9v9.4c0 1.1-.7 2-1.8 2.3c1.2.6 1.6 2.2 1.4 3.8-.5 4-3.4 8.2-8.2 10-2.2.8-5 .2-5.6-1.8-.5-1.4.2-2.8 1.4-3.4 1.6 1.6 4.6 1.4 5.4-1 .6-1.8-.4-3.6-2.2-4.4l-1.2-1.2h-5.2c-1.3 0-2.4-1.1-2.4-2.4V142c0-1.7 1.2-3 2.9-3z" transform="translate(25 0)"></path>
+        </g>
+      </svg>
+      <span style="font-size:14px; font-weight:650; letter-spacing:-0.02em;">Useful Brain</span>
+    </div>
+
+    <div style="flex:1; display:flex; flex-direction:column; justify-content:center; gap:28px; max-width:376px;">
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        <h1 style="margin:0; font-size:24px; line-height:32px; font-weight:600; letter-spacing:-0.02em;">Sign in to Northwind</h1>
+        <p style="margin:0; font-size:15px; line-height:24px; color:var(--ink-muted); text-wrap:pretty;">Ask about company documents. Every answer shows the passage behind it.</p>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <label style="display:flex; flex-direction:column; gap:6px;">
+          <span style="font-size:13px; font-weight:500;">Email</span>
+          <span style="height:44px; display:flex; align-items:center; padding:0 14px; border-radius:14px; background:var(--bubble); box-shadow:0 0 0 1px var(--edge), var(--lift); font-size:15px; color:var(--ink);">maya.chen@northwind.example</span>
+        </label>
+        <label style="display:flex; flex-direction:column; gap:6px;">
+          <span style="font-size:13px; font-weight:500;">Password</span>
+          <span style="height:44px; display:flex; align-items:center; gap:10px; padding:0 8px 0 14px; border-radius:14px; background:var(--bubble); box-shadow:0 0 0 1px var(--edge), var(--lift), 0 0 0 2px var(--canvas), 0 0 0 4px var(--ink); font-size:15px; color:var(--ink);"><span style="flex:1; display:flex; align-items:center; letter-spacing:0.12em;">••••••••••<span aria-hidden="true" style="width:1.5px; height:20px; margin-left:2px; background:var(--ink);"></span></span><span role="button" aria-label="Show password" style="width:32px; height:32px; border-radius:10px; display:grid; place-items:center; color:var(--ink-muted); cursor:pointer;"><ub-icon name="eye" size="16"></ub-icon></span></span>
+        </label>
+        <button style="height:44px; margin-top:4px; border:0; border-radius:10px; background:var(--accent); font:500 14px/1 var(--sans); color:var(--accent-ink); cursor:pointer;" style-hover="opacity:0.86;">Sign in</button>
+      </div>
+      <p style="margin:0; font-size:12px; line-height:18px; color:var(--ink-faint-text); text-wrap:pretty;">You'll only see documents your department and role can read.</p>
+    </div>
+    <span style="font-size:12px; color:var(--ink-faint-text);">Northwind Systems</span>
+  </div>
+
+  <div style="flex:1; min-width:0; margin:10px 10px 10px 0; border-radius:24px; background:var(--surface); box-shadow:0 0 0 1px var(--edge), var(--stage-shadow); display:flex; flex-direction:column; justify-content:center; padding:0 96px;">
+    <div style="max-width:620px; display:flex; flex-direction:column; gap:28px;">
+      <p style="margin:0; font-size:15px; line-height:24px; color:var(--ink);">You get sixteen weeks of fully paid parental leave per child, at 100% of base salary <span style="display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; padding:0 5px; box-sizing:border-box; margin:0 1px; border-radius:6px; vertical-align:2px; font-family:var(--mono); font-size:11px; font-weight:500; line-height:1; background:var(--accent); color:var(--accent-ink);">1</span>.</p>
+      <div style="display:flex; flex-direction:column; gap:12px; padding-left:20px; box-shadow:inset 1px 0 0 var(--border-strong);">
+        <span style="display:flex; align-items:center; gap:8px; font-size:13px;"><span style="font-weight:500;">Parental Leave Policy</span><span style="color:var(--ink-faint-text);">Paid Leave Duration</span></span>
+        <p style="margin:0; font-size:20px; line-height:34px; color:var(--ink-muted); letter-spacing:-0.01em; text-wrap:pretty;"><mark style="background:var(--hl-strong); color:var(--ink); border-radius:4px; padding:2px 3px; -webkit-box-decoration-break:clone; box-decoration-break:clone;">Every eligible parent receives sixteen weeks of fully paid parental leave per child. The sixteen weeks are paid at 100% of base salary</mark> and are available to each parent individually: if both parents work at Northwind, both may take the full sixteen weeks.</p>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}"></script>
+</body>
+</html>

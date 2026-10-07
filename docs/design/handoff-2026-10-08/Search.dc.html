@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><script src="./ub-icon.js"></script><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&amp;display=swap"></helmet>
+<div style="position:relative; width:1440px; height:900px; overflow:hidden; font-family:var(--sans); color:var(--ink); -webkit-font-smoothing:antialiased; font-variant-numeric:tabular-nums;">
+  <dc-import name="Chat" state="empty" rail="search" hint-size="1440px,900px"></dc-import>
+  <div style="position:absolute; inset:0; background:var(--scrim); display:flex; justify-content:center; padding-top:112px;">
+    <div role="dialog" aria-modal="true" aria-label="Search" style="width:640px; align-self:flex-start; border-radius:16px; background:var(--bubble); box-shadow:0 0 0 1px var(--edge), var(--lift), 0 24px 64px -24px rgb(0 0 0 / 0.35); overflow:hidden;">
+      <div style="height:56px; display:flex; align-items:center; gap:12px; padding:0 16px 0 18px; border-bottom:1px solid var(--border);">
+        <span style="display:inline-flex; color:var(--ink-muted);"><ub-icon name="search" size="18"></ub-icon></span>
+        <span style="flex:1; display:flex; align-items:center; font-size:16px; color:var(--ink);">parental<span aria-hidden="true" style="width:1.5px; height:20px; margin-left:1px; background:var(--ink);"></span></span>
+        <span style="height:22px; padding:0 6px; display:inline-flex; align-items:center; border-radius:6px; background:var(--sunken); box-shadow:inset 0 0 0 1px var(--edge); font-family:var(--mono); font-size:11px; color:var(--ink-muted);">esc</span>
+      </div>
+
+      <div role="listbox" style="padding:6px 8px 8px; display:flex; flex-direction:column;">
+        <span style="padding:10px 10px 6px; font-size:12px; font-weight:500; color:var(--ink-faint-text);">Chats</span>
+        <sc-for list="{{ chats }}" as="r" hint-placeholder-count="2">
+          <div role="option" aria-selected="{{ r.sel }}" onMouseEnter="{{ r.enter }}" style="height:40px; display:flex; align-items:center; gap:12px; padding:0 10px; border-radius:10px; background:{{ r.bg }}; cursor:pointer;">
+            <span style="display:inline-flex; color:var(--ink-muted);"><ub-icon name="message-square" size="16"></ub-icon></span>
+            <span style="flex:1; min-width:0; font-size:14px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><span style="font-weight:600;">{{ r.m }}</span>{{ r.rest }}</span>
+            <span style="font-size:12px; color:var(--ink-faint-text);">{{ r.when }}</span>
+            <sc-if value="{{ r.sel }}" hint-placeholder-val="{{ false }}"><span style="display:inline-flex; color:var(--ink-muted);"><ub-icon name="corner-down-left" size="14"></ub-icon></span></sc-if>
+          </div>
+        </sc-for>
+
+        <span style="padding:14px 10px 6px; font-size:12px; font-weight:500; color:var(--ink-faint-text);">Documents</span>
+        <sc-for list="{{ docs }}" as="r" hint-placeholder-count="3">
+          <div role="option" aria-selected="{{ r.sel }}" onMouseEnter="{{ r.enter }}" style="min-height:56px; display:flex; align-items:center; gap:12px; padding:8px 10px; box-sizing:border-box; border-radius:10px; background:{{ r.bg }}; cursor:pointer;">
+            <span style="display:inline-flex; align-self:flex-start; margin-top:2px; color:var(--ink-muted);"><ub-icon name="file-text" size="16"></ub-icon></span>
+            <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:2px;">
+              <span style="font-size:14px; line-height:20px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><span style="font-weight:600;">{{ r.m }}</span>{{ r.rest }}</span>
+              <span style="font-size:12px; line-height:16px; color:var(--ink-faint-text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ r.snippet }}</span>
+            </div>
+            <span style="font-size:12px; color:var(--ink-faint-text);">{{ r.dept }}</span>
+            <sc-if value="{{ r.sel }}" hint-placeholder-val="{{ false }}"><span style="display:inline-flex; color:var(--ink-muted);"><ub-icon name="corner-down-left" size="14"></ub-icon></span></sc-if>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="height:42px; display:flex; align-items:center; gap:16px; padding:0 18px; border-top:1px solid var(--border); font-size:12px; color:var(--ink-faint-text);">
+        <span style="display:inline-flex; align-items:center; gap:6px;"><span style="min-width:20px; height:20px; display:inline-grid; place-items:center; border-radius:6px; background:var(--sunken); box-shadow:inset 0 0 0 1px var(--edge); font-family:var(--mono); font-size:11px; color:var(--ink-muted);">↑</span><span style="min-width:20px; height:20px; display:inline-grid; place-items:center; border-radius:6px; background:var(--sunken); box-shadow:inset 0 0 0 1px var(--edge); font-family:var(--mono); font-size:11px; color:var(--ink-muted);">↓</span>Move</span>
+        <span style="display:inline-flex; align-items:center; gap:6px;"><span style="min-width:20px; height:20px; display:inline-grid; place-items:center; border-radius:6px; background:var(--sunken); box-shadow:inset 0 0 0 1px var(--edge); font-family:var(--mono); font-size:11px; color:var(--ink-muted);">↵</span>Open</span>
+        <span style="display:inline-flex; align-items:center; gap:6px;"><span style="min-width:20px; height:20px; padding:0 4px; box-sizing:border-box; display:inline-grid; place-items:center; border-radius:6px; background:var(--sunken); box-shadow:inset 0 0 0 1px var(--edge); font-family:var(--mono); font-size:11px; color:var(--ink-muted);">⌘↵</span>Ask about this</span>
+        <span style="flex:1;"></span>
+        <span>{{ countLine }}</span>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  state = { sel: 0 };
+  componentDidMount() {
+    this.onKey = e => {
+      if (e.key === 'ArrowDown') { e.preventDefault(); this.setState(s => ({ sel: Math.min(4, s.sel + 1) })); }
+      if (e.key === 'ArrowUp') { e.preventDefault(); this.setState(s => ({ sel: Math.max(0, s.sel - 1) })); }
+    };
+    window.addEventListener('keydown', this.onKey);
+  }
+  componentWillUnmount() { window.removeEventListener('keydown', this.onKey); }
+  renderVals() {
+    const sel = this.state.sel;
+    const mk = (i, extra) => ({ ...extra, sel: i === sel, bg: i === sel ? 'var(--sunken)' : 'transparent', enter: () => this.setState({ sel: i }) });
+    const chats = [['Parental', ' leave eligibility', 'Today'], ['Parental', ' leave overlap with a partner at Northwind', '2 Oct']]
+      .map(([m, rest, when], i) => mk(i, { m, rest, when }));
+    const docs = [
+      ['Parental', ' Leave Policy', 'Paid Leave Duration · Every eligible parent receives sixteen weeks of fully paid parental leave…', 'HR'],
+      ['', 'Leave and Time Off Policy', 'Annual Leave · Parental leave is separate from your 20/25/18 annual days…', 'HR'],
+      ['', 'Employee Handbook', 'Time Away from Work · See the Parental Leave Policy for paid leave after a birth or adoption…', 'HR'],
+    ].map(([m, rest, snippet, dept], i) => mk(i + 2, { m, rest, snippet, dept }));
+    return { chats, docs, countLine: '2 chats · 3 documents' };
+  }
+}
+</script>
+</body>
+</html>
