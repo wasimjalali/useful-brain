@@ -40,7 +40,7 @@ export function Field({
           aria-describedby={
             [describedBy, error ? errorId : undefined].filter(Boolean).join(" ") || undefined
           }
-          aria-invalid={error ? true : undefined}
+          aria-invalid={error ? true : props["aria-invalid"]}
           className="ub-field-input"
           disabled={disabled}
           id={inputId}

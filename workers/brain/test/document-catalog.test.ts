@@ -154,6 +154,73 @@ describe("catalog backfill ACL consistency", () => {
       .first<{ n: number }>();
     expect(rows!.n).toBe(0);
   });
+
+  async function prepareGeneration(...mutations: string[]): Promise<string> {
+    const gen = (await seedCorpus()).generationId;
+    await env.CORPUS_DB.batch([
+      env.CORPUS_DB.prepare(`DELETE FROM document_catalog WHERE generation_id = ?`).bind(gen),
+      env.CORPUS_DB.prepare(`DELETE FROM document_bodies WHERE generation_id = ?`).bind(gen),
+      ...mutations.map((sql) => env.CORPUS_DB.prepare(sql).bind(gen)),
+    ]);
+    return gen;
+  }
+
+  async function writtenRows(gen: string): Promise<number> {
+    const row = await env.CORPUS_DB.prepare(
+      `SELECT (SELECT COUNT(*) FROM document_catalog WHERE generation_id = ?1)
+            + (SELECT COUNT(*) FROM document_bodies WHERE generation_id = ?1) AS n`,
+    )
+      .bind(gen)
+      .first<{ n: number }>();
+    return row!.n;
+  }
+
+  it("throws when private chunks share scope, arrays and a stale acl_group but differ in owner, and writes nothing", async () => {
+    const gen = await prepareGeneration(
+      `UPDATE chunks SET access_scope = 'private', allowed_roles = '[]', allowed_departments = '[]',
+         acl_group = 'stale000000000000000000000000000',
+         metadata = json_set(metadata, '$.owner_user_id', CASE chunk_index WHEN 0 THEN 'alice' ELSE 'bob' END)
+       WHERE generation_id = ? AND document_id = 'doc-eng-runbook'`,
+    );
+    await expect(backfillDocumentCatalog(env.CORPUS_DB, gen)).rejects.toThrow(/ACL/);
+    expect(await writtenRows(gen)).toBe(0);
+  });
+
+  it("writes nothing when a consistent document sorts before a mixed one", async () => {
+    const gen = await prepareGeneration(
+      `UPDATE chunks SET allowed_departments = '["support"]'
+       WHERE generation_id = ? AND document_id = 'doc-public-handbook' AND chunk_index = 1`,
+    );
+    await expect(backfillDocumentCatalog(env.CORPUS_DB, gen)).rejects.toThrow(/ACL/);
+    expect(await writtenRows(gen)).toBe(0);
+  });
+
+  it.each([
+    ["a numeric owner", `json_set(metadata, '$.owner_user_id', 42)`],
+    ["an empty owner", `json_set(metadata, '$.owner_user_id', '')`],
+    ["a missing owner", `json_remove(metadata, '$.owner_user_id')`],
+    ["an object owner", `json_set(metadata, '$.owner_user_id', json('{"id":"member-maya"}'))`],
+    ["unparseable metadata", `'not json'`],
+  ])("throws on a private document with %s and writes nothing", async (_label, expression) => {
+    const gen = await prepareGeneration(
+      `UPDATE chunks SET metadata = ${expression}
+       WHERE generation_id = ? AND document_id = 'doc-private-maya'`,
+    );
+    await expect(backfillDocumentCatalog(env.CORPUS_DB, gen)).rejects.toThrow(/ACL|owner/);
+    expect(await writtenRows(gen)).toBe(0);
+  });
+
+  it("rebuilds a consistent private document with its owner", async () => {
+    const gen = await prepareGeneration();
+    expect(await backfillDocumentCatalog(env.CORPUS_DB, gen)).toBe(CORPUS_DOCUMENT_IDS.length);
+    const row = await env.CORPUS_DB.prepare(
+      `SELECT access_scope, json_extract(metadata, '$.owner_user_id') AS owner FROM document_catalog
+       WHERE generation_id = ? AND document_id = 'doc-private-maya'`,
+    )
+      .bind(gen)
+      .first<{ access_scope: string; owner: string }>();
+    expect(row).toEqual({ access_scope: "private", owner: "member-maya" });
+  });
 });
 
 describe("migration 0004 over an existing 0001-0003 database", () => {

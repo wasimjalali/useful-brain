@@ -1077,6 +1077,7 @@ body {
 .ub-field:focus-within {
   background: var(--bubble);
   box-shadow: 0 0 0 1px var(--edge), 0 0 0 2px var(--ring-bg, var(--surface)), 0 0 0 4px var(--ink);
+  outline: 2px solid transparent;
 }
 .ub-field[data-invalid="true"] {
   background: var(--bubble);
