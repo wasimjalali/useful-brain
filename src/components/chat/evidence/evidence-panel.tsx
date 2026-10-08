@@ -1,6 +1,8 @@
 "use client";
 
-import { ArrowRightIcon, XIcon } from "@/components/icons";
+import { useEffect, useState } from "react";
+
+import { ArrowRightIcon, CheckIcon, ChevronRightIcon, CopyIcon, XIcon } from "@/components/icons";
 import { IconButton } from "@/components/ui/button";
 import { Segmented } from "@/components/ui/segmented";
 import { PassageSkeleton } from "@/components/ui/skeleton";
@@ -51,6 +53,104 @@ function PassageText({ text, highlights, active }: { text: string; highlights?: 
   );
 }
 
+const DETAILS_KEY = "ub:retrieval-details-open";
+
+function CopyChunkButton({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) {
+      return;
+    }
+    const timer = window.setTimeout(() => setCopied(false), 1500);
+    return () => window.clearTimeout(timer);
+  }, [copied]);
+  return (
+    <button
+      aria-label="Copy chunk ID"
+      className="ub-ring inline-flex items-center gap-1 rounded p-0.5 text-ink-faint-text transition-colors duration-[120ms] hover:bg-hover hover:text-ink"
+      onClick={() => {
+        navigator.clipboard.writeText(value).then(
+          () => setCopied(true),
+          () => undefined,
+        );
+      }}
+      type="button"
+    >
+      {copied ? <span className="text-[11px]">Copied</span> : null}
+      {copied ? <CheckIcon className="size-3.5" /> : <CopyIcon className="size-3.5" />}
+    </button>
+  );
+}
+
+function RetrievalDetails({ passage }: { passage: CitedPassageView }) {
+  const [open, setOpen] = useState(() => {
+    try {
+      return window.localStorage.getItem(DETAILS_KEY) === "1";
+    } catch {
+      // Storage can be blocked. The disclosure then starts closed.
+      return false;
+    }
+  });
+  function toggle() {
+    const next = !open;
+    setOpen(next);
+    try {
+      window.localStorage.setItem(DETAILS_KEY, next ? "1" : "0");
+    } catch {
+      // Not remembering is fine.
+    }
+  }
+  const scores = [
+    ["Keyword", passage.keywordScore],
+    ["Vector", passage.vectorScore],
+    ["Rerank", passage.rerankScore],
+  ] as const;
+  return (
+    <div className="ml-[26px] rounded-[10px] bg-sunken">
+      <button
+        aria-expanded={open}
+        className="ub-ring flex w-full items-center justify-between rounded-[10px] px-2.5 py-2 text-xs text-ink-muted"
+        onClick={toggle}
+        type="button"
+      >
+        Retrieval details
+        <ChevronRightIcon
+          aria-hidden="true"
+          className={`size-3.5 transition-transform duration-[160ms] ${open ? "rotate-90" : ""}`}
+        />
+      </button>
+      {open ? (
+        <div className="flex flex-col gap-2 px-2.5 pb-2.5">
+          <div className="grid grid-cols-3 rounded-lg bg-surface shadow-[0_0_0_1px_var(--edge)]">
+            {scores.map(([label, value]) => (
+              <div className="flex flex-col gap-px border-l border-border px-[9px] py-[7px] first:border-l-0" key={label}>
+                <span className="text-[10.5px] text-ink-faint-text">{label}</span>
+                <span className="font-mono text-[13px] tabular-nums text-ink">{score(value)}</span>
+              </div>
+            ))}
+          </div>
+          <dl className="m-0 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2.5 gap-y-1 text-[11px] text-ink-faint-text">
+            <dt>Chunk</dt>
+            <dd className="m-0 truncate font-mono text-ink-muted" title={passage.chunkId}>
+              {passage.chunkId}
+            </dd>
+            <CopyChunkButton value={passage.chunkId} />
+            {passage.generation ? (
+              <>
+                <dt>Generation</dt>
+                <dd className="m-0 truncate font-mono text-ink-muted" title={passage.generation}>
+                  {shortGenerationId(passage.generation)}
+                </dd>
+                <span />
+              </>
+            ) : null}
+          </dl>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function CitedRow({
   passage,
   isAdmin,
@@ -75,25 +175,6 @@ function CitedRow({
         <span className="truncate text-xs text-ink-faint-text">{passage.section}</span>
       </div>
       <PassageText active={active} highlights={passage.highlights} text={passage.text} />
-      {isAdmin ? (
-        <dl className="m-0 ml-[26px] grid grid-cols-[auto_1fr] gap-x-3 gap-y-[3px] font-mono text-[11px] leading-4 text-ink-faint-text">
-          <dt>chunk</dt>
-          <dd className="m-0 break-all text-ink-muted">{passage.chunkId}</dd>
-          {passage.generation ? (
-            <>
-              <dt>generation</dt>
-              <dd className="m-0 text-ink-muted" title={passage.generation}>
-                {shortGenerationId(passage.generation)}
-              </dd>
-            </>
-          ) : null}
-          <dt>scores</dt>
-          <dd className="m-0 text-ink-muted">
-            Keyword {score(passage.keywordScore)} · Vector {score(passage.vectorScore)} · Rerank{" "}
-            {score(passage.rerankScore)}
-          </dd>
-        </dl>
-      ) : null}
       <button
         className="ub-ring ml-[26px] inline-flex w-max items-center gap-1 rounded-md text-xs font-medium text-ink-muted transition-colors duration-[120ms] hover:text-ink"
         onClick={() => onOpenDocument(passage.n)}
@@ -102,6 +183,7 @@ function CitedRow({
         Open document
         <ArrowRightIcon className="size-3.5" />
       </button>
+      {isAdmin ? <RetrievalDetails passage={passage} /> : null}
     </div>
   );
 }

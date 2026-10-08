@@ -61,16 +61,24 @@ describe("SettingsDialog", () => {
 
   it("shows only the readable count for members", () => {
     setup({ initialSection: "account" });
-    expect(screen.getByText("Can read 34 documents")).toBeInTheDocument();
+    expect(screen.getByText("Documents you can read")).toBeInTheDocument();
+    expect(screen.getByText("34")).toBeInTheDocument();
+    expect(screen.queryByRole("meter")).toBeNull();
   });
 
-  it("shows the total only when provided and signs out", () => {
+  it("shows a profile header with chips and an access meter", () => {
     const props = setup({
       initialSection: "account",
       isAdmin: true,
       account: { ...account, readableDocuments: 31, totalDocuments: 62 },
     });
-    expect(screen.getByText("Can read 31 of 62 documents")).toBeInTheDocument();
+    expect(screen.getByText("MC")).toBeInTheDocument();
+    expect(screen.getByText("Maya Chen")).toBeInTheDocument();
+    expect(screen.getByText("maya.chen@northwind.example")).toBeInTheDocument();
+    expect(screen.getByText("Role")).toBeInTheDocument();
+    expect(screen.getByText("Department")).toBeInTheDocument();
+    expect(screen.getByText("31 of 62")).toBeInTheDocument();
+    expect(screen.getByRole("meter")).toHaveAttribute("aria-valuenow", "31");
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
     expect(props.onSignOut).toHaveBeenCalledOnce();
   });
@@ -91,11 +99,45 @@ describe("SettingsDialog", () => {
       ],
     });
     fireEvent.click(screen.getByRole("button", { name: "Model and retrieval" }));
-    expect(screen.getByText("Read-only. Changes go through evals.")).toBeInTheDocument();
+    expect(screen.getByText("Read-only")).toBeInTheDocument();
+    expect(screen.queryByText("Read-only. Changes go through evals.")).toBeNull();
+    expect(screen.getByText("Qwen3 Embedding 0.6B")).toBeInTheDocument();
     expect(screen.getByText("@cf/qwen/qwen3-embedding-0.6b")).toBeInTheDocument();
+    expect(screen.getByText("GLM 5.3 Flash")).toBeInTheDocument();
+    expect(screen.getByText("Models")).toBeInTheDocument();
+    expect(screen.getByText("Retrieval")).toBeInTheDocument();
+    expect(screen.getByText("g-c305cf57")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Connectors" }));
     expect(screen.getByRole("button", { name: "Connect" })).toBeDisabled();
     expect(screen.getByText("Not connected")).toBeInTheDocument();
+  });
+
+  it("shows an unknown model id once, without a second line", () => {
+    setup({
+      isAdmin: true,
+      config: { ...config, answerModel: "@cf/acme/mystery" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Model and retrieval" }));
+    expect(screen.getAllByText("@cf/acme/mystery")).toHaveLength(1);
+  });
+
+  it("shows a name that equals the email once and omits chips with no value", () => {
+    setup({
+      initialSection: "account",
+      account: { ...account, name: account.email, role: "", department: "" },
+    });
+    expect(screen.getAllByText(account.email)).toHaveLength(1);
+    expect(screen.queryByText("Role")).toBeNull();
+    expect(screen.queryByText("Department")).toBeNull();
+  });
+
+  it("hides the meter when the total is zero", () => {
+    setup({
+      initialSection: "account",
+      isAdmin: true,
+      account: { ...account, readableDocuments: 0, totalDocuments: 0 },
+    });
+    expect(screen.queryByRole("meter")).toBeNull();
   });
 
   it("closes from the close button and Escape", () => {
