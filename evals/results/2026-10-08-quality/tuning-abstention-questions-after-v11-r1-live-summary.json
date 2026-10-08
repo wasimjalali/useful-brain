@@ -1,0 +1,69 @@
+{
+  "model": "@cf/zai-org/glm-5.3-flash",
+  "questionsFile": "content/northwind/tuning-abstention-questions.json",
+  "generationId": "g-2055a92b-103e-447f-a4c1-5ab7d071fc8b",
+  "latency": {
+    "count": 3,
+    "total": 3,
+    "partial": false,
+    "meanMs": 16322,
+    "p50Ms": 18912,
+    "p95Ms": 19345
+  },
+  "results": [
+    {
+      "questionId": "ta01",
+      "category": "unanswerable",
+      "answerType": "insufficient_evidence",
+      "citedDocumentIds": [],
+      "retrievedDocumentIds": [
+        "nw_hr_recruiting_interview",
+        "nw_sales_referral_program",
+        "nw_sales_partner_program",
+        "nw_sales_commission_plan",
+        "nw_hr_onboarding_guide"
+      ],
+      "sectionHit": null,
+      "liveRecall": null,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0,
+      "refusalReason": "model_abstained_with_evidence",
+      "status": "pass",
+      "detail": "Correct abstention for unanswerable."
+    },
+    {
+      "questionId": "ta02",
+      "category": "unanswerable",
+      "answerType": "insufficient_evidence",
+      "citedDocumentIds": [],
+      "retrievedDocumentIds": [
+        "nw_finance_travel_expense",
+        "nw_finance_employee_expense",
+        "nw_hr_employee_handbook"
+      ],
+      "sectionHit": null,
+      "liveRecall": null,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0,
+      "refusalReason": "model_abstained_with_evidence",
+      "status": "pass",
+      "detail": "Correct abstention for unanswerable."
+    },
+    {
+      "questionId": "ta03",
+      "category": "unanswerable",
+      "answerType": "insufficient_evidence",
+      "citedDocumentIds": [],
+      "retrievedDocumentIds": [
+        "nw_hr_onboarding_guide"
+      ],
+      "sectionHit": null,
+      "liveRecall": null,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0,
+      "refusalReason": "model_abstained_with_evidence",
+      "status": "pass",
+      "detail": "Correct abstention for unanswerable."
+    }
+  ]
+}

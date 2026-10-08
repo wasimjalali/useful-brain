@@ -1,0 +1,6 @@
+# v12 worker (port 8791), worker-v12-8791.log line 2406
+{"requestId":"e97cbbf9-a1f9-49a5-9cb8-56e5faffaf6a","operation":"turns","status":"error","durationMs":72238,"errorCode":"UNAVAILABLE"}
+[wrangler:info] POST /turns 503 Service Unavailable (72243ms)
+# v13 worker (port 8791), worker-v13-8791.log line 1021
+{"requestId":"ff373e73-a0ba-4a54-bfa0-6eb9d4a05618","operation":"turns","status":"error","durationMs":68824,"errorCode":"UNAVAILABLE"}
+[wrangler:info] POST /turns 503 Service Unavailable (68832ms)

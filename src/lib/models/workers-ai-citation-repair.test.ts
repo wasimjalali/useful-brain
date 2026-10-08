@@ -8,6 +8,7 @@ import {
 
 import type { CitedRetrievalResult } from "../answer/contract";
 import { BudgetExceededError } from "../agent/budgets";
+import { ExtractionTruncatedError } from "../agent/extraction-truncated";
 import { SEARCH_KNOWLEDGE_TOOL } from "../agent/host-grounding";
 import { runKnowledgeAgent } from "../agent/run";
 import { FakeEmbeddingProvider } from "../retrieve/fake-embed";
@@ -68,11 +69,90 @@ describe("Workers AI citation repair", () => {
         stream: false,
         temperature: 0,
         seed: 7,
-        max_completion_tokens: 1024,
-        chat_template_kwargs: { enable_thinking: false },
+        max_completion_tokens: 4096,
+        reasoning_effort: "low",
       }),
       { signal: undefined },
     );
+    expect(run.mock.calls[0]?.[1]).not.toHaveProperty("chat_template_kwargs");
+  });
+
+  // Extraction decoding failures measured 2026-10-08 on the live worker:
+  // 1. GLM-5.3 Flash ignores chat_template_kwargs.enable_thinking (its
+  //    schema: "Reasoning cannot be disabled") and reasons at max effort;
+  // 2. max-effort reasoning fills a 1,024-token cap, finish_reason
+  //    "length", empty content, so coverage and repair return nothing;
+  // 3. the fix must not send reasoning_effort to models that have a
+  //    working thinking toggle or no reasoning schema at all.
+  it("uses the lowest documented reasoning effort for models that cannot disable reasoning", async () => {
+    const run = vi.fn().mockResolvedValue({
+      choices: [{ finish_reason: "stop", message: { content: JSON.stringify({ quotes: [] }) } }],
+    });
+    const cover = createWorkersAiCoveragePass({ run }, "@cf/zai-org/glm-5.3");
+    await cover({ question: "What is the P1 response target?", draft: "None. [1]", evidence });
+    expect(run.mock.calls[0]?.[1]).toMatchObject({ reasoning_effort: "low", max_completion_tokens: 4096 });
+    expect(run.mock.calls[0]?.[1]).not.toHaveProperty("chat_template_kwargs");
+  });
+
+  it("tells the coverage pass why each uncited document was hinted", async () => {
+    const run = vi.fn().mockResolvedValue({
+      choices: [{ finish_reason: "stop", message: { content: JSON.stringify({ quotes: [] }) } }],
+    });
+    const twinEvidence: CitedRetrievalResult[] = [
+      {
+        ...evidence[0],
+        chunkId: "process__windows__001",
+        source: "records-request-process.md",
+        documentId: "records-request-process",
+        text: "The standard response window is 30 days. Complex requests can be extended by up to 60 days.",
+      },
+      {
+        ...evidence[0],
+        rank: 2,
+        chunkId: "rights__rights__001",
+        source: "customer-rights-policy.md",
+        documentId: "customer-rights-policy",
+        citationLabel: "[2]",
+        text: "We respond within 30 days, extendable by up to 60 days with notice.",
+      },
+    ];
+    await createWorkersAiCoveragePass({ run })({
+      question: "How long do we have to answer a records request?",
+      draft: "The standard response window is 30 days. Complex requests can be extended by up to 60 days. [1]",
+      evidence: twinEvidence,
+    });
+    const user = (run.mock.calls[0]?.[1] as { messages: Array<{ role: string; content: string }> })
+      .messages[1].content;
+    expect(user).toContain(
+      "The document behind [2] (customer-rights-policy.md) states the same figures as a cited draft paragraph",
+    );
+    // A candidate for the model to judge, never an assertion of the same rule.
+    expect(user).toContain("Only if its Text states the same rule for the same topic");
+    expect(user).not.toContain("so it states the same rule");
+  });
+
+  it("keeps the thinking toggle and the 1,024 cap for models that honor it", async () => {
+    const run = vi.fn().mockResolvedValue({
+      choices: [{ finish_reason: "stop", message: { content: JSON.stringify({ quotes: [] }) } }],
+    });
+    await createWorkersAiCoveragePass({ run }, "@cf/google/gemma-4-26b-a4b-it")({
+      question: "What is the P1 response target?",
+      draft: "None. [1]",
+      evidence,
+    });
+    await createWorkersAiCoveragePass({ run }, "@cf/meta/llama-4-scout-17b-16e-instruct")({
+      question: "What is the P1 response target?",
+      draft: "None. [1]",
+      evidence,
+    });
+    expect(run.mock.calls[0]?.[1]).toMatchObject({
+      max_completion_tokens: 1024,
+      chat_template_kwargs: { enable_thinking: false },
+    });
+    expect(run.mock.calls[0]?.[1]).not.toHaveProperty("reasoning_effort");
+    expect(run.mock.calls[1]?.[1]).toMatchObject({ max_completion_tokens: 1024 });
+    expect(run.mock.calls[1]?.[1]).not.toHaveProperty("reasoning_effort");
+    expect(run.mock.calls[1]?.[1]).not.toHaveProperty("chat_template_kwargs");
   });
 
   it("forwards the abort signal into the ai.run options", async () => {
@@ -363,6 +443,82 @@ describe("Workers AI citation repair", () => {
     );
   });
 
+  // Dedup by text alone drops an exact-sentence twin: the owner policy states
+  // the same sentence as the cited process document, so its quote matches the
+  // draft text but adds a citation the draft lacks.
+  it("keeps the same sentence under a new citation label and drops a true duplicate", async () => {
+    const twinEvidence: CitedRetrievalResult[] = [
+      evidence[0],
+      {
+        ...evidence[0],
+        rank: 2,
+        chunkId: "owner__targets__001",
+        source: "response-targets-policy.md",
+        citationLabel: "[2]",
+        documentId: "response-targets-policy",
+      },
+    ];
+    const run = vi.fn().mockResolvedValue({
+      choices: [
+        {
+          finish_reason: "stop",
+          message: {
+            content: JSON.stringify({
+              quotes: [
+                { quote: "P1 tickets have a first-response target of 1 hour.", citation: "[1]" },
+                { quote: "P1 tickets have a first-response target of 1 hour.", citation: "[2]" },
+              ],
+            }),
+          },
+        },
+      ],
+    });
+    await expect(
+      createWorkersAiCoveragePass({ run })({
+        question: "What is the P1 response target?",
+        draft: "P1 tickets have a first-response target of 1 hour.[1]",
+        evidence: twinEvidence,
+      }),
+    ).resolves.toBe("P1 tickets have a first-response target of 1 hour. [2]");
+  });
+
+  it("returns a repeated new quote once", async () => {
+    const twoDocEvidence: CitedRetrievalResult[] = [
+      evidence[0],
+      {
+        ...evidence[0],
+        rank: 2,
+        chunkId: "escalation__owners__001",
+        source: "complaint-escalation.md",
+        text: "ESC-3 complaints are owned by the VP of Support.",
+        citationLabel: "[2]",
+        documentId: "complaint-escalation",
+      },
+    ];
+    const run = vi.fn().mockResolvedValue({
+      choices: [
+        {
+          finish_reason: "stop",
+          message: {
+            content: JSON.stringify({
+              quotes: [
+                { quote: "ESC-3 complaints are owned by the VP of Support.", citation: "[2]" },
+                { quote: "ESC-3 complaints are owned by the VP of Support. ", citation: "[2]" },
+              ],
+            }),
+          },
+        },
+      ],
+    });
+    await expect(
+      createWorkersAiCoveragePass({ run })({
+        question: "What is the P1 response target and who owns ESC-3 complaints?",
+        draft: "P1 tickets have a first-response target of 1 hour.[1]",
+        evidence: twoDocEvidence,
+      }),
+    ).resolves.toBe("ESC-3 complaints are owned by the VP of Support. [2]");
+  });
+
   it("recovers the quotes object when the model narrates before the JSON", async () => {
     const run = vi.fn().mockResolvedValue({
       choices: [
@@ -479,6 +635,182 @@ function quotesResponse(quotes: Array<{ quote: string; citation: string }>) {
     ],
   };
 }
+
+// Truncated extraction (finish_reason "length", empty content). Failure
+// modes:
+// 1. it reads as "no quotes" (null), indistinguishable from a real answer;
+// 2. citation repair caches it, so a later strict retry or abstention
+//    recheck in the same run replays the truncation instead of retrying;
+// 3. the warning leaks evidence or reasoning text into logs;
+// 4. a truncated response that did write content is treated as truncated.
+describe("truncated extraction", () => {
+  const truncated = {
+    choices: [
+      {
+        finish_reason: "length",
+        message: { content: "", reasoning_content: "Thinking about the P1 response target..." },
+      },
+    ],
+    usage: { completion_tokens: 4096 },
+  };
+
+  it("rejects a truncated repair, warns without content and never caches it", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const run = vi.fn().mockResolvedValue(truncated);
+    const repair = createWorkersAiCitationRepair({ run });
+    const extractionCache = new Map<string, unknown>();
+    const input = { question: "What is the P1 first-response target?", evidence, extractionCache };
+
+    await expect(repair(input)).rejects.toBeInstanceOf(ExtractionTruncatedError);
+    expect(extractionCache.size).toBe(0);
+    await expect(repair({ ...input, lexicalFallback: false })).rejects.toBeInstanceOf(
+      ExtractionTruncatedError,
+    );
+    // The second pass asked the provider again instead of replaying.
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(warn).toHaveBeenCalledTimes(2);
+    const logged = String(warn.mock.calls[0]?.[0]);
+    expect(JSON.parse(logged)).toMatchObject({ event: "extraction_truncated", pass: "repair" });
+    expect(logged).not.toContain("P1");
+    expect(logged).not.toContain("Thinking");
+    warn.mockRestore();
+  });
+
+  it("rejects a truncated coverage pass instead of returning no additions", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const run = vi.fn().mockResolvedValue(truncated);
+    await expect(
+      createWorkersAiCoveragePass({ run })({
+        question: "What is the P1 response target?",
+        draft: "P1 tickets have a first-response target of 1 hour. [1]",
+        evidence,
+      }),
+    ).rejects.toBeInstanceOf(ExtractionTruncatedError);
+    expect(JSON.parse(String(warn.mock.calls[0]?.[0]))).toMatchObject({ pass: "coverage" });
+    warn.mockRestore();
+  });
+
+  // 5. a length-limited answer cut off mid-JSON slips past the empty-content
+  //    check: coverage returns null and repair caches it;
+  // 6. an earlier complete example object in narration stands in for the
+  //    final answer the budget cut off;
+  // 7. the check reads only top-level choices while the parser also accepts
+  //    result.choices.
+  const cutOff = {
+    choices: [
+      {
+        finish_reason: "length",
+        message: { content: '{"quotes":[{"quote":"P1 tickets have a first-response target of 1 hour.","citat' },
+      },
+    ],
+  };
+
+  it("rejects incomplete JSON from a length-limited repair before caching it", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const run = vi.fn().mockResolvedValue(cutOff);
+    const extractionCache = new Map<string, unknown>();
+    await expect(
+      createWorkersAiCitationRepair({ run })({
+        question: "What is the P1 first-response target?",
+        evidence,
+        extractionCache,
+      }),
+    ).rejects.toBeInstanceOf(ExtractionTruncatedError);
+    expect(extractionCache.size).toBe(0);
+    warn.mockRestore();
+  });
+
+  it("rejects incomplete JSON from a length-limited coverage pass", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await expect(
+      createWorkersAiCoveragePass({ run: vi.fn().mockResolvedValue(cutOff) })({
+        question: "What is the P1 response target?",
+        draft: "Something else. [1]",
+        evidence,
+      }),
+    ).rejects.toBeInstanceOf(ExtractionTruncatedError);
+    warn.mockRestore();
+  });
+
+  it("does not accept an earlier example object when the final answer was cut off", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const narrated = {
+      choices: [
+        {
+          finish_reason: "length",
+          message: {
+            content:
+              'The shape is {"quotes":[]} so the answer is {"quotes":[{"quote":"P1 tickets have a first-response',
+          },
+        },
+      ],
+    };
+    await expect(
+      createWorkersAiCoveragePass({ run: vi.fn().mockResolvedValue(narrated) })({
+        question: "What is the P1 response target?",
+        draft: "Something else. [1]",
+        evidence,
+      }),
+    ).rejects.toBeInstanceOf(ExtractionTruncatedError);
+    warn.mockRestore();
+  });
+
+  // 8. the cut-off final object is too short to match '{"quotes"', so the
+  //    earlier complete example is the last match and passes as the answer.
+  it("rejects a complete example followed by a cut-off object", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const exampleThenCut = {
+      choices: [{ finish_reason: "length", message: { content: 'Example: {"quotes":[]}. Answer: {"quo' } }],
+    };
+    const extractionCache = new Map<string, unknown>();
+    await expect(
+      createWorkersAiCitationRepair({ run: vi.fn().mockResolvedValue(exampleThenCut) })({
+        question: "What is the P1 first-response target?",
+        evidence,
+        extractionCache,
+      }),
+    ).rejects.toBeInstanceOf(ExtractionTruncatedError);
+    expect(extractionCache.size).toBe(0);
+    await expect(
+      createWorkersAiCoveragePass({ run: vi.fn().mockResolvedValue(exampleThenCut) })({
+        question: "What is the P1 response target?",
+        draft: "Something else. [1]",
+        evidence,
+      }),
+    ).rejects.toBeInstanceOf(ExtractionTruncatedError);
+    warn.mockRestore();
+  });
+
+  it("detects truncation inside a result.choices envelope", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await expect(
+      createWorkersAiCoveragePass({ run: vi.fn().mockResolvedValue({ result: truncated }) })({
+        question: "What is the P1 response target?",
+        draft: "Something else. [1]",
+        evidence,
+      }),
+    ).rejects.toBeInstanceOf(ExtractionTruncatedError);
+    warn.mockRestore();
+  });
+
+  it("parses a length-limited response that still wrote its answer", async () => {
+    const run = vi.fn().mockResolvedValue({
+      choices: [
+        {
+          finish_reason: "length",
+          message: {
+            content: JSON.stringify({
+              quotes: [{ quote: "P1 tickets have a first-response target of 1 hour.", citation: "[1]" }],
+            }),
+          },
+        },
+      ],
+    });
+    await expect(
+      createWorkersAiCitationRepair({ run })({ question: "What is the P1 first-response target?", evidence }),
+    ).resolves.toBe("P1 tickets have a first-response target of 1 hour. [1]");
+  });
+});
 
 describe("run-local extraction reuse", () => {
   it("reuses one extraction across a strict rejection and a non-lexical abstention recheck", async () => {

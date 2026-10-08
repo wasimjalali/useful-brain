@@ -1,0 +1,147 @@
+{
+  "model": "@cf/zai-org/glm-5.3-flash",
+  "harnessGitSha": "d52b372a896bae4a1cee5a75a24a4ca329fa4b43",
+  "harnessDirty": false,
+  "pipelineVersion": "grounded-answer.v13|real-stack|300/30|0.70/0.30|kw6|kr3|cb0.05|rr20|@cf/baai/bge-reranker-base|floor0.05|top8|fts-stopword-or-v1",
+  "latency": {
+    "count": 120,
+    "total": 120,
+    "partial": false,
+    "meanMs": 22525,
+    "p50Ms": 20052,
+    "p95Ms": 58390
+  },
+  "retrieval": {
+    "recallAtK": 0.9123711340206185,
+    "mrr": 0.824742268041237,
+    "ndcgAtK": 0.8370127906093069,
+    "citationCorrectness": 0.5051546391752577,
+    "abstentionCorrectness": 0,
+    "aclLeakCount": 0,
+    "questions": 120
+  },
+  "live": {
+    "total": 120,
+    "scored": 120,
+    "passed": 117,
+    "failed": 3,
+    "skipped": 0,
+    "passRate": 0.975,
+    "byCategory": {
+      "factual": {
+        "scored": 70,
+        "passed": 70
+      },
+      "trap": {
+        "scored": 17,
+        "passed": 17
+      },
+      "permission": {
+        "scored": 13,
+        "passed": 12
+      },
+      "unanswerable": {
+        "scored": 10,
+        "passed": 10
+      },
+      "multi_hop": {
+        "scored": 5,
+        "passed": 3
+      },
+      "multi_hop_expanded": {
+        "scored": 5,
+        "passed": 5
+      }
+    },
+    "retrievedRecall": 0.9948453608247423,
+    "goldRetrievedUncitedCount": 13,
+    "citedNotExpectedCount": 13,
+    "vectorDegradedTurns": 0,
+    "hybridBaselineComparable": true,
+    "refusedWithEvidence": 13
+  },
+  "failures": [
+    {
+      "layer": "live",
+      "questionId": "q073",
+      "detail": {
+        "questionId": "q073",
+        "category": "permission",
+        "answerType": "grounded",
+        "citedDocumentIds": [
+          "nw_engineering_release_notes_2026"
+        ],
+        "retrievedDocumentIds": [
+          "nw_engineering_release_notes_2026"
+        ],
+        "sectionHit": null,
+        "liveRecall": null,
+        "goldRetrievedUncited": [],
+        "vectorDegradedCount": 0,
+        "status": "fail",
+        "detail": "Expected insufficient_evidence for permission, got \"grounded\"."
+      }
+    },
+    {
+      "layer": "live",
+      "questionId": "q086",
+      "detail": {
+        "questionId": "q086",
+        "category": "multi_hop",
+        "answerType": "grounded",
+        "citedDocumentIds": [
+          "nw_engineering_change_management"
+        ],
+        "retrievedDocumentIds": [
+          "nw_engineering_change_management",
+          "nw_engineering_deployment",
+          "nw_hr_employee_handbook",
+          "nw_engineering_sdlc",
+          "nw_support_channels_hours",
+          "nw_engineering_release_notes_2026",
+          "nw_operations_scheduled_maintenance"
+        ],
+        "sectionHit": true,
+        "liveRecall": 1,
+        "goldRetrievedUncited": [
+          "nw_engineering_deployment"
+        ],
+        "vectorDegradedCount": 0,
+        "status": "fail",
+        "detail": "Multi-hop answer missing citations for nw_engineering_deployment."
+      }
+    },
+    {
+      "layer": "live",
+      "questionId": "q090",
+      "detail": {
+        "questionId": "q090",
+        "category": "multi_hop",
+        "answerType": "grounded",
+        "citedDocumentIds": [
+          "nw_finance_refund_policy",
+          "nw_legal_data_retention"
+        ],
+        "retrievedDocumentIds": [
+          "nw_finance_refund_policy",
+          "nw_support_dsar_process",
+          "nw_legal_data_retention",
+          "nw_engineering_error_code_reference",
+          "nw_hr_employee_handbook",
+          "nw_sales_referral_program",
+          "nw_support_customer_onboarding",
+          "nw_finance_invoicing_payment",
+          "nw_support_complaint_escalation"
+        ],
+        "sectionHit": true,
+        "liveRecall": 1,
+        "goldRetrievedUncited": [
+          "nw_support_dsar_process"
+        ],
+        "vectorDegradedCount": 0,
+        "status": "fail",
+        "detail": "Multi-hop answer missing citations for nw_support_dsar_process."
+      }
+    }
+  ]
+}

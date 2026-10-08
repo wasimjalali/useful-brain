@@ -6,6 +6,7 @@ Every eval campaign in this repo gets documented here: model evals (comparing mo
 
 | Date | Type | Report | Headline |
 | --- | --- | --- | --- |
+| 2026-10-08 | System | [Pointer twin fix](system-evals/2026-10-08-pointer-twin-fix.md) | The coverage pass returned empty content 67% of the time; fixed: full battery 117/120 with 0 leaks (vs 115/120 twice on the [redesign build](system-evals/2026-10-08-redesign-verification.md)), q028 0/4 to 3/3, q088 1/4 to 3/3; new tuning set shows no measurable change (46/48 vs 47/48) |
 | 2026-10-08 | System | [Redesign verification](system-evals/2026-10-08-redesign-verification.md) | 115/120 twice, 0 leaks; A/B finds no sign the redesign caused the gap from 118 |
 | 2026-09-06 | System | [Pointer-triggered coverage](system-evals/2026-09-06-northwind-pointer-coverage.md) | Systemic fixes only: 116 to 118/120, no corpus-fitted logic |
 | 2026-08-31 | System | [Northwind grounding repair](system-evals/2026-08-31-northwind-grounding-repair.md) | Live pass rate 72% to 95% (114/120) without touching a scorer |
@@ -31,6 +32,7 @@ The live Northwind eval needs the isolated eval worker and the seeded corpus gen
 npx wrangler dev --config workers/brain/wrangler.jsonc --port 8789 --persist-to .wrangler/state-eval
 npm run eval:northwind -- --live http://127.0.0.1:8789                 # locked production model
 npm run eval:northwind -- --live http://127.0.0.1:8789 --model <id>    # loopback-only candidate override
+npm run eval:northwind -- --live http://127.0.0.1:8789 --questions content/northwind/tuning-questions.json   # tuning set, not the locked 120
 ```
 
-Results land in `eval-output/findings*.json`.
+Results land in `eval-output/findings*.json`. A `--questions` run lands in `eval-output/tuning/<file>/` so it can never be mistaken for, or resumed into, the locked run.

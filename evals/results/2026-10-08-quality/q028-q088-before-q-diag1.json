@@ -1,0 +1,76 @@
+{
+  "label": "diag1",
+  "brainUrl": "http://127.0.0.1:8791",
+  "repeats": 1,
+  "ids": [
+    "q028",
+    "q088"
+  ],
+  "tally": {
+    "q028": {
+      "pass": 0,
+      "total": 1
+    },
+    "q088": {
+      "pass": 1,
+      "total": 1
+    }
+  },
+  "rows": [
+    {
+      "label": "diag1",
+      "round": 0,
+      "promptVersion": "grounded-answer.v10",
+      "model": "@cf/zai-org/glm-5.3-flash",
+      "ms": 54576,
+      "questionId": "q028",
+      "category": "factual",
+      "answerType": "grounded",
+      "citedDocumentIds": [
+        "nw_support_dsar_process"
+      ],
+      "retrievedDocumentIds": [
+        "nw_finance_refund_policy",
+        "nw_support_sla_policy",
+        "nw_engineering_release_notes_2026",
+        "nw_support_meridian_admin",
+        "nw_support_dsar_process",
+        "nw_engineering_incident_escalation",
+        "nw_support_complaint_escalation"
+      ],
+      "sectionHit": false,
+      "liveRecall": 0,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0,
+      "status": "fail",
+      "detail": "Grounded answer did not cite expected documents (nw_legal_privacy_policy). Cited: nw_support_dsar_process."
+    },
+    {
+      "label": "diag1",
+      "round": 0,
+      "promptVersion": "grounded-answer.v10",
+      "model": "@cf/zai-org/glm-5.3-flash",
+      "ms": 40749,
+      "questionId": "q088",
+      "category": "multi_hop",
+      "answerType": "grounded",
+      "citedDocumentIds": [
+        "nw_sales_referral_program",
+        "nw_sales_commission_plan"
+      ],
+      "retrievedDocumentIds": [
+        "nw_sales_referral_program",
+        "nw_sales_commission_plan",
+        "nw_sales_discount_approval",
+        "nw_sales_territory_assignment",
+        "nw_sales_partner_program"
+      ],
+      "sectionHit": true,
+      "liveRecall": 1,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0,
+      "status": "pass",
+      "detail": "Grounded answer cited every expected document."
+    }
+  ]
+}

@@ -195,7 +195,7 @@ function toOpenAiMessage(message: Message): OpenAiChatMessage {
   return mapped;
 }
 
-function readChoice(payload: unknown): {
+export function readChoice(payload: unknown): {
   finish_reason?: string;
   message?: { content?: unknown; tool_calls?: unknown };
 } {

@@ -1,0 +1,46 @@
+{
+  "model": "@cf/zai-org/glm-5.3-flash",
+  "questionsFile": "content/northwind/tuning-questions.json",
+  "latency": {
+    "count": 11,
+    "total": 11,
+    "partial": false,
+    "meanMs": 49503,
+    "p50Ms": 49814,
+    "p95Ms": 83319
+  },
+  "retrieval": {
+    "recallAtK": 0.8181818181818182,
+    "mrr": 0.9545454545454546,
+    "ndcgAtK": 0.8257744113302992,
+    "citationCorrectness": 0.8181818181818182,
+    "abstentionCorrectness": 0,
+    "aclLeakCount": 0,
+    "questions": 11
+  },
+  "live": {
+    "total": 11,
+    "scored": 11,
+    "passed": 11,
+    "failed": 0,
+    "skipped": 0,
+    "passRate": 1,
+    "byCategory": {
+      "factual": {
+        "scored": 6,
+        "passed": 6
+      },
+      "multi_hop": {
+        "scored": 5,
+        "passed": 5
+      }
+    },
+    "retrievedRecall": 1,
+    "goldRetrievedUncitedCount": 0,
+    "citedNotExpectedCount": 1,
+    "vectorDegradedTurns": 0,
+    "hybridBaselineComparable": true,
+    "refusedWithEvidence": 0
+  },
+  "failures": []
+}

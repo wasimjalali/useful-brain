@@ -1,0 +1,74 @@
+{
+  "model": "@cf/zai-org/glm-5.3-flash",
+  "questionsFile": "content/northwind/tuning-questions.json",
+  "harnessGitSha": "14a17b2f11d33016c7769bf1cd37faff4477411c",
+  "harnessDirty": true,
+  "pipelineVersion": "grounded-answer.v10|real-stack|300/30|0.70/0.30|kw6|kr3|cb0.05|rr20|@cf/baai/bge-reranker-base|floor0.05|top8|fts-stopword-or-v1",
+  "latency": {
+    "count": 16,
+    "total": 16,
+    "partial": false,
+    "meanMs": 48682,
+    "p50Ms": 49775,
+    "p95Ms": 85684
+  },
+  "retrieval": {
+    "recallAtK": 0.90625,
+    "mrr": 0.8333333333333334,
+    "ndcgAtK": 0.844861410050375,
+    "citationCorrectness": 0.625,
+    "abstentionCorrectness": 0,
+    "aclLeakCount": 0,
+    "questions": 16
+  },
+  "live": {
+    "total": 16,
+    "scored": 16,
+    "passed": 15,
+    "failed": 1,
+    "skipped": 0,
+    "passRate": 0.9375,
+    "byCategory": {
+      "factual": {
+        "scored": 14,
+        "passed": 13
+      },
+      "multi_hop": {
+        "scored": 2,
+        "passed": 2
+      }
+    },
+    "retrievedRecall": 1,
+    "goldRetrievedUncitedCount": 1,
+    "citedNotExpectedCount": 3,
+    "vectorDegradedTurns": 0,
+    "hybridBaselineComparable": true,
+    "refusedWithEvidence": 0
+  },
+  "failures": [
+    {
+      "layer": "live",
+      "questionId": "tu07",
+      "detail": {
+        "questionId": "tu07",
+        "category": "factual",
+        "answerType": "grounded",
+        "citedDocumentIds": [
+          "nw_finance_corporate_card"
+        ],
+        "retrievedDocumentIds": [
+          "nw_finance_corporate_card",
+          "nw_finance_employee_expense"
+        ],
+        "sectionHit": false,
+        "liveRecall": 1,
+        "goldRetrievedUncited": [
+          "nw_finance_employee_expense"
+        ],
+        "vectorDegradedCount": 0,
+        "status": "fail",
+        "detail": "Grounded answer did not cite expected documents (nw_finance_employee_expense). Cited: nw_finance_corporate_card."
+      }
+    }
+  ]
+}

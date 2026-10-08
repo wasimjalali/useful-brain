@@ -1,0 +1,3583 @@
+
+ ⛅️ wrangler 4.126.0 (update available 4.148.0)
+───────────────────────────────────────────────
+Your Worker has access to the following bindings:
+Binding                                                                   Resource                  Mode
+env.CONVERSATION (ConversationRunLock)                                    Durable Object            local
+env.APPROVAL_WORKFLOW (ApprovalWorkflow)                                  Workflow                  local
+env.INGEST_QUEUE (useful-brain-ingest-development)                        Queue                     local
+env.APPROVAL_RESUME_QUEUE (useful-brain-approval-resume-development)      Queue                     local
+env.CORPUS_DB (useful-brain-corpus-development)                           D1 Database               local
+env.OPERATIONS_DB (useful-brain-operations-development)                   D1 Database               local
+env.VECTORIZE (useful-brain-development)                                  Vectorize Index           remote
+env.SOURCES (useful-brain-sources-development (eu))                       R2 Bucket                 local
+env.AI                                                                    AI                        remote
+env.RUNTIME_ENV ("development")                                           Environment Variable      local
+env.IDENTITY_MODE ("loopback")                                            Environment Variable      local
+env.RESOURCES_PROVISIONED ("false")                                       Environment Variable      local
+env.WRANGLER_ACCESS_DEV ("false")                                         Environment Variable      local
+env.LOOPBACK_RUNTIME ("true")                                             Environment Variable      local
+env.LOOPBACK_SUBJECT ("dev@localhost")                                    Environment Variable      local
+
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mScheduled Workers are not automatically triggered during local development.[0m
+
+  To manually trigger a scheduled event, run:
+    curl "http://127.0.0.1:8791/cdn-cgi/local/scheduled"
+  For more details, see [4mhttps://developers.cloudflare.com/workers/configuration/cron-triggers/#test-cron-triggers-locally[0m
+
+
+Wrangler detected this dev session is running in an AI agent.
+The Local Explorer API is available at http://127.0.0.1:8791/cdn-cgi/local/explorer/api
+Useful routes:
+  GET http://127.0.0.1:8791/cdn-cgi/local/explorer/api/local/workers - local Workers and bindings
+  GET http://127.0.0.1:8791/cdn-cgi/local/explorer/api/storage/kv/namespaces - KV namespaces
+  GET http://127.0.0.1:8791/cdn-cgi/local/explorer/api/d1/database - D1 databases
+  GET http://127.0.0.1:8791/cdn-cgi/local/explorer/api/r2/buckets - R2 buckets
+  GET http://127.0.0.1:8791/cdn-cgi/local/explorer/api/workers/durable_objects/namespaces - Durable Object namespaces
+  GET http://127.0.0.1:8791/cdn-cgi/local/explorer/api/workflows - Workflows
+  POST http://127.0.0.1:8791/cdn-cgi/local/explorer/api/local/observability/query - run a read-only SQL query (SELECT/WITH only) over captured request traces and console logs. Tables: spans, logs (read attributes via json(attributes)). Example:
+    curl -X POST http://127.0.0.1:8791/cdn-cgi/local/explorer/api/local/observability/query -H 'Content-Type: application/json' -d '{"sql":"SELECT service, name, outcome, duration_ms FROM spans WHERE parent_id IS NULL LIMIT 20"}'
+If the routes above don't cover what you need, fetch the full OpenAPI schema (large - use only as a last resort):
+  GET http://127.0.0.1:8791/cdn-cgi/local/explorer/api - OpenAPI schema
+⎔ Establishing remote connection...
+⎔ Starting local server...
+⎔ Connection status updated
+Your Worker has access to the following bindings:
+Binding                                                                   Resource                  Mode
+env.CONVERSATION (ConversationRunLock)                                    Durable Object            local
+env.APPROVAL_WORKFLOW (ApprovalWorkflow)                                  Workflow                  local
+env.INGEST_QUEUE (useful-brain-ingest-development)                        Queue                     local
+env.APPROVAL_RESUME_QUEUE (useful-brain-approval-resume-development)      Queue                     local
+env.CORPUS_DB (useful-brain-corpus-development)                           D1 Database               local
+env.OPERATIONS_DB (useful-brain-operations-development)                   D1 Database               local
+env.VECTORIZE (useful-brain-development)                                  Vectorize Index           remote
+env.SOURCES (useful-brain-sources-development (eu))                       R2 Bucket                 local
+env.AI                                                                    AI                        remote
+env.RUNTIME_ENV ("development")                                           Environment Variable      local
+env.IDENTITY_MODE ("loopback")                                            Environment Variable      local
+env.RESOURCES_PROVISIONED ("false")                                       Environment Variable      local
+env.WRANGLER_ACCESS_DEV ("false")                                         Environment Variable      local
+env.LOOPBACK_RUNTIME ("true")                                             Environment Variable      local
+env.LOOPBACK_SUBJECT ("dev@localhost")                                    Environment Variable      local
+
+[wrangler:info] Ready on http://127.0.0.1:8791
+{"requestId":"295700ea-4fb3-46ee-894c-5c4220ff72c5","principalKind":"user","operation":"knowledge","status":"ok","durationMs":41}
+[wrangler:info] GET /knowledge 200 OK (49ms)
+⎔ Connection status updated
+Your Worker has access to the following bindings:
+Binding                                                                   Resource                  Mode
+env.CONVERSATION (ConversationRunLock)                                    Durable Object            local
+env.APPROVAL_WORKFLOW (ApprovalWorkflow)                                  Workflow                  local
+env.INGEST_QUEUE (useful-brain-ingest-development)                        Queue                     local
+env.APPROVAL_RESUME_QUEUE (useful-brain-approval-resume-development)      Queue                     local
+env.CORPUS_DB (useful-brain-corpus-development)                           D1 Database               local
+env.OPERATIONS_DB (useful-brain-operations-development)                   D1 Database               local
+env.VECTORIZE (useful-brain-development)                                  Vectorize Index           remote
+env.SOURCES (useful-brain-sources-development (eu))                       R2 Bucket                 local
+env.AI                                                                    AI                        remote
+env.RUNTIME_ENV ("development")                                           Environment Variable      local
+env.IDENTITY_MODE ("loopback")                                            Environment Variable      local
+env.RESOURCES_PROVISIONED ("false")                                       Environment Variable      local
+env.WRANGLER_ACCESS_DEV ("false")                                         Environment Variable      local
+env.LOOPBACK_RUNTIME ("true")                                             Environment Variable      local
+env.LOOPBACK_SUBJECT ("dev@localhost")                                    Environment Variable      local
+
+{"requestId":"562e3ac5-a15b-4147-a379-5ef890e049b3","principalKind":"user","operation":"knowledge","status":"ok","durationMs":32}
+[wrangler:info] GET /knowledge 200 OK (41ms)
+{"requestId":"a1902928-f623-4d00-8b78-3fc47620463f","principalKind":"user","operation":"turns","status":"ok","durationMs":9703}
+[wrangler:info] POST /turns 200 OK (9706ms)
+{"requestId":"fd683fc2-3f5f-45c4-b79d-89c143853c38","principalKind":"user","operation":"turns","status":"ok","durationMs":10608}
+[wrangler:info] POST /turns 200 OK (10614ms)
+{"requestId":"3fccecb6-11ca-47b4-90fc-b1be6f412487","principalKind":"user","operation":"turns","status":"ok","durationMs":23193}
+[wrangler:info] POST /turns 200 OK (23198ms)
+{"requestId":"a7936c77-9442-40fb-bb2e-200b10b1f01b","principalKind":"user","operation":"turns","status":"ok","durationMs":27526}
+[wrangler:info] POST /turns 200 OK (27532ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = up5p9shick3ouqpfmkdjgc14[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = af9s09p9br05tgqvc97chjfq[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = csv2520q60ae8vkfsbgu0q8v[0m
+
+
+{"requestId":"3f4a6e18-0cf8-4301-8dad-fb0f14ba7e95","principalKind":"user","operation":"turns","status":"ok","durationMs":17405}
+[wrangler:info] POST /turns 200 OK (17409ms)
+{"requestId":"266d3ada-d5d3-4a6c-96f1-3a2a8cf76fc0","principalKind":"user","operation":"turns","status":"ok","durationMs":15026}
+[wrangler:info] POST /turns 200 OK (15031ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 257bpb23rbpfubn87jnnt75p[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = dbm0tq2iqdq1mc3m4vn06pdr[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = roj22l25acjkhsrqvbi8kufd[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = nrtekvlthim2qfue2p6uqm90[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = s558kq13f6n83jbtq625l2fg[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 3eqcn68t8h9vuroc4th94bqr[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = fdine3tsokro6uh2atkj569c[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ngi4c3s2mguvfqcrhk1ccpk4[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 3s0siqho3n56tpgdt0hefcia[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = o4jto9160gl5q0voiiqkrh9n[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = b7kdj1bgoqn23ojmbq8th44j[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 78j857q3ua8dp8pp41faf9iu[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = u9mak6crnngqibrmpmh2l9s5[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = rirgp2k0mijvcip0cnn3oa1j[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = mbfpp74tuuq5f5ofosu12iqt[0m
+
+
+{"requestId":"14dbf091-9e71-4810-9fe0-b3473a432518","principalKind":"user","operation":"turns","status":"ok","durationMs":44514}
+[wrangler:info] POST /turns 200 OK (44517ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 5nrabooqk7rhdkkfspd8neeh[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 1u99obo04nm60uu4a7g79m9p[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = f5d86hgt80lnltihinrala32[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = hmtll2ddfl3e6n1d9093i42v[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = jlhvvnhsqkk0if7vm098ibcv[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = b3d7l5aboe0a03pgab14lme3[0m
+
+
+{"requestId":"e3ad3417-9e6b-41a8-92f9-2a929c913f6e","principalKind":"user","operation":"turns","status":"ok","durationMs":26768}
+[wrangler:info] POST /turns 200 OK (26773ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = idtqj3gvo3lrj9q0c1kvfn7k[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = vjuu8a5i1i3qb358hk08f3pl[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 2p65pu8e1pimc37hrig9lvu1[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = lu2otgfoe68h67ind274ujp3[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = qtb1b0edeosa4ns4k6m721ga[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = f9drccvem8hc5cp3rumeiojv[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 1mgais4g1rr11fc0l647f8g2[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 2qopf5b2deb6pc1n72jeiu6a[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = q956nohvvgub0q726cscopua[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 8h3kpn2bqrncuoaq4s0lbpl5[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 3r0p47tg22lcltr2at7gk873[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = d7c54bnld9moksp6rfj6ja11[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ja7cl7df020i51mpn5trsqsk[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = vkl76ht7u0dqbk44b1gl13n7[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = o0enbuqt46l3f58tc742g8e7[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = p6i43ra9nhnmdsle1n7t50h2[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = fht5a3jhjdja7tk39a09s6rv[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = hssfpl583aoc9gh2pcfofoi2[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 2i3pa0ah93kco65pe5rmktt9[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 3m9o2h14j5tt2lq1ull3hode[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = gmpechfgu8ngo1st4quo371l[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = h6h5rp6s7bdqk796lmj96g44[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 6shg51tqnet5qtc9s7b8vg9r[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = dihnhaan2hvu6lm5jol5e8lg[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = uj03i8q6l7oigk4aheriocbt[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = hdia4vn9jh7mcccpna8c4sim[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 24t70cm74uf69s8oevqpf2tk[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = a5mpohfplsqqkn53tlqgm65a[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = skesnkj5fflf8crpoj5e9ihd[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = i1vs4a0a7ar4163bqt44conb[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = it2prh0fr7atovnqkt3art2q[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = u7gq403rmi7jtp5q7ijckt7j[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = bq8r9j6ctunc3qmnu6q72014[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = kmjeujfmrjma14sjn7ivfs8u[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = r0hp180t1ebnf34qo8e9b9qb[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 0j0u0h7r8jrc8k88pm1fsnfp[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 07qa4ruu1o5stivscfddjjor[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = lr3vjli8vauqihitgbqqq7el[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 3rvdtnrpetjuslttf44lrb6f[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = qqhv9lg8aeak5tdqdshda99v[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 2lopcrfhou2ss00goefcv2pf[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 3mkgpk8q4khu6lpua7f4fkfs[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = oq2t3kr0m2u4knc102ccos9p[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = pugmf423f6lb1vqffd6ronh4[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = g7q6nhbkn7k9g6fkbk9b8cpq[0m
+
+
+{"requestId":"39213bdf-c0a2-4bc7-bec8-2ee6f7724e91","principalKind":"user","operation":"turns","status":"ok","durationMs":70197}
+[wrangler:info] POST /turns 200 OK (70201ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 28bvm924kkni6f8tqloep3mv[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = vsknck3va2oiksp51ro7bcr2[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 9tpib786q6qs246i130320o1[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 5t11hldhsiqqa3j20pqc54ba[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = dkba78af0p1bid55sjpp7u6c[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = jpfa8nhaie25tvlcn07ohj0f[0m
+
+
+{"requestId":"4bc62fe5-3f96-4da7-9b40-150a632ce644","principalKind":"user","operation":"turns","status":"ok","durationMs":24677}
+[wrangler:info] POST /turns 200 OK (24679ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = avml6a5i98ll6j7ka93nrkau[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = krml5b6fmsosrmsqiv1c10qk[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = pjss8sp10gnu5qr62cca9fg7[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 5upq04ih5jbhus4b6vv99u4u[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 7rtp1obt9p1qrlv9umgeqabo[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = nqr8usqgcv7ffngh2t33539j[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = r7rmqumdjp17r0a7irql1r33[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = vensp7rh0gp2d4bt421b3lgd[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = h9bu9vr3p7b3rk2u3osmk7do[0m
+
+
+{"requestId":"c65f7d37-14b4-4a92-a134-0a0ee8752c20","principalKind":"user","operation":"turns","status":"ok","durationMs":20409}
+[wrangler:info] POST /turns 200 OK (20413ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = hgqv6mo0g0ah77q0t3n43mro[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = hge5m7pgbce4esup6mo4v1ls[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = amdr524a0rhp1p2kpq6vkken[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = jju7bgmimb6fq60kb981jpb5[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = up9i4em7e3c47prlbe3atkc4[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 32v6p8ca5er7f7crpbm5av4g[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = nbmf3ve030qiiueejjc1k1ga[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 1cvn1qdakbc5kihlgrihfkf3[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = o7sc93j78tck5hmlds22or0g[0m
+
+
+{"requestId":"32496c03-1292-44f2-92ab-34867eda149d","principalKind":"user","operation":"turns","status":"ok","durationMs":28828}
+[wrangler:info] POST /turns 200 OK (28833ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 3630ka9ja6mq2c94ff3jmm95[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = jntgj7kurkoms8nqcasv4106[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = dcjk19h9iil4qbeggit7bkit[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 6be5v5koosdgkkoastv88vcj[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = hmbhrfbf93gp8skga4nhqosm[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = k8dh774prit4bpsaadn93o9v[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ldiihev81669g8r3qt7m365i[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = qjju6sepppdu02ld2mb3euun[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 099ure1hoctmkrje0ubh04en[0m
+
+
+{"requestId":"93034559-df38-4920-b86d-2850e361c9f4","principalKind":"user","operation":"turns","status":"ok","durationMs":25799}
+[wrangler:info] POST /turns 200 OK (25804ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = uei6tkikma8sb94tdh50oqve[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = rn305742bajjt1lkv015p0dd[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = uiqs1f0jcdongaa7gq43d4o2[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = bipf8o9shirp55efpbbabis4[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = rrqipimubpbf0vgtcqooonok[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = dlnhmh7cpght7h3paldovo90[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 9jvg7pjfp9cjissbdrvf3mrb[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 6fgd321h10qtr0qmnl1kc015[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ouj4nil6rg4v47ft34sj9400[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = hbhmf3sg80vf1532ap1temvb[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = dgmp40n9aoetcgpo66h4pe2a[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = fo4fk8ekl0npjl1104tkdmgt[0m
+
+
+{"requestId":"c279fb60-d344-4f4e-9db3-8e7331f221c2","principalKind":"user","operation":"turns","status":"ok","durationMs":21498}
+[wrangler:info] POST /turns 200 OK (21504ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 0o844er8513ijub6qhanjo25[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = pipsgt285vnoohmmg3s3218o[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 99fubj1ltcbjlut483ja9tt3[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = g0mtoojnfa5ni3gns5948thr[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = sbugmmr0424hd5sa8jnpamdg[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = alfqvfghnt03so9l8e2os0hq[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = h0d8nt0lamc3ts46f79jlg3l[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = jos38rinfen29bvqoij66aum[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ho1pnjf818mvdml9td8rtjeb[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 2dpn1a13karsqvt5miqrbolo[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = sdjpql1jsd3lu2baok39ph4j[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 1g9adkusp8k5u9ofdsurbn3t[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = kn11lgkgjv9ork2h1h7ns3bh[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = qmdr04cq7kkvm1thg3dfkrc4[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = dcg2g41tnriqj93bgqnlhcsa[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = stddd77ptk28a754jl2beoau[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = rnc63udllpdkgqvl632okrgd[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 01vgdnuhhrl65dbtjqaufg8m[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 3ej2q8r9pk2tadndpt623fl6[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = eko33e710epu7ic8lau41huh[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 5e73gcdlp0jh146339rc19le[0m
+
+
+{"requestId":"16917d62-b1c5-4241-a793-38ca79d2f34c","principalKind":"user","operation":"turns","status":"ok","durationMs":25221}
+[wrangler:info] POST /turns 200 OK (25227ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = t74a00fggp7jaq167hc0njl0[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 5chcul74r9ucfbqkciac5mr3[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = b3bavpjrr9g8ktm53bfuev4b[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = g4766ctcdf2ci6m2fkng0cv5[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = rh3tllid6a2lb98m9m4nu6s0[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = lk7gp4mkkndruul4io3oa52i[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 6p9l83m8fq0cu5g8616e9r8j[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 4k19mtsv6b2270t20e3g81s9[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = jk4n7r9u4k8hgrs01hgo0nvs[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 31icc2din6562vgio7s3h663[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = t56jjo9iaj68mic7mjivr7ec[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = jcl81qhsovhv6pqsncvjcnbo[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = nckfd8gar80gfm3kp6cd77t7[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = c819vi3eh7afiro29briks2i[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 8m9aftu0i6ub9ba7m8v8udnn[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 8ckesgpog2c0al0civiqpiar[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = jj0fdr8c3nggl8ue8g6upgbb[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 6qvmd7ocsoit408st4j2m1fa[0m
+
+
+{"requestId":"c1525055-2863-40e6-8380-371576c76da8","principalKind":"user","operation":"turns","status":"ok","durationMs":42644}
+[wrangler:info] POST /turns 200 OK (42649ms)
+{"requestId":"5a64740a-c726-479c-a5e4-2c5363645c15","principalKind":"user","operation":"knowledge","status":"ok","durationMs":11}
+[wrangler:info] GET /knowledge 200 OK (15ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 5m95lp6e2s5tem1jlfqc25go[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ejh0odrsgv3shelg2eaqkc2j[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = quaaj4a3hub920aot9ahq2bh[0m
+
+
+{"requestId":"29f62236-5909-4c69-9109-da28ca0db122","principalKind":"user","operation":"turns","status":"ok","durationMs":17563}
+[wrangler:info] POST /turns 200 OK (17566ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = qilaidgij335spl1hrhmg9ff[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = qbj7tmdh1k90d811qn1fl4fe[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = a7v4d27fm2s6kaui95l2rl6q[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 93rheecasgpd8vrogk2ag6kn[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = giu9rqu1ts2a3sjubm42d7lf[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = pjc6tpu3qqm73kdtpj2u6fev[0m
+
+
+{"requestId":"a9c78742-084a-48db-8864-cf003533e27b","principalKind":"user","operation":"turns","status":"ok","durationMs":14384}
+[wrangler:info] POST /turns 200 OK (14387ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = un8nqfcogi0ouuc6gnv59b99[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 96ifugnatfrjktb0bgtbiuhg[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = djfnu1tk7417t8mfrsj3b8ol[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = a7na3i26i3gu50fnvfn6av6r[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = qljbq98lvvrgl01lto0c9vp7[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = jr43l034k3pgoplrcif5o0ls[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ncd3a77cl8c1snfniofqetvr[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = csnddnot3sdli5bke1849l24[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = u62f1btfkogk59go7l2oiu3r[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = fr90e5nlbn1vutevr7pt9dho[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ogh3110124ju1u1k2g1l3rf5[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = lt70n0inv950g3vjm1303dj0[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 9jfb0ctshvc4qacu35n45nbt[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = f564ougvbkv5tu5470hrlrum[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 2poulmfratqu42n0nlnkpv5j[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = q4cmj7suojee3qe5nge2lgj7[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = j1pknu9o4p5b785t9rul98i6[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = rj8qtb34h9nmfj56cglmp255[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = mtebjv5m1n2no8unpkmddcng[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = iso3chp7e2ab8r9gdp6qb5so[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = js2ietep42aptsjnbcrjsbm6[0m
+
+
+{"requestId":"8fd457cd-87be-436a-92c1-63b74b38b08e","principalKind":"user","operation":"turns","status":"ok","durationMs":39897}
+[wrangler:info] POST /turns 200 OK (39901ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = v8lcvq2ali4p7ioj93qkt5u2[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = khr145tnjuks3hk58f3db94k[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = hj4losj827sfrerfuc1pt6vs[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 24394eh6n2kipjp4156meklo[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = kvplcapn84i4od3o3e4m8bll[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = vsags8pkl0lp4qcbagschcv5[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 35iv540mql20hsmmbruii2s9[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = n89dtmiul0suc5r0p0ccqi95[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = md3leontk242tq6ofnqanntf[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = r78bjsl8u173jldelrf3i65q[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 0je1g3r5rfft0t6qmfdq8o9f[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = bsatn1ks8nbileva88qeocpu[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ak220mitqjomsmqi7e7mu436[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ke2k2kctfmr0k857selpbcl3[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = u0tksi91m6bqln1fn8gbc2ik[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = frdpkqct6bt7qfn757771kav[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = sa2tte552is7flhnpb2s2d25[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = mkckb1k7ad6iabps1dl6ehab[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = fnhdpd7ute5k4od0ohrm7r68[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 62kso54vnslqlte7g5c0pogj[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = arm23qa436n4vi6on7esfoco[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 479uklm0prddam5p1rfj6pqo[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 159ae5cs2m2cbsflcjf6smd9[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = pmsh1l1sgul3fvjo54e9nigd[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 6m7kisems1rbocldmb6d62um[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 9st735dsltge3uu81kehdci9[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ubod1qclfppaig735991kkga[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = oggn8ah26mp94e1v3k475ar5[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 2516kh76vtu2i1bbemd0i69m[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 7tmsi2qo5r4qb80gvp3ls46p[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = uvh6g5da4j6mlmtp5loqn19u[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = jtq9hd6fqsiv68bdtj032gfh[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = shpjqi4vnf0vqhb03ei3lgm6[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = banr7ti615jh9ie9cre2t2dq[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 6ronb3ft36n7hrnc4n4mls0s[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = esjitkbgn4s6domcq1vik4lp[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = s8obmuruoqdvdh7ksdtd1l4a[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = c1m9jo1vkb2m6bpddmepd7ue[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ppta5fktk9qep6h1qof78h4d[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 07u1cgtnmhdsf9hduepcb028[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = k9r91orpv6af9bkit4h1l14h[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = beiene7c0im8eokgvpo8497o[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = vjj9f6s4orhhqeqsuvcmqcmg[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = rcm2i32rs759ce0i10joto64[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = fbbjuj805t5rijj1nqoi0bhc[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 24iebmdb30vc11it744r9nb7[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = qf7d84phao11ivvqqh6vp2cs[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 149ptgi25nf6uko45cm5gebf[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 1hog9ncvmf3k64htebde0on2[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = slbmkv7gjl5gg4j1h1pvpci7[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = kkiacafhtiv5pifl3jon8gmk[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = stedkg5jc3ptocdroc706goi[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = i5o6235c90h28o39vtuc3khg[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = pvv19htunlr246adce0af34i[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 7u7mvjb7cdllclo988gd9rqg[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 5aoo80huqq5lv7cqhfmhc7vm[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = i0n6dtjno8pt46a6l36klkv4[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = c5541n55qbtdacjk7gmp9jub[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 05lt4v2ofcpcsafkc7rqt39g[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ikmj3po7q4bessgaf9ib6lob[0m
+
+
+{"requestId":"4892aaef-8f52-4ba2-9e81-e09ba6be70da","principalKind":"user","operation":"turns","status":"ok","durationMs":67663}
+[wrangler:info] POST /turns 200 OK (67667ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = dv58hb1jvigh8bakqjrrqr1o[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = katatsbhhcjeerme18lotlkh[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 4vrigkqvdcffeo7b230uu3th[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 80cp8nmp9itb7hsvfvajgt7c[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 2h8lrij7dh7jo7chsisidctc[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = s52nvvkm4kci6ktsf3l04phj[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = gbunebti2efhqeleufedrg05[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 0b17i2k8s0m97a9g146uda68[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = cf665733p494ufektr2lcf2j[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 1jmjmpk978c9737vrl7i4h4l[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 2h0lht5988lccgvepo8lsos3[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = f7ina24kb8095bsmbumrgekn[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = lfqnaangvsq9fn5fnl6s7pro[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = usqob5c84mnmnbguo1ckmmf6[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = oq8bmmpavsd8rejv0ph9dl6s[0m
+
+
+{"requestId":"e8271e77-1f4c-4dca-a3c7-e66b7bfde105","principalKind":"user","operation":"turns","status":"ok","durationMs":30363}
+[wrangler:info] POST /turns 200 OK (30368ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = lanti47e5cj3qs5nmtkflq1b[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 5428t28vgoi4a8ouilb3q4d9[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = c22uuo97c48cl14o5g8rkt1q[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = kluidmealbpok1adiqam2ktr[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = l38sc7ob72o8p00msqrcrdh7[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = bub0qsl0sasinkuf1qfug9t6[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 0v6450mq7bsjk7erc4jpqi0g[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = knmbkj60fru68k9ra6of5qls[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = bkachunaj33a25ksungd9vk5[0m
+
+
+{"requestId":"6344e136-b634-44fd-b210-aaab64622791","principalKind":"user","operation":"turns","status":"ok","durationMs":36949}
+[wrangler:info] POST /turns 200 OK (36955ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = qaiuqr65ovsf22dnrn3f0p74[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = uqmdspbpi60qfo5upnf6fscd[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = hr7a27daogvcgmlt77trqts1[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 9hbhu6jbj75jlorgo0i7qcdi[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = il616433ou3edc771vmb6red[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = o5d08ae866m0cppoan6hs0gj[0m
+
+
+{"requestId":"b7e6f3b2-cd2c-47c2-9e63-cc79e1d0e535","principalKind":"user","operation":"turns","status":"ok","durationMs":14753}
+[wrangler:info] POST /turns 200 OK (14757ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 10bfrle97fk2lv67ogibgmsa[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = nj1om85ommhsjl5rm9uhhs0f[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = hfokif558i32sp15847hphvt[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = qelhg4clsushaeo7hdr109uj[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = qh2e58et5k1cu4mdk6itap6s[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 44otu4f998ieu5171r1sgo5q[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = up420v3frke3rbd9ptgc1bak[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = br73ujtkht03aekhtrbqtc5t[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 7sebcvbt731mi9ddt4cnvad2[0m
+
+
+{"requestId":"248cc8b2-ede3-4bc2-afc4-a1440001aaa2","principalKind":"user","operation":"turns","status":"ok","durationMs":23222}
+[wrangler:info] POST /turns 200 OK (23226ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 1uluq4arkhltsoe32qtef67f[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 1gp74kj8s14d7n2taar9aveb[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = guu9ecselgipbjgldd978l2c[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 580v0mmob9csi48pd66qcp2v[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = eeh48suclo8justcvea1qom8[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = c8i8vrrvlejor63g1b7vgj2n[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = hpe957u969el09r2cl8hc8uc[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = a26uvqq0qnl9u8rf7i07081b[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = q2pko6rfqaau5nd315b9cltj[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 44ct33tlah2vdkltvhcsqg12[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 7us1onlqv2eg1m69gpcqv8kq[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 3kdkvijg1itveibni5jjp9ad[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = rr7dtm12hgn9ee8g4c12dvkn[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = nqidt0ar9e1nums24rtg2dl2[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = sctr81b9o2mjf8n0e5huhv33[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = nk7nrpmuafopb96ap9staten[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ebf5l87e8khbullat3msqkhq[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = q39qumd08la6ttrmhoquul59[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = hplib7cr0g53hnthf9kg8ipq[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = r3rkfobvsbiqi2j29r8ig1u9[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 5pfrr3fmd09djku0i1l1cei9[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 9gvec5vqi0315kt58mh7jnq1[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = dtbb3821s2nkn6mupkobhclh[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 385fev74d1dhhsmg02qikqi7[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 066789982nrvr27kf7opg1uo[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = dolpkvmsq0vscmesibaarv9u[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 99h22kagg4aumpas0m0fjvvk[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = nuc1vl9ree9kgi5o5n94k2oq[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = eiru8p9mlhr0neal20tg56ua[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 76k35r0673vl731dk99847c5[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = l1o78h0gbf34me36hu8v0qg8[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = hcsfo0qq5j0953gcdf9emdej[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = j1m5ktom3da3kfkh8f6dgsni[0m
+
+
+{"requestId":"6327daef-3318-47a0-8c48-f47d2bc5ff80","principalKind":"user","operation":"turns","status":"ok","durationMs":29650}
+[wrangler:info] POST /turns 200 OK (29656ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 01kf63o4b17erv23k64oha12[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = l1en95ktg8blshg461r7akvb[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = efnmtchkkhovp16erkadu7tf[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 1t5runhoa1ehfc2h4bofd84h[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = opl6mvosa54n4j6th5a22fad[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 89o4bikj8509adule67i9qo5[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 4slb39b4i5b1r0fluiguptvj[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 73b496khec8ne4jgkpm3a8os[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = c1ck0ts2cfsn9td3iosaf031[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ljoj1hld358eokr98hls3dcb[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = tc8mmpu7nq4ljncbb7497qra[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 0ku6abnq9f2q2orbbc42urf7[0m
+
+
+{"requestId":"74a5d4a0-af7d-4b95-971c-0145b788e81c","principalKind":"user","operation":"turns","status":"ok","durationMs":17132}
+[wrangler:info] POST /turns 200 OK (17140ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 4a69f8ug7qll5n2iob1isnfj[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = fib8097fddabbc07t6gck14g[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = jutr7hq1hjarfdhv3lm2iodr[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ls5bphkd3bdghrutu4qf75m7[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = k1hsj3q51ge0hg9fts24a6ts[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = a7m0v3rfmsoau5qn883eaika[0m
+
+
+{"requestId":"9ca57b40-c4b6-4794-bec0-1840c22be956","principalKind":"user","operation":"turns","status":"ok","durationMs":14477}
+[wrangler:info] POST /turns 200 OK (14482ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 8n401kc6sjiuevuftdr4spbu[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = a5f70qrccln1iiln54e3kbdl[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = q639v5eqn46rv1q03tkrp164[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 0tmimm261oo5lk8fp79ocv8f[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ovom5c1ll6i7pft1utrb0ek9[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = n706lujfutfh76l0fl12228m[0m
+
+
+{"requestId":"86a6fc0f-254d-4562-888c-59e3beed3685","principalKind":"user","operation":"turns","status":"ok","durationMs":12523}
+[wrangler:info] POST /turns 200 OK (12527ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = rf4g6tdfndiqfqq8gb074g7d[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = f79qnuuqm281kvupu5m6b58u[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = qtcnb06cr6kcc4eok76f9062[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 6eemliqb6m65ag75pnstdf3g[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 203f53ic6ma7tgdjg3ruqiol[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = aqpijjnrd2b081l94aqnkldb[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 3eg4u0jmddppv3eetvro3311[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 804639i3akkt3rsu1414gccq[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = fm99noqbr1eqs1s0pv91ek6r[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 6epmtjanrja60pbrps4gt82m[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 6t299380a7ru6ajclsj19sfp[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = hg4ta68g3l38un4ge3bn5hv4[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = q1qnspmn9f3vppfpm2vbmagq[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 5mr2qp1uhcg04o2o2r5uks6s[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = fvssma68psjp1n8lmcjpeqqr[0m
+
+
+{"requestId":"fcc3cbeb-d2cf-47cd-85f3-80b0f54d9edd","principalKind":"user","operation":"turns","status":"ok","durationMs":16218}
+[wrangler:info] POST /turns 200 OK (16221ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = p496esfh0bl600ljfue3hlcn[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = dob52i0vb7slg1skvek2or6v[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 4udjgi482bhio0p0s915i0r7[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ai5phg204v2qrgck6c7i29l9[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = cb9up02j6set6aiio259q8e1[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = jj4h8n0gmc4jcrm0q8afpvml[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = uuf28lp7gvoeo60a98vgekdk[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 3cc437er15449l00mb5io5g1[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = gr2pg77m5omgc2kqkiolq8rl[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = r1ppkk6rnj24gv7chjbtjfi0[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = mhvfinu0gdf1s6ub3kb8c9q1[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = rhblf538ftveo1hr763bk35n[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = gd01lk9no4kqc3h1ep86ghq7[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = h04sva1kqmo8m91jb3orpvca[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 1a53b8eqf2hhq6jleb8kjeha[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = q1ijfr2okm3rlanrs81b5jov[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = mo8rc4si2ckqu9jgdkdrvvha[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = cmqbsj4i1v1mgr2cnse1fmor[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 3naretirtqa520e8nrj8hf3u[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = l9aujrhu3s098lo7lpmk4uii[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = p3bjnp8j4m9eg9j8ol0p8hoi[0m
+
+
+{"requestId":"8ba255e5-30d3-44a1-8bbb-18722aeedb26","principalKind":"user","operation":"turns","status":"ok","durationMs":18399}
+[wrangler:info] POST /turns 200 OK (18405ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = np52ine2nqa6edm401m2dmrk[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = baqv7lmfbtffkc1r89qfmkff[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = keeol1e3cnr585fhu19ta1s6[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = beva89fjp66una1s9ss719p6[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = rm6f6jh7n6kg1ethfrcnper4[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = uugb36c3gaa0pnqqmcvfhr03[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = n4a0h43g2o4smlpb5t8uun65[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = c07ft2c6ifu5hv3g3l8ul3pt[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = rvkosc3ff2iitjqh8iqebnhg[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = j0mperiuqn749emrn5g9ehqm[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = aum791bq690lvvb25a0pnjhu[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = vetqbsb73dju80dbi935s8be[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 6ib97trj7830f1gl4g63eo4l[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = uufc3vd38omomintle2nvlg5[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ln3eekmqkkcpqa74g827ajg7[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = f5c3s0g88ja5if5jkanj3t22[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = q3r16fe3672nukpr2un640fp[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = psvk4v3th58k6803116b2tto[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 6r9d4ulbeg981ivafml2gfrh[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 3nvb6742qjq6lfcreqbcuu40[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ecpp9futh6lkb50t6mpavs7n[0m
+
+
+{"requestId":"ea3af8c4-3c1d-4977-aad7-de76dd628110","principalKind":"user","operation":"turns","status":"ok","durationMs":24481}
+[wrangler:info] POST /turns 200 OK (24486ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = fehlqsprpac8enr2f5rv4veq[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 3jll8bdoq2108p64ms8cl136[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = dm5vnoor0jqd0uuvjaf8a3ug[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 6dl3n6tnbgdkj1vtfctqc4ss[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 717m3t1dtcc3jruqo0mtcsgf[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = o7rk2ufi4cg5m40taeji3ftg[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = pu83j0tmdknr125kj2tbmam5[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = d9ph3sfulg1fcgfkccuud8jo[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = afqnjmrqi4b2icbofarh6mba[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = lu11l5b08fudb6r47oki8rgi[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = n80rlfbbhrqv35rjaq55bc6m[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 58bgijllt9hieo5nuqes0731[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = sf0v20aacmitutum03vr50t8[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 1os0a0b3cqan9t75ule6k06n[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 8aagrmejmucfbfckki3lrbsh[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = qel6h5d2uifc9e2dqvjjb7sc[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = o6frsjn66nelu1c1at4m93rm[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = cpiiaclbevu5mee6umimftd3[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 8imkhn8hsfnej7v0smm9l2gk[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = svq7h2d81hjrln9k5oft978r[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 3j90bh0p5sh7v6q6ca36o0ja[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 7vc7rjratmtgaad4gt379imd[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = nq2gkpqn3sop3uhakl41t6p6[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = r03tq7k45s4orq8ehrjhdjs9[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = g9p04ocd0cv0f5b3ijlh2cts[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 8a7dburvrj6mfev068jclhln[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = qmvv9d3gecln0vks1j59riu2[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 769iahme7ecdnocbdv2d21cm[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = hcvideurt9qdmo7l0gdn0kve[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = sq3bpoosi01uqta65ni224po[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = e2evb8o2gvj36s661h6huuv1[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 620q54uuidsb3julqlh9jemk[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = oeobcbus52e9t2g6kt5ivjdr[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = kicu3542trdp1t4psel2p22m[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = q2s5p9vdtlkojkn8f0vva7rt[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ef4v8fpvdl1m08j3a1c891bo[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = c8i4v4g4qlmms9nrja7kc8ek[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = bent12mj9gaf4dhhrq1dp0sp[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = tihidva9hb67cm4delutlthh[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ogjc8h39sr64kjdj2l1kmuni[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 62dptsjb8pdhphsralgbom7s[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = vpbu5ta1af6rr3gjto6jcckv[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = h62bk611tejq5g0s4fc8lppd[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = sfhlni8k8bgrsb642emgahm6[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = b1uiuea24vh890cr1hrbldok[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 6q00c6diplmv81ur2166uiqf[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = mj9kutmle2od9ltlaq860mtc[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = st1fuhm1qbdv0a53b9coa1un[0m
+
+
+{"requestId":"bdbd9039-1770-4574-acad-8e2b1717b3aa","principalKind":"user","operation":"turns","status":"ok","durationMs":38890}
+[wrangler:info] POST /turns 200 OK (38895ms)
+{"requestId":"dfa7368f-14e6-4d99-841d-8d3292295b40","principalKind":"user","operation":"knowledge","status":"ok","durationMs":21}
+[wrangler:info] GET /knowledge 200 OK (25ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = pej2j6tq7b40vi8tbr0jiio9[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = snvtjveonqsu6udpvppt0j8a[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 4sor9sv9mq4q62a3c1jvhec7[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = levb5kl30q4hme099psgclpf[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = fg834kqn7uvobbjdesguihon[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 4sa17nu0q9601l5pdqi24nep[0m
+
+
+{"requestId":"198ea3ff-b0f4-49e9-acba-a2f719c78434","principalKind":"user","operation":"turns","status":"ok","durationMs":8668}
+[wrangler:info] POST /turns 200 OK (8670ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = apoc1oteobmdrsmoffvo44qp[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = o67fv35pcgln2gcnl1qdh8s5[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = hisjnpu5c66uigjfhd03qa47[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = o55e82j59a0odqpak44qi18m[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 4s8qkv2hg2v00jk8nfd52tp9[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = n6tl7mihhh1rrl8revp7olia[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = g1lgim8kgt0vcuoqcjp4md2t[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = d2n3e88ijsfc4jct5m3qoqtp[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = c44nti1s1km6jitqij77pbgi[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = v3i0gt0v9fplq7v1m7be605c[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = aj52jdq03qkei0bp1koofo2c[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 73qhqu7h2ssf125favuogvj3[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 2hsgioenc0qcn4cr60drd1fv[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = dik6fu68objon9a8foe72os6[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 14pf651v0042l896ddik5pg8[0m
+
+
+{"requestId":"8d93cef2-8370-4aa0-9b50-6b3e9a7a1c44","principalKind":"user","operation":"turns","status":"ok","durationMs":10905}
+[wrangler:info] POST /turns 200 OK (10913ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 169ndmu3a5p8ubfpqh14cvu8[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = vbr7s0n3830lekpqjqd1u7sv[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = itlvcak791npq0lnoas13tqs[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = sc3q0ff4ulmgani9laikgifd[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ljck7bq1rk0pu6ktmnpt04hd[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 97jjpo2vtk5t9s9enj4t7vph[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = mrg4b2anlkmm61j52i52a5sc[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = qe7d1incm9ombhao36ndbler[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = g80n2b2sm44fk40etq9pudi7[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = mvvuobsadkooq7bge7r0qd3c[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = dsv68hh9kv4kqa9nsc1o8oqk[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 9oosmgsjchocnngcrmulrm9b[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = qrk00qm4fctl6qp2sa4g4mn1[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 4h83gv9264jsl7flk63ju3uk[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 7e6jv6idmjo7tvqm82kfqtck[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 9ea1lh5nclnem7g3du8fo32m[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = kjboptcfrpu9bd57balb9qb3[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = hqru0sgcfeli3smt4js27ioh[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = up4qq3ekkgvctemcm5tb6pdj[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ts5ldl7j1cu96u8iqtlr0a0c[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = gj5ts6jpb6djn2b0fuh9dktv[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = u4u0ulao9j78r60ekpj7kjaf[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = dpkan1vd4gue5qd1ol8idf4r[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ihnmdqnrfbkl2gjvha4utd5t[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = p8vrd1lt1rtgbkqdkqn4lq4j[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 4gqipmak5vt9cr2r9sbu2ara[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = vclmmbs5vtnn2kc20d499mip[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = srvdvi77nqp5v3pmr9vgr5kr[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 319e04nbrak0rrcmt6upcbht[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = s6mr3cdrqdpedlsnt0pociln[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = v9n7qjqtfel65lb4sa4ttn7j[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 0f1rkpllsu8qj1bi1cc11omi[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = rhrg99eu4o7gccvq626ll77e[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 21sq6fem6ul22qngfdfo3ul8[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = djdet15mjhiu1clor2j23q81[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = km5s3phedcpp74chru1shiql[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = nmslg4g5jnhtpqhqi5sratnn[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = sbl6o5prsg78aut0k58gfbrn[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = qqsecvoioa8tephjvq8jsik7[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ps2n1dg875nefo2oe5uctfdq[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 3e1ckadj5407ehtqapo3qecg[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = pa3bokge4kkhgkgjdp3ao1ie[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 0sbrnpdkfq8i8o1oj2msqme8[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ne3trtjukomdqskmrsf3uctc[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 0qj380hgh7riksp698knmj88[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = r0730tgu7b9a65nnldmolrhe[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = afiodqh9ua8elch8pd9emels[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 7v4ip421201rcvhpnmc2dufm[0m
+
+
+{"requestId":"f4a6a168-2ea4-4aa8-99b3-2f65fc6d5b91","principalKind":"user","operation":"turns","status":"ok","durationMs":61992}
+[wrangler:info] POST /turns 200 OK (61999ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = q0cl428kmddqj2tj4ghgtl3c[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = pgfh0c0k2oj9036kjkie042p[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 82oi91v57vm2r8jnq37onvqr[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = spn3rk6b36njuh66868hk1me[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = o0amj4ocu60fpsmlfo7i16fo[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = nou2uh2bg3ofc7ft1g9u611v[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 7knkt3d681vpj8umi7eesfka[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = bmvk2cukb2ai378vfo1agghk[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = qi9pn3lblfjg6hn6ajaose7c[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = k5rcb18uoad73ifa2q2c9ct0[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = a4ej63lqko2aj7v1qjjord1t[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 80ttbmpavj00mphgroap62vf[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 9v23qaptuvrlfj2vosclr872[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = vp1j6gg0icst86m2kqrp814p[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 4i4kkupn6lhhvd4cd08hvdbm[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = qm0k8g0dn5bhh5rt6fcp92i1[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = rhktn3hreirnsmp2dkiejeqn[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = bb7jm6334oho594qn08iqis4[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = gkig2rdjuonhclqfnscge0a5[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 10suc59n58c8ukfuq4cecab1[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 84s0lubjbm7eh9frulvgqve0[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 9mig09aoo0hdf846hiaun7hn[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = jcdgt0ecb25lr4ajqpk6in4q[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = gsunlr0hc6nsmlkqvcdk3r8h[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = df1oadkphmd3vajeglpqlpmp[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ol8t5oh160d60c7jnsuf2q91[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 8t817c35av2glsar13invbks[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = o727t4btl261tgg8jt4v3alb[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = r26ieun29rv5h4ecu5jnnhep[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = iu22fjolngm22hf60cu4n86d[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = uaogvi4r0duso6erk0if3bu7[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 31mj52bm4bc3568ig3nmk6is[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 6b8b48q1g7cqe9oqs3an59m7[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = a2vfkautapg5abr2l24neghg[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 27rjb15qnbdt2c5lhbreep4b[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = rntfdl239d3b6ig204c7tsqj[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 3dn93sa9nf0jhitug4qldkpv[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 9cmsdci2tqmvu4b3d524dcqh[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ak64mi8022hp9hrroelaheaf[0m
+
+
+{"requestId":"0be32946-b324-46f4-9d01-47ff174b94a8","principalKind":"user","operation":"turns","status":"ok","durationMs":35819}
+[wrangler:info] POST /turns 200 OK (35824ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 2bt1bp6vfgmd27a1amdbsga1[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = p2drcrtq9b4gcnf8in3ist23[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = u3pcfmqt7gjn5fum9n8eaogr[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = hmighc85pc0415vuu48s72s8[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = vv0ps2nod8u6c33vjieos9vu[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = n7ugqol5pvlh3pl5c9p8ocke[0m
+
+
+{"requestId":"9197c57a-9554-496e-800f-60bbe26d2470","principalKind":"user","operation":"turns","status":"ok","durationMs":20544}
+[wrangler:info] POST /turns 200 OK (20546ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 9f0s89233mp14165g1d2fpqf[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = usngag8olv1r2hp1dbiegt4b[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = n34ad2vliqd7niqqh49ie4n4[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = uf8tqdoegal98093tc25ejod[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = vva57bt6lc6hdbbkfajavaf6[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = gcoqpa75dp1ka6qlvsesooad[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ooqoltfsredrdv0ttkdhb95u[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = hsgva0rc5r8f48kg2k9irelm[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 0jpfpe7hhtajjj1gl8uk203e[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 92kdgg5hlrovvpeifvsdivds[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 8ght83k7kl0psofav7197kb6[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = vhtu2md8re3qimag06ae1vne[0m
+
+
+{"requestId":"a631cbc7-f390-4cfd-8b3a-e305ba33850c","principalKind":"user","operation":"turns","status":"ok","durationMs":19370}
+[wrangler:info] POST /turns 200 OK (19377ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 47qcfdg3o3da417585b2g7rm[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 0ndovpq5njiu9031a7mr0s7g[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = a1lkm8um0j0taohbkf0go3ns[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 4jq7jq2pgiimvlsd886hd32t[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = o238tkocu1euif3co3nn20d3[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = egffrlrmo9q25fnrumaf9da4[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = std10ijvaku2o101nphb0ikf[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = lqdts1aq9sdttgd437kn657d[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 696rnvmg8faqevq4op5gvg05[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = sv3942m3g43duq4h03ot9462[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = cqi5cmsg9sbd6pofl2tq2791[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = u4484ksk9oq151ghbrujb9ct[0m
+
+
+{"requestId":"775b5f8c-dc29-470e-92cf-962219a2a940","principalKind":"user","operation":"turns","status":"ok","durationMs":28786}
+[wrangler:info] POST /turns 200 OK (28790ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = h6q3k205i1qao2miq637v91i[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = lbr04euqn3sn091idq3si3rf[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = q4voki9iulnakqbj15uoluac[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = u5c19jv56406dnnftr9v6i8m[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = tfjeids5gg70df0eqda37b71[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ne6mfic2v2o4666rvo9dmeco[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = jrvea3eflg3p33i3eqdflubu[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 6604j5iu7mj02d3cruhecdc1[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = s9ess108bjdvk8hplh7g0mba[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 4v0dmbik1q9hobct9v0ia0st[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = l400t29gfhbfmsmaf26e4jgh[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 6glj5kchakh862saurpnrpts[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 019t4fj36ffgg3kgi9q3o6ol[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = kksdmjvm7rmadlsmc9hrgo5s[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 9g9b9uk2ddfhvibb2ru5jcec[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = tla10kbmps0lqbopgkq2un8g[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ru7qpoo08u3ctajo573tr717[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = hqu7gsgl94bqb1iml20c7m6r[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = pckhn7i1k8mim00bqbfl7a66[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 8qnltbhigrbngk59ka09v9kt[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 4b60hcgc71lpaovaetcelfl0[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ois4kiccf0riv0amh2l1fi6k[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = mq2qjo4gh1v1rjc8l8jadjn6[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 8go3ifou1d7u8fehaovkrh91[0m
+
+
+{"requestId":"a6a1415c-d72e-46f9-9a71-31b391659724","principalKind":"user","operation":"turns","status":"ok","durationMs":22466}
+[wrangler:info] POST /turns 200 OK (22471ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ouiksk5spi02oesn8iv0og0e[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = qe220qccf6bsr6u50l5rsorg[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = v97au0arnb3er0eimg66e94i[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 8jbr0idh1rre1o8bjr4c39q9[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = uu62j39ltovcer9qntngh5a2[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = s1uvf37e327nmr5ojd6h7tfb[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 6vjp6fnh7ivvjgddknce1jd8[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = rkrc06et93ah2m3cbvij0i6j[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = kcn8c4siu0ftvdgii72cibsj[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 32g180ivh8gocl36p5tfq081[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = g59rfpik3k7v0cmbqn6lg4or[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = hfj4pg2hj0eitumo2ktncja1[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = abrpfcocn4rteoejp6j9gupj[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = m7u6u43bj2n76r3c23vorqln[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 4uvfq7plqot64aguplmspk04[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = bvcortmj06p1oo6iepj63o1b[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 5oi717dicjdlgbfrlbv8rrvg[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = tchdr0hdc76pjm18f5lkq2vm[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 4450cu95ktu47185omhi0132[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = r606ijg3i3jt1kasspcfukjs[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = thv6ifevu57tulvf0enlh03a[0m
+
+
+{"requestId":"3419a7c2-54c5-49a2-b020-ebefd3317865","principalKind":"user","operation":"turns","status":"ok","durationMs":28920}
+[wrangler:info] POST /turns 200 OK (28925ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 15fc2brneslnqoirf3dq5q0t[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 0m65u8dj6r8an4mtfr5b3k96[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = nn7busb29mgmbrk72bdqsqju[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ijomvokini0pja6fric6r1qb[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 4h5sji6kidd689coonnflvbg[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = m1nu72kml0361rsi73ajr69s[0m
+
+
+{"requestId":"141b196e-f780-492c-931e-4d846ad62847","principalKind":"user","operation":"turns","status":"ok","durationMs":21707}
+[wrangler:info] POST /turns 200 OK (21710ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = e71qije20j1vkaaeqb7vcjiq[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = tg6hu8kv7ap3qaou9avvaeps[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 5l0t1oeo9okkl7pbvsklhtom[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 515e3ol5s9ap0gi0odjvttrm[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 63nchst0md4hjqna8ci7f7vk[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = qvl5th88kdke38abruqjr1t8[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = m3m7a41lkca8srgc2usl9k2t[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 0h307ggn2d1er4ilfurh9obj[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 2bgkqlhl07ru9k7drnng70d5[0m
+
+
+{"requestId":"54004bd7-3bbc-43ed-9d99-35034b6be067","principalKind":"user","operation":"turns","status":"ok","durationMs":22726}
+[wrangler:info] POST /turns 200 OK (22730ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ad62v32pde7b7vt9dlrn6vek[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = l11c3fgb7ldqc028ko63s4ib[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ane7q0q9758sq2s8n4vt0k15[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 8dp248pofuj9ef38le3cp94r[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = c1duaaq64mcodgqc9p6te105[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = tqagq8ohv0j381gi9drv2uof[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 0k7i8kkioqbjcljtdnnobcup[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = lctq7tikcgjfdlp1rdln301v[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 59ilkmcivbi3a35ar6a9r3eg[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = lrg8kkbo8jid9jjd0a6oiaar[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 18uth0vtm5pl5407al1df7mi[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = h9t0td6hbrub1lcq4ak4ipqf[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = jpaulv2l3u4dqk5hs461cqda[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ato5kib5m3d3i0jvlo69hdab[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = aivunr2d38qqnqe2ev8mducn[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = naonmncs9orljessp1fk9ng3[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = op9ad447eovo48id1cogv23b[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = io7nk4ihi81n2u0kp257bhg5[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ofq89cf2mb6tqocb089hrlsp[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = vrg6bhg17tcr6h3ikcctq78v[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = sbgaikfj69al1j4iq20dcj3o[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = fptrtpmlgb27rlo035hqujj2[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = v2irf1jlubqjhejh8dnr7bgp[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = htub2khg9asqfieocp5qj4cn[0m
+
+
+{"requestId":"b3c528db-03d9-4a9e-84bd-41595bf3f701","principalKind":"user","operation":"turns","status":"ok","durationMs":21349}
+[wrangler:info] POST /turns 200 OK (21353ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = e6f2tm171pd6ru57bui2it7c[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = quo325l5gve2bj32h4v9evpf[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = r6826niovp09ircvc2latbt2[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 5i133kgg6cfutmj6e5ibtel3[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ehb2rg3onc1hcb3va130r53r[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = nb68ekn8dg527kmv10hrkbvv[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = g916hsjg9b89g3a30jb292fr[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = b7tprf9fdhhcp7jtanp915ht[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = s9ng2gq6ccclkvfosq8kme95[0m
+
+
+{"requestId":"9163d9e4-df24-48bb-a238-387b0c76d088","principalKind":"user","operation":"turns","status":"ok","durationMs":16732}
+[wrangler:info] POST /turns 200 OK (16736ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = suernkuqs7inum440mlk2ha0[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 45te9234teafnumuck0mp4u2[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 60sl9slf0nm7c4bsp84br25q[0m
+
+
+{"requestId":"5d8bb204-b89c-42d5-91bc-b88ad8d8c614","principalKind":"user","operation":"turns","status":"ok","durationMs":16838}
+[wrangler:info] POST /turns 200 OK (16843ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = pqcq336g3abbus4sbdg5ndq1[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = gdus71km7nqljufhc9tedskq[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 1lrj9gqhjud09hm2rkdht7l8[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = fhr5ruhc677rr4cpdehs0gnq[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 9sjhtji6527264r553t70la2[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = e1hakh7ln7b4bf4v49adiqsv[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 04vasgn5rf4l151ecejjpd4c[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = jbc9j3m51jeivr4vp3rubcjq[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 1ei8av0tju5htdcut1ks89mh[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 3oa9189gm7mnp8r1o7p5e8n7[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = mu8h7aq8cplsllcfe31f99as[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = nqet1aafkkuotqtnq0uu1hpi[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = vjfb7cnb686r8c0jktaih8ad[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = bkn32r9thjh2lq4mvbj71fbv[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 50jmspjfaiimdktsjepr0n0u[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = fp19b8m7tm4rvool2ekle9tg[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 1ke1o9ogsfbatdh1nqmiuf20[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = s6s8l4t6i42antqkbbr7i3g4[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 0fuij2ql1rco877rduntqsc0[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = r2bvvr0ihai2a76qs1sce0ls[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 95lujl3tg10p5kupcdulj0mk[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = pt1ccc6hl8kinbm81krgaqp7[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 50c4enfaa9dvai4epo0qntet[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 3sidh2utf49fj2s759646mdf[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 3ps7uu3ane8m37ago1u677lg[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 5f8fh2c52dpbasocbd5u3ea9[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = oja2betduopgbvp7nrqe9am3[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = nrom3ko3ma59rjssc1m0hgvt[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 6ijnthe0nm74jkksgdthsg17[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = gt7rlnb6scb70phm7s1h4rrm[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = f2kao7og99rnjji05svjndbl[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = blfq95vv6l76uvvo1rc4amkl[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 4js556rdpkuagv72thk4gha5[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = so6os6g738625o526i4fcoo5[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = t4dcj4n9q3drhjsgb6ss61bt[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = jtirgmt3s1kr6gfous0g13dn[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = shmcoluba9807ojec3ajaans[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 54ael961e5fmrul8bemehqma[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = dhsoo7lt09nd50pi0efp1rtt[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ulia7l5gf6865gaqap7kfrrj[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 3dhghci4umovdgog4hk3hj19[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 42olebrc2ohjqqr7vpbvk5r4[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 19p7at1vtg7qfbknns419i59[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 9n4329p9mbofeu4tgchjenqg[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 6mb94rdaanq8bage7dlucndg[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 8v9lmhu4l6im67hss5l1kgml[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 4fb4irtqccq52j21mkngl88q[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 160becia44cmbl9p7nnaq3ua[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = on5ncomq320cqhqi08inb1cj[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = dua4hck75u90am8hs389c1i2[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 4pte2s7b3som0vcp2q4nhft4[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = mr44m2a98ddrj37bishf4nup[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 4njp3vtt57duouiana453acj[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = nt634c25f02mcaeiqkeqp5md[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = blvd0lf9int70452cd99q3tn[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 6b78vjndbtmf2p2lkhu069ck[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = kaebrg1sscqu0505dkqim49r[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = b3e3t9e8u3kvod8sp10cs49b[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = gunvl8d6g9se2sna6clr01pm[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = uomvh7k83ot345aa2r8c3r89[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = sjch1jf2affh324fc0o31sss[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 9jg25pjjq4jqciv31aakdm57[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ir9vn4sibau1hs0479m25752[0m
+
+
+{"requestId":"e97cbbf9-a1f9-49a5-9cb8-56e5faffaf6a","operation":"turns","status":"error","durationMs":72238,"errorCode":"UNAVAILABLE"}
+[wrangler:info] POST /turns 503 Service Unavailable (72243ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 14glhsuafjovem8heucoqo0l[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ioflkmuo5ufckobl8gaqfoo2[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = fnn2elk8tundrkl71u30ijlj[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = iuoqch8n487mhr2ugvnmiudf[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = uk911a9r6g053s6vr0lf5adf[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = qcrmsn1qgka49gpifdsebqjq[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = m3ebu046eaoil6rgqrh5mo5r[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = pb0csfr9nm2fjo8hb95rnl78[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 89q14vb5rr2gktq51jglnq7d[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = j1c2mec94qe64p8vnv5g13t5[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = n10l2l8me9m0842pm2edfftl[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = dseg0g26cda97lb8s74phmv8[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = hast0i4uju0hdc4b7om6beoa[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = h7oij1vf3cau7aaf3cgcbsvd[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = e37a135kgk3djh0gidlbhddi[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = lhrkfadkrr8kt4iqp3gt88js[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = hdag4132oqf1r2jmd2273a17[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = op774429t8gk1vpnnnt7m296[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = sui6un3h09vaqfuhj4u7s7td[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = t0a7nfgjm84g16d17rrojpj7[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = nskp7s1tciraomle1b60rc93[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ig50i9ikmqvbncfbnvbpmald[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 4kafqcqvpoag5hk1scsg0vbc[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 3nueijodev9g7g9no9tpjs9s[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = j6omm0ooa2erukp3j6f2tbnp[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = q92kh29ci90o6tvco624k2l1[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 9iurlfrkf98f7fr48uossu6h[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = igq35oobie269gsjduj3atp5[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 3u8ajsqh2jkm93fpc5hcihad[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = v2g68eafk7jqm8i8un16l0pi[0m
+
+
+{"requestId":"5e5336df-2f92-49fd-88de-20522c25367f","principalKind":"user","operation":"turns","status":"ok","durationMs":45480}
+[wrangler:info] POST /turns 200 OK (45486ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = f5ptqeig3ildku5jhv060hvd[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = pcebpqm0ba2lrbmncg9s94cl[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = eqno8ea06q08aq6t48gdbrla[0m
+
+
+{"requestId":"413f2fb3-02cf-4bfd-9afa-808c0e81ac07","principalKind":"user","operation":"turns","status":"ok","durationMs":15903}
+[wrangler:info] POST /turns 200 OK (15908ms)
+{"requestId":"6a74dde1-83fd-4ee7-9f24-0a8911d5b66d","principalKind":"user","operation":"knowledge","status":"ok","durationMs":13}
+[wrangler:info] GET /knowledge 200 OK (17ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = i3hc42oenn844pisn2tfqoeg[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 80fbjvk962jr9b5pm0fid7t1[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 09ik6fr0nljm4vl24pha7qo8[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 2c6nr5k5j1kql9nimpg2vlb5[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = b9hd80helso2c5iiae3qrhkp[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = d6r0ppqai1hmnpa3g9g82a85[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 283fct06kfk07a1hfm18fdej[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 9cun63kjdo0moetr8jqscorf[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = m03546vdmas91ur2rhhuhenj[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = t1v6n2or78r7takut1q7bjqs[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 71atk9h0ee2otcs03pi2jomu[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = jmuqskeo4sug1acfq4tq8h33[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = lag8u1ln54b07tjrvtd3b3rm[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 4ll97a41b95tsi4b0k4gqagf[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 7ja7g513ckk9cnabilu4rt7u[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = nsjmibett37prd7buba2sp0g[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = hagham2ea97rlenfmbra4l8i[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = g8dh397gujp4dtigc74sor0b[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = n7v46u53vs6q5a7a3l9n02fe[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 2vknv34sunh27n5nv9ak2ab7[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = l665fseae2jqtp2peh8bdk2j[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = lna9fdat28qr7r3plt7dhdc0[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = j2luvad4rsm64l483c4s19vl[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = g639l1115jt242ng2hldkt3s[0m
+
+
+{"requestId":"9f995455-e147-4ea9-a3ba-b99ddaaf5633","principalKind":"user","operation":"turns","status":"ok","durationMs":41927}
+[wrangler:info] POST /turns 200 OK (41930ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = c0b1isakvessr5a3nb7a0rts[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 3tv0v9lf252cevkh8ps2fbhe[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 0et8c09kktrf7cs9ftefv88i[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = c7nnioua7vgcp0880dp9tup9[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = djea6su5jfdr6j7r0m0pm5u7[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = vtlbpri27r4jmvtkq50k2jv4[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = rah8mbrgqjss0d82uapbn3lv[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = eclpgmqobuq8cn0nqe20vjn7[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = bagj0slc013025li7ep4bloc[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 325kfv103f4f7056o73an0o3[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = i3das2v9l01cs8i7m4mhj31t[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = kh22hg5v66j4dpagmafpn6dh[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = lglevnjib69gg29di8t1u6lj[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = s697bggetoueut5jvluiv609[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 2ud67sm5o1kqlkerircmumvk[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 6iqa1sr1pimmg76ukiulptd4[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = cl356f6m010ch5t6lcnecndk[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 9tq2dl8u3jjjamequktr8i68[0m
+
+
+{"requestId":"499c1a95-7b4c-4d67-be14-fb5bcea82b7b","principalKind":"user","operation":"turns","status":"ok","durationMs":10384}
+[wrangler:info] POST /turns 200 OK (10388ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = o4aaajt9fse48qhn1sh6m0ti[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = uct8jiuocr667ovq0p6ja6u4[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = onomcjm1roe6l70sk6m5i755[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 67jilm48gtmqv8ruuqa6b68s[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 65c3250dbfc9r9g2qmfk061t[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 1aauuoeqtlo04elk2ghcoknv[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = fci1hn2o0m6j4dho5ka9eh9b[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = cdj0jac0m0lbliu9upqj988r[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = pkb267ob1kef8g4aj3hv7gru[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = hihpsgjk8dunlj4sd8k7u2gl[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = gk81ngilsur61l3f3kdgbqft[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 83551f4fj2p2bvvqcetsdqrk[0m
+
+
+{"requestId":"3ebba3c1-342f-4fd0-b610-9577488c7891","principalKind":"user","operation":"turns","status":"ok","durationMs":29185}
+[wrangler:info] POST /turns 200 OK (29190ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 2pdmua3aubnjo159tg5tjm87[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = tdvjnm6q2bcsijbgog9n5q8o[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 3062evs90d8aj25ogm7880qe[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ajncvni4v0j5ee2p7u01lsll[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = r0rhalal734tqguuktpk9b1a[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 9gb6vqoe9rn9cf8bvr3k3inu[0m
+
+
+{"requestId":"6e53fb56-47a9-4292-aa33-54ae1b4f90a7","principalKind":"user","operation":"knowledge","status":"ok","durationMs":14}
+[wrangler:info] GET /knowledge 200 OK (18ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = fpauqj6t0415b03i296i0977[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = bjhe3chlch7e85117mvrlugv[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = mdt3f63ovl69kmtt905ks0am[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 6ohcj1eomrslt6caucdpieq4[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = jc8ssme9l2poqspbh3hn8imu[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = j1ps1pojvooptu05u3hqhsjt[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = olm1806mah30lb1q655ihgkp[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = aqf7v9a16sev6qpgsu9ehj4d[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 4deu14ikd0alot5dpvfpa9i8[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = qsu8o2b6iahged36bo159d51[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = rqurbn7aal78l29210sraunm[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 2t7n8qe3bfbvdgmelbl3e20l[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 0gdmcndv1b8221flm8t7p8qo[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 8cm2tnmhee9829kt9fls7jj5[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ic2epbnerkrfm0b9gha3nhni[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 936m0nulvverg8v4a47nejga[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 00i4pmea1c6ob141i6ofjln9[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = vn1laa7nojl28jovpacd306v[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = n5ikc811bjvmrlbk5kochhol[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = m3s4qihmmd7j6jvkol41idto[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = e4mpdpknvp1hsb5m95s7h8ed[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = thuhig3g0v7sk90eno2lirmd[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = l9ckfhkk6h38h988fbm2fk0s[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = rk8u96enohpvf8dt08ujscmm[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = lkmbdf3n15rj7r34co6v2tmc[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ik961enl1ccmjj66qg3g0e2h[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 1k6483ihs4is6335246qu9gr[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 3hleoskdth2ng5is4bbnf1to[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = dk3233l3iicotqm3ng4dv5na[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = goh505inoj3vb49km2r7811a[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = du68gr46j9hr0irdc39ikc25[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 7q0ph2i19e6d15ol8eelk130[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = h31ukr27drtunaivsls4up5m[0m
+
+
+{"requestId":"2952a2d9-8343-45e9-8c34-1ad07031b780","principalKind":"user","operation":"turns","status":"ok","durationMs":36762}
+[wrangler:info] POST /turns 200 OK (36766ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = riiscfgi9jnugjespq7qit52[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = lotng1i0um477h5bv5hadhnd[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = qhv4ihkrvsi9ivgkl08j3p0n[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ivac1n7rronphe8i4phlueng[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = r5n29td3raabml9m747edsdd[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = nanj6se4m6krakt14cl5lv1t[0m
+
+
+{"requestId":"523f8c16-022f-4a46-be6f-c6f88338b45b","principalKind":"user","operation":"turns","status":"ok","durationMs":11400}
+[wrangler:info] POST /turns 200 OK (11404ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = v94bi0slhh1trtr8cmrmp3v7[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = rcaliv5kudkn81sgmjoomasg[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 4o0rp7lt8a41fthsf6q514hf[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 6iijnql4mca7ka9igrg3l32k[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = c66pto9ivp696jhoi66fsunr[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = vinqhu5p3ns74gdiacbi7h91[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = i9m7tkptfvc3jrihgoga3gn2[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 0qbvml5fugdahm6c2euadd9s[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = uvhl59n56pl5vh2bt29rp8kf[0m
+
+
+{"requestId":"22406067-548b-499e-be1e-db5cefab1cec","principalKind":"user","operation":"turns","status":"ok","durationMs":11969}
+[wrangler:info] POST /turns 200 OK (11975ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = qbcplq1b18a2mvhc9il8icpk[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ee00nqjsr4pb68uas12klsrs[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 9kkvnr0mtgcbl410e9e6ea35[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = lbu4c1v8bh75ge38q6oio1rf[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = lo32nr14b5qh9e6knlh6fhv9[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 7sjgqjdaqv3drmk4a2fja8oj[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 9ftidq1agnfcjbl3ur46l56q[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 1lm6254nlt84tuo127no5bb1[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 04tsem5emdu2otiie8to1id8[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = cqeqqb6v7k473gkm01umi8or[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 8kqsk77npecl124enoa4pfdi[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 6ohe2dcc7fimgov8d661ok3u[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = kfq7koa06qrvl29fhcpde6jf[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = nt0qv6ou9bh6hu6u0oq0q5m0[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = kj5vjqilkhvvmncbmamkljqt[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = b99gaifh44crt93f6brpru8d[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = djqhmsvtb0j63a66nh7rgkbp[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 90kmlb3in8eofeocpl0bmeh9[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = t4tku1oboh85hrl5j8e71o4s[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 0agg6dp8l69c88leke77su2v[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 3o2ca1dure3pagn12f649rbk[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ag51njt5p3chf4e4d80as6rc[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = fd77sn5jlohv0nlpf7q6ig8h[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = vf6ahsngfdro387vc3u22p9m[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 6lq2hq8ok7ao1d63d8o8vbcm[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 21r786acj5nt1hp6e25egau3[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = bcvt0r0jm6opqatju1k6ookf[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 9rjg2t93oe99hmvumu0cvhg0[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = o5ok41a64mfg228t3ms9bo8b[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = l1lnogaceihd6k7pv7097jq5[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = a136kb0e1eatlta88jdparpt[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 1cbi1qn4mqpf16kth6hensoi[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = jgn374j7lqmrmc778lv6k27s[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = plo6jqr5h7qu8jebc99k901i[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = lpq9banes7ud5g9p21reuo2v[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = fjq0nsq2lel3ucuoe8viicgd[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = pr2eger9bp7bgu1vqklpaqmn[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = nfa03hgvlas652r60s66btv0[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = eiuepf8i89pv0ghkbvnh4t78[0m
+
+
+{"requestId":"f517143f-5835-4c37-97c2-41297703ea4d","principalKind":"user","operation":"turns","status":"ok","durationMs":31464}
+[wrangler:info] POST /turns 200 OK (31466ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = bj9g67d7p60voof7legjl8vc[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 0l9q2u525gg6lkrli9b30pk4[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = kndrbbcnuoutelteuq2cfqr6[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = fucgvnlol8ld1oogmrm3h40d[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = hgig28tjkjsjq8j16bkribn9[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 8jb69q7pbria0kv2u3ij49g3[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = bqbgoe74gav5tsstv9ae9pf9[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = fp1qms08jbktj4l2oegtiee2[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 4lfoi5r21l47vevqmiahg78g[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 81u955rr7620g3kg3n6h6n4r[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = i53vt8ph9q0t3b2f3aapm6cs[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = rcrcd7mfkglpdd1mlt47a9vf[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = gftfnl68omb2senijtmrob2t[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 84m82odcppamvucv328q71m8[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 88t3pasgss9iq5o6s6v36uhb[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 84tapfdvr83eluhe8tmrd43o[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ts7v7iiq0i5608o686i7a8j4[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = hkh01c2qutlrd0s9i6upcj66[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 6t2feotqc0n0p3ivhki0ht34[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = k420r4hmmo9cccb4spuk7aja[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 6c682dt9lku6mhqfegb496gd[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = tppu1hqm40fjrd7bno8r9qef[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = tbpdnudkmvpe6lgdt8c94jdt[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = eorvln07epvnlc7fpv2ga0cl[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 21jpuj5ibdjdqaok10k0pnl1[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = vpqntom46f7eov4fc6o3etmo[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = mn6hfnqs05sqcd9hc4qga3vk[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 0n4n49jonoguum0kgftm0s4t[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = h67rbvus6qlqcaqtqqcqpjp2[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = r7n240pic6t6nars5prrgrs1[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = k8ga8v2l8s0gf14tp6couut2[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ur0q59fa5cdjm1s8bvi1og96[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = k8kd5hkakia9km2p7gh7s03p[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = qvppepqv91ivv68db62nnihs[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = pkur4okbs2rai20gamd01vfv[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 44u6ddgn8j3tl3vvoujjukfg[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 8uj7e91r3sd0uf217o684jjc[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = u9uuc2q76bbnokcoqeu7pp0p[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 24puo4o3933nmqc7bri9n6um[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = h9751q2tc7ipm6koj9vn3uvv[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 48q348kopinqua6fis41veao[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = qibiq11p07849nop00vgd626[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = vo22tm5lq2nf0qhn13a1jg16[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 1sheeepiqq19ke57chf07vlu[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = omnjqef2b8lqhvce1c0uqp6t[0m
+
+
+{"requestId":"985c9b1f-5ff1-4954-bb37-66a54840f403","principalKind":"user","operation":"turns","status":"ok","durationMs":30244}
+[wrangler:info] POST /turns 200 OK (30247ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = oc8e9kg1eg23h3ee0cvu5ovh[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = p9b3alhqslm4nj1f8kbljqlh[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = fbti0nt451vufem2nnggat9c[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = g434m391btj3uhrisu1fm4ao[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = tkpcg6jdaurjgdq5jne44t68[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 22bu08h245ojvj4qqkob3cg0[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = jkuvcgob1nfnb7gm45m5ap7v[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ollqlob3ll50kqna35jd4hbu[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = tid47b9gf0621n3q311e3jke[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = eencjtrs4ol6nro26apv1gbu[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = nqqc79pa002i7me7rogc0hjf[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = p1ou1bht9gb395f6cusb0e92[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 0sun1nmf4930muunmbdv6f54[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = rb8s3lpq8ltlss5st2rc8jqi[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 4tr1u88cpaeudrjf568lmnsu[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 6ddrjo0opsbhqdf3mjme3gan[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = fc68iiovmpsl37mgg1ep0c16[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = o77gmnngndldthklkpbnqfio[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = chb6tpnvdvd0nuf6jus694l1[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = dsvbvp8nrhn29u797k8h6d5g[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = rlagv7b3l0osgs5a10p7nads[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 9ancaur1it8i3637immuf0dd[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = aul4qvc5tiserv40dcbhsii8[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = gav0508hasecl5iggl9ehcb6[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = s81641c43uucrn07j7tsnr6s[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 9jvvh83ej5k3st34e8ggbd2p[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = rtas4a5joame7bp6s8d68sdn[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ov48apvrq3ua4rh5vhqmbvfs[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 83a1k30st0mc677f5gu6soku[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 8o0854ekth1qq5io4ffk7da1[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = d0p4p5ua4s3cbutbbssrpab6[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = iqqqjde0hcsl5vboojb3js9u[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = clm1l9cu12hjgcovkj8b4vqs[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ud3fgd2b766sijvu1kud2gfn[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 0k4g29c7o73lfdmbsn97rsij[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = hi1pem13igioeql28nrmhoti[0m
+
+
+{"requestId":"87c92b09-c676-4192-88db-5d1890ed0fc2","principalKind":"user","operation":"turns","status":"ok","durationMs":27287}
+[wrangler:info] POST /turns 200 OK (27290ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 7vsk9g3l8efli6iua182q553[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = adlb7d9a85ds2jbir74muj82[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = mbv467hnn8k8lri6usn099rb[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 21spbrtn496oufjpe8s94opo[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = qpv0fbuaf1kv13spcttrqb04[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = r32qa4tt0e23tn9da7cnc5m1[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = e93m9mgb7tsq24oq8p5r832t[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = d81q6vcbl4ne86rl9ljr17kp[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = htkmv0l26b9d5oaj13vnp7qg[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 2t8fhacndo815jl010j3vdcr[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 9o7nf4aqt40ttl5qvu7adcue[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = sp0eva77kqthjouerfh3ctu7[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = rq4u90asdifr3ngdee3jvoff[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = r1ects5922pmcelrcimti4vc[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = fvd4r7pfqldl2rifb4651chh[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = uoq4858oqh060sarnqao3psh[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = tu5bfj10ad4bk5l5cbidfs77[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = d9852jal4g3qf1sqd0ic4a6n[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = qrjm1p23f64rjkd6q3inlfvk[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 7sp6t5b6u1bfefcenmptnog2[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = o5777i8alvpk2oak7sibvqba[0m
+
+
+{"requestId":"783ebe59-d38e-4700-a2b0-162f679db8ea","principalKind":"user","operation":"turns","status":"ok","durationMs":26894}
+[wrangler:info] POST /turns 200 OK (26898ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 6nrhako9n9kjuhi123v84g6b[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 4te6e0fdu9rmh91l8v063an9[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = i1c0e1gsh0mnhsq43tudeu08[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = vigalqnu49858q242hi22ct8[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 6canhmeu1k3e6hdohhv3pdsg[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ddrk8tcn6j7924c9gvpt7756[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = tch6numfhkp150u023fv57e9[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = fii27oaa0ihpjluo2bf6faps[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = su363vqd8ahlsfmv16hj2vtv[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = secrphmi14ehm2lcq63n0jmd[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = uue3gt5t0pu4vukjs3na2c24[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ouu6gaqvh89o4a9mfpts0gnl[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ososcu4tkqj4218snlcrffs2[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = o760m9eksc2mckb94roenm36[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = vdje76laje0rc4l7k8hdp1lv[0m
+
+
+{"requestId":"f37f0733-0fde-4cde-a1a6-bbb67a20dd51","principalKind":"user","operation":"turns","status":"ok","durationMs":28858}
+[wrangler:info] POST /turns 200 OK (28863ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = gjjpec83ahrq98aj6fqprtm4[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = nkv485kc1tdg4j3b57q44bi0[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 8oa5rf5tsfn1iiondjkaa4sm[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = nn9sr5js9vro19ch4ikmrijb[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 6kcs24hcrr8roq9o4fhe8c7k[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = scsi0ivb1usmqai6jf77i02v[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 6ji5rpmkfrhiucbf5mstlg0s[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = d3r9us69ci88le56dd6ulaho[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 8apqqsht29jca3rbs30irehu[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = es7oac3kt4ee9u4lbkgrigr4[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = eruehpjmvcoitotev9ufvs33[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = vpb568bv0oqd0m05qeul9ic6[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = qjbq24vv7naqqobcsc0psnep[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 3dkv0sklqdgritdoo94vdo4k[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ma6p9n64uh8sgsk32d277eso[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 01pn0utjb4mpd41c9u38gj71[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = asn6d1kt78kq2l341mlvvaji[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = qsa1cquk03k4beiripg2d0bn[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 03fg5h3a2j1ofjg1e882tvsn[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = q3g80i9o7cpcm2njrfgl21b8[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = g0ekkhcl21rqho9adua7tpgn[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = khha09t9r79gj3jj1iif5trm[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = umvj17d7eu1li8lqkg6pcl23[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 4mcob3vmtabar3crer7c5tvb[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = dov8dsn5disilrccee08g2e2[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = hd8af3v26ftih4e7iupi1m7a[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = bvv51ah1o212fshvtjk4aapl[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = et53m3d0quj1043sb7nqia9d[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = rjlo0d8c9vt3s4bemmpvsuu9[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = b04tr9t596g96o8024o1vbim[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 5ro361ka56cg2vbdqb6vaq1h[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 36mrf54avs86q8r3r2e0loc3[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 2fo4336qoat0h5u336d9s3nn[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = le064ri6ac8n9v7dqaq8i0se[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = il32jfqb38mn65neejnpiej5[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = dgondp330lo6m4ch7dhcrsva[0m
+
+
+{"requestId":"57bf825c-47d7-402b-84e2-8da12a807e24","principalKind":"user","operation":"turns","status":"ok","durationMs":41230}
+[wrangler:info] POST /turns 200 OK (41236ms)
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = vpappm5moul5i2auj7u0qu8q[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = jumkn35e3fpheorha70sp2k4[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = upkf99m3un10i4i49muoko6d[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ll79f2q2snqbghqheaps7b2n[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ihi7bm9aabodehv50jtks84o[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = kpto007lh284jsv6084t418h[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = r4tou7sqkf1c26nro4ad5df1[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 3vqo37hqscmpdrkjha44vf9k[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = j12ic70jrl0r69a1kfkfffl7[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = hqtbvv4ho1r7tuju6noqabef[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = alq3620j788sf9fqqm1911ov[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = bi4i7udgb9vmk96khsj0h6tm[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = garnia3eqe3padl40ceplahp[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = n6vfdai8rdpn95eu70cgq3iu[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = st5j6k2m6907mcvsbb1926b1[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 2bh0jk33ifodeodpabu56g29[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 1jgfj0gcd5u0fh19dsabc0ck[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = juajssp9mocdkcsnhd73bchl[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 43s8rq3c1mgvn71rfovd9v1t[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = vbs9cvku34ksfcafi091oqus[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = dkmsnc4nmmkbmftvkvmja1p9[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = bshv6e9uj6v64jfgq6fb3ifd[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = emdk0akr0d9bmcnusjvk0mlo[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = v4u5649bdlc7ge6r6dthkni9[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = a2qkvhg4upt4kppdaelgfi9s[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 3a6mh13qne8isq4pq7dsqiv6[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 0c5qomnse3203ablcchhbeim[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ek1qsd5bsan3vpsivtdt9mqm[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 9jqrfk1ci223i2g99egrbrj5[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = sb3kmf8p8av1m0gulheopfdf[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = vncrf5c0uehud3o9s4gaq6tp[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = eiehukab56vv7trklhsa02am[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = alsbppk28q7ncuobe5156u4p[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = umg1bt44h3ervhkbr0gijktr[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = qpom6fupqogbha030ie8iqlq[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 4a24kmd5ukltkdt0f1uomf22[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 5i1c9paf0aa4fnpv0k8mns9a[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = i2vmj2bkqjllt7btgc1ibthr[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 0b5127l64bddkeh3ntmc5udi[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = usgrbl89t90goidpj7ravn1h[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 5db42hl19tcm4453tiu3jj6j[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = ea8mi0imfiljpqppaqcnnqbg[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 1ovcmpgm3duoutp3kqnr7i4k[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 15fsd68mk2khtao0trb9on1b[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 1dlddj3m5k9uqruc7qdj5fgd[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 621s10egpev2kssdrcr3tr42[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = hbon7k1p5emlk5o78s02romk[0m
+
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 9plo6k8h4cij15abjh4l3oe4[0m
+
+
+🪵  Logs were written to "~/.wrangler/logs/wrangler-2026-10-08_13-24-14_248.log"

@@ -1,0 +1,47 @@
+{
+  "label": "diag3",
+  "brainUrl": "http://127.0.0.1:8791",
+  "repeats": 1,
+  "ids": [
+    "q088"
+  ],
+  "tally": {
+    "q088": {
+      "pass": 0,
+      "total": 1
+    }
+  },
+  "rows": [
+    {
+      "label": "diag3",
+      "round": 0,
+      "promptVersion": "grounded-answer.v10",
+      "model": "@cf/zai-org/glm-5.3-flash",
+      "ms": 54676,
+      "questionId": "q088",
+      "category": "multi_hop",
+      "answerType": "grounded",
+      "citedDocumentIds": [
+        "nw_hr_recruiting_interview",
+        "nw_sales_commission_plan"
+      ],
+      "retrievedDocumentIds": [
+        "nw_hr_recruiting_interview",
+        "nw_sales_commission_plan",
+        "nw_sales_referral_program",
+        "nw_sales_partner_program",
+        "nw_hr_onboarding_guide",
+        "nw_sales_discount_approval",
+        "nw_sales_territory_assignment"
+      ],
+      "sectionHit": true,
+      "liveRecall": 1,
+      "goldRetrievedUncited": [
+        "nw_sales_referral_program"
+      ],
+      "vectorDegradedCount": 0,
+      "status": "fail",
+      "detail": "Multi-hop answer missing citations for nw_sales_referral_program."
+    }
+  ]
+}

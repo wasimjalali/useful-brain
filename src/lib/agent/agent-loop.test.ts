@@ -25,6 +25,7 @@ import {
   toolCallsFromMessages,
 } from "./run";
 import { createSearchKnowledgeTool } from "./search-knowledge";
+import { ExtractionTruncatedError } from "./extraction-truncated";
 import { redactToolResultForStorage } from "./redact-tool-result";
 import { createWorkersAiCitationRepair } from "../models/workers-ai-citation-repair";
 import {
@@ -1445,6 +1446,41 @@ describe("multi-part coverage pass", () => {
 
     expect(coverAnswerParts).toHaveBeenCalledTimes(1);
     expect(result.finalResponse).toBe("Billing disputes open more than 30 days move to ESC-3.[1]");
+  }, 20_000);
+
+  // A truncated coverage call must keep the draft (as any failed call does)
+  // and be counted, so the turn can report that the second look never ran.
+  it("keeps the draft and counts a truncated coverage call", async () => {
+    const pipeline = await escalationPipeline();
+    const faux = fauxProvider({ provider: "useful-brain-coverage-truncated" });
+    faux.setResponses([
+      fauxAssistantMessage(
+        [fauxText("Searching."), fauxToolCall(SEARCH_KNOWLEDGE_TOOL, { query: "billing dispute complaint" })],
+        { stopReason: "toolUse" },
+      ),
+      fauxAssistantMessage(
+        [fauxText("Billing disputes open more than 30 days move to ESC-3.[1]")],
+        { stopReason: "stop" },
+      ),
+    ]);
+    const coverAnswerParts = vi.fn().mockRejectedValue(new ExtractionTruncatedError("coverage"));
+
+    const result = await runKnowledgeAgent({
+      question: "How do billing disputes and complaints interact?",
+      pipeline,
+      principal,
+      policyPrincipal,
+      conversationId: "c-coverage-truncated",
+      runtime: {
+        model: { ...faux.getModel(), api: "openai-completions" },
+        stream: (model, context, options) => faux.provider.streamSimple(model, context, options),
+        coverAnswerParts,
+      },
+    });
+
+    expect(coverAnswerParts).toHaveBeenCalledTimes(1);
+    expect(result.finalResponse).toBe("Billing disputes open more than 30 days move to ESC-3.[1]");
+    expect(result.extractionTruncatedCount).toBe(1);
   }, 20_000);
 
   it("never runs coverage on a refusal", async () => {

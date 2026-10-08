@@ -1,0 +1,2 @@
+worker-v12-8791.log turn responses by status {'200': 60, '503': 1} extraction_truncated warnings 0 remote internal-error lines 1122
+worker-v13-8791.log turn responses by status {'200': 60, '503': 1} extraction_truncated warnings 0 remote internal-error lines 291

@@ -1,0 +1,72 @@
+{
+  "model": "@cf/zai-org/glm-5.3-flash",
+  "questionsFile": "content/northwind/tuning-abstention-questions.json",
+  "harnessGitSha": "f0cad6515fa856783b9a076313802a15b9f52d1a",
+  "harnessDirty": false,
+  "pipelineVersion": "grounded-answer.v13|real-stack|300/30|0.70/0.30|kw6|kr3|cb0.05|rr20|@cf/baai/bge-reranker-base|floor0.05|top8|fts-stopword-or-v1",
+  "generationId": "g-2055a92b-103e-447f-a4c1-5ab7d071fc8b",
+  "latency": {
+    "count": 3,
+    "total": 3,
+    "partial": false,
+    "meanMs": 23766,
+    "p50Ms": 21527,
+    "p95Ms": 33412
+  },
+  "results": [
+    {
+      "questionId": "ta01",
+      "category": "unanswerable",
+      "answerType": "insufficient_evidence",
+      "citedDocumentIds": [],
+      "retrievedDocumentIds": [
+        "nw_hr_recruiting_interview",
+        "nw_sales_referral_program",
+        "nw_sales_partner_program",
+        "nw_sales_commission_plan",
+        "nw_hr_onboarding_guide"
+      ],
+      "sectionHit": null,
+      "liveRecall": null,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0,
+      "refusalReason": "model_abstained_with_evidence",
+      "status": "pass",
+      "detail": "Correct abstention for unanswerable."
+    },
+    {
+      "questionId": "ta02",
+      "category": "unanswerable",
+      "answerType": "insufficient_evidence",
+      "citedDocumentIds": [],
+      "retrievedDocumentIds": [
+        "nw_finance_travel_expense",
+        "nw_finance_employee_expense",
+        "nw_hr_employee_handbook"
+      ],
+      "sectionHit": null,
+      "liveRecall": null,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0,
+      "refusalReason": "model_abstained_with_evidence",
+      "status": "pass",
+      "detail": "Correct abstention for unanswerable."
+    },
+    {
+      "questionId": "ta03",
+      "category": "unanswerable",
+      "answerType": "insufficient_evidence",
+      "citedDocumentIds": [],
+      "retrievedDocumentIds": [
+        "nw_hr_onboarding_guide"
+      ],
+      "sectionHit": null,
+      "liveRecall": null,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0,
+      "refusalReason": "model_abstained_with_evidence",
+      "status": "pass",
+      "detail": "Correct abstention for unanswerable."
+    }
+  ]
+}

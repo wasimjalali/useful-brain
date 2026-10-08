@@ -608,13 +608,16 @@ function historyToAgentMessages(history: StoredHistoryTurn[], modelId: string): 
 
 function withTurnDiagnostics(
   response: GroundedAnswerResponse,
-  result: { vectorDegradedCount: number; refusalReason?: string },
+  result: { vectorDegradedCount: number; extractionTruncatedCount?: number; refusalReason?: string },
   assumedPrincipal: Principal | undefined,
 ): GroundedAnswerResponse {
   return {
     ...response,
     ...(result.vectorDegradedCount > 0
       ? { vectorDegradedCount: result.vectorDegradedCount }
+      : {}),
+    ...(result.extractionTruncatedCount
+      ? { extractionTruncatedCount: result.extractionTruncatedCount }
       : {}),
     ...(result.refusalReason ? { refusalReason: result.refusalReason } : {}),
     ...(assumedPrincipal

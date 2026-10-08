@@ -5,27 +5,119 @@ import {
   type CitedRetrievalResult,
 } from "../answer/contract";
 import type { AnswerCoveragePass, GroundedAnswerRepair } from "../agent/run";
-import { hintedUncitedDocuments } from "../agent/pointer-completion";
-import { MODELS_WITHOUT_THINKING_TOGGLE } from "./eval-override";
-import { parseWorkersAiChatMessage, runUntilAborted, type WorkersAiChatRunner } from "./workers-ai-chat";
+import { ExtractionTruncatedError } from "../agent/extraction-truncated";
+import { hintedPointerGroups, type PointerReason } from "../agent/pointer-completion";
+import { MODELS_WITH_MANDATORY_REASONING, MODELS_WITHOUT_THINKING_TOGGLE } from "./eval-override";
+import {
+  parseWorkersAiChatMessage,
+  readChoice,
+  runUntilAborted,
+  type WorkersAiChatRunner,
+} from "./workers-ai-chat";
 import { CHAT_MODEL_ID } from "./selection";
 
 // Quote extraction needs no chain-of-thought: with thinking enabled the
 // selected chat model can spend the whole completion budget reasoning and
 // return empty content (finish_reason "length"), and its reasoning time can
-// outlive the run's remaining wall budget. Thinking stays off (where the
-// model schema has the toggle) and the seed is pinned so extraction is fast
-// and repeatable.
+// outlive the run's remaining wall budget. Thinking stays off where the
+// model schema has the toggle, and the seed is pinned so extraction is fast
+// and repeatable. Models that cannot turn reasoning off run at the lowest
+// documented effort with room for that reasoning plus the JSON answer.
+const EXTRACTION_MAX_TOKENS = 1024;
+const MANDATORY_REASONING_MAX_TOKENS = 4096;
+
 function extractionDecoding(modelId: string): Record<string, unknown> {
   const base = {
     stream: false,
     temperature: 0,
     seed: 7,
-    max_completion_tokens: 1024,
+    max_completion_tokens: EXTRACTION_MAX_TOKENS,
   };
+  if (MODELS_WITH_MANDATORY_REASONING.has(modelId)) {
+    return {
+      ...base,
+      max_completion_tokens: MANDATORY_REASONING_MAX_TOKENS,
+      reasoning_effort: "low",
+    };
+  }
   return MODELS_WITHOUT_THINKING_TOGGLE.has(modelId)
     ? base
     : { ...base, chat_template_kwargs: { enable_thinking: false } };
+}
+
+/**
+ * Throws when an extraction ran out of completion budget before it finished
+ * its answer: finish_reason "length" with no content, or with content whose
+ * final quotes object is cut off. That is a failed call, not "no quotes", so
+ * it must never be cached or read as an empty result. A length-limited
+ * response is accepted only when its last quotes object is complete JSON.
+ * The choice is read from the same envelopes the chat parser accepts
+ * (`choices` or `result.choices`). The one-line warning carries no
+ * question, evidence or reasoning text.
+ */
+function assertNotTruncated(
+  response: unknown,
+  modelId: string,
+  pass: ExtractionTruncatedError["pass"],
+): void {
+  let choice: ReturnType<typeof readChoice>;
+  try {
+    choice = readChoice(response);
+  } catch {
+    // A malformed envelope is the chat parser's failure to report.
+    return;
+  }
+  if (choice.finish_reason !== "length") {
+    return;
+  }
+  const content = typeof choice.message?.content === "string" ? choice.message.content : "";
+  const final = finalQuotesObject(content);
+  // Anything object-like after the last complete quotes object is a final
+  // answer the budget cut off before it matched '{"quotes"'.
+  if (final && !content.slice(final.end).includes("{")) {
+    return;
+  }
+  const body = isRecord(response) ? response : {};
+  const usage = isRecord(body.usage)
+    ? body.usage
+    : isRecord(body.result) && isRecord(body.result.usage)
+      ? body.result.usage
+      : {};
+  console.warn(
+    JSON.stringify({
+      event: "extraction_truncated",
+      pass,
+      model: modelId,
+      completionTokens: typeof usage.completion_tokens === "number" ? usage.completion_tokens : null,
+    }),
+  );
+  throw new ExtractionTruncatedError(pass);
+}
+
+/**
+ * The last `{"quotes": [...]}` object in the text and the offset just past
+ * it, when it is complete JSON. An earlier complete object (an example in
+ * narration) never stands in for a final one the budget cut off.
+ */
+function finalQuotesObject(raw: string): { value: { quotes: unknown[] }; end: number } | null {
+  const starts = [...raw.matchAll(/\{\s*"quotes"/g)];
+  const last = starts.at(-1);
+  if (!last) {
+    return null;
+  }
+  const start = last.index ?? 0;
+  const balanced = balancedJsonObject(raw, start);
+  if (!balanced) {
+    return null;
+  }
+  try {
+    const value: unknown = JSON.parse(balanced);
+    return isRecord(value) && Array.isArray(value.quotes)
+      ? { value: value as { quotes: unknown[] }, end: start + balanced.length }
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 export function createWorkersAiCitationRepair(
@@ -114,6 +206,7 @@ async function extractQuoteResponse(
     options.signal,
   );
   options.signal?.throwIfAborted();
+  assertNotTruncated(response, modelId, "repair");
   options.extractionCache?.set(key, response);
   return response;
 }
@@ -286,7 +379,7 @@ function balancedJsonObject(text: string, start: number): string | null {
  * Second-pass coverage for multi-part questions: returns extra verbatim
  * "quote [n]" paragraphs for asked facts the draft did not answer. Quotes
  * must copy an evidence Text field exactly and carry that field's label;
- * quotes already present in the draft are dropped.
+ * a quote the draft already states under the same label is dropped.
  */
 export function createWorkersAiCoveragePass(
   ai: WorkersAiChatRunner,
@@ -306,6 +399,7 @@ export function createWorkersAiCoveragePass(
       signal,
     );
     signal?.throwIfAborted();
+    assertNotTruncated(response, modelId, "coverage");
     const message = parseWorkersAiChatMessage(response, modelId);
     const raw = message.content
       .filter((part) => part.type === "text")
@@ -315,38 +409,61 @@ export function createWorkersAiCoveragePass(
     if (!raw) {
       return null;
     }
-    const draftText = normalizeSupportText(draft);
+    // A quote is a duplicate only when a draft paragraph already carries both
+    // its text and its label. The same sentence under a new label (an owner
+    // policy stating exactly what the cited process document states) adds
+    // that citation and is kept.
+    const draftParagraphs = draft.split(/\n\s*\n/).map((paragraph) => ({
+      text: normalizeSupportText(paragraph),
+      labels: new Set(paragraph.match(/\[\d{1,2}\]/g) ?? []),
+    }));
+    const seen = new Set<string>();
     const additions = parseExactQuoteItems(raw, evidence)
-      .filter((item) => !draftText.includes(normalizeSupportText(item.quote)))
+      .filter((item) => {
+        // The model can return the same new quote twice; keep it once.
+        const key = `${normalizeSupportText(item.quote)} ${item.citation}`;
+        if (seen.has(key)) {
+          return false;
+        }
+        seen.add(key);
+        return true;
+      })
+      .filter(
+        (item) =>
+          !draftParagraphs.some(
+            (paragraph) =>
+              paragraph.labels.has(item.citation) &&
+              paragraph.text.includes(normalizeSupportText(item.quote)),
+          ),
+      )
       .map((item) => `${item.quote} ${item.citation}`);
     return additions.length > 0 ? additions.join("\n\n") : null;
   };
 }
 
-/**
- * Evidence documents the draft or question names by title without the draft
- * citing them. These are the "pointer" cases: the cited document restates a
- * rule owned by a dedicated policy that is itself in evidence.
- */
-function referencedUncitedDocuments(
-  question: string,
-  draft: string,
-  evidence: CitedRetrievalResult[],
-): CitedRetrievalResult[] {
-  return hintedUncitedDocuments(question, draft, evidence).flat();
-}
+const POINTER_HINTS: Record<PointerReason, (label: string, source: string) => string> = {
+  restates: (label, source) =>
+    `The document behind ${label} (${source}) states the same figures as a cited draft paragraph. That can be coincidence. Only if its Text states the same rule for the same topic the question asks about, include its exact sentence so both sources are cited; otherwise ignore it.`,
+  contrast: (label, source) =>
+    `The evidence says the program or policy behind ${label} (${source}) is different from one the draft cites. If the question's wording could mean ${label}'s program, include its exact sentence too, so the answer shows each program with its own numbers.`,
+  named: (label, source) =>
+    `The question or draft names the document behind ${label} (${source}) but the draft does not cite it. If its Text states an asked fact, include its exact sentence.`,
+};
 
 function coverageMessages(
   question: string,
   draft: string,
   evidence: CitedRetrievalResult[],
 ): Array<{ role: "system" | "user"; content: string }> {
-  const referenced = referencedUncitedDocuments(question, draft, evidence);
-  const hints = referenced.map(
-    (item) =>
+  const hints = hintedPointerGroups(question, draft, evidence).flatMap((group) =>
+    group.items.map((item) =>
       // The source name is corpus data; keep it out of instruction position
       // unsanitized. Only word characters survive into the hint.
-      `The question or draft names the document behind ${item.citationLabel} (${item.source.replace(/[^\w.\- ]+/g, "").slice(0, 64)}) but the draft does not cite it. If its Text states an asked fact, include its exact sentence.`,
+      POINTER_HINTS[group.reason](
+        item.citationLabel,
+        item.source.replace(/[^\w.\- ]+/g, "").slice(0, 64),
+      ),
+    ),
   );
   return [
     {

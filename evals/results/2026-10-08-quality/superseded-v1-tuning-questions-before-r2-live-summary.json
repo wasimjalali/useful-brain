@@ -1,0 +1,378 @@
+{
+  "model": "@cf/zai-org/glm-5.3-flash",
+  "questionsFile": "content/northwind/tuning-questions.json",
+  "generationId": "g-2055a92b-103e-447f-a4c1-5ab7d071fc8b",
+  "latency": {
+    "count": 16,
+    "total": 16,
+    "partial": false,
+    "meanMs": 40080,
+    "p50Ms": 42094,
+    "p95Ms": 80472
+  },
+  "results": [
+    {
+      "questionId": "tq01",
+      "category": "factual",
+      "answerType": "grounded",
+      "citedDocumentIds": [
+        "nw_support_sla_policy"
+      ],
+      "retrievedDocumentIds": [
+        "nw_support_channels_hours",
+        "nw_support_sla_policy",
+        "nw_hr_onboarding_guide",
+        "nw_support_ticket_priority",
+        "nw_support_atlas_runbook"
+      ],
+      "sectionHit": true,
+      "liveRecall": 1,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0,
+      "status": "pass",
+      "detail": "Grounded answer cited nw_support_sla_policy."
+    },
+    {
+      "questionId": "tq02",
+      "category": "factual",
+      "answerType": "grounded",
+      "citedDocumentIds": [
+        "nw_legal_contract_review",
+        "nw_operations_procurement"
+      ],
+      "retrievedDocumentIds": [
+        "nw_legal_contract_review",
+        "nw_operations_procurement",
+        "nw_sales_discount_approval",
+        "nw_sales_proposal_quote",
+        "nw_legal_data_retention",
+        "nw_finance_procurement_forms",
+        "nw_finance_contractor_expense",
+        "nw_sales_deal_desk"
+      ],
+      "sectionHit": true,
+      "liveRecall": 1,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0,
+      "status": "pass",
+      "detail": "Grounded answer cited nw_legal_contract_review."
+    },
+    {
+      "questionId": "tq03",
+      "category": "factual",
+      "answerType": "grounded",
+      "citedDocumentIds": [
+        "nw_support_sla_policy"
+      ],
+      "retrievedDocumentIds": [
+        "nw_support_agent_scorecard",
+        "nw_support_sla_policy",
+        "nw_support_channels_hours",
+        "nw_support_atlas_runbook",
+        "nw_hr_onboarding_guide",
+        "nw_hr_employee_handbook"
+      ],
+      "sectionHit": true,
+      "liveRecall": 1,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0,
+      "status": "pass",
+      "detail": "Grounded answer cited nw_support_sla_policy."
+    },
+    {
+      "questionId": "tq04",
+      "category": "factual",
+      "answerType": "grounded",
+      "citedDocumentIds": [
+        "nw_finance_refund_policy"
+      ],
+      "retrievedDocumentIds": [
+        "nw_finance_refund_policy",
+        "nw_support_complaint_escalation",
+        "nw_finance_invoicing_payment",
+        "nw_hr_employee_handbook",
+        "nw_support_dsar_process"
+      ],
+      "sectionHit": true,
+      "liveRecall": 1,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0,
+      "status": "pass",
+      "detail": "Grounded answer cited nw_finance_refund_policy."
+    },
+    {
+      "questionId": "tq05",
+      "category": "factual",
+      "answerType": "grounded",
+      "citedDocumentIds": [
+        "nw_support_complaint_escalation"
+      ],
+      "retrievedDocumentIds": [
+        "nw_support_complaint_escalation",
+        "nw_hr_anti_harassment",
+        "nw_engineering_on_call",
+        "nw_support_dsar_process",
+        "nw_hr_employee_handbook",
+        "nw_support_sla_policy",
+        "nw_support_ticket_priority"
+      ],
+      "sectionHit": true,
+      "liveRecall": 1,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0,
+      "status": "pass",
+      "detail": "Grounded answer cited nw_support_complaint_escalation."
+    },
+    {
+      "questionId": "tq06",
+      "category": "multi_hop",
+      "answerType": "grounded",
+      "citedDocumentIds": [
+        "nw_sales_partner_program",
+        "nw_sales_commission_plan"
+      ],
+      "retrievedDocumentIds": [
+        "nw_finance_invoicing_payment",
+        "nw_sales_commission_plan",
+        "nw_sales_partner_program",
+        "nw_sales_referral_program",
+        "nw_sales_territory_assignment"
+      ],
+      "sectionHit": true,
+      "liveRecall": 1,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0,
+      "status": "pass",
+      "detail": "Grounded answer cited every expected document."
+    },
+    {
+      "questionId": "tq07",
+      "category": "multi_hop",
+      "answerType": "insufficient_evidence",
+      "citedDocumentIds": [],
+      "retrievedDocumentIds": [
+        "nw_engineering_log_retention",
+        "nw_operations_scheduled_maintenance",
+        "nw_engineering_on_call",
+        "nw_engineering_incident_escalation",
+        "nw_legal_privacy_policy",
+        "nw_legal_ip_confidentiality",
+        "nw_operations_equipment_return",
+        "nw_finance_tax_withholding",
+        "nw_legal_data_retention",
+        "nw_operations_office_facilities",
+        "nw_sales_commission_plan"
+      ],
+      "sectionHit": false,
+      "liveRecall": 1,
+      "goldRetrievedUncited": [
+        "nw_legal_data_retention",
+        "nw_engineering_log_retention"
+      ],
+      "vectorDegradedCount": 0,
+      "status": "fail",
+      "detail": "Expected a grounded answer, got \"insufficient_evidence\"."
+    },
+    {
+      "questionId": "tq08",
+      "category": "multi_hop",
+      "answerType": "grounded",
+      "citedDocumentIds": [
+        "nw_hr_onboarding_guide",
+        "nw_hr_performance_review"
+      ],
+      "retrievedDocumentIds": [
+        "nw_hr_onboarding_guide",
+        "nw_hr_recruiting_interview",
+        "nw_hr_employee_handbook",
+        "nw_hr_performance_review"
+      ],
+      "sectionHit": true,
+      "liveRecall": 1,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0,
+      "status": "pass",
+      "detail": "Grounded answer cited every expected document."
+    },
+    {
+      "questionId": "tq09",
+      "category": "multi_hop",
+      "answerType": "grounded",
+      "citedDocumentIds": [
+        "nw_engineering_incident_escalation",
+        "nw_support_complaint_escalation"
+      ],
+      "retrievedDocumentIds": [
+        "nw_engineering_incident_escalation",
+        "nw_support_atlas_runbook",
+        "nw_engineering_on_call",
+        "nw_engineering_error_code_reference",
+        "nw_support_complaint_escalation",
+        "nw_finance_refund_policy",
+        "nw_support_sla_policy",
+        "nw_finance_employee_expense"
+      ],
+      "sectionHit": true,
+      "liveRecall": 1,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0,
+      "status": "pass",
+      "detail": "Grounded answer cited every expected document."
+    },
+    {
+      "questionId": "tq10",
+      "category": "factual",
+      "answerType": "grounded",
+      "citedDocumentIds": [
+        "nw_support_dsar_process",
+        "nw_legal_privacy_policy"
+      ],
+      "retrievedDocumentIds": [
+        "nw_legal_data_retention",
+        "nw_legal_privacy_policy",
+        "nw_support_dsar_process",
+        "nw_engineering_api_standards",
+        "nw_finance_refund_policy",
+        "nw_support_channels_hours",
+        "nw_hr_onboarding_guide",
+        "nw_support_sla_policy",
+        "nw_support_ticket_priority"
+      ],
+      "sectionHit": true,
+      "liveRecall": 1,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0,
+      "status": "pass",
+      "detail": "Grounded answer cited nw_support_dsar_process, nw_legal_privacy_policy."
+    },
+    {
+      "questionId": "tq11",
+      "category": "multi_hop",
+      "answerType": "grounded",
+      "citedDocumentIds": [
+        "nw_sales_partner_program",
+        "nw_sales_commission_plan"
+      ],
+      "retrievedDocumentIds": [
+        "nw_sales_partner_program",
+        "nw_finance_invoicing_payment",
+        "nw_sales_commission_plan",
+        "nw_sales_referral_program",
+        "nw_sales_territory_assignment"
+      ],
+      "sectionHit": true,
+      "liveRecall": 1,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0,
+      "status": "pass",
+      "detail": "Grounded answer cited every expected document."
+    },
+    {
+      "questionId": "tq12",
+      "category": "factual",
+      "answerType": "grounded",
+      "citedDocumentIds": [
+        "nw_support_complaint_escalation",
+        "nw_finance_refund_policy"
+      ],
+      "retrievedDocumentIds": [
+        "nw_support_complaint_escalation",
+        "nw_finance_refund_policy",
+        "nw_finance_invoicing_payment"
+      ],
+      "sectionHit": true,
+      "liveRecall": 1,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0,
+      "status": "pass",
+      "detail": "Grounded answer cited nw_finance_refund_policy."
+    },
+    {
+      "questionId": "tq13",
+      "category": "factual",
+      "answerType": "grounded",
+      "citedDocumentIds": [
+        "nw_operations_procurement",
+        "nw_legal_contract_review"
+      ],
+      "retrievedDocumentIds": [
+        "nw_operations_procurement",
+        "nw_sales_discount_approval",
+        "nw_legal_contract_review",
+        "nw_sales_proposal_quote",
+        "nw_finance_procurement_forms"
+      ],
+      "sectionHit": true,
+      "liveRecall": 1,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0,
+      "status": "pass",
+      "detail": "Grounded answer cited nw_legal_contract_review."
+    },
+    {
+      "questionId": "tq14",
+      "category": "factual",
+      "answerType": "grounded",
+      "citedDocumentIds": [
+        "nw_support_channels_hours",
+        "nw_support_sla_policy"
+      ],
+      "retrievedDocumentIds": [
+        "nw_support_channels_hours",
+        "nw_hr_onboarding_guide",
+        "nw_support_sla_policy",
+        "nw_support_ticket_priority"
+      ],
+      "sectionHit": false,
+      "liveRecall": 1,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0,
+      "status": "pass",
+      "detail": "Grounded answer cited nw_support_sla_policy. Cited expected documents but not an expected section (Response and Resolution Targets)."
+    },
+    {
+      "questionId": "tq15",
+      "category": "factual",
+      "answerType": "grounded",
+      "citedDocumentIds": [
+        "nw_support_complaint_escalation"
+      ],
+      "retrievedDocumentIds": [
+        "nw_support_complaint_escalation",
+        "nw_support_atlas_runbook",
+        "nw_engineering_on_call",
+        "nw_support_customer_onboarding",
+        "nw_hr_onboarding_guide"
+      ],
+      "sectionHit": true,
+      "liveRecall": 1,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0,
+      "status": "pass",
+      "detail": "Grounded answer cited nw_support_complaint_escalation."
+    },
+    {
+      "questionId": "tq16",
+      "category": "multi_hop",
+      "answerType": "grounded",
+      "citedDocumentIds": [
+        "nw_sales_partner_program",
+        "nw_sales_commission_plan"
+      ],
+      "retrievedDocumentIds": [
+        "nw_sales_commission_plan",
+        "nw_sales_referral_program",
+        "nw_sales_partner_program",
+        "nw_finance_invoicing_payment",
+        "nw_sales_discount_approval",
+        "nw_sales_territory_assignment"
+      ],
+      "sectionHit": true,
+      "liveRecall": 1,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0,
+      "status": "pass",
+      "detail": "Grounded answer cited every expected document."
+    }
+  ]
+}
