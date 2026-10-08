@@ -58,13 +58,14 @@ describe("ActivityTable", () => {
       <ActivityTable
         loadTrace={loadTrace}
         rows={rows}
-        traces={{ a: [{ step: "rewrite", detail: "p1 ticket", duration: "38 ms" }] }}
+        traces={{ a: [{ step: "rewrite", detail: "queryTokens: 6", duration: "38 ms" }] }}
       />,
     );
-    expect(screen.getByText("rewrite")).toBeInTheDocument();
-    expect(screen.getByText("38 ms")).toBeInTheDocument();
+    expect(screen.getByText("Rewrite question")).toBeInTheDocument();
+    expect(screen.getByText("6 tokens")).toBeInTheDocument();
+    expect(screen.getByText("0.0 s")).toBeInTheDocument();
     fireEvent.click(btn);
-    expect(screen.queryByText("rewrite")).toBeNull();
+    expect(screen.queryByText("Rewrite question")).toBeNull();
   });
 
   it("keeps every cell in a row with the toggle button inside the first cell", () => {

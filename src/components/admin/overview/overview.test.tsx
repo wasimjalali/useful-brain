@@ -77,7 +77,7 @@ describe("SystemHealth", () => {
   it("counts errors as warnings too and uses mono for detail", () => {
     render(<SystemHealth rows={[{ id: "x", name: "Brain", status: "error", detail: "Down" }, ...rows]} />);
     expect(screen.getByText("2 warnings")).toBeInTheDocument();
-    expect(screen.getByText("Synced to g-c305cf57")).toHaveClass("font-mono");
+    expect(screen.getByText("g-c305cf57")).toHaveClass("font-mono");
     expect(within(screen.getAllByRole("listitem")[0]).getByText("Down")).toHaveClass("text-danger");
   });
 });
