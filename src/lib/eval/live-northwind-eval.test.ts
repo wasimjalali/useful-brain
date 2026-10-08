@@ -83,10 +83,27 @@ describe("live Northwind eval --questions", () => {
     expect(() => loadTuningQuestions(file, [])).toThrow(/no questions/);
   });
 
-  it("records the harness commit beside each run", () => {
+  it("records the harness commit beside each run, or null outside a git checkout", () => {
     const provenance = harnessProvenance();
-    expect(provenance.harnessGitSha).toMatch(/^[0-9a-f]{40}$/);
-    expect(typeof provenance.harnessDirty).toBe("boolean");
+    if (provenance.harnessGitSha === null) {
+      // A source export without .git (or without git installed) records
+      // an explicit null rather than failing the run.
+      expect(provenance.harnessDirty).toBeNull();
+    } else {
+      expect(provenance.harnessGitSha).toMatch(/^[0-9a-f]{40}$/);
+      expect(typeof provenance.harnessDirty).toBe("boolean");
+    }
+  });
+
+  it("records null provenance when git is unavailable", () => {
+    const cwd = process.cwd();
+    const dir = mkdtempSync(path.join(tmpdir(), "no-git-"));
+    process.chdir(dir);
+    try {
+      expect(harnessProvenance()).toEqual({ harnessGitSha: null, harnessDirty: null });
+    } finally {
+      process.chdir(cwd);
+    }
   });
 
   it("refuses the locked file through another spelling of its path", () => {
@@ -107,6 +124,11 @@ describe("live Northwind eval --questions", () => {
 //    the same expected section);
 // 2. a tuning id equals a locked id, so a merged report mixes the two;
 // 3. a tuning file repeats an id within itself (the loader rejects this).
+// Scope: the guard compares gold document plus expected section only. It
+// does not catch a tuning question that asks a locked fact from a different
+// section of the same document, or a partial overlap inside one section
+// (tu05's 30-day deletion also appears in locked q090's gold); those are
+// reviewed by hand and disclosed in the write-up.
 describe("tuning sets stay apart from the locked battery", () => {
   const root = path.join(process.cwd(), "content/northwind");
   const documents = loadDocuments(root);

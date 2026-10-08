@@ -65,30 +65,48 @@ const CITATION_LABEL_RE = /\[\d{1,2}\]/g;
  * A figure is a quantity with a unit: a duration, a percentage or an amount
  * of money. Bare numbers (years, section and step numbers, counts) never
  * count, so a shared "2026" or "section 4" is not a restatement. Day and hour
- * qualifiers stay part of the figure: 5 business days is not 5 calendar days.
+ * qualifiers stay part of the figure (5 business days is not 5 calendar
+ * days), and so does a money magnitude ($5 million is not $5).
  */
 const FIGURE_RE =
-  /(\d+(?:\.\d+)?)\s+(?:(business|calendar|working)\s+)?(percent|dollars?|minutes?|hours?|days?|weeks?|months?|years?)\b/g;
+  /(\d+(?:\.\d+)?)\s+(?:(thousand|million|billion)\s+)?(?:(business|calendar|working)\s+)?(percent|dollars?|minutes?|hours?|days?|weeks?|months?|years?)\b/g;
+const MONEY_MAGNITUDES: Record<string, string> = {
+  k: "thousand",
+  thousand: "thousand",
+  m: "million",
+  mm: "million",
+  million: "million",
+  b: "billion",
+  bn: "billion",
+  billion: "billion",
+};
 /** One shared figure is coincidence; two in one passage is a restatement candidate. */
 const MIN_SHARED_FIGURES = 2;
 
 /**
  * Distinct figures in a text, in order: "30-day" and "30 days" are both
- * "30 day", "4 business hours" is "4 business hour", "$2,000" is
- * "2000 dollar" and "8%" is "8 percent". Citation labels are not figures.
+ * "30 day", "4 business hours" and "4-business-hour" are both
+ * "4 business hour", "$2,000" is "2000 dollar", "$5 million" and "$5M" are
+ * "5 million dollar", and "8%" is "8 percent". Citation labels are not
+ * figures.
  */
 export function figureTokens(text: string): string[] {
   const prepared = text
     .toLowerCase()
     .replace(CITATION_LABEL_RE, " ")
     .replace(/(\d),(?=\d{3}\b)/g, "$1")
-    .replace(/\$\s?(\d+(?:\.\d+)?)/g, "$1 dollar")
+    .replace(
+      /\$\s?(\d+(?:\.\d+)?)(?:\s?(thousand|million|billion|bn|mm|k|m|b)\b)?/g,
+      (_match, amount: string, magnitude?: string) =>
+        magnitude ? `${amount} ${MONEY_MAGNITUDES[magnitude]} dollar` : `${amount} dollar`,
+    )
     .replace(/(\d)\s?%/g, "$1 percent")
-    .replace(/(\d)-(?=[a-z])/g, "$1 ");
+    .replace(/(\d)-(?=[a-z])/g, "$1 ")
+    .replace(/\b(business|calendar|working)-(?=[a-z])/g, "$1 ");
   const figures: string[] = [];
   for (const match of prepared.matchAll(FIGURE_RE)) {
-    const [, amount, qualifier, unit] = match;
-    const figure = [amount, qualifier, unit.replace(/s$/, "")].filter(Boolean).join(" ");
+    const [, amount, magnitude, qualifier, unit] = match;
+    const figure = [amount, magnitude, qualifier, unit.replace(/s$/, "")].filter(Boolean).join(" ");
     if (!figures.includes(figure)) {
       figures.push(figure);
     }

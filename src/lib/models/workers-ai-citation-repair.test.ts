@@ -443,6 +443,45 @@ describe("Workers AI citation repair", () => {
     );
   });
 
+  // Dedup by text alone drops an exact-sentence twin: the owner policy states
+  // the same sentence as the cited process document, so its quote matches the
+  // draft text but adds a citation the draft lacks.
+  it("keeps the same sentence under a new citation label and drops a true duplicate", async () => {
+    const twinEvidence: CitedRetrievalResult[] = [
+      evidence[0],
+      {
+        ...evidence[0],
+        rank: 2,
+        chunkId: "owner__targets__001",
+        source: "response-targets-policy.md",
+        citationLabel: "[2]",
+        documentId: "response-targets-policy",
+      },
+    ];
+    const run = vi.fn().mockResolvedValue({
+      choices: [
+        {
+          finish_reason: "stop",
+          message: {
+            content: JSON.stringify({
+              quotes: [
+                { quote: "P1 tickets have a first-response target of 1 hour.", citation: "[1]" },
+                { quote: "P1 tickets have a first-response target of 1 hour.", citation: "[2]" },
+              ],
+            }),
+          },
+        },
+      ],
+    });
+    await expect(
+      createWorkersAiCoveragePass({ run })({
+        question: "What is the P1 response target?",
+        draft: "P1 tickets have a first-response target of 1 hour.[1]",
+        evidence: twinEvidence,
+      }),
+    ).resolves.toBe("P1 tickets have a first-response target of 1 hour. [2]");
+  });
+
   it("recovers the quotes object when the model narrates before the JSON", async () => {
     const run = vi.fn().mockResolvedValue({
       choices: [
@@ -611,6 +650,83 @@ describe("truncated extraction", () => {
       }),
     ).rejects.toBeInstanceOf(ExtractionTruncatedError);
     expect(JSON.parse(String(warn.mock.calls[0]?.[0]))).toMatchObject({ pass: "coverage" });
+    warn.mockRestore();
+  });
+
+  // 5. a length-limited answer cut off mid-JSON slips past the empty-content
+  //    check: coverage returns null and repair caches it;
+  // 6. an earlier complete example object in narration stands in for the
+  //    final answer the budget cut off;
+  // 7. the check reads only top-level choices while the parser also accepts
+  //    result.choices.
+  const cutOff = {
+    choices: [
+      {
+        finish_reason: "length",
+        message: { content: '{"quotes":[{"quote":"P1 tickets have a first-response target of 1 hour.","citat' },
+      },
+    ],
+  };
+
+  it("rejects incomplete JSON from a length-limited repair before caching it", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const run = vi.fn().mockResolvedValue(cutOff);
+    const extractionCache = new Map<string, unknown>();
+    await expect(
+      createWorkersAiCitationRepair({ run })({
+        question: "What is the P1 first-response target?",
+        evidence,
+        extractionCache,
+      }),
+    ).rejects.toBeInstanceOf(ExtractionTruncatedError);
+    expect(extractionCache.size).toBe(0);
+    warn.mockRestore();
+  });
+
+  it("rejects incomplete JSON from a length-limited coverage pass", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await expect(
+      createWorkersAiCoveragePass({ run: vi.fn().mockResolvedValue(cutOff) })({
+        question: "What is the P1 response target?",
+        draft: "Something else. [1]",
+        evidence,
+      }),
+    ).rejects.toBeInstanceOf(ExtractionTruncatedError);
+    warn.mockRestore();
+  });
+
+  it("does not accept an earlier example object when the final answer was cut off", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const narrated = {
+      choices: [
+        {
+          finish_reason: "length",
+          message: {
+            content:
+              'The shape is {"quotes":[]} so the answer is {"quotes":[{"quote":"P1 tickets have a first-response',
+          },
+        },
+      ],
+    };
+    await expect(
+      createWorkersAiCoveragePass({ run: vi.fn().mockResolvedValue(narrated) })({
+        question: "What is the P1 response target?",
+        draft: "Something else. [1]",
+        evidence,
+      }),
+    ).rejects.toBeInstanceOf(ExtractionTruncatedError);
+    warn.mockRestore();
+  });
+
+  it("detects truncation inside a result.choices envelope", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await expect(
+      createWorkersAiCoveragePass({ run: vi.fn().mockResolvedValue({ result: truncated }) })({
+        question: "What is the P1 response target?",
+        draft: "Something else. [1]",
+        evidence,
+      }),
+    ).rejects.toBeInstanceOf(ExtractionTruncatedError);
     warn.mockRestore();
   });
 

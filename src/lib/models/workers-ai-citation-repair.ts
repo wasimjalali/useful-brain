@@ -8,7 +8,12 @@ import type { AnswerCoveragePass, GroundedAnswerRepair } from "../agent/run";
 import { ExtractionTruncatedError } from "../agent/extraction-truncated";
 import { hintedPointerGroups, type PointerReason } from "../agent/pointer-completion";
 import { MODELS_WITH_MANDATORY_REASONING, MODELS_WITHOUT_THINKING_TOGGLE } from "./eval-override";
-import { parseWorkersAiChatMessage, runUntilAborted, type WorkersAiChatRunner } from "./workers-ai-chat";
+import {
+  parseWorkersAiChatMessage,
+  readChoice,
+  runUntilAborted,
+  type WorkersAiChatRunner,
+} from "./workers-ai-chat";
 import { CHAT_MODEL_ID } from "./selection";
 
 // Quote extraction needs no chain-of-thought: with thinking enabled the
@@ -41,27 +46,40 @@ function extractionDecoding(modelId: string): Record<string, unknown> {
 }
 
 /**
- * Throws when an extraction ran out of completion budget before writing any
- * content (finish_reason "length", empty answer). That is a failed call, not
- * "no quotes", so it must never be cached or read as an empty result. The
- * one-line warning carries no question, evidence or reasoning text.
+ * Throws when an extraction ran out of completion budget before it finished
+ * its answer: finish_reason "length" with no content, or with content whose
+ * final quotes object is cut off. That is a failed call, not "no quotes", so
+ * it must never be cached or read as an empty result. A length-limited
+ * response is accepted only when its last quotes object is complete JSON.
+ * The choice is read from the same envelopes the chat parser accepts
+ * (`choices` or `result.choices`). The one-line warning carries no
+ * question, evidence or reasoning text.
  */
 function assertNotTruncated(
   response: unknown,
   modelId: string,
   pass: ExtractionTruncatedError["pass"],
 ): void {
-  const choice = isRecord(response) && Array.isArray(response.choices) ? response.choices[0] : undefined;
-  if (!isRecord(choice) || choice.finish_reason !== "length") {
+  let choice: ReturnType<typeof readChoice>;
+  try {
+    choice = readChoice(response);
+  } catch {
+    // A malformed envelope is the chat parser's failure to report.
     return;
   }
-  const message = isRecord(choice.message) ? choice.message : {};
-  const content = typeof message.content === "string" ? message.content.trim() : "";
-  const toolCalls = Array.isArray(message.tool_calls) ? message.tool_calls : [];
-  if (content || toolCalls.length > 0) {
+  if (choice.finish_reason !== "length") {
     return;
   }
-  const usage = isRecord(response) && isRecord(response.usage) ? response.usage : {};
+  const content = typeof choice.message?.content === "string" ? choice.message.content : "";
+  if (finalQuotesObject(content)) {
+    return;
+  }
+  const body = isRecord(response) ? response : {};
+  const usage = isRecord(body.usage)
+    ? body.usage
+    : isRecord(body.result) && isRecord(body.result.usage)
+      ? body.result.usage
+      : {};
   console.warn(
     JSON.stringify({
       event: "extraction_truncated",
@@ -71,6 +89,29 @@ function assertNotTruncated(
     }),
   );
   throw new ExtractionTruncatedError(pass);
+}
+
+/**
+ * The last `{"quotes": [...]}` object in the text, when it is complete JSON.
+ * An earlier complete object (an example in narration) never stands in for
+ * a final one the budget cut off.
+ */
+function finalQuotesObject(raw: string): { quotes: unknown[] } | null {
+  const starts = [...raw.matchAll(/\{\s*"quotes"/g)];
+  const last = starts.at(-1);
+  if (!last) {
+    return null;
+  }
+  const balanced = balancedJsonObject(raw, last.index ?? 0);
+  if (!balanced) {
+    return null;
+  }
+  try {
+    const value: unknown = JSON.parse(balanced);
+    return isRecord(value) && Array.isArray(value.quotes) ? (value as { quotes: unknown[] }) : null;
+  } catch {
+    return null;
+  }
 }
 
 export function createWorkersAiCitationRepair(
@@ -332,7 +373,7 @@ function balancedJsonObject(text: string, start: number): string | null {
  * Second-pass coverage for multi-part questions: returns extra verbatim
  * "quote [n]" paragraphs for asked facts the draft did not answer. Quotes
  * must copy an evidence Text field exactly and carry that field's label;
- * quotes already present in the draft are dropped.
+ * a quote the draft already states under the same label is dropped.
  */
 export function createWorkersAiCoveragePass(
   ai: WorkersAiChatRunner,
@@ -362,9 +403,23 @@ export function createWorkersAiCoveragePass(
     if (!raw) {
       return null;
     }
-    const draftText = normalizeSupportText(draft);
+    // A quote is a duplicate only when a draft paragraph already carries both
+    // its text and its label. The same sentence under a new label (an owner
+    // policy stating exactly what the cited process document states) adds
+    // that citation and is kept.
+    const draftParagraphs = draft.split(/\n\s*\n/).map((paragraph) => ({
+      text: normalizeSupportText(paragraph),
+      labels: new Set(paragraph.match(/\[\d{1,2}\]/g) ?? []),
+    }));
     const additions = parseExactQuoteItems(raw, evidence)
-      .filter((item) => !draftText.includes(normalizeSupportText(item.quote)))
+      .filter(
+        (item) =>
+          !draftParagraphs.some(
+            (paragraph) =>
+              paragraph.labels.has(item.citation) &&
+              paragraph.text.includes(normalizeSupportText(item.quote)),
+          ),
+      )
       .map((item) => `${item.quote} ${item.citation}`);
     return additions.length > 0 ? additions.join("\n\n") : null;
   };

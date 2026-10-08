@@ -151,7 +151,8 @@ describe("hintedUncitedDocuments", () => {
 // 5. numeric coincidence: shared years (2024, 2026), section or list
 //    numbers, or bare counts make an unrelated document a "twin";
 // 6. a unit qualifier is dropped, so 5 business days matches 5 calendar
-//    days;
+//    days, or a hyphenated "1-business-day" is not read at all;
+// 6b. a money magnitude is dropped, so "$5 million" matches "$5";
 // 7. restating twins evict documents the question names, or explicit
 //    contrasts, under the hint cap; or named neighbors from cited text
 //    evict the twin;
@@ -199,6 +200,28 @@ describe("figureTokens", () => {
     expect(figureTokens("The window applies. [2] [4]")).toEqual([]);
     expect(figureTokens("Effective 2026 and reviewed in 2024, per section 4.2 and step 3 of 10 steps.")).toEqual([]);
     expect(figureTokens("SEV-2 tickets and P1 issues under clause 7.3(b)")).toEqual([]);
+  });
+
+  it("reads hyphenated qualified durations like their spaced twins", () => {
+    expect(figureTokens("a 1-business-day response and 5-business-day resolution")).toEqual([
+      "1 business day",
+      "5 business day",
+    ]);
+    expect(figureTokens("a 1 business day response and 5 business days resolution")).toEqual([
+      "1 business day",
+      "5 business day",
+    ]);
+    expect(figureTokens("a 10-calendar-day window")).toEqual(["10 calendar day"]);
+  });
+
+  it("keeps the magnitude of scaled money amounts", () => {
+    expect(figureTokens("deals above $5 million")).toEqual(["5 million dollar"]);
+    expect(figureTokens("deals above $5M")).toEqual(["5 million dollar"]);
+    expect(figureTokens("a $5 fee")).toEqual(["5 dollar"]);
+    expect(figureTokens("budgets of $2.5 billion and $250k")).toEqual([
+      "2.5 billion dollar",
+      "250 thousand dollar",
+    ]);
   });
 
   it("keeps day qualifiers apart", () => {
@@ -263,6 +286,28 @@ describe("hintedPointerGroups: restated figures", () => {
         other,
       ]),
     ).toEqual([]);
+  });
+
+  it("does not treat scaled and unscaled money as the same figures", () => {
+    const cited = neighbor("[1]", "acme_deals", "deal-approval.md", "Deals above $5 million and up to $20 million need board review.");
+    const other = neighbor("[2]", "acme_fees", "fee-schedule.md", "Fees range from $5 to $20 per seat.");
+    expect(
+      hintedPointerGroups("Which deals need board review?", "Deals above $5 million and up to $20 million need board review. [1]", [
+        cited,
+        other,
+      ]),
+    ).toEqual([]);
+  });
+
+  it("hints a twin that writes the same durations with hyphens", () => {
+    const cited = neighbor("[1]", "acme_channels", "channels.md", "Email gets a 1 business day response and 5 business days resolution.");
+    const owner = neighbor("[2]", "acme_sla", "sla.md", "P3 tickets get a 1-business-day response and a 5-business-day resolution.");
+    expect(
+      hintedPointerGroups("How fast do we answer email?", "Email gets a 1 business day response and 5 business days resolution. [1]", [
+        cited,
+        owner,
+      ]).map((group) => [group.reason, group.items[0]?.documentId]),
+    ).toEqual([["restates", "acme_sla"]]);
   });
 
   it("protects documents named in the question and explicit contrasts from restating twins", () => {
