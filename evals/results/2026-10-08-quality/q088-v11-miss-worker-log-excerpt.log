@@ -1,0 +1,63 @@
+DBG-QUALITY raw {"q":"How long do we have to respond to a customer data access request?","searches":[{"query":"customer data access request response time deadline"}],"rawFinal":"The Customer Data Access Requests process states that a request \"runs on the 30-day response window\" [6].\n\nThe Privacy Policy adds the full rule: \"Northwind responds within 30 days; where a request is complex or the v
+DBG-QUALITY precover {"grounded":"runs on the 30-day response window[6]\n\nNorthwind responds within 30 days; where a request is complex or the volume is large, the response can be extended by up to 60 days, with notice to the requester[3]","multi":false,"hints":[["[1] nw_finance_refund_policy"],["[4] nw_support_sla_policy"],["[7] nw_support_complaint_escalation"]]}
+✘ [ERROR] Error: internal error; reference = b9bj7nfvieu8c5qgrufsm0jv
+✘ [ERROR] Error: internal error; reference = joneujuhg6a90mcplie47vp5
+✘ [ERROR] Error: internal error; reference = 49c87dps5dundpija2ohsvs2
+✘ [ERROR] Error: internal error; reference = jjciogem3qtsiclmvbq8pd9c
+✘ [ERROR] Error: internal error; reference = 04h62mekpgrh8n0c9hkfiulq
+✘ [ERROR] Error: internal error; reference = 9qtcuilen7tc665r0qp42s2e
+✘ [ERROR] Error: internal error; reference = pf1qti7qi0gfj03rs4gdphpj
+✘ [ERROR] Error: internal error; reference = ipltqlbrsrpd2pdsle32arfq
+✘ [ERROR] Error: internal error; reference = 9tqb8ta1ttup8dsmrs6rm6ej
+DBG-QUALITY coverraw {"raw":"{\"quotes\":[]}","resp":"nces the dedicated policy, return dedicated policy's sentence. Draft quotes [6] which references the 30-day window directly — it states the fact itself. [3] is the dedicated policy and is cited. So quotes empty? The instruction says also return dedicated policy sentence when draft quotes a document that only restates/references. [6] states the 
+{"requestId":"cab51e84-7bc4-474b-a087-b9f1df0a6fd4","principalKind":"user","operation":"turns","status":"ok","durationMs":27575}
+[wrangler:info] POST /turns 200 OK (27577ms)
+✘ [ERROR] Error: internal error; reference = 892srs0i9i0vif16kbtuhrfe
+✘ [ERROR] Error: internal error; reference = qj71ljc9avbg9jsho1gm9oea
+✘ [ERROR] Error: internal error; reference = g9sej09gc8v6cd20j2keh8k5
+✘ [ERROR] Error: internal error; reference = op3dc6uceco2fbkl0uo2qm09
+✘ [ERROR] Error: internal error; reference = rrdct8bsu9ro8ekotj57tu93
+✘ [ERROR] Error: internal error; reference = 348ipoime2kas7q7ov38qcvj
+✘ [ERROR] Error: internal error; reference = v98kmqgs5lqpv2ond9dqg2rp
+✘ [ERROR] Error: internal error; reference = 832kliea083rteso0f0mg2e4
+✘ [ERROR] Error: internal error; reference = 3cu66lfv9evgvs3m2u2t7r5q
+✘ [ERROR] Error: internal error; reference = aiggtijavjve84vh3ti2qpar
+✘ [ERROR] Error: internal error; reference = p5f17e13oea3tp6ugbmtlamb
+✘ [ERROR] Error: internal error; reference = m6q577jbs3i2etv651v8rmf6
+✘ [ERROR] Error: internal error; reference = 8jeb8o0bujcb83q2faue639g
+✘ [ERROR] Error: internal error; reference = 412gm56tauv2tno37300cigc
+✘ [ERROR] Error: internal error; reference = 2asdle9bvb2bq0hq8f34r893
+✘ [ERROR] Error: internal error; reference = 3fghvk341mc60vqbsei91nrr
+✘ [ERROR] Error: internal error; reference = omlegk6n6bsokjsq90vjtso3
+✘ [ERROR] Error: internal error; reference = osn3793bm469ih7drn99einb
+✘ [ERROR] Error: internal error; reference = v3p4u0ja3hs2atq6mau5q4tv
+✘ [ERROR] Error: internal error; reference = hebmv3tmardmpd1akg4m2tqg
+✘ [ERROR] Error: internal error; reference = 7osaloqb86pt9amgdkglr4vp
+✘ [ERROR] Error: internal error; reference = 8s9rc5ipi4bg0707l9l4eo27
+✘ [ERROR] Error: internal error; reference = iucmmif5ffsmsjogfo9esher
+✘ [ERROR] Error: internal error; reference = s93pkks5t0ve8grtpmlesl17
+✘ [ERROR] Error: internal error; reference = 0qmhn8t457lq1196tnqd19uc
+✘ [ERROR] Error: internal error; reference = jt843peep2fopjcnkjotdo6i
+✘ [ERROR] Error: internal error; reference = 41f0987rot0v3s3a49pu1juq
+✘ [ERROR] Error: internal error; reference = ll5m4ofrntgtkn628t3604a2
+✘ [ERROR] Error: internal error; reference = 76gpnjld8k9qk1hmtuvc7jdh
+✘ [ERROR] Error: internal error; reference = o84epmqdtr9pfulj256shad8
+✘ [ERROR] Error: internal error; reference = rmafeaio900c38e4mfm05ddp
+✘ [ERROR] Error: internal error; reference = f6ac8bf26heclc5hcppm0g6l
+✘ [ERROR] Error: internal error; reference = 30cqjn6h5sorddbsgtoceko7
+✘ [ERROR] Error: internal error; reference = 20jkg7arvol9b6dkb113u8to
+✘ [ERROR] Error: internal error; reference = 6jhd1dpk06j81lk5m7lmcobv
+✘ [ERROR] Error: internal error; reference = 36hjrkrbrq3dgot8tlf0ob3k
+✘ [ERROR] Error: internal error; reference = drh41lk3h8ctfnunjsdvkvj5
+✘ [ERROR] Error: internal error; reference = cgddillp8soi7qvar2o5cr5q
+✘ [ERROR] Error: internal error; reference = 4ssdevshpndvjo01f7aadfmg
+✘ [ERROR] Error: internal error; reference = pecnn09umsc41pq1ml7rdbjv
+✘ [ERROR] Error: internal error; reference = bjee3g0dt8p225uafgncj8sk
+✘ [ERROR] Error: internal error; reference = 1m16f8ks4v833ojdpsudcsms
+✘ [ERROR] Error: internal error; reference = ltk3m8u38f5bvc1ta41vjniv
+✘ [ERROR] Error: internal error; reference = ag8nqv0r77gd5gieu7vp8hki
+✘ [ERROR] Error: internal error; reference = o852fndsavd73tv065kc7bpq
+✘ [ERROR] Error: internal error; reference = c6hbovladmnprlgauigre02o
+✘ [ERROR] Error: internal error; reference = dbf721imfv5n1oaebhst60c9
+✘ [ERROR] Error: internal error; reference = chkll8cl2mq59mhkbpadjqvb
+DBG-QUALITY raw {"q":"A sales manager wants to explain to a rep how an employee referral payout works and how commission is calculated on a new deal. What are both numbers?","searches":[],"rawFinal":"","grounded":"","ev":[]}

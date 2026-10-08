@@ -1,0 +1,49 @@
+{
+  "model": "@cf/zai-org/glm-5.3-flash",
+  "questionsFile": "content/northwind/tuning-questions.json",
+  "harnessGitSha": "14a17b2f11d33016c7769bf1cd37faff4477411c",
+  "harnessDirty": true,
+  "pipelineVersion": "grounded-answer.v12|real-stack|300/30|0.70/0.30|kw6|kr3|cb0.05|rr20|@cf/baai/bge-reranker-base|floor0.05|top8|fts-stopword-or-v1",
+  "latency": {
+    "count": 16,
+    "total": 16,
+    "partial": false,
+    "meanMs": 29476,
+    "p50Ms": 21711,
+    "p95Ms": 118737
+  },
+  "retrieval": {
+    "recallAtK": 0.90625,
+    "mrr": 0.8333333333333334,
+    "ndcgAtK": 0.844861410050375,
+    "citationCorrectness": 0.625,
+    "abstentionCorrectness": 0,
+    "aclLeakCount": 0,
+    "questions": 16
+  },
+  "live": {
+    "total": 16,
+    "scored": 16,
+    "passed": 16,
+    "failed": 0,
+    "skipped": 0,
+    "passRate": 1,
+    "byCategory": {
+      "factual": {
+        "scored": 14,
+        "passed": 14
+      },
+      "multi_hop": {
+        "scored": 2,
+        "passed": 2
+      }
+    },
+    "retrievedRecall": 1,
+    "goldRetrievedUncitedCount": 0,
+    "citedNotExpectedCount": 3,
+    "vectorDegradedTurns": 0,
+    "hybridBaselineComparable": true,
+    "refusedWithEvidence": 0
+  },
+  "failures": []
+}

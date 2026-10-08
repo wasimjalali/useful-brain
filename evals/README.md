@@ -6,7 +6,7 @@ Every eval campaign in this repo gets documented here: model evals (comparing mo
 
 | Date | Type | Report | Headline |
 | --- | --- | --- | --- |
-| 2026-10-08 | System | [Pointer twin fix](system-evals/2026-10-08-pointer-twin-fix.md) | The coverage pass was returning empty content 67% of the time; fixed, q028 0/4 to 5/6, q088 1/4 to 5/6, tuning set 46/48 to 48/48 |
+| 2026-10-08 | System | [Pointer twin fix](system-evals/2026-10-08-pointer-twin-fix.md) | The coverage pass returned empty content 67% of the time; fixed, q028 0/4 to 3/3, q088 1/4 to 3/3, new tuning set 46/48 to 47/48 |
 | 2026-10-08 | System | [Redesign verification](system-evals/2026-10-08-redesign-verification.md) | 115/120 twice, 0 leaks; A/B finds no sign the redesign caused the gap from 118 |
 | 2026-09-06 | System | [Pointer-triggered coverage](system-evals/2026-09-06-northwind-pointer-coverage.md) | Systemic fixes only: 116 to 118/120, no corpus-fitted logic |
 | 2026-08-31 | System | [Northwind grounding repair](system-evals/2026-08-31-northwind-grounding-repair.md) | Live pass rate 72% to 95% (114/120) without touching a scorer |
