@@ -71,7 +71,7 @@ About 440 live turns across the two full runs, the re-ask, the A/B and the brown
 ## What changed because of this
 
 - Nothing in the answer path. The ticket instruction stays: removing it doesn't move the score, and approvals need it.
-- The redesign's eval gate is recorded as "115/120 twice, 0 leaks, gap not shown to be caused by the redesign" instead of "118 or better". That's a judgment call on a small control, flagged for Wasim. The band on this battery is wider than the 2026-09-06 report's 116 to 120.
+- The redesign's eval gate is recorded as "115/120 twice, 0 leaks, gap not shown to be caused by the redesign" instead of "118 or better". Wasim accepted that result on 2026-10-08. The band on this battery is wider than the 2026-09-06 report's 116 to 120.
 - Worth doing next (not done here): repeat full runs on a fresh worker per run, and fix q088 and q028 with corpus-agnostic changes measured over several runs rather than one.
 
 ## Reproduce
