@@ -7,6 +7,7 @@ import {
   DRAFT_CHECKS_PER_DAY,
   DRAFT_LIVE_RECALL_FLOOR,
   decideChecks,
+  finishCheckRun,
   MutationPendingError,
   reconcileDraft,
   reserveCheckRun,
@@ -25,6 +26,7 @@ import {
   type DocumentToIndex,
 } from "../../../src/lib/ingest/draft-index";
 import { generationNamespace, vectorIdForChunk } from "../../../src/lib/ingest/digests";
+import { VectorInventoryError, type VectorInventory } from "../../../src/lib/ingest/vector-inventory";
 import { ensureDraftGeneration } from "../../../src/lib/store/corpus-d1";
 import { claimDiscard, closeDraft, ensureOpenDraft, failDraft, getOpenDraft, markBaseCopied } from "../../../src/lib/store/drafts";
 import { claimFinalize, startIndexing } from "../../../src/lib/store/draft-state";
@@ -718,6 +720,216 @@ describe("reconciliation", () => {
     ).rejects.toThrow("boom");
     const n = await env.CORPUS_DB.prepare("SELECT COUNT(*) AS n FROM reconciliation_audits WHERE id = ?").bind(draft.generationId).first<{ n: number }>();
     expect(n!.n).toBe(0);
+  });
+
+  describe("with a full Vectorize inventory (D20)", () => {
+    function listing(store: Map<string, unknown>): VectorInventory {
+      return { listAll: async () => ({ ids: [...store.keys()], totalCount: store.size }) };
+    }
+
+    function addOrphan(vectors: ReturnType<typeof fakeVectors>, id: string, namespace: string) {
+      vectors.store.set(id, { id, values: [], namespace, metadata: { acl_group: "a".repeat(32) } });
+    }
+
+    const auditRow = (generationId: string) =>
+      env.CORPUS_DB.prepare("SELECT status, missing_count, orphan_count FROM reconciliation_audits WHERE id = ?")
+        .bind(generationId)
+        .first<Record<string, unknown>>();
+
+    it("with no inventory configured the outcome is binding-only and says so", async () => {
+      const { vectors, draft } = await draftWithVectors();
+      addOrphan(vectors, "unlisted-orphan", await generationNamespace(draft.generationId));
+      const outcome = await reconcileDraft({ db: db(), vectors: vectors.port, generationId: draft.generationId });
+      expect(outcome).toMatchObject({
+        mode: "ledger_getbyids",
+        reconciled: true,
+        status: "complete",
+        missing: 0,
+        inventoryChecked: false,
+        orphanVectors: null,
+        orphanVectorsInDraft: null,
+      });
+      expect(await auditRow(draft.generationId)).toEqual({ status: "complete", missing_count: 0, orphan_count: 0 });
+    });
+
+    it("a keyword-only draft ignores an inventory: there is no index to list", async () => {
+      const draft = await newDraft();
+      let listed = 0;
+      const inventory: VectorInventory = { listAll: async () => { listed += 1; return { ids: [], totalCount: 0 }; } };
+      const outcome = await reconcileDraft({ db: db(), vectors: null, inventory, generationId: draft.generationId });
+      expect(outcome).toMatchObject({ mode: "keyword_only", reconciled: true, inventoryChecked: false });
+      expect(listed).toBe(0);
+    });
+
+    it("an index that holds exactly the ledger reconciles with zero orphans", async () => {
+      const { vectors, draft } = await draftWithVectors();
+      const outcome = await reconcileDraft({ db: db(), vectors: vectors.port, inventory: listing(vectors.store), generationId: draft.generationId });
+      expect(outcome).toMatchObject({
+        mode: "ledger_getbyids",
+        reconciled: true,
+        status: "complete",
+        missing: 0,
+        inventoryChecked: true,
+        orphanVectors: 0,
+        orphanVectorsInDraft: 0,
+      });
+      expect(await auditRow(draft.generationId)).toEqual({ status: "complete", missing_count: 0, orphan_count: 0 });
+    });
+
+    it("an orphan in the draft namespace fails the draft; the reason counts it and never names an id", async () => {
+      const { vectors, draft } = await draftWithVectors();
+      addOrphan(vectors, "stray-draft-vector-1", await generationNamespace(draft.generationId));
+      addOrphan(vectors, "stray-draft-vector-2", await generationNamespace(draft.generationId));
+      const outcome = await reconcileDraft({ db: db(), vectors: vectors.port, inventory: listing(vectors.store), generationId: draft.generationId });
+      expect(outcome).toMatchObject({ reconciled: false, status: "complete", missing: 0, inventoryChecked: true, orphanVectors: 2, orphanVectorsInDraft: 2 });
+      expect(outcome.reason).toMatch(/2 /);
+      expect(outcome.reason).not.toMatch(/stray-draft/);
+      expect(await auditRow(draft.generationId)).toEqual({ status: "complete", missing_count: 0, orphan_count: 2 });
+    });
+
+    it("an orphan in another namespace is counted but does not block", async () => {
+      const { vectors, draft } = await draftWithVectors();
+      addOrphan(vectors, "stray-elsewhere", "some-other-namespace");
+      const outcome = await reconcileDraft({ db: db(), vectors: vectors.port, inventory: listing(vectors.store), generationId: draft.generationId });
+      expect(outcome).toMatchObject({ reconciled: true, status: "complete", inventoryChecked: true, orphanVectors: 1, orphanVectorsInDraft: 0 });
+      expect(await auditRow(draft.generationId)).toEqual({ status: "complete", missing_count: 0, orphan_count: 0 });
+    });
+
+    it("a listed id that is already gone from the index is a race, not an orphan", async () => {
+      const { vectors, draft } = await draftWithVectors();
+      const gone: VectorInventory = {
+        listAll: async () => ({ ids: [...vectors.store.keys(), "deleted-after-listing"], totalCount: vectors.store.size + 1 }),
+      };
+      const outcome = await reconcileDraft({ db: db(), vectors: vectors.port, inventory: gone, generationId: draft.generationId });
+      expect(outcome).toMatchObject({ reconciled: true, orphanVectors: 0, orphanVectorsInDraft: 0 });
+    });
+
+    it("fails when the listing lacks a ledger id the binding can still fetch", async () => {
+      const { vectors, draft, doc } = await draftWithVectors();
+      const row = await env.CORPUS_DB.prepare("SELECT vector_id FROM chunks WHERE generation_id = ? AND document_id = ?")
+        .bind(draft.generationId, doc.documentId)
+        .first<{ vector_id: string }>();
+      const lagging: VectorInventory = {
+        listAll: async () => ({ ids: [...vectors.store.keys()].filter((id) => id !== row!.vector_id), totalCount: 0 }),
+      };
+      const outcome = await reconcileDraft({ db: db(), vectors: vectors.port, inventory: lagging, generationId: draft.generationId });
+      expect(outcome).toMatchObject({ reconciled: false, missing: 1 });
+      expect(await auditRow(draft.generationId)).toEqual({ status: "complete", missing_count: 1, orphan_count: 0 });
+    });
+
+    it("a ledger id missing from the listing is retried while pending, so index lag is absorbed", async () => {
+      const { vectors, draft, doc } = await draftWithVectors();
+      const row = await env.CORPUS_DB.prepare("SELECT vector_id FROM chunks WHERE generation_id = ? AND document_id = ?")
+        .bind(draft.generationId, doc.documentId)
+        .first<{ vector_id: string }>();
+      let visible = false;
+      const eventually: VectorInventory = {
+        listAll: async () => {
+          const ids = [...vectors.store.keys()].filter((id) => visible || id !== row!.vector_id);
+          return { ids, totalCount: ids.length };
+        },
+      };
+      const run = () => reconcileDraft({ db: db(), vectors: vectors.port, inventory: eventually, generationId: draft.generationId, missingIsPending: true });
+      await expect(run()).rejects.toBeInstanceOf(MutationPendingError);
+      expect((await auditRow(draft.generationId)) ?? null).toBeNull();
+      visible = true;
+      expect(await run()).toMatchObject({ reconciled: true, inventoryChecked: true });
+    });
+
+    it("does not list the index while ledger vectors are still missing from getByIds", async () => {
+      const { vectors, draft, doc } = await draftWithVectors();
+      const row = await env.CORPUS_DB.prepare("SELECT vector_id FROM chunks WHERE generation_id = ? AND document_id = ?")
+        .bind(draft.generationId, doc.documentId)
+        .first<{ vector_id: string }>();
+      vectors.drop(row!.vector_id);
+      let listed = 0;
+      const inventory: VectorInventory = { listAll: async () => { listed += 1; return { ids: [], totalCount: 0 }; } };
+      await expect(
+        reconcileDraft({ db: db(), vectors: vectors.port, inventory, generationId: draft.generationId, missingIsPending: true }),
+      ).rejects.toBeInstanceOf(MutationPendingError);
+      const final = await reconcileDraft({ db: db(), vectors: vectors.port, inventory, generationId: draft.generationId });
+      expect(final).toMatchObject({ reconciled: false, missing: 1, inventoryChecked: false });
+      expect(listed).toBe(0);
+    });
+
+    it("vectors held by discarded drafts, and by other generations, are known and not orphans", async () => {
+      const { vectors, draft } = await draftWithVectors();
+      const namespace = await generationNamespace(draft.generationId);
+      addOrphan(vectors, "tombstoned-vector", namespace);
+      await env.CORPUS_DB.prepare("INSERT INTO discarded_vectors (generation_id, vector_id) VALUES (?, ?)")
+        .bind("some-discarded-generation", "tombstoned-vector")
+        .run();
+      const other = await env.CORPUS_DB.prepare("SELECT vector_id FROM chunks WHERE generation_id <> ? LIMIT 1")
+        .bind(draft.generationId)
+        .first<{ vector_id: string }>();
+      if (other) {
+        addOrphan(vectors, other.vector_id, "some-other-namespace");
+      }
+      const outcome = await reconcileDraft({ db: db(), vectors: vectors.port, inventory: listing(vectors.store), generationId: draft.generationId });
+      expect(outcome).toMatchObject({ reconciled: true, inventoryChecked: true, orphanVectors: 0, orphanVectorsInDraft: 0 });
+    });
+
+    it("a listing error rethrows while pending so the step retries, and records nothing", async () => {
+      const { vectors, draft } = await draftWithVectors();
+      const broken: VectorInventory = { listAll: async () => { throw new VectorInventoryError("list request failed: HTTP 503"); } };
+      await expect(
+        reconcileDraft({ db: db(), vectors: vectors.port, inventory: broken, generationId: draft.generationId, missingIsPending: true }),
+      ).rejects.toBeInstanceOf(VectorInventoryError);
+      expect(await auditRow(draft.generationId)).toBeNull();
+    });
+
+    it("on the final attempt a listing error records a partial audit and is not reconciled", async () => {
+      const { vectors, draft } = await draftWithVectors();
+      const broken: VectorInventory = { listAll: async () => { throw new VectorInventoryError("list request failed: HTTP 503"); } };
+      const outcome = await reconcileDraft({ db: db(), vectors: vectors.port, inventory: broken, generationId: draft.generationId });
+      expect(outcome).toMatchObject({ mode: "ledger_getbyids", reconciled: false, status: "partial", expected: 1, inventoryChecked: false, orphanVectors: null });
+      expect(outcome.reason).toMatch(/index scan failed: VectorInventoryError/);
+      expect(await auditRow(draft.generationId)).toEqual({ status: "partial", missing_count: 1, orphan_count: 0 });
+    });
+
+    it("records the inventory columns on the draft check and leaves reconcile_mode alone", async () => {
+      const { vectors, draft } = await draftWithVectors();
+      addOrphan(vectors, "stray-elsewhere", "some-other-namespace");
+      await reserveCheckRun(db(), draft.generationId);
+      const outcome = await reconcileDraft({ db: db(), vectors: vectors.port, inventory: listing(vectors.store), generationId: draft.generationId });
+      await finishCheckRun(db(), draft.generationId, {
+        status: "passed",
+        reconciled: outcome.reconciled,
+        mode: outcome.mode,
+        inventoryChecked: outcome.inventoryChecked,
+        orphanVectors: outcome.orphanVectors,
+        orphanVectorsInDraft: outcome.orphanVectorsInDraft,
+        aclLeaks: 0,
+        liveRecall: 1,
+        questionsRun: 1,
+        errorCode: null,
+      });
+      const row = await env.CORPUS_DB.prepare(
+        "SELECT reconcile_mode, inventory_checked, orphan_vectors, orphan_vectors_in_draft FROM draft_checks WHERE generation_id = ?",
+      )
+        .bind(draft.generationId)
+        .first<Record<string, unknown>>();
+      expect(row).toEqual({ reconcile_mode: "ledger_getbyids", inventory_checked: 1, orphan_vectors: 1, orphan_vectors_in_draft: 0 });
+      // Binding-only: the columns stay NULL, not zero.
+      await finishCheckRun(db(), draft.generationId, {
+        status: "passed",
+        reconciled: true,
+        mode: "ledger_getbyids",
+        inventoryChecked: false,
+        orphanVectors: null,
+        orphanVectorsInDraft: null,
+        aclLeaks: 0,
+        liveRecall: 1,
+        questionsRun: 1,
+        errorCode: null,
+      });
+      const bare = await env.CORPUS_DB.prepare(
+        "SELECT inventory_checked, orphan_vectors, orphan_vectors_in_draft FROM draft_checks WHERE generation_id = ?",
+      )
+        .bind(draft.generationId)
+        .first<Record<string, unknown>>();
+      expect(bare).toEqual({ inventory_checked: 0, orphan_vectors: null, orphan_vectors_in_draft: null });
+    });
   });
 });
 

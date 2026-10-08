@@ -18,6 +18,7 @@ import { WorkersAiReranker } from "../retrieve/workers-ai-reranker";
 import { auditStoreConsistency } from "../store/inventory-audit";
 import { loadExpectedVectorIds, recordAudit, type SqlExecutor } from "../store/corpus-d1";
 import type { VectorPort } from "./draft-index";
+import type { VectorInventory } from "./vector-inventory";
 
 /** Draft checks per UTC day. Above it a draft waits as "paused". */
 export const DRAFT_CHECKS_PER_DAY = 10;
@@ -41,8 +42,14 @@ export type ReconcileOutcome = {
   missing: number;
   /** Null only for the synthetic outcome when even the ledger could not be read. */
   expected: number | null;
-  /** Why an audit is partial, when it is. Diagnostic only; the audit table has no column for it. */
+  /** Why an audit is partial or not reconciled, when it is. Counts only, never vector ids. */
   reason?: string;
+  /** True when the whole index was listed and compared with D1. False means binding-only. */
+  inventoryChecked: boolean;
+  /** Listed ids no D1 row accounts for that still exist in the index. Null unless inventoryChecked. */
+  orphanVectors: number | null;
+  /** The subset of those in the draft's own namespace. Any of them blocks the draft. Null unless inventoryChecked. */
+  orphanVectorsInDraft: number | null;
   /** Index-wide processed mutation before and after the scan. Advisory, never a gate. */
   startWatermark?: string | null;
   endWatermark?: string | null;
@@ -75,15 +82,34 @@ async function readWatermark(vectors: VectorPort): Promise<string> {
 }
 
 /**
+ * Known vector ids: every chunk row in any generation, plus the tombstones of
+ * discarded drafts that are not purged yet (the purge deletes a tombstone once
+ * its vector is gone). Anything else in the index has no D1 row behind it.
+ */
+async function loadKnownVectorIds(db: SqlExecutor): Promise<Set<string>> {
+  const chunks = await db.prepare(`SELECT vector_id FROM chunks`).all<{ vector_id: string }>();
+  const tombstones = await db.prepare(`SELECT vector_id FROM discarded_vectors`).all<{ vector_id: string }>();
+  return new Set([...chunks.results, ...tombstones.results].map((row) => row.vector_id));
+}
+
+/**
  * Reconciles the draft's D1 vector ledger with the index. With a Vectorize
  * binding it fetches every ledger id back and checks namespace and ACL
  * metadata. That per-id check is the decisive one. The index is shared by every
  * generation, so its processed-mutation watermark can move for reasons that are
  * not this draft's (another draft, a purge). The watermark is therefore only
  * recorded for diagnostics and never gates the result; lag shows up as missing
- * ids, which `missingIsPending` retries. The binding has no list call, so
- * orphan vectors cannot be enumerated here; that gap is part of the recorded
- * mode. With no binding (keyword-only) there are no vectors, so the audit is
+ * ids, which `missingIsPending` retries. The binding has no list call, so on
+ * its own it cannot find orphan vectors; the outcome says so with
+ * `inventoryChecked: false`.
+ *
+ * With an `inventory` (a Vectorize Read token is configured) and every ledger
+ * vector verified, the whole index is listed. A ledger id absent from the
+ * listing counts as missing (lag, retried while pending). Listed ids that no
+ * chunk row or undeleted tombstone accounts for are orphans: those still
+ * present in the draft's namespace fail the draft, those in other namespaces
+ * are only counted because every query filters by namespace and `acl_group`.
+ * With no binding (keyword-only) there are no vectors, so the audit is
  * recorded as empty and clean with mode "keyword_only".
  *
  * On the final attempt (`missingIsPending` false) an audit is always recorded:
@@ -94,6 +120,8 @@ export async function reconcileDraft(
   input: {
     db: SqlExecutor;
     vectors: VectorPort | null;
+    /** Lists the whole index. Absent means binding-only reconciliation. */
+    inventory?: VectorInventory | null;
     generationId: string;
     now?: number;
     /**
@@ -117,11 +145,21 @@ export async function reconcileDraft(
       vectorIds: () => [],
     });
     await recordAudit(db, generationId, report, now);
-    return { mode: "keyword_only", reconciled: report.clean, status: report.status, missing: 0, expected: expectedCount };
+    return {
+      mode: "keyword_only",
+      reconciled: report.clean,
+      status: report.status,
+      missing: 0,
+      expected: expectedCount,
+      inventoryChecked: false,
+      orphanVectors: null,
+      orphanVectorsInDraft: null,
+    };
   }
   let present: string[];
   let processedBefore: string;
   let processedAfter: string;
+  let inventoried: { orphans: number; inDraft: string[] } | null = null;
   try {
     processedBefore = await readWatermark(vectors);
     const aclRows = await db
@@ -140,6 +178,24 @@ export async function reconcileDraft(
         const aclOk = typeof ledgerAcl === "string" && vector.metadata?.acl_group === ledgerAcl;
         if (namespaceOk && aclOk && expected[vector.id] !== undefined) {
           present.push(vector.id);
+        }
+      }
+    }
+    // List the index only once every ledger vector is visible: until then the
+    // result is pending or failed anyway and a listing would be wasted.
+    if (input.inventory && present.length === expectedCount) {
+      const listed = new Set((await input.inventory.listAll()).ids);
+      present = present.filter((id) => listed.has(id));
+      const known = await loadKnownVectorIds(db);
+      const unknown = [...listed].filter((id) => !known.has(id));
+      inventoried = { orphans: 0, inDraft: [] };
+      for (const batch of chunksOf(unknown, VECTOR_GET_LIMIT)) {
+        // An unknown id that no longer resolves was deleted since the listing: not an orphan.
+        for (const vector of await vectors.getByIds(batch)) {
+          inventoried.orphans += 1;
+          if (vector.namespace === namespace) {
+            inventoried.inDraft.push(vector.id);
+          }
         }
       }
     }
@@ -168,14 +224,25 @@ export async function reconcileDraft(
       },
       now,
     );
-    return { mode: "ledger_getbyids", reconciled: false, status: "partial", missing: expectedCount, expected: expectedCount, reason };
+    return {
+      mode: "ledger_getbyids",
+      reconciled: false,
+      status: "partial",
+      missing: expectedCount,
+      expected: expectedCount,
+      reason,
+      inventoryChecked: false,
+      orphanVectors: null,
+      orphanVectorsInDraft: null,
+    };
   }
   // The watermark is advisory: a constant stands in for it so a shared index
   // moving under us cannot turn a verified inventory into a partial one.
   const report = auditStoreConsistency({
     inventoryWatermark: () => "advisory",
     expectedVectorIds: () => expected,
-    vectorIds: () => present,
+    // Orphans in the draft's namespace count as index content the ledger does not own.
+    vectorIds: () => [...present, ...(inventoried?.inDraft ?? [])],
   });
   report.startWatermark = processedBefore || null;
   report.endWatermark = processedAfter || null;
@@ -183,13 +250,21 @@ export async function reconcileDraft(
     throw new MutationPendingError();
   }
   await recordAudit(db, generationId, report, now);
+  const reason =
+    report.reason ??
+    (inventoried && inventoried.inDraft.length > 0
+      ? `${inventoried.inDraft.length} vectors in the draft namespace have no database row`
+      : undefined);
   return {
     mode: "ledger_getbyids",
     reconciled: report.clean,
     status: report.status,
     missing: report.missingVectors.length,
     expected: expectedCount,
-    ...(report.reason ? { reason: report.reason } : {}),
+    ...(reason ? { reason } : {}),
+    inventoryChecked: inventoried !== null,
+    orphanVectors: inventoried?.orphans ?? null,
+    orphanVectorsInDraft: inventoried?.inDraft.length ?? null,
     startWatermark: report.startWatermark,
     endWatermark: report.endWatermark,
   };
@@ -448,6 +523,9 @@ export async function finishCheckRun(
     status: "passed" | "failed";
     reconciled: boolean;
     mode: "ledger_getbyids" | "keyword_only";
+    inventoryChecked: boolean;
+    orphanVectors: number | null;
+    orphanVectorsInDraft: number | null;
     aclLeaks: number;
     liveRecall: number | null;
     questionsRun: number;
@@ -457,14 +535,18 @@ export async function finishCheckRun(
 ): Promise<void> {
   await db
     .prepare(
-      `UPDATE draft_checks SET status = ?, reconciled = ?, reconcile_mode = ?, acl_leaks = ?,
+      `UPDATE draft_checks SET status = ?, reconciled = ?, reconcile_mode = ?, inventory_checked = ?,
+         orphan_vectors = ?, orphan_vectors_in_draft = ?, acl_leaks = ?,
          live_recall = ?, questions_run = ?, error_code = ?, finished_at = ?
-       WHERE generation_id = ?`,
+       WHERE generation_id = ?`
     )
     .bind(
       result.status,
       result.reconciled ? 1 : 0,
       result.mode,
+      result.inventoryChecked ? 1 : 0,
+      result.orphanVectors,
+      result.orphanVectorsInDraft,
       result.aclLeaks,
       result.liveRecall,
       result.questionsRun,

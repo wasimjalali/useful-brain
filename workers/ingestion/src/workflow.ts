@@ -39,6 +39,7 @@ import {
 import { extractUploadText } from "../../../src/lib/ingest/extract";
 import { MAX_UPLOAD_BYTES, uploadSourcePath } from "../../../src/lib/ingest/upload-validation";
 import { acknowledgeIngestJob } from "../../../src/lib/ingest/queue-message";
+import { createRestVectorInventory, type VectorInventory } from "../../../src/lib/ingest/vector-inventory";
 import type { VectorizeIndex } from "../../../src/lib/retrieve/cloudflare-pipeline";
 import type { SqlExecutor } from "../../../src/lib/store/corpus-d1";
 import { draftAcceptsWrites, failDraft, getDraft, markBaseCopied } from "../../../src/lib/store/drafts";
@@ -98,7 +99,17 @@ export async function reconcileWithFinalRecord(
     return await step.do("reconcile-final", STEP_CONFIG, async () => run(false));
   } catch (error) {
     console.error("reconcile-final failed", sanitizedErrorName(error));
-    return { mode, reconciled: false, status: "partial", missing: 0, expected: null, reason: "reconcile could not record an audit" };
+    return {
+      mode,
+      reconciled: false,
+      status: "partial",
+      missing: 0,
+      expected: null,
+      reason: "reconcile could not record an audit",
+      inventoryChecked: false,
+      orphanVectors: null,
+      orphanVectorsInDraft: null,
+    };
   }
 }
 const WAIT_BASE_ITERATIONS = 60;
@@ -133,6 +144,27 @@ export class IngestionWorkflow extends WorkflowEntrypoint<Env, IngestionWorkflow
       ai: (this.env.AI as unknown as IndexContext["ai"]) ?? null,
       vectors: (this.env.VECTORIZE as unknown as VectorPort | undefined) ?? null,
     };
+  }
+
+  /**
+   * Full-index listing for draft reconciliation. Present only when the token,
+   * the account id and the index name are all configured; otherwise
+   * reconciliation stays binding-only. Secrets are read here and nowhere else.
+   */
+  private inventory(): VectorInventory | null {
+    const config = this.env as unknown as {
+      VECTORIZE_API_TOKEN?: string;
+      CLOUDFLARE_ACCOUNT_ID?: string;
+      VECTORIZE_INDEX_NAME?: string;
+    };
+    if (!config.VECTORIZE_API_TOKEN || !config.CLOUDFLARE_ACCOUNT_ID || !config.VECTORIZE_INDEX_NAME) {
+      return null;
+    }
+    return createRestVectorInventory({
+      apiToken: config.VECTORIZE_API_TOKEN,
+      accountId: config.CLOUDFLARE_ACCOUNT_ID,
+      indexName: config.VECTORIZE_INDEX_NAME,
+    });
   }
 
   private async assertOpen(generationId: string): Promise<void> {
@@ -583,7 +615,13 @@ export class IngestionWorkflow extends WorkflowEntrypoint<Env, IngestionWorkflow
     const reconciled = await reconcileWithFinalRecord(
       step,
       (missingIsPending) =>
-        reconcileDraft({ db: context.db, vectors: context.vectors, generationId, missingIsPending }),
+        reconcileDraft({
+          db: context.db,
+          vectors: context.vectors,
+          inventory: this.inventory(),
+          generationId,
+          missingIsPending,
+        }),
       context.vectors ? "ledger_getbyids" : "keyword_only",
     );
     const probe = await step.do("acl-parity", STEP_CONFIG, async () => {
@@ -637,6 +675,9 @@ export class IngestionWorkflow extends WorkflowEntrypoint<Env, IngestionWorkflow
         status,
         reconciled: reconciled.reconciled,
         mode: reconciled.mode,
+        inventoryChecked: reconciled.inventoryChecked,
+        orphanVectors: reconciled.orphanVectors,
+        orphanVectorsInDraft: reconciled.orphanVectorsInDraft,
         aclLeaks: probe.leaks + summary.leaks,
         liveRecall: summary.liveRecall,
         questionsRun: summary.questionsRun,

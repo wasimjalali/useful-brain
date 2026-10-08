@@ -195,6 +195,25 @@ describe("protected Worker configuration", () => {
     }
   });
 
+  it("names the Vectorize index to list in every Ingestion environment, equal to the binding's index", () => {
+    const config = readJsonc("workers/ingestion/wrangler.jsonc");
+    const environments = config.env as Record<string, Record<string, unknown>>;
+    const targets: Array<[string, Record<string, unknown>]> = [
+      ["top level", config],
+      ...Object.entries(environments),
+    ];
+    expect(targets.map(([name]) => name)).toEqual(["top level", "development", "staging", "production"]);
+    for (const [name, target] of targets) {
+      const bindings = target.vectorize as Array<{ binding: string; index_name: string }>;
+      expect(bindings, name).toHaveLength(1);
+      const vars = target.vars as Record<string, string>;
+      expect(vars.VECTORIZE_INDEX_NAME, name).toBe(bindings[0].index_name);
+      // The listing credentials are secrets (wrangler secret put), never vars.
+      expect(vars, name).not.toHaveProperty("VECTORIZE_API_TOKEN");
+      expect(vars, name).not.toHaveProperty("CLOUDFLARE_ACCOUNT_ID");
+    }
+  });
+
   it("applies local D1 migrations before the Cloudflare preview", () => {
     const pkg = JSON.parse(readFileSync(path.join(process.cwd(), "package.json"), "utf8")) as {
       scripts: Record<string, string>;

@@ -29,6 +29,19 @@ Local portfolio agent. Synthetic data only. No billing or production cutover.
 3. Confirm no real company objects in R2.
 4. Record gross Cloudflare spend before credits. Idle should stay at the existing Workers Paid minimum.
 
+## Vectorize inventory secrets (Ingestion worker)
+
+Draft reconciliation lists the whole Vectorize index through the REST API when these two secrets are set, so it can find orphan vectors. Without them it stays binding-only (`getByIds` on the ledger) and records `inventory_checked = 0`. Create an API token with the Account > Vectorize > Read permission only. Values live in the password manager, never in the repo.
+
+Staging:
+
+```bash
+npx wrangler secret put VECTORIZE_API_TOKEN -c workers/ingestion/wrangler.jsonc --env staging
+npx wrangler secret put CLOUDFLARE_ACCOUNT_ID -c workers/ingestion/wrangler.jsonc --env staging
+```
+
+Local dev: put `VECTORIZE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` in `workers/ingestion/.dev.vars` (gitignored). The index name is the plain var `VECTORIZE_INDEX_NAME` in `workers/ingestion/wrangler.jsonc`, kept equal to each environment's Vectorize `index_name` by a test. Apply corpus migration `0006_draft_inventory.sql` before deploying.
+
 ## Incidents (fail closed)
 
 - Missing identity, ACL, corpus state, citations, or tool permission: refuse.
