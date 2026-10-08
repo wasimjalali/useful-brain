@@ -60,12 +60,14 @@ export function loadTuningQuestions(file: string, documents: NorthwindDocument[]
  * versions are recorded per run from its responses; this is the commit of
  * the harness checkout, which can differ from the Brain under test.
  */
-export function harnessProvenance(): { harnessGitSha: string | null; harnessDirty: boolean | null } {
+export function harnessProvenance(
+  cwd: string = process.cwd(),
+): { harnessGitSha: string | null; harnessDirty: boolean | null } {
+  // git's own stderr ("not a git repository") stays out of the run log.
+  const options = { cwd, encoding: "utf8" as const, stdio: ["ignore", "pipe", "ignore"] as ["ignore", "pipe", "ignore"] };
   try {
-    const sha = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
-    const status = execFileSync("git", ["status", "--porcelain", "--untracked-files=no"], {
-      encoding: "utf8",
-    });
+    const sha = execFileSync("git", ["rev-parse", "HEAD"], options).trim();
+    const status = execFileSync("git", ["status", "--porcelain", "--untracked-files=no"], options);
     return { harnessGitSha: sha, harnessDirty: status.trim().length > 0 };
   } catch {
     return { harnessGitSha: null, harnessDirty: null };

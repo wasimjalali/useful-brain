@@ -71,7 +71,10 @@ function assertNotTruncated(
     return;
   }
   const content = typeof choice.message?.content === "string" ? choice.message.content : "";
-  if (finalQuotesObject(content)) {
+  const final = finalQuotesObject(content);
+  // Anything object-like after the last complete quotes object is a final
+  // answer the budget cut off before it matched '{"quotes"'.
+  if (final && !content.slice(final.end).includes("{")) {
     return;
   }
   const body = isRecord(response) ? response : {};
@@ -92,23 +95,26 @@ function assertNotTruncated(
 }
 
 /**
- * The last `{"quotes": [...]}` object in the text, when it is complete JSON.
- * An earlier complete object (an example in narration) never stands in for
- * a final one the budget cut off.
+ * The last `{"quotes": [...]}` object in the text and the offset just past
+ * it, when it is complete JSON. An earlier complete object (an example in
+ * narration) never stands in for a final one the budget cut off.
  */
-function finalQuotesObject(raw: string): { quotes: unknown[] } | null {
+function finalQuotesObject(raw: string): { value: { quotes: unknown[] }; end: number } | null {
   const starts = [...raw.matchAll(/\{\s*"quotes"/g)];
   const last = starts.at(-1);
   if (!last) {
     return null;
   }
-  const balanced = balancedJsonObject(raw, last.index ?? 0);
+  const start = last.index ?? 0;
+  const balanced = balancedJsonObject(raw, start);
   if (!balanced) {
     return null;
   }
   try {
     const value: unknown = JSON.parse(balanced);
-    return isRecord(value) && Array.isArray(value.quotes) ? (value as { quotes: unknown[] }) : null;
+    return isRecord(value) && Array.isArray(value.quotes)
+      ? { value: value as { quotes: unknown[] }, end: start + balanced.length }
+      : null;
   } catch {
     return null;
   }
@@ -411,7 +417,17 @@ export function createWorkersAiCoveragePass(
       text: normalizeSupportText(paragraph),
       labels: new Set(paragraph.match(/\[\d{1,2}\]/g) ?? []),
     }));
+    const seen = new Set<string>();
     const additions = parseExactQuoteItems(raw, evidence)
+      .filter((item) => {
+        // The model can return the same new quote twice; keep it once.
+        const key = `${normalizeSupportText(item.quote)} ${item.citation}`;
+        if (seen.has(key)) {
+          return false;
+        }
+        seen.add(key);
+        return true;
+      })
       .filter(
         (item) =>
           !draftParagraphs.some(

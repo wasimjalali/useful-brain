@@ -26,6 +26,44 @@ One of the four q028 "before" turns on this worker (`q028-q088-before-q-diag1.js
 
 The new tuning set and the abstention guard show **no measurable change**: 46/48 on `origin/main` against 47/48 on v13, a difference of one question at n=3, and 6/6 against 6/6. They're a regression guard, not evidence of improvement.
 
+On the full locked battery, v13 scored **117/120 with 0 ACL leaks**, against 115/120 twice on the redesign build. Details are in [Full 120 battery](#full-120-battery).
+
+## Full 120 battery
+
+The orchestrator ran the locked 120-question battery on v13 (`f0cad65`, harness at `d52b372`). It used a fresh worker on port 8792 with its own state and generation `g-7a3b7142`. Result: **117/120 with 0 ACL leaks**. For comparison, the redesign build scored 115/120 in both of its full runs ([redesign verification](2026-10-08-redesign-verification.md)). The retrieval layer is unchanged: recall@3 0.912, MRR 0.825, nDCG 0.837.
+
+| Category | Redesign run 1 | Redesign run 2 | v13 |
+| --- | --- | --- | --- |
+| Factual | 69/70 | 70/70 | 70/70 |
+| Trap | 17/17 | 17/17 | 17/17 |
+| Permission | 12/13 | 12/13 | 12/13 |
+| Unanswerable | 10/10 | 10/10 | 10/10 |
+| Multi-hop (locked) | 3/5 | 3/5 | 3/5 |
+| Multi-hop (expanded) | 4/5 | 3/5 | 5/5 |
+| **Total** | **115/120** | **115/120** | **117/120** |
+| ACL leaks | 0 | 0 | 0 |
+| Live retrieved recall | 0.995 | 0.995 | 0.995 |
+| Latency p50 / p95 | 21.2s / 75.6s | 27.0s / 83.4s | 20.1s / 58.4s |
+
+Other v13 numbers:
+- 0 vector-degraded turns.
+- `citedNotExpectedCount` 13.
+- `goldRetrievedUncitedCount` 13.
+- 13 refusals kept with evidence in hand. All 13 are correct abstentions: 9 permission and 4 unanswerable.
+
+q028 and q088 both pass. The three misses:
+- **q073** (permission): answered from an allowed neighbor, the 2026 release notes, instead of abstaining. The forbidden document was never retrieved, so it's not a leak. It's on the 2026-08-31 failure list too.
+- **q086** (multi-hop): cited the change management policy but not the deployment policy.
+- **q090** (multi-hop): cited the refund and data retention policies but not the DSAR process.
+
+All three are citation choices with the gold retrieved, not retrieval failures. One full run can't separate a gain this size from run-to-run variance: the 2026-09-06 report put the band at 116 to 120.
+
+Two small fixes landed after this battery, from the third review round:
+- a length-limited response with a cut-off object after a complete example is now treated as truncated;
+- the coverage pass drops a quote that the model repeated within one response.
+
+Both touch only truncated or duplicated extraction responses, and the v13 tuning, abstention and q028/q088 runs logged 0 truncations. So the battery reflects the answer path as merged. Raw files: `results/2026-10-08-quality/full-battery-v13-{findings,live-summary,live-checkpoint,retrieval-report}.json`.
+
 ## How it was found
 
 1. Read `pointer-completion.ts` and its call sites. Detection looked right for both questions: q088's draft hinted the sales referral program by title, so the coverage pass should have run with that hint.
@@ -123,7 +161,7 @@ Reported for the record, not pooled with the final numbers.
   - One v10 tuning repeat stalled on a coverage call that hung for more than 10 minutes. The whole repeat was discarded (`superseded-v1-tuning-questions-before-r3-aborted-brownout.log`), the worker restarted and the repeat re-run.
   - No scored turn in the v12 or v13 measurements came near 300 seconds.
 - **Citations barely broadened.** v13 answers cite a non-gold document about as often as `main`: 10 versus 9 across three tuning runs. v11 had broadened more: 21 versus 11 on tuning v1. The softer restates wording and the demotion of text-only named hints account for the difference. Nothing unsupported was added and the abstention guard held. The full battery's `citedNotExpectedCount` is the number to watch.
-- **Wider blast radius than the two questions.** The decoding fix also revives citation repair, identifier recovery and the abstention recheck, which were starved the same way. That should help factual refusals and could in principle hurt unanswerable cases. The 3-question abstention guard is small. The full 120 battery is the real check.
+- **Wider blast radius than the two questions.** The decoding fix also revives citation repair, identifier recovery and the abstention recheck, which were starved the same way. That should help factual refusals and could in principle hurt unanswerable cases. The 3-question abstention guard is small. The full battery's 10/10 unanswerable and 70/70 factual are the broader check, from one run.
 - **q028 still needs two figures in the draft** for the restated-figure hint. A draft that quotes only "30 days" gives it nothing to match, by design.
 - **Small samples.** 3 turns per locked question on the final build, 48 tuning turns per side. Two local workers, two seeded generations of the same corpus.
 - **Turn budget.** About 320 live turns across three rounds (152, 108 and 60), plus Northwind seeds on two fresh workers (one seed request was sent twice after a client-side timeout). That's over the ~250 guideline, because the review rounds asked for re-measurement. Workers AI on credits, well inside the $75/month inference safety boundary. Gross spend wasn't metered per run.
@@ -139,7 +177,8 @@ Reported for the record, not pooled with the final numbers.
   - v12: `*-after-v12*`
 - **Superseded tuning v1:** `superseded-tuning-questions-v1.json`, `superseded-v1-*`
 - **Instrumentation:** `instrumentation-v10.log`, `instrumentation-v11.log`, plus `coverage-call-stats.py` and `coverage-call-stats.txt`, which produce the first table
-- **Worker health:** `worker-v12-8791.log`, `worker-v13-8791.log`, `worker-log-counts.py`, `worker-log-counts.txt`, `worker-503-excerpts.log`
+- **Full battery (v13):** `full-battery-v13-findings.json`, `full-battery-v13-live-summary.json`, `full-battery-v13-live-checkpoint.json`, `full-battery-v13-retrieval-report.json`
+- **Worker health:** `worker-v12-8791.log`, `worker-v13-8791.log`, `worker-log-counts.py`, `worker-log-counts.txt`, `worker-503-excerpts.log`. After capture, one home-directory path in `worker-v12-8791.log` (a wrangler log location) was replaced with `~` (commit `d52b372`). Nothing else in the logs was edited.
 - **Runner:** `tuning-run.sh <label> <repeats> <file stem> [port]`
 
 ## Reproduce

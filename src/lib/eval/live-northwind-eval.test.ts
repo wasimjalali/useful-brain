@@ -95,15 +95,13 @@ describe("live Northwind eval --questions", () => {
     }
   });
 
-  it("records null provenance when git is unavailable", () => {
-    const cwd = process.cwd();
+  it("records null provenance outside a git checkout, quietly", () => {
     const dir = mkdtempSync(path.join(tmpdir(), "no-git-"));
-    process.chdir(dir);
-    try {
-      expect(harnessProvenance()).toEqual({ harnessGitSha: null, harnessDirty: null });
-    } finally {
-      process.chdir(cwd);
-    }
+    const stderr = vi.spyOn(process.stderr, "write");
+    expect(harnessProvenance(dir)).toEqual({ harnessGitSha: null, harnessDirty: null });
+    // git's own "not a git repository" message must not leak into the run log.
+    expect(stderr).not.toHaveBeenCalled();
+    stderr.mockRestore();
   });
 
   it("refuses the locked file through another spelling of its path", () => {

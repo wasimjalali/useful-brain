@@ -482,6 +482,43 @@ describe("Workers AI citation repair", () => {
     ).resolves.toBe("P1 tickets have a first-response target of 1 hour. [2]");
   });
 
+  it("returns a repeated new quote once", async () => {
+    const twoDocEvidence: CitedRetrievalResult[] = [
+      evidence[0],
+      {
+        ...evidence[0],
+        rank: 2,
+        chunkId: "escalation__owners__001",
+        source: "complaint-escalation.md",
+        text: "ESC-3 complaints are owned by the VP of Support.",
+        citationLabel: "[2]",
+        documentId: "complaint-escalation",
+      },
+    ];
+    const run = vi.fn().mockResolvedValue({
+      choices: [
+        {
+          finish_reason: "stop",
+          message: {
+            content: JSON.stringify({
+              quotes: [
+                { quote: "ESC-3 complaints are owned by the VP of Support.", citation: "[2]" },
+                { quote: "ESC-3 complaints are owned by the VP of Support. ", citation: "[2]" },
+              ],
+            }),
+          },
+        },
+      ],
+    });
+    await expect(
+      createWorkersAiCoveragePass({ run })({
+        question: "What is the P1 response target and who owns ESC-3 complaints?",
+        draft: "P1 tickets have a first-response target of 1 hour.[1]",
+        evidence: twoDocEvidence,
+      }),
+    ).resolves.toBe("ESC-3 complaints are owned by the VP of Support. [2]");
+  });
+
   it("recovers the quotes object when the model narrates before the JSON", async () => {
     const run = vi.fn().mockResolvedValue({
       choices: [
@@ -710,6 +747,32 @@ describe("truncated extraction", () => {
     };
     await expect(
       createWorkersAiCoveragePass({ run: vi.fn().mockResolvedValue(narrated) })({
+        question: "What is the P1 response target?",
+        draft: "Something else. [1]",
+        evidence,
+      }),
+    ).rejects.toBeInstanceOf(ExtractionTruncatedError);
+    warn.mockRestore();
+  });
+
+  // 8. the cut-off final object is too short to match '{"quotes"', so the
+  //    earlier complete example is the last match and passes as the answer.
+  it("rejects a complete example followed by a cut-off object", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const exampleThenCut = {
+      choices: [{ finish_reason: "length", message: { content: 'Example: {"quotes":[]}. Answer: {"quo' } }],
+    };
+    const extractionCache = new Map<string, unknown>();
+    await expect(
+      createWorkersAiCitationRepair({ run: vi.fn().mockResolvedValue(exampleThenCut) })({
+        question: "What is the P1 first-response target?",
+        evidence,
+        extractionCache,
+      }),
+    ).rejects.toBeInstanceOf(ExtractionTruncatedError);
+    expect(extractionCache.size).toBe(0);
+    await expect(
+      createWorkersAiCoveragePass({ run: vi.fn().mockResolvedValue(exampleThenCut) })({
         question: "What is the P1 response target?",
         draft: "Something else. [1]",
         evidence,
