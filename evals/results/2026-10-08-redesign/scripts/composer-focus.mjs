@@ -1,0 +1,10 @@
+import { createRequire } from "node:module";
+const { chromium } = createRequire(import.meta.url)(process.argv[2]);
+const b = await chromium.launch({ channel: "chrome", headless: true });
+const p = await (await b.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
+await p.goto("http://127.0.0.1:8787/chat"); await p.waitForLoadState("networkidle");
+const form = p.locator("form", { has: p.getByLabel("Question") });
+console.log("rest :", await form.evaluate((el) => getComputedStyle(el).boxShadow));
+await p.getByLabel("Question").focus(); await p.waitForTimeout(400);
+console.log("focus:", await form.evaluate((el) => getComputedStyle(el).boxShadow));
+await b.close();

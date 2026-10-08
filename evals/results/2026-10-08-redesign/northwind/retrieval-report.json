@@ -1,0 +1,1843 @@
+{
+  "topK": 3,
+  "recallAtK": 0.9123711340206185,
+  "mrr": 0.824742268041237,
+  "ndcgAtK": 0.8370127906093069,
+  "citationCorrectness": 0.5051546391752577,
+  "abstentionCorrectness": 0,
+  "aclLeakCount": 0,
+  "results": [
+    {
+      "questionId": "q001",
+      "category": "factual",
+      "recall": 0,
+      "reciprocalRank": 0,
+      "ndcg": 0,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_legal_ip_confidentiality",
+        "nw_hr_onboarding_guide",
+        "nw_support_sla_policy"
+      ]
+    },
+    {
+      "questionId": "q002",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_hr_employee_handbook",
+        "nw_finance_tax_withholding",
+        "nw_hr_onboarding_guide"
+      ]
+    },
+    {
+      "questionId": "q003",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_hr_leave_policy",
+        "nw_hr_onboarding_guide",
+        "nw_support_meridian_admin"
+      ]
+    },
+    {
+      "questionId": "q004",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_hr_leave_policy",
+        "nw_hr_onboarding_guide",
+        "nw_hr_employee_handbook"
+      ]
+    },
+    {
+      "questionId": "q005",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 0.5,
+      "ndcg": 0.6309297535714575,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_hr_onboarding_guide",
+        "nw_hr_parental_leave"
+      ]
+    },
+    {
+      "questionId": "q006",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_hr_parental_leave",
+        "nw_hr_employee_handbook"
+      ]
+    },
+    {
+      "questionId": "q007",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 0.5,
+      "ndcg": 0.6309297535714575,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_hr_parental_leave",
+        "nw_hr_remote_work"
+      ]
+    },
+    {
+      "questionId": "q008",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_hr_anti_harassment"
+      ]
+    },
+    {
+      "questionId": "q009",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_hr_termination_offboarding",
+        "nw_operations_equipment_return"
+      ]
+    },
+    {
+      "questionId": "q010",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_hr_termination_offboarding",
+        "nw_hr_parental_leave",
+        "nw_hr_onboarding_guide"
+      ]
+    },
+    {
+      "questionId": "q011",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 0.5,
+      "ndcg": 0.6309297535714575,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_sales_referral_program",
+        "nw_hr_recruiting_interview",
+        "nw_hr_onboarding_guide"
+      ]
+    },
+    {
+      "questionId": "q012",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_hr_training_budget",
+        "nw_hr_leave_policy",
+        "nw_hr_onboarding_guide"
+      ]
+    },
+    {
+      "questionId": "q013",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_finance_budget_planning",
+        "nw_sales_deal_desk"
+      ]
+    },
+    {
+      "questionId": "q014",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_finance_travel_expense",
+        "nw_hr_employee_handbook",
+        "nw_legal_privacy_policy"
+      ]
+    },
+    {
+      "questionId": "q015",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_finance_travel_expense",
+        "nw_finance_employee_expense",
+        "nw_hr_employee_handbook"
+      ]
+    },
+    {
+      "questionId": "q016",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_finance_employee_expense",
+        "nw_hr_remote_work",
+        "nw_finance_travel_expense"
+      ]
+    },
+    {
+      "questionId": "q017",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 0.5,
+      "ndcg": 0.6309297535714575,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_hr_onboarding_guide",
+        "nw_hr_employee_handbook",
+        "nw_finance_employee_expense"
+      ]
+    },
+    {
+      "questionId": "q018",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_finance_contractor_expense"
+      ]
+    },
+    {
+      "questionId": "q019",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_finance_refund_policy",
+        "nw_finance_invoicing_payment"
+      ]
+    },
+    {
+      "questionId": "q020",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_finance_refund_policy",
+        "nw_finance_corporate_card",
+        "nw_support_sla_policy"
+      ]
+    },
+    {
+      "questionId": "q021",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_finance_invoicing_payment",
+        "nw_engineering_error_code_reference"
+      ]
+    },
+    {
+      "questionId": "q022",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 0.3333333333333333,
+      "ndcg": 0.5,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_engineering_error_code_reference",
+        "nw_legal_data_retention",
+        "nw_finance_invoicing_payment"
+      ]
+    },
+    {
+      "questionId": "q023",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_finance_corporate_card"
+      ]
+    },
+    {
+      "questionId": "q024",
+      "category": "factual",
+      "recall": 0,
+      "reciprocalRank": 0,
+      "ndcg": 0,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_hr_onboarding_guide",
+        "nw_legal_contract_review"
+      ]
+    },
+    {
+      "questionId": "q025",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_legal_data_retention",
+        "nw_legal_ip_confidentiality"
+      ]
+    },
+    {
+      "questionId": "q026",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 0.5,
+      "ndcg": 0.6309297535714575,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_legal_nda_policy",
+        "nw_legal_contract_review"
+      ]
+    },
+    {
+      "questionId": "q027",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_legal_ip_confidentiality",
+        "nw_hr_onboarding_guide",
+        "nw_hr_remote_work"
+      ]
+    },
+    {
+      "questionId": "q028",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_legal_privacy_policy",
+        "nw_legal_data_retention"
+      ]
+    },
+    {
+      "questionId": "q029",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_legal_nda_policy",
+        "nw_legal_dpa_handbook",
+        "nw_sales_deal_desk"
+      ]
+    },
+    {
+      "questionId": "q030",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_legal_compliance_calendar",
+        "nw_legal_dpa_handbook"
+      ]
+    },
+    {
+      "questionId": "q031",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_support_complaint_escalation",
+        "nw_hr_onboarding_guide"
+      ]
+    },
+    {
+      "questionId": "q032",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_support_sla_policy",
+        "nw_support_ticket_priority",
+        "nw_support_atlas_runbook"
+      ]
+    },
+    {
+      "questionId": "q033",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_support_ticket_priority",
+        "nw_engineering_api_standards"
+      ]
+    },
+    {
+      "questionId": "q034",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_support_channels_hours",
+        "nw_support_sla_policy"
+      ]
+    },
+    {
+      "questionId": "q035",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 0.5,
+      "ndcg": 0.6309297535714575,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_legal_privacy_policy",
+        "nw_support_dsar_process",
+        "nw_finance_refund_policy"
+      ]
+    },
+    {
+      "questionId": "q036",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_support_customer_onboarding"
+      ]
+    },
+    {
+      "questionId": "q037",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_engineering_incident_escalation",
+        "nw_engineering_sdlc"
+      ]
+    },
+    {
+      "questionId": "q038",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_engineering_log_retention",
+        "nw_legal_ip_confidentiality"
+      ]
+    },
+    {
+      "questionId": "q039",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 0.5,
+      "ndcg": 0.6309297535714575,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_engineering_change_management",
+        "nw_engineering_deployment"
+      ]
+    },
+    {
+      "questionId": "q040",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_engineering_change_management",
+        "nw_hr_employee_handbook"
+      ]
+    },
+    {
+      "questionId": "q041",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 0.5,
+      "ndcg": 0.6309297535714575,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_hr_onboarding_guide",
+        "nw_engineering_on_call"
+      ]
+    },
+    {
+      "questionId": "q042",
+      "category": "factual",
+      "recall": 0,
+      "reciprocalRank": 0,
+      "ndcg": 0,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_support_atlas_runbook",
+        "nw_engineering_atlas_catalog"
+      ]
+    },
+    {
+      "questionId": "q043",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_engineering_sdlc",
+        "nw_engineering_release_notes_2026"
+      ]
+    },
+    {
+      "questionId": "q044",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_engineering_security_vulnerability",
+        "nw_engineering_deployment",
+        "nw_hr_onboarding_guide"
+      ]
+    },
+    {
+      "questionId": "q045",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_sales_discount_approval",
+        "nw_sales_commission_plan"
+      ]
+    },
+    {
+      "questionId": "q046",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 0.5,
+      "ndcg": 0.6309297535714575,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_sales_deal_desk",
+        "nw_sales_partner_program"
+      ]
+    },
+    {
+      "questionId": "q047",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_sales_proposal_quote",
+        "nw_sales_discount_approval"
+      ]
+    },
+    {
+      "questionId": "q048",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_operations_equipment_return",
+        "nw_hr_onboarding_guide"
+      ]
+    },
+    {
+      "questionId": "q049",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_operations_scheduled_maintenance"
+      ]
+    },
+    {
+      "questionId": "q050",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_legal_compliance_calendar",
+        "nw_executive_board_calendar"
+      ]
+    },
+    {
+      "questionId": "q051",
+      "category": "trap",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_finance_refund_policy",
+        "nw_operations_equipment_return",
+        "nw_legal_data_retention"
+      ]
+    },
+    {
+      "questionId": "q052",
+      "category": "trap",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_finance_contractor_expense",
+        "nw_support_ticket_priority",
+        "nw_finance_tax_withholding"
+      ]
+    },
+    {
+      "questionId": "q053",
+      "category": "trap",
+      "recall": 1,
+      "reciprocalRank": 0.5,
+      "ndcg": 0.6309297535714575,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_finance_procurement_forms",
+        "nw_finance_employee_expense",
+        "nw_hr_onboarding_guide"
+      ]
+    },
+    {
+      "questionId": "q054",
+      "category": "trap",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_support_complaint_escalation",
+        "nw_hr_onboarding_guide"
+      ]
+    },
+    {
+      "questionId": "q055",
+      "category": "trap",
+      "recall": 0,
+      "reciprocalRank": 0,
+      "ndcg": 0,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_hr_onboarding_guide",
+        "nw_support_sla_policy",
+        "nw_engineering_on_call"
+      ]
+    },
+    {
+      "questionId": "q056",
+      "category": "trap",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_finance_travel_expense",
+        "nw_hr_onboarding_guide"
+      ]
+    },
+    {
+      "questionId": "q057",
+      "category": "trap",
+      "recall": 1,
+      "reciprocalRank": 0.5,
+      "ndcg": 0.6309297535714575,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_hr_onboarding_guide",
+        "nw_hr_parental_leave"
+      ]
+    },
+    {
+      "questionId": "q058",
+      "category": "trap",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_hr_leave_policy",
+        "nw_hr_onboarding_guide"
+      ]
+    },
+    {
+      "questionId": "q059",
+      "category": "trap",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_sales_partner_program",
+        "nw_sales_referral_program"
+      ]
+    },
+    {
+      "questionId": "q060",
+      "category": "trap",
+      "recall": 1,
+      "reciprocalRank": 0.5,
+      "ndcg": 0.6309297535714575,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_hr_onboarding_guide",
+        "nw_sales_referral_program",
+        "nw_hr_recruiting_interview"
+      ]
+    },
+    {
+      "questionId": "q061",
+      "category": "trap",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_engineering_log_retention",
+        "nw_legal_ip_confidentiality",
+        "nw_support_meridian_admin"
+      ]
+    },
+    {
+      "questionId": "q062",
+      "category": "trap",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_operations_scheduled_maintenance"
+      ]
+    },
+    {
+      "questionId": "q063",
+      "category": "trap",
+      "recall": 1,
+      "reciprocalRank": 0.3333333333333333,
+      "ndcg": 0.5,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_support_ticket_priority",
+        "nw_hr_onboarding_guide",
+        "nw_support_sla_policy"
+      ]
+    },
+    {
+      "questionId": "q064",
+      "category": "trap",
+      "recall": 0,
+      "reciprocalRank": 0,
+      "ndcg": 0,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_sales_deal_desk"
+      ]
+    },
+    {
+      "questionId": "q065",
+      "category": "trap",
+      "recall": 1,
+      "reciprocalRank": 0.5,
+      "ndcg": 0.6309297535714575,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_legal_contract_review",
+        "nw_legal_dispute_resolution",
+        "nw_sales_deal_desk"
+      ]
+    },
+    {
+      "questionId": "q066",
+      "category": "permission",
+      "recall": 0,
+      "reciprocalRank": 0,
+      "ndcg": 0,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_hr_recruiting_interview",
+        "nw_support_kb_guidelines",
+        "nw_hr_parental_leave"
+      ]
+    },
+    {
+      "questionId": "q067",
+      "category": "permission",
+      "recall": 0,
+      "reciprocalRank": 0,
+      "ndcg": 0,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_hr_termination_offboarding",
+        "nw_support_sla_policy",
+        "nw_hr_onboarding_guide"
+      ]
+    },
+    {
+      "questionId": "q068",
+      "category": "permission",
+      "recall": 0,
+      "reciprocalRank": 0,
+      "ndcg": 0,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_legal_compliance_calendar",
+        "nw_legal_privacy_policy"
+      ]
+    },
+    {
+      "questionId": "q069",
+      "category": "permission",
+      "recall": 0,
+      "reciprocalRank": 0,
+      "ndcg": 0,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_support_complaint_escalation",
+        "nw_sales_deal_desk"
+      ]
+    },
+    {
+      "questionId": "q070",
+      "category": "permission",
+      "recall": 0,
+      "reciprocalRank": 0,
+      "ndcg": 0,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_sales_referral_program",
+        "nw_hr_onboarding_guide"
+      ]
+    },
+    {
+      "questionId": "q071",
+      "category": "permission",
+      "recall": 0,
+      "reciprocalRank": 0,
+      "ndcg": 0,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_finance_employee_expense",
+        "nw_support_sla_policy",
+        "nw_engineering_release_notes_2026"
+      ]
+    },
+    {
+      "questionId": "q072",
+      "category": "permission",
+      "recall": 0,
+      "reciprocalRank": 0,
+      "ndcg": 0,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_support_sla_policy",
+        "nw_support_ticket_priority",
+        "nw_support_kb_guidelines"
+      ]
+    },
+    {
+      "questionId": "q073",
+      "category": "permission",
+      "recall": 0,
+      "reciprocalRank": 0,
+      "ndcg": 0,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_engineering_atlas_catalog"
+      ]
+    },
+    {
+      "questionId": "q074",
+      "category": "permission",
+      "recall": 0,
+      "reciprocalRank": 0,
+      "ndcg": 0,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_sales_referral_program",
+        "nw_finance_employee_expense",
+        "nw_operations_equipment_return"
+      ]
+    },
+    {
+      "questionId": "q075",
+      "category": "permission",
+      "recall": 0,
+      "reciprocalRank": 0,
+      "ndcg": 0,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_hr_anti_harassment",
+        "nw_hr_remote_work",
+        "nw_hr_onboarding_guide"
+      ]
+    },
+    {
+      "questionId": "q076",
+      "category": "unanswerable",
+      "recall": 0,
+      "reciprocalRank": 0,
+      "ndcg": 0,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_hr_onboarding_guide",
+        "nw_legal_data_retention",
+        "nw_hr_employee_handbook"
+      ]
+    },
+    {
+      "questionId": "q077",
+      "category": "unanswerable",
+      "recall": 0,
+      "reciprocalRank": 0,
+      "ndcg": 0,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_hr_onboarding_guide",
+        "nw_finance_tax_withholding"
+      ]
+    },
+    {
+      "questionId": "q078",
+      "category": "unanswerable",
+      "recall": 0,
+      "reciprocalRank": 0,
+      "ndcg": 0,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_operations_office_facilities",
+        "nw_hr_remote_work"
+      ]
+    },
+    {
+      "questionId": "q079",
+      "category": "unanswerable",
+      "recall": 0,
+      "reciprocalRank": 0,
+      "ndcg": 0,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_hr_onboarding_guide",
+        "nw_hr_remote_work"
+      ]
+    },
+    {
+      "questionId": "q080",
+      "category": "unanswerable",
+      "recall": 0,
+      "reciprocalRank": 0,
+      "ndcg": 0,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_finance_employee_expense",
+        "nw_support_ticket_priority",
+        "nw_hr_onboarding_guide"
+      ]
+    },
+    {
+      "questionId": "q081",
+      "category": "unanswerable",
+      "recall": 0,
+      "reciprocalRank": 0,
+      "ndcg": 0,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_finance_procurement_forms",
+        "nw_hr_onboarding_guide"
+      ]
+    },
+    {
+      "questionId": "q082",
+      "category": "unanswerable",
+      "recall": 0,
+      "reciprocalRank": 0,
+      "ndcg": 0,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_engineering_on_call",
+        "nw_legal_ip_confidentiality",
+        "nw_hr_recruiting_interview"
+      ]
+    },
+    {
+      "questionId": "q083",
+      "category": "unanswerable",
+      "recall": 0,
+      "reciprocalRank": 0,
+      "ndcg": 0,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_legal_ip_confidentiality",
+        "nw_hr_onboarding_guide"
+      ]
+    },
+    {
+      "questionId": "q084",
+      "category": "unanswerable",
+      "recall": 0,
+      "reciprocalRank": 0,
+      "ndcg": 0,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_legal_ip_confidentiality",
+        "nw_operations_office_facilities"
+      ]
+    },
+    {
+      "questionId": "q085",
+      "category": "unanswerable",
+      "recall": 0,
+      "reciprocalRank": 0,
+      "ndcg": 0,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_hr_onboarding_guide",
+        "nw_hr_leave_policy",
+        "nw_hr_employee_handbook"
+      ]
+    },
+    {
+      "questionId": "q086",
+      "category": "multi_hop",
+      "recall": 1,
+      "reciprocalRank": 0.5,
+      "ndcg": 0.6934264036172708,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_legal_privacy_policy",
+        "nw_engineering_deployment",
+        "nw_engineering_change_management"
+      ]
+    },
+    {
+      "questionId": "q087",
+      "category": "multi_hop",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 0.9197207891481876,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_support_complaint_escalation",
+        "nw_hr_onboarding_guide",
+        "nw_finance_invoicing_payment"
+      ]
+    },
+    {
+      "questionId": "q088",
+      "category": "multi_hop",
+      "recall": 0.5,
+      "reciprocalRank": 0.5,
+      "ndcg": 0.38685280723454163,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_sales_partner_program",
+        "nw_sales_referral_program"
+      ]
+    },
+    {
+      "questionId": "q089",
+      "category": "multi_hop",
+      "recall": 0.5,
+      "reciprocalRank": 1,
+      "ndcg": 0.6131471927654584,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_hr_termination_offboarding",
+        "nw_hr_parental_leave",
+        "nw_hr_onboarding_guide"
+      ]
+    },
+    {
+      "questionId": "q090",
+      "category": "multi_hop",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_support_dsar_process",
+        "nw_finance_refund_policy",
+        "nw_support_complaint_escalation"
+      ]
+    },
+    {
+      "questionId": "q091",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 0.5,
+      "ndcg": 0.6309297535714575,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_hr_onboarding_guide",
+        "nw_engineering_error_code_reference"
+      ]
+    },
+    {
+      "questionId": "q092",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_engineering_error_code_reference",
+        "nw_hr_onboarding_guide"
+      ]
+    },
+    {
+      "questionId": "q093",
+      "category": "factual",
+      "recall": 0,
+      "reciprocalRank": 0,
+      "ndcg": 0,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_hr_onboarding_guide"
+      ]
+    },
+    {
+      "questionId": "q094",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_engineering_error_code_reference",
+        "nw_legal_data_retention",
+        "nw_legal_privacy_policy"
+      ]
+    },
+    {
+      "questionId": "q095",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_support_atlas_runbook",
+        "nw_hr_onboarding_guide"
+      ]
+    },
+    {
+      "questionId": "q096",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_support_atlas_runbook"
+      ]
+    },
+    {
+      "questionId": "q097",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_support_atlas_runbook"
+      ]
+    },
+    {
+      "questionId": "q098",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_engineering_release_notes_2026"
+      ]
+    },
+    {
+      "questionId": "q099",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_operations_dr_runbook",
+        "nw_hr_anti_harassment",
+        "nw_finance_procurement_forms"
+      ]
+    },
+    {
+      "questionId": "q100",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_operations_dr_runbook",
+        "nw_legal_privacy_policy",
+        "nw_hr_remote_work"
+      ]
+    },
+    {
+      "questionId": "q101",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_hr_onboarding_guide"
+      ]
+    },
+    {
+      "questionId": "q102",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 0.5,
+      "ndcg": 0.6309297535714575,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_legal_ip_confidentiality",
+        "nw_hr_onboarding_guide"
+      ]
+    },
+    {
+      "questionId": "q103",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_hr_onboarding_guide"
+      ]
+    },
+    {
+      "questionId": "q104",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_finance_procurement_forms",
+        "nw_sales_deal_desk"
+      ]
+    },
+    {
+      "questionId": "q105",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_legal_dpa_handbook",
+        "nw_hr_onboarding_guide"
+      ]
+    },
+    {
+      "questionId": "q106",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_legal_dpa_handbook",
+        "nw_support_meridian_admin",
+        "nw_hr_parental_leave"
+      ]
+    },
+    {
+      "questionId": "q107",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_legal_dpa_handbook",
+        "nw_hr_remote_work",
+        "nw_engineering_on_call"
+      ]
+    },
+    {
+      "questionId": "q108",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_sales_deal_desk"
+      ]
+    },
+    {
+      "questionId": "q109",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_support_meridian_admin"
+      ]
+    },
+    {
+      "questionId": "q110",
+      "category": "factual",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_engineering_atlas_catalog",
+        "nw_engineering_log_retention"
+      ]
+    },
+    {
+      "questionId": "q111",
+      "category": "trap",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_support_atlas_runbook",
+        "nw_legal_privacy_policy"
+      ]
+    },
+    {
+      "questionId": "q112",
+      "category": "trap",
+      "recall": 1,
+      "reciprocalRank": 0.3333333333333333,
+      "ndcg": 0.5,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_legal_privacy_policy",
+        "nw_legal_ip_confidentiality",
+        "nw_engineering_release_notes_2026"
+      ]
+    },
+    {
+      "questionId": "q113",
+      "category": "permission",
+      "recall": 0,
+      "reciprocalRank": 0,
+      "ndcg": 0,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_hr_onboarding_guide"
+      ]
+    },
+    {
+      "questionId": "q114",
+      "category": "permission",
+      "recall": 0,
+      "reciprocalRank": 0,
+      "ndcg": 0,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_hr_leave_policy",
+        "nw_support_atlas_runbook",
+        "nw_hr_anti_harassment"
+      ]
+    },
+    {
+      "questionId": "q115",
+      "category": "permission",
+      "recall": 0,
+      "reciprocalRank": 0,
+      "ndcg": 0,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_legal_ip_confidentiality",
+        "nw_hr_onboarding_guide",
+        "nw_engineering_atlas_catalog"
+      ]
+    },
+    {
+      "questionId": "q116",
+      "category": "multi_hop_expanded",
+      "recall": 0.5,
+      "reciprocalRank": 0.5,
+      "ndcg": 0.38685280723454163,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_engineering_error_code_reference",
+        "nw_engineering_incident_escalation",
+        "nw_support_meridian_admin"
+      ]
+    },
+    {
+      "questionId": "q117",
+      "category": "multi_hop_expanded",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_hr_remote_work",
+        "nw_operations_equipment_return"
+      ]
+    },
+    {
+      "questionId": "q118",
+      "category": "multi_hop_expanded",
+      "recall": 0.5,
+      "reciprocalRank": 1,
+      "ndcg": 0.6131471927654584,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_hr_training_budget",
+        "nw_finance_employee_expense"
+      ]
+    },
+    {
+      "questionId": "q119",
+      "category": "multi_hop_expanded",
+      "recall": 0.5,
+      "reciprocalRank": 1,
+      "ndcg": 0.6131471927654584,
+      "citationCorrect": false,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_legal_dpa_handbook"
+      ]
+    },
+    {
+      "questionId": "q120",
+      "category": "multi_hop_expanded",
+      "recall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 1,
+      "citationCorrect": true,
+      "abstentionCorrect": false,
+      "leakedDocumentIds": [],
+      "aclViolationChunkIds": [],
+      "topDocumentIds": [
+        "nw_support_sla_policy",
+        "nw_support_complaint_escalation",
+        "nw_support_ticket_priority"
+      ]
+    }
+  ]
+}
