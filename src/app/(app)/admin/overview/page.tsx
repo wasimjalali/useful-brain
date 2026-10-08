@@ -23,7 +23,7 @@ export default async function OverviewPage() {
   return (
     <div className="uv-scroll min-h-0 flex-1 overflow-y-auto">
       <PageHeader subtitle={rangeSubtitle(overview.daily)} title="Overview" />
-      <div className="px-12 pt-6 pb-10">
+      <div className="px-4 pt-6 pb-10 min-[768px]:px-12">
       <OverviewView
         evals={mapEvalsSummary(evals)}
         kpis={mapKpis(overview)}

@@ -108,13 +108,13 @@ export function AppShell({
     setFreshFromPath(null);
   }
   const activePath = freshFromPath !== null ? "/chat" : pathname;
-  const newChat = useCallback(() => {
+  const newChat = useCallback((options?: { pushUrl?: boolean }) => {
     setNewChatNonce((value) => value + 1);
     setFreshFromPath(pathname);
     // The URL must say /chat too, so a reload or a shared link opens the blank
     // chat rather than the conversation that was on screen. pushState keeps
     // that conversation one Back away; Next syncs usePathname without a navigation.
-    if (window.location.pathname !== "/chat") {
+    if (options?.pushUrl !== false && window.location.pathname !== "/chat") {
       window.history.pushState(null, "", "/chat");
     }
   }, [pathname]);
@@ -278,13 +278,17 @@ export function AppShell({
               >
                 <MenuIcon className="size-5" />
               </IconButton>
-              <h1 className="ub-header-title m-0">{title}</h1>
+              {conversationIdFromPath(activePath) ? (
+                <h1 className="ub-header-title m-0">{title}</h1>
+              ) : (
+                <span className="ub-header-title m-0">{title}</span>
+              )}
               <Link
                 aria-label="New chat"
                 className="ub-iconbtn ub-ring"
                 data-nav="true"
                 href="/chat"
-                onClick={newChat}
+                onClick={() => newChat()}
               >
                 <SquarePenIcon className="size-5" />
               </Link>

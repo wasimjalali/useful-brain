@@ -23,7 +23,7 @@ vi.mock("@/app/library-actions", () => ({ searchAll: vi.fn() }));
 import { ChatComposer } from "@/components/chat/chat-composer";
 
 import { AppShell } from "./app-shell";
-import { ShellPanel } from "./shell-context";
+import { ShellPanel, useShell } from "./shell-context";
 import { admin, clearViewport, member, setViewport } from "./test-support";
 
 const conversation = {
@@ -139,6 +139,25 @@ describe("global shortcuts", () => {
     press("k", { ctrlKey: true });
     press("n", { ctrlKey: true });
     expect(nav.push).not.toHaveBeenCalled();
+  });
+});
+
+describe("shell title heading", () => {
+  it("is a span on /library at 1000px so the page header owns the only h1", () => {
+    setViewport(1000);
+    nav.pathname = "/library";
+    renderShell({ children: <h1>Library</h1> });
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(document.querySelector(".ub-header-title")?.tagName).toBe("SPAN");
+  });
+
+  it("is the h1 on a conversation at 1000px", () => {
+    setViewport(1000);
+    nav.pathname = "/chat/c1";
+    renderShell();
+    const h1s = screen.getAllByRole("heading", { level: 1 });
+    expect(h1s).toHaveLength(1);
+    expect(h1s[0]).toHaveTextContent("Parental leave");
   });
 });
 
@@ -327,6 +346,21 @@ describe("settings and chats", () => {
     expect(within(rail()).getByRole("link", { name: /New chat/ })).toHaveAttribute("aria-current", "page");
     // The address bar says /chat too, so a reload opens the blank chat.
     expect(window.location.pathname).toBe("/chat");
+  });
+
+  it("skips the /chat history entry when the caller navigates itself", () => {
+    nav.pathname = "/chat/c1";
+    const push = vi.spyOn(window.history, "pushState");
+    window.history.replaceState(null, "", "/chat/c1");
+    function Ask() {
+      const { newChat } = useShell();
+      return <button onClick={() => newChat({ pushUrl: false })}>ask</button>;
+    }
+    renderShell({ children: <Ask /> });
+    fireEvent.click(screen.getByRole("button", { name: "ask" }));
+    expect(push).not.toHaveBeenCalled();
+    expect(window.location.pathname).toBe("/chat/c1");
+    push.mockRestore();
   });
 
   it("follows the conversation again when the user opens it from elsewhere", () => {

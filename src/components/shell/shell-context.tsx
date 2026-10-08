@@ -29,7 +29,8 @@ export type ShellContextValue = {
   conversationError: string | null;
   /** Bumped by New chat so a mounted chat view resets even on the same URL. */
   newChatNonce: number;
-  newChat: () => void;
+  /** pushUrl: false skips the /chat history entry when the caller navigates itself. */
+  newChat: (options?: { pushUrl?: boolean }) => void;
   openSearch: () => void;
   openSettings: () => void;
   panelHost: HTMLElement | null;

@@ -597,14 +597,11 @@ describe("evidence panel", () => {
     expect(within(panel()).queryByRole("button", { name: "Back to evidence" })).toBeNull();
   });
 
-  it("hides the chat head and its Evidence toggle below 768px, keeps them from 768px", () => {
+  it("always renders the chat head and hides it below 768px with CSS, so SSR and hydration match", () => {
     setViewport(390);
-    const { unmount } = renderChat({ initialTurns: [turn()] });
-    expect(screen.queryByRole("button", { name: "Evidence" })).toBeNull();
-    unmount();
-    setViewport(900);
     renderChat({ initialTurns: [turn()] });
-    expect(screen.getByRole("button", { name: "Evidence" })).toBeInTheDocument();
+    const toggle = screen.getByRole("button", { name: "Evidence" });
+    expect(toggle.closest("header")).toHaveClass("max-[767px]:hidden");
   });
 
   it("uses the bottom sheet and a 44px sources summary on a narrow screen", () => {

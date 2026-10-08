@@ -9,7 +9,7 @@ export default async function ActivityPage() {
   return (
     <div className="uv-scroll min-h-0 flex-1 overflow-y-auto">
       <PageHeader title="Activity" />
-      <div className="px-12 pt-6 pb-10">
+      <div className="px-4 pt-6 pb-10 min-[768px]:px-12">
         <ActivityView initial={initial.ok ? initial.data : null} />
       </div>
     </div>

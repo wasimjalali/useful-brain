@@ -94,7 +94,8 @@ export function SearchHost({ onClose }: { onClose: () => void }) {
       error={error}
       loading={loading}
       onAskDocument={(id) => {
-        newChat();
+        // router.push follows, so skip the history entry newChat would add.
+        newChat({ pushUrl: false });
         go(`/chat?scope=${encodeURIComponent(id)}`);
       }}
       onClose={onClose}

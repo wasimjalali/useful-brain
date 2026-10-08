@@ -42,37 +42,57 @@ export function fileNameOf(path: string): string {
 type BackfillChunkRow = {
   heading: string;
   content: string;
+  start_offset: number;
+  end_offset: number;
 };
 
-const MAX_OVERLAP_CHARS = 1000;
-const MIN_OVERLAP_CHARS = 8;
-
-/** Longest suffix of `previous` that is also a prefix of `next`, within the bounds. */
-function overlapLength(previous: string, next: string): number {
-  const limit = Math.min(MAX_OVERLAP_CHARS, previous.length, next.length);
-  for (let length = limit; length >= MIN_OVERLAP_CHARS; length -= 1) {
-    if (previous.endsWith(next.slice(0, length))) {
-      return length;
-    }
+/** Gap text between two chunks of one section is whitespace; a new section adds its heading line. */
+function startsNewSection(previous: BackfillChunkRow, next: BackfillChunkRow): boolean {
+  if (previous.heading !== next.heading) {
+    return true;
   }
-  return 0;
+  const gap = next.start_offset - previous.end_offset;
+  // "#" + space + heading is the shortest heading line that can sit in the gap.
+  return gap >= next.heading.length + 2;
 }
 
 /**
- * Rebuilds a markdown body from ordered chunks: consecutive chunks that share a
- * heading form one section under a `## heading` line, and the repeated overlap
- * between neighbouring chunks of a section is dropped.
+ * Length of the verified overlap between neighbouring chunks of one section, or
+ * 0. The overlap is the part of their stored source ranges that intersect, and
+ * it counts only when the text at the end of `previous` really equals the text
+ * at the start of `next`. Anything unverifiable is kept, never dropped.
+ */
+function verifiedOverlap(previous: BackfillChunkRow, next: BackfillChunkRow): number {
+  const length = previous.end_offset - next.start_offset;
+  if (
+    !Number.isInteger(length) ||
+    length <= 0 ||
+    length > previous.content.length ||
+    length > next.content.length
+  ) {
+    return 0;
+  }
+  return previous.content.slice(previous.content.length - length) === next.content.slice(0, length) ? length : 0;
+}
+
+/**
+ * Rebuilds a markdown body from ordered chunks. Consecutive chunks of one
+ * section sit under a single `## heading` line; text is removed only where the
+ * stored source ranges of adjacent chunks overlap and the overlapping text
+ * matches. Distinct sections that share a heading stay separate.
  */
 export function reconstructBody(chunks: BackfillChunkRow[]): string {
   const parts: string[] = [];
   for (let index = 0; index < chunks.length; ) {
     const heading = chunks[index].heading;
     let text = chunks[index].content;
+    let last = chunks[index];
     index += 1;
-    while (index < chunks.length && chunks[index].heading === heading) {
-      const next = chunks[index].content;
-      const overlap = overlapLength(text, next);
-      text = overlap > 0 ? text + next.slice(overlap) : `${text}\n\n${next}`;
+    while (index < chunks.length && !startsNewSection(last, chunks[index])) {
+      const next = chunks[index];
+      const overlap = verifiedOverlap(last, next);
+      text = overlap > 0 ? text + next.content.slice(overlap) : `${text}\n\n${next.content}`;
+      last = next;
       index += 1;
     }
     parts.push(heading ? `## ${heading}\n\n${text}` : text);
@@ -204,7 +224,7 @@ async function documentAclKey(db: SqlExecutor, generationId: string, documentId:
  * Idempotent: rebuilds catalog and body rows for documents of a generation
  * that lack them. The original text is not stored for such generations, so the
  * body is reconstructed section by section from chunk text (headings restored,
- * chunk overlap removed) and marked
+ * verified chunk overlap removed) and marked
  * `reconstructed = 1`; offsets do not index into a reconstructed body.
  * Existing rows are never overwritten.
  *
@@ -233,7 +253,7 @@ export async function backfillDocumentCatalog(
     for (let offset = 0; ; offset += BACKFILL_PAGE) {
       const page = await db
         .prepare(
-          `SELECT heading, content, access_scope, allowed_roles, allowed_departments, acl_group, metadata
+          `SELECT heading, content, start_offset, end_offset, access_scope, allowed_roles, allowed_departments, acl_group, metadata
            FROM chunks WHERE generation_id = ? AND document_id = ?
            ORDER BY chunk_index LIMIT ? OFFSET ?`,
         )
@@ -244,7 +264,12 @@ export async function backfillDocumentCatalog(
           throw new Error(`document ${documentId} changed ACL during backfill`);
         }
         first ??= chunk;
-        chunks.push({ heading: chunk.heading, content: chunk.content });
+        chunks.push({
+          heading: chunk.heading,
+          content: chunk.content,
+          start_offset: chunk.start_offset,
+          end_offset: chunk.end_offset,
+        });
       }
       if (page.results.length < BACKFILL_PAGE) {
         break;

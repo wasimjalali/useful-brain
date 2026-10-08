@@ -1,6 +1,7 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 import { brainStreamPut } from "@/lib/cf/brain-stream";
+import { hostAllowedForRuntime } from "@/lib/cf/loopback-host";
 import type { BrainService } from "@/lib/cf/service-binding-identity";
 
 export const dynamic = "force-dynamic";
@@ -49,6 +50,11 @@ export async function PUT(
   if (!isSameOriginRequest(request)) {
     return reject(403, "FORBIDDEN", "This request came from another site.");
   }
+  const { env } = await getCloudflareContext({ async: true });
+  // The app-wide proxy applies the same guard; this keeps the upload safe on its own.
+  if (!hostAllowedForRuntime(env as { LOOPBACK_RUNTIME?: string }, request.headers.get("host") ?? new URL(request.url).host)) {
+    return reject(403, "FORBIDDEN", "This request came from another site.");
+  }
   const { batchId, fileId } = await params;
   if (!ID_PATTERN.test(batchId) || !ID_PATTERN.test(fileId)) {
     return reject(404, "NOT_FOUND", "That resource was not found.");
@@ -57,7 +63,6 @@ export async function PUT(
   if (!Number.isInteger(declared) || declared < 1 || declared > MAX_UPLOAD_BYTES || !request.body) {
     return reject(400, "VALIDATION_FAILED", "The request is invalid.");
   }
-  const { env } = await getCloudflareContext({ async: true });
   const brain = (env as { BRAIN?: BrainService }).BRAIN;
   if (!brain) {
     return reject(503, "UNAVAILABLE", "Brain is not bound to this web worker.");
