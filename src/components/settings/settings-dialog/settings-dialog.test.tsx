@@ -109,7 +109,24 @@ describe("SettingsDialog", () => {
     expect(screen.getByText("g-c305cf57")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Connectors" }));
     expect(screen.getByRole("button", { name: "Connect" })).toBeDisabled();
+    expect(screen.queryByText("Not connected")).toBeNull();
+    expect(screen.getByText("Active")).toBeInTheDocument();
+  });
+
+  it("lists connectors as a grouped list with status pills", () => {
+    setup({
+      isAdmin: true,
+      connectors: [
+        { id: "desk", name: "Support desk", description: "Creates tickets, each one needs your approval", status: "connected" },
+        { id: "other", name: "Other", description: "Not wired", status: "not_connected" },
+      ],
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Connectors" }));
+    expect(screen.getByText("Creates tickets, each one needs your approval")).toBeInTheDocument();
+    expect(screen.queryByText(/create_ticket/)).toBeNull();
+    expect(screen.getByText("Connected")).toBeInTheDocument();
     expect(screen.getByText("Not connected")).toBeInTheDocument();
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
   });
 
   it("shows an unknown model id once, without a second line", () => {

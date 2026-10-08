@@ -59,8 +59,8 @@ export function mapAdminSettings(
       id: "support-desk",
       name: "Support desk",
       description: ticket.approval
-        ? "create_ticket, every call needs approval"
-        : "create_ticket",
+        ? "Creates tickets, each one needs your approval"
+        : "Creates tickets",
       status: ticket.status,
     });
   }

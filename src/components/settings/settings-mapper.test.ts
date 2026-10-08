@@ -68,7 +68,7 @@ describe("mapAdminSettings", () => {
     });
     expect(connectors.map((c) => [c.name, c.status, c.description])).toEqual([
       ["Uploads", "active", "Built in, 65 documents"],
-      ["Support desk", "connected", "create_ticket, every call needs approval"],
+      ["Support desk", "connected", "Creates tickets, each one needs your approval"],
       ["GitHub", "not_connected", "Sync a repository folder into a draft"],
     ]);
     expect(connectors[2].connectable).toBe(true);

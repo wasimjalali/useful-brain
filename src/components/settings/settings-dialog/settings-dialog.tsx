@@ -279,27 +279,29 @@ export function SettingsDialog({
             {section === "connectors" && isAdmin && !adminError ? (
               <section className="flex flex-col gap-3.5">
                 <h3 className="text-sm font-semibold">Connectors</h3>
-                <ul className="flex flex-col">
+                <ul className="m-0 flex list-none flex-col overflow-hidden rounded-[10px] p-0 shadow-[0_0_0_1px_var(--border)]">
                   {(connectors ?? []).map((connector) => {
                     const status = CONNECTOR_STATUS[connector.status];
+                    const showConnect = connector.connectable && connector.status === "not_connected";
                     return (
                       <li
-                        className="flex items-center gap-3 border-b border-border py-3 last:border-b-0"
+                        className="flex min-w-0 items-center justify-between gap-4 px-3 py-[9px] [&+&]:border-t [&+&]:border-border"
                         key={connector.id}
                       >
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[13px] font-medium">{connector.name}</p>
+                        <div className="min-w-0">
+                          <p className="text-[13px]">{connector.name}</p>
                           <p className="text-xs text-ink-faint-text">{connector.description}</p>
                         </div>
-                        {connector.connectable ? (
+                        {showConnect ? (
                           <Button disabled size={32}>
                             Connect
                           </Button>
-                        ) : null}
-                        <span className="inline-flex items-center gap-1.5 text-xs text-ink-faint-text">
-                          <StatusDot tone={status.tone} />
-                          {status.label}
-                        </span>
+                        ) : (
+                          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-sunken py-0.5 pl-2 pr-2.5 text-[11px] text-ink-muted">
+                            <StatusDot tone={status.tone} />
+                            {status.label}
+                          </span>
+                        )}
                       </li>
                     );
                   })}
