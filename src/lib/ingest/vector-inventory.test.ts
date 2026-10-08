@@ -46,7 +46,7 @@ function ids(prefix: string, from: number, to: number): string[] {
   return Array.from({ length: to - from }, (_, index) => `${prefix}-${from + index}`);
 }
 
-type Call = { url: URL; authorization: string | null };
+type Call = { url: URL; authorization: string | null; signal: AbortSignal | null };
 
 /** Fake fetch that answers from a queue of responses and records every call. */
 function fakeFetch(responses: Array<Response | Error | ((call: Call) => Response)>) {
@@ -56,6 +56,7 @@ function fakeFetch(responses: Array<Response | Error | ((call: Call) => Response
     const call: Call = {
       url: new URL(String(input)),
       authorization: new Headers(init?.headers).get("authorization"),
+      signal: init?.signal ?? null,
     };
     calls.push(call);
     const next = queue.shift();
@@ -377,25 +378,16 @@ describe("REST vector inventory limits", () => {
     expect(sleeps).toEqual([0, 0, 0, 0, 0]);
   });
 
-  it("stops after five retries when Retry-After is an HTTP date in the past", async () => {
-    const { port, calls } = inventory(Array.from({ length: 8 }, () => limited("Wed, 21 Oct 2015 07:28:00 GMT")));
-    const error = await failure(port.listAll());
-    expect(error).toBeInstanceOf(VectorInventoryRateLimited);
-    expect(calls).toHaveLength(6);
-  });
-
-  it("waits for a future HTTP date within the limit", async () => {
-    const clock = { t: Date.parse("2026-10-08T12:00:00Z") };
-    const { port, sleeps } = inventory(
-      [limited("Thu, 08 Oct 2026 12:00:07 GMT"), body({ ids: ids("v", 0, 2), totalCount: 2 })],
-      { clock },
-    );
-    expect((await port.listAll()).ids).toHaveLength(2);
-    expect(sleeps).toEqual([7000]);
-  });
-
   it("rejects malformed Retry-After values without waiting or retrying", async () => {
-    for (const bad of ["-1", "abc", "1.5", "1e3", "", " ", "1 2", "99999999", "2015-10-21"]) {
+    // Only whole delta-seconds are honoured. Every HTTP-date form (IMF-fixdate, RFC 850, asctime) is refused.
+    const dates = [
+      "Wed, 21 Oct 2015 07:28:00 GMT",
+      "Thu, 08 Oct 2099 12:00:07 GMT",
+      "Wednesday, 21-Oct-15 07:28:00 GMT",
+      "Wed Oct 21 07:28:00 2015",
+      "Fri, 99 Foo 2026 99:99:99 GMT",
+    ];
+    for (const bad of ["-1", "abc", "1.5", "1e3", "", " ", "1 2", "99999999", "2015-10-21", ...dates]) {
       const { port, calls, sleeps } = inventory([limited(bad), limited(bad)]);
       const error = await failure(port.listAll());
       expect(error, bad).toBeInstanceOf(VectorInventoryRateLimited);
@@ -422,6 +414,54 @@ describe("REST vector inventory limits", () => {
     const { port, sleeps } = inventory([limited("50"), body({ ids: [], totalCount: 0 })], { clock, deadlineMs: 40_000 });
     expect(await failure(port.listAll())).toBeInstanceOf(VectorInventoryDeadline);
     expect(sleeps).toEqual([]);
+  });
+
+  it("bounds the request itself: a fetch that never resolves ends in the deadline error", async () => {
+    const hang = (call: Call) =>
+      new Promise<Response>((_resolve, reject) => {
+        call.signal?.addEventListener("abort", () => reject(call.signal?.reason));
+      });
+    // Real time, tiny deadline: the abort signal is what ends the wait.
+    const { port, calls } = inventory([hang as never], { deadlineMs: 30 });
+    const error = await failure(port.listAll());
+    expect(error).toBeInstanceOf(VectorInventoryDeadline);
+    expect(calls[0].signal).not.toBeNull();
+    expectNoSecrets(error);
+  });
+
+  it("bounds the body read: a response whose body never resolves ends in the deadline error", async () => {
+    const stalledBody = (call: Call) =>
+      ({
+        status: 200,
+        ok: true,
+        headers: new Headers(),
+        json: () =>
+          new Promise((_resolve, reject) => {
+            call.signal?.addEventListener("abort", () => reject(call.signal?.reason));
+          }),
+      }) as unknown as Response;
+    const { port } = inventory([stalledBody], { deadlineMs: 30 });
+    const error = await failure(port.listAll());
+    expect(error).toBeInstanceOf(VectorInventoryDeadline);
+    expect(error.name).toBe("VectorInventoryDeadline");
+  });
+
+  it("an abort that is not a timeout is still a plain network error", async () => {
+    const { port } = inventory([new TypeError("socket hang up")]);
+    const error = await failure(port.listAll());
+    expect(error).toBeInstanceOf(VectorInventoryError);
+    expect(error).not.toBeInstanceOf(VectorInventoryDeadline);
+  });
+
+  it("does not return a listing that finished after the deadline", async () => {
+    const clock = { t: 0 };
+    const slowLast = (call: Call) => {
+      clock.t += 500; // the final response arrives after the 100 ms deadline
+      void call;
+      return body({ ids: ids("v", 0, 2), totalCount: 2 });
+    };
+    const { port } = inventory([slowLast as never], { clock, deadlineMs: 100 });
+    expect(await failure(port.listAll())).toBeInstanceOf(VectorInventoryDeadline);
   });
 
   it("a healthy scan of 100 full pages finishes inside the deadline at the default gap", async () => {

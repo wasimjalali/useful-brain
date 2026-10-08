@@ -116,22 +116,17 @@ function parsePage(raw: unknown): Page {
 }
 
 /**
- * Retry-After as milliseconds. Only a non-negative integer of seconds or an
- * HTTP-date (it starts with a weekday name) is accepted; anything else is null.
+ * Retry-After as milliseconds. Only whole delta-seconds are honoured. The
+ * HTTP-date form is not parsed (its three legacy formats are easy to get
+ * wrong), so a date or anything else is null and the attempt fails.
  */
-function retryAfterMs(response: Response, now: number): number | null {
+function retryAfterMs(response: Response): number | null {
   const header = response.headers.get("retry-after")?.trim();
-  if (!header) {
-    return null;
-  }
-  if (/^\d{1,6}$/.test(header)) {
-    return Number(header) * 1000;
-  }
-  if (/^[A-Za-z]{3},\s/.test(header)) {
-    const date = Date.parse(header);
-    return Number.isFinite(date) ? Math.max(0, date - now) : null;
-  }
-  return null;
+  return header && /^\d{1,6}$/.test(header) ? Number(header) * 1000 : null;
+}
+
+function isTimeout(error: unknown): boolean {
+  return error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError");
 }
 
 type Budget = { waitedMs: number; startedAt: number };
@@ -142,10 +137,13 @@ export function createRestVectorInventory(config: RestVectorInventoryConfig): Ve
   const sleep = config.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const now = config.now ?? Date.now;
 
-  function assertWithinDeadline(budget: Budget, upcomingWaitMs = 0): void {
-    if (now() - budget.startedAt + upcomingWaitMs > (config.deadlineMs ?? LIST_DEADLINE_MS)) {
+  /** Milliseconds left before the deadline, less a wait about to be slept. Throws when none are left. */
+  function remainingMs(budget: Budget, upcomingWaitMs = 0): number {
+    const left = (config.deadlineMs ?? LIST_DEADLINE_MS) - (now() - budget.startedAt) - upcomingWaitMs;
+    if (left < 0) {
       throw new VectorInventoryDeadline();
     }
+    return left;
   }
 
   async function requestPage(cursor: string | null, budget: Budget): Promise<Page> {
@@ -158,20 +156,25 @@ export function createRestVectorInventory(config: RestVectorInventoryConfig): Ve
     }
     let response: Response;
     for (let retries = 0; ; retries += 1) {
-      assertWithinDeadline(budget);
+      // The signal bounds the request and, once fetch resolves, the body read too.
+      const signal = AbortSignal.timeout(remainingMs(budget));
       try {
         response = await doFetch(url.toString(), {
           method: "GET",
           headers: { authorization: `Bearer ${config.apiToken}`, accept: "application/json" },
+          signal,
         });
-      } catch {
+      } catch (error) {
+        if (isTimeout(error)) {
+          throw new VectorInventoryDeadline();
+        }
         // The platform error text can echo the URL. Say only what failed.
         throw new VectorInventoryError("list request failed: network error");
       }
       if (response.status !== 429) {
         break;
       }
-      const wait = retryAfterMs(response, now());
+      const wait = retryAfterMs(response);
       if (
         wait === null ||
         retries >= MAX_RATE_LIMIT_RETRIES ||
@@ -180,7 +183,7 @@ export function createRestVectorInventory(config: RestVectorInventoryConfig): Ve
       ) {
         throw new VectorInventoryRateLimited("list request failed: HTTP 429");
       }
-      assertWithinDeadline(budget, wait);
+      remainingMs(budget, wait);
       budget.waitedMs += wait;
       await sleep(wait);
     }
@@ -193,7 +196,10 @@ export function createRestVectorInventory(config: RestVectorInventoryConfig): Ve
     let raw: unknown;
     try {
       raw = await response.json();
-    } catch {
+    } catch (error) {
+      if (isTimeout(error)) {
+        throw new VectorInventoryDeadline();
+      }
       throw new VectorInventoryError("list response is malformed");
     }
     if (isRecord(raw) && raw.success === false) {
@@ -234,13 +240,15 @@ export function createRestVectorInventory(config: RestVectorInventoryConfig): Ve
       if (page.cursorExpiresAt !== null && now() >= page.cursorExpiresAt) {
         throw new CursorExpired();
       }
-      assertWithinDeadline(budget, delayMs);
+      remainingMs(budget, delayMs);
       await sleep(delayMs);
       page = await requestPage(page.nextCursor, budget);
     }
     if (ids.size < totalCount) {
       throw new VectorInventoryError("list is incomplete");
     }
+    // A listing that finished after the deadline is not returned: the step is out of time anyway.
+    remainingMs(budget);
     return { ids: [...ids], totalCount };
   }
 
