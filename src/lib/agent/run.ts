@@ -562,12 +562,27 @@ export async function runKnowledgeAgent(input: {
     refusalReason = "model_abstained_with_evidence";
   }
 
+  // A search that failed this turn (a backend error caught by the tool, or
+  // a tool that threw) makes the outcome unavailable whatever the draft
+  // says, so no repair or coverage model call is spent on it. This fails
+  // closed on purpose, even when another search in the same turn grounded a
+  // valid draft: the failed search may have held the evidence for another
+  // part of the question (a second hop) or a fact that would change the
+  // answer, so a cited draft beside it cannot be trusted as complete. The
+  // client retries the turn instead.
+  const searchFailed =
+    evidenceLedger.searchError ||
+    toolCallsFromMessages(agent.state.messages.slice(priorMessageCount)).some(
+      (call) => call.tool === SEARCH_KNOWLEDGE_TOOL && call.status === "error",
+    );
+
   // Re-evaluated before every repair attempt: an abort landing between
   // passes must not start another model call.
   const canRepair = () =>
     Boolean(input.runtime?.repairGroundedAnswer) &&
     !input.abort?.signal.aborted &&
     !wall.aborted &&
+    !searchFailed &&
     evidence.length > 0;
   if (grounded === BRAIN_INVALID_CITATION && canRepair()) {
     try {
@@ -697,6 +712,7 @@ export async function runKnowledgeAgent(input: {
     Boolean(input.runtime?.coverAnswerParts) &&
     !input.abort?.signal.aborted &&
     !wall.aborted &&
+    !searchFailed &&
     evidence.length > 0;
   if (
     canCover &&
@@ -732,13 +748,21 @@ export async function runKnowledgeAgent(input: {
     }
   }
 
+  // The repair, recovery and coverage passes above run on their own
+  // deadlines, which can fire before the wall signal; their catches keep the
+  // earlier refusal or draft. Recheck the budget after all of them: a run
+  // that ended at or past the wall-time edge is unavailable, never a
+  // complete answer or an honest refusal.
+  if (!budgetErrorMessage && budgets.remainingWallTimeMs() === 0) {
+    budgetErrorMessage = "interactive wall time budget exhausted";
+  }
+
   const recorded = toolCallsFromMessages(agent.state.messages);
   const pendingApproval = recorded.some((call) => call.status === "pending_approval");
-  const searchErrored = recorded.some((call) => call.tool === SEARCH_KNOWLEDGE_TOOL && call.status === "error");
   return {
     finalResponse:
-      (budgetErrorMessage ? BRAIN_KNOWLEDGE_UNAVAILABLE : grounded) ??
-      (searchErrored ? BRAIN_KNOWLEDGE_UNAVAILABLE : BRAIN_MUST_RETRIEVE),
+      (budgetErrorMessage || searchFailed ? BRAIN_KNOWLEDGE_UNAVAILABLE : grounded) ??
+      BRAIN_MUST_RETRIEVE,
     messages:
       input.captureMessages === false
         ? []
@@ -756,7 +780,7 @@ export async function runKnowledgeAgent(input: {
     errorMessage: agent.state.errorMessage ?? budgetErrorMessage,
     evidence,
     vectorDegradedCount: evidenceLedger.vectorDegradedCount,
-    refusalReason,
+    refusalReason: searchFailed ? undefined : refusalReason,
   };
 }
 

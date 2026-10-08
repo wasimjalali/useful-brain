@@ -313,6 +313,8 @@ export async function loadConversationForUi(
         error: cancelled ? null : "The previous answer could not be completed.",
         errorRetryable:
           assistant.error_code === "RATE_LIMITED" || assistant.error_code === "PROVIDER_TEMPORARY",
+        // Only the unavailable code reaches the client: it picks the copy.
+        ...(assistant.error_code === "PROVIDER_TEMPORARY" ? { errorCode: "PROVIDER_TEMPORARY" as const } : {}),
         cancelled,
         answerType: null,
         latencyMs: null,

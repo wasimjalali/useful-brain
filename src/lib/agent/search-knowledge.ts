@@ -53,6 +53,7 @@ export function createSearchKnowledgeTool(input: {
           details: { hitCount: 0 },
         };
       }
+      const ledger = input.ledger ?? createLedger();
       try {
         const remainingWall = input.budgets.remainingWallTimeMs();
         const deadline = toolDeadlineSignal(
@@ -75,7 +76,6 @@ export function createSearchKnowledgeTool(input: {
         // the ledger only records evidence from a search that finished
         // inside its cancellation window.
         deadline.throwIfAborted();
-        const ledger = input.ledger ?? createLedger();
         if (response.trace.vectorChannelError) {
           ledger.vectorDegradedCount += 1;
         }
@@ -137,6 +137,9 @@ export function createSearchKnowledgeTool(input: {
         if (signal?.aborted) {
           throw error;
         }
+        // The host, not the model, decides what a failed search means: the
+        // turn ends unavailable, never as a refusal written around the error.
+        ledger.searchError = true;
         return {
           content: [
             {

@@ -1614,3 +1614,271 @@ describe("review regressions", () => {
     expect(identifierTokens("Is the mileage rate 0.58 per mile?")).toEqual([]);
   });
 });
+
+describe("retrieval availability", () => {
+  function scriptedRuntime(provider: string, replies: ReturnType<typeof fauxAssistantMessage>[]) {
+    const faux = fauxProvider({ provider });
+    faux.setResponses(replies);
+    return {
+      model: { ...faux.getModel(), api: "openai-completions" as const },
+      stream: ((model, context, options) =>
+        faux.provider.streamSimple(model, context, options)) as NonNullable<
+        Parameters<typeof runKnowledgeAgent>[0]["runtime"]
+      >["stream"],
+    };
+  }
+  const searchCall = (query: string) =>
+    fauxAssistantMessage([fauxText("Searching."), fauxToolCall(SEARCH_KNOWLEDGE_TOOL, { query })], {
+      stopReason: "toolUse",
+    });
+  const finalText = (text: string) => fauxAssistantMessage([fauxText(text)], { stopReason: "stop" });
+  const emptySearch = (query: string, vectorChannelError?: boolean) => ({
+    hits: [],
+    trace: {
+      query,
+      finalChunkIds: [],
+      vectorScores: {},
+      keywordScores: {},
+      fusedScores: {},
+      rerankScores: {},
+      fingerprint: "test",
+      ...(vectorChannelError ? { vectorChannelError } : {}),
+    },
+  });
+
+  it("does not record a refusal written after a failed search as a grounded refusal", async () => {
+    // Brownout shape: the backend throws, the model reads {"error":true} and
+    // replies with the exact not-enough-evidence sentence it was told to use.
+    const result = await runKnowledgeAgent({
+      question: "How much leave accrues each month?",
+      pipeline: {
+        search: async () => {
+          throw new Error("D1_ERROR: Network connection lost.");
+        },
+      },
+      principal,
+      policyPrincipal,
+      conversationId: "c-search-failed-refusal",
+      runtime: scriptedRuntime("useful-brain-failed-refusal", [
+        searchCall("leave accrual"),
+        finalText(BRAIN_NOT_ENOUGH_EVIDENCE),
+      ]),
+    });
+
+    expect(result.finalResponse).toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
+    expect(result.refusalReason).toBeUndefined();
+    expect(result.evidence).toEqual([]);
+  }, 20_000);
+
+  it("does not let an empty retry hide an earlier failed search", async () => {
+    let calls = 0;
+    const result = await runKnowledgeAgent({
+      question: "How much leave accrues each month?",
+      pipeline: {
+        search: async ({ query }) => {
+          calls += 1;
+          if (calls === 1) {
+            throw new Error("reranker unavailable");
+          }
+          return emptySearch(query);
+        },
+      },
+      principal,
+      policyPrincipal,
+      conversationId: "c-search-failed-then-empty",
+      runtime: scriptedRuntime("useful-brain-failed-then-empty", [
+        searchCall("leave accrual"),
+        searchCall("monthly leave"),
+        finalText("The documents do not contain information about monthly leave accrual."),
+      ]),
+    });
+
+    expect(calls).toBe(2);
+    expect(result.finalResponse).toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
+    expect(result.refusalReason).toBeUndefined();
+  }, 20_000);
+
+  it("fails closed when any search in the turn failed, even beside a grounded draft", async () => {
+    const pipeline = await tinyPipeline();
+    let calls = 0;
+    const repairGroundedAnswer = vi.fn().mockResolvedValue(null);
+    const result = await runKnowledgeAgent({
+      question: "How much leave accrues each month and who approves it?",
+      pipeline: {
+        search: async (input) => {
+          calls += 1;
+          if (calls === 2) {
+            throw new Error("search deadline exceeded");
+          }
+          return pipeline.search(input);
+        },
+      },
+      principal,
+      policyPrincipal,
+      conversationId: "c-search-partial",
+      runtime: {
+        ...scriptedRuntime("useful-brain-partial", [
+          searchCall("leave accrual"),
+          searchCall("leave approver"),
+          finalText("Employees accrue 1.5 days of leave per month.[1]"),
+        ]),
+        repairGroundedAnswer,
+      },
+    });
+
+    // The second hop never ran, so the answer cannot be trusted as complete.
+    expect(calls).toBe(2);
+    expect(result.finalResponse).toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
+    expect(repairGroundedAnswer).not.toHaveBeenCalled();
+  }, 20_000);
+
+  it("treats a search tool that throws inside the agent as unavailable", async () => {
+    const result = await runKnowledgeAgent({
+      question: "How much leave accrues each month?",
+      pipeline: { search: async ({ query }) => emptySearch(query) },
+      principal,
+      policyPrincipal,
+      conversationId: "c-search-tool-throws",
+      tools: [
+        {
+          name: SEARCH_KNOWLEDGE_TOOL,
+          label: "Search knowledge",
+          description: "Search tool whose execute path throws.",
+          parameters: Type.Object({ query: Type.String() }),
+          execute: async () => {
+            throw new Error("search tool crashed");
+          },
+        },
+      ],
+      runtime: scriptedRuntime("useful-brain-tool-throws", [
+        searchCall("leave accrual"),
+        finalText(BRAIN_NOT_ENOUGH_EVIDENCE),
+      ]),
+    });
+
+    expect(result.toolCalls[0]?.status).toBe("error");
+    expect(result.finalResponse).toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
+  }, 20_000);
+
+  it("keeps a vector-degraded empty search an honest refusal with a recorded count", async () => {
+    const result = await runKnowledgeAgent({
+      question: "Does the company offer a stock purchase plan?",
+      pipeline: { search: async ({ query }) => emptySearch(query, true) },
+      principal,
+      policyPrincipal,
+      conversationId: "c-vector-degraded-empty",
+      runtime: scriptedRuntime("useful-brain-degraded-empty", [
+        searchCall("stock purchase plan"),
+        finalText(BRAIN_NOT_ENOUGH_EVIDENCE),
+      ]),
+    });
+
+    expect(result.finalResponse).toBe(BRAIN_NOT_ENOUGH_EVIDENCE);
+    expect(result.vectorDegradedCount).toBe(1);
+  }, 20_000);
+
+  // Frozen clock: elapsed time is exactly `offset`, so the budget edge is
+  // deterministic instead of depending on how fast the test machine runs.
+  function frozenClock() {
+    const base = Date.now();
+    const clock = { offset: 0 };
+    const spy = vi.spyOn(Date, "now").mockImplementation(() => base + clock.offset);
+    return { clock, restore: () => spy.mockRestore() };
+  }
+  const abortError = () => new DOMException("The operation was aborted.", "AbortError");
+
+  it("ends unavailable when an abstention recheck uses the last of the wall-time budget", async () => {
+    const pipeline = await tinyPipeline();
+    const { clock, restore } = frozenClock();
+    try {
+      // The repair deadline fires at exactly zero remaining wall time, before
+      // the separate wall signal, and the catch keeps the refusal.
+      const repairGroundedAnswer = vi.fn().mockImplementation(async () => {
+        clock.offset = AGENT_BUDGETS.wallTimeMs;
+        throw abortError();
+      });
+      const result = await runKnowledgeAgent({
+        question: "Does the company offer a stock purchase plan?",
+        pipeline,
+        principal,
+        policyPrincipal,
+        conversationId: "c-wall-repair",
+        runtime: {
+          ...scriptedRuntime("useful-brain-wall-repair", [
+            searchCall("stock purchase plan"),
+            finalText("The retrieved documents do not contain any information about a stock purchase plan."),
+          ]),
+          repairGroundedAnswer,
+        },
+      });
+
+      expect(repairGroundedAnswer).toHaveBeenCalledTimes(1);
+      expect(result.aborted).toBe(true);
+      expect(result.finalResponse).toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
+    } finally {
+      restore();
+    }
+  }, 20_000);
+
+  it("ends unavailable when a coverage pass outlives the wall-time budget", async () => {
+    const pipeline = await escalationPipeline();
+    const { clock, restore } = frozenClock();
+    try {
+      const coverAnswerParts = vi.fn().mockImplementation(async () => {
+        clock.offset = AGENT_BUDGETS.wallTimeMs + 1;
+        throw abortError();
+      });
+      const result = await runKnowledgeAgent({
+        question: "How do billing disputes and complaints interact?",
+        pipeline,
+        principal,
+        policyPrincipal,
+        conversationId: "c-wall-coverage",
+        runtime: {
+          ...scriptedRuntime("useful-brain-wall-coverage", [
+            searchCall("billing dispute complaint"),
+            finalText("Billing disputes open more than 30 days move to ESC-3.[1]"),
+          ]),
+          coverAnswerParts,
+        },
+      });
+
+      expect(coverAnswerParts).toHaveBeenCalledTimes(1);
+      expect(result.aborted).toBe(true);
+      expect(result.finalResponse).toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
+    } finally {
+      restore();
+    }
+  }, 20_000);
+
+  it("ends a run whose wall-time budget runs out mid-search as aborted and unavailable", async () => {
+    const pipeline = await tinyPipeline();
+    const realNow = Date.now;
+    let offset = 0;
+    const clock = vi.spyOn(Date, "now").mockImplementation(() => realNow() + offset);
+    try {
+      const result = await runKnowledgeAgent({
+        question: "How much leave accrues each month?",
+        pipeline: {
+          search: async (input) => {
+            // The search outlives the interactive wall-time budget.
+            offset = AGENT_BUDGETS.wallTimeMs + 1_000;
+            return pipeline.search(input);
+          },
+        },
+        principal,
+        policyPrincipal,
+        conversationId: "c-wall-mid-search",
+        runtime: scriptedRuntime("useful-brain-wall-mid-search", [
+          searchCall("leave accrual"),
+          finalText("Employees accrue 1.5 days of leave per month.[1]"),
+        ]),
+      });
+
+      expect(result.aborted).toBe(true);
+      expect(result.finalResponse).toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
+    } finally {
+      clock.mockRestore();
+    }
+  }, 20_000);
+});

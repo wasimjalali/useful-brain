@@ -123,6 +123,25 @@ describe("Workers AI chat mapping", () => {
     expect(message.stopReason).toBe("aborted");
   });
 
+  it("ends the stream aborted when the signal fires and ai.run never settles", async () => {
+    // A remote binding can ignore the abort signal and hold the request for
+    // minutes; the stream must end on the signal, not on the provider.
+    const controller = new AbortController();
+    const stream = createWorkersAiChatStream({ run: () => new Promise(() => undefined) });
+    const eventStream = stream(
+      glm53FlashModel(),
+      {
+        systemPrompt: "Ground every answer.",
+        messages: [{ role: "user", content: "What is the refund window?", timestamp: 1 }],
+        tools: [],
+      },
+      { signal: controller.signal },
+    );
+    setTimeout(() => controller.abort(), 10);
+    const message = await eventStream.result();
+    expect(message.stopReason).toBe("aborted");
+  }, 2_000);
+
   it("never calls the model when the signal is already aborted", async () => {
     const controller = new AbortController();
     controller.abort();

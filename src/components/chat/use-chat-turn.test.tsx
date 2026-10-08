@@ -106,6 +106,50 @@ describe("useChatTurn failures first", () => {
     expect(result.current.turns[1]).toMatchObject({ cancelled: true, error: null });
   });
 
+  it("retries a failed first turn inside the conversation Brain already created", async () => {
+    const askAction = vi
+      .fn<AskAction>()
+      .mockResolvedValueOnce({
+        ok: false,
+        error: {
+          code: "PROVIDER_TEMPORARY",
+          message: "The knowledge base is unavailable. Try the question again in a new turn.",
+          retryable: true,
+          turn: { conversationId: "conversation-1", assistantMessageId: "msg-failed" },
+        },
+      })
+      .mockResolvedValue(actionSuccess(answer));
+    const onConversationChange = vi.fn();
+    const onNavigate = vi.fn();
+    const { result } = renderHook(() => useChatTurn({ askAction, onConversationChange, onNavigate }));
+    await act(async () => {
+      await result.current.submit("first");
+    });
+    expect(result.current.conversationId).toBe("conversation-1");
+    expect(result.current.turns[0]).toMatchObject({ messageId: "msg-failed", errorCode: "PROVIDER_TEMPORARY" });
+    // The sidebar lists the conversation Brain created; a failure never navigates.
+    expect(onConversationChange).toHaveBeenCalledWith(
+      "conversation-1",
+      [expect.objectContaining({ question: "first", answer: null })],
+    );
+    expect(onNavigate).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await result.current.retryTurn(result.current.turns[0].id);
+    });
+    expect(askAction).toHaveBeenLastCalledWith(
+      expect.objectContaining({ retryOfMessageId: "msg-failed", conversationId: "conversation-1" }),
+    );
+    expect(result.current.turns).toHaveLength(1);
+
+    await act(async () => {
+      await result.current.submit("second");
+    });
+    expect(askAction).toHaveBeenLastCalledWith(
+      expect.objectContaining({ question: "second", conversationId: "conversation-1" }),
+    );
+  });
+
   it("drops an answer that lands after the chat was reset", async () => {
     let resolveAsk: (value: ActionResult<GroundedAnswerResponse>) => void = () => {};
     const askAction = vi.fn(

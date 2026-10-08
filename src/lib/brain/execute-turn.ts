@@ -18,6 +18,7 @@ import { recordTurnSteps } from "../store/turn-steps";
 import { withMemberEvidenceView } from "./member-view";
 import { buildTurnSteps, type SearchRecord } from "./turn-trace";
 import { structuredJsonFromGroundedProse } from "../answer/prose-to-structured";
+import { BRAIN_KNOWLEDGE_UNAVAILABLE } from "../agent/host-grounding";
 import {
   LIVE_KNOWLEDGE_SYSTEM_PROMPT,
   runKnowledgeAgent,
@@ -26,10 +27,12 @@ import {
 import type { TurnStage } from "../cf/turn-progress";
 import { countReadableDocuments } from "../acl/access";
 import {
+  markFailedTurn,
   WorkerBusyError,
   WorkerCancelledError,
   WorkerForbiddenError,
   WorkerNotFoundError,
+  WorkerUnavailableError,
   WorkerValidationError,
 } from "../cf/worker-errors";
 import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL } from "../embeddings/instructions";
@@ -192,6 +195,12 @@ async function executeTurnFull(
       runtime: baseRuntime,
       captureMessages: false,
     });
+    // No caller can cancel an ephemeral turn, so an aborted run is a model
+    // error or an exhausted wall-time budget. Like a failed search, it is
+    // unavailable, never an insufficient-evidence answer.
+    if (result.aborted || result.finalResponse === BRAIN_KNOWLEDGE_UNAVAILABLE) {
+      throw new WorkerUnavailableError();
+    }
     return withTurnDiagnostics(
       responseFromAgent(input.question, result.finalResponse, result.evidence, result.model),
       result,
@@ -231,6 +240,15 @@ async function executeTurnFull(
     throw new WorkerBusyError();
   }
 
+  // From here on the turn is stored (possibly in a conversation this request
+  // created), so every failure names it: the client retries in place instead
+  // of starting a second conversation.
+  const storedTurnFailure = <T>(error: T): T =>
+    markFailedTurn(error, {
+      conversationId: pending.conversationId,
+      assistantMessageId: pending.assistantMessageId,
+    });
+
   const lock = input.lockFor(pending.conversationId);
   const acquired = await lock.acquire(pending.assistantMessageId);
   if (!acquired.ok) {
@@ -240,7 +258,7 @@ async function executeTurnFull(
       errorCode: "RATE_LIMITED",
       now,
     }).catch(() => undefined);
-    throw new WorkerBusyError();
+    throw storedTurnFailure(new WorkerBusyError());
   }
 
   const claimedTurn = await loadOwnedTurnHandleByRequestId(
@@ -250,7 +268,7 @@ async function executeTurnFull(
   );
   if (!claimedTurn || claimedTurn.status !== "pending") {
     await lock.release(pending.assistantMessageId).catch(() => undefined);
-    throw new WorkerCancelledError();
+    throw storedTurnFailure(new WorkerCancelledError());
   }
 
   const runAbort = new AbortController();
@@ -340,12 +358,13 @@ async function executeTurnFull(
     if (runAbort.signal.aborted || (await lock.cancelled())) {
       throw new WorkerCancelledError();
     }
-    // An internal abort (wall-time budget exhausted inside the run) must
-    // fail the turn the same way an external cancellation does: the run
-    // never produced a validated answer, so persisting one would store an
-    // unvalidated result as a completed answer.
-    if (result.aborted) {
-      throw new WorkerCancelledError();
+    // Only the member's own stop (checked above) is a cancellation. An
+    // internal abort (model error, exhausted budget or wall time) and a
+    // failed search never produced a validated answer: the turn fails as
+    // unavailable, so the member sees a retryable failure instead of a
+    // quiet "stopped" turn or an insufficient-evidence answer.
+    if (result.aborted || result.finalResponse === BRAIN_KNOWLEDGE_UNAVAILABLE) {
+      throw new WorkerUnavailableError();
     }
     await markStage("writing");
     let rawModelJson = structuredJsonFromGroundedProse(result.finalResponse, result.evidence);
@@ -423,11 +442,16 @@ async function executeTurnFull(
     await failTurn(input.operations, {
       assistantMessageId: pending.assistantMessageId,
       ownerPrincipalId: input.principal.id,
-      errorCode: failure instanceof WorkerCancelledError ? "CANCELLED" : "INTERNAL_ERROR",
+      errorCode:
+        failure instanceof WorkerCancelledError
+          ? "CANCELLED"
+          : failure instanceof WorkerUnavailableError
+            ? "PROVIDER_TEMPORARY"
+            : "INTERNAL_ERROR",
       now: Date.now(),
     }).catch(() => undefined);
     await lock.release(pending.assistantMessageId).catch(() => undefined);
-    throw mapStoreError(failure);
+    throw storedTurnFailure(mapStoreError(failure));
   } finally {
     cancellationWatchStop.abort();
     await cancellationWatch;
