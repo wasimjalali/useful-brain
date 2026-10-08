@@ -110,6 +110,7 @@ function Chips({ step, detail }: { step: string; detail: string }) {
           );
         }
         if (step === "generate" && k === "model") {
+          // Add new models to MODEL_NAMES in src/lib/labels.ts (modelDisplayName).
           return (
             <Chip key={k} title={v}>
               {modelDisplayName(v)}
@@ -134,12 +135,12 @@ export function TraceTimeline({ steps, total }: { steps: TraceStepView[]; total?
   const timings = steps.map((s) => millis(s.duration));
   const longest = Math.max(0, ...timings.map((t) => t ?? 0));
   return (
-    <>
+    <ol className="col-span-full m-0 flex list-none flex-col gap-3 p-0">
       {steps.map((s, i) => {
         const ms = timings[i];
         return (
-          <div
-            className="col-span-full grid grid-cols-[132px_minmax(0,1fr)_132px] items-center gap-x-4 font-sans text-[13px]"
+          <li
+            className="grid grid-cols-1 items-center gap-x-4 gap-y-1.5 font-sans text-[13px] sm:grid-cols-[132px_minmax(0,1fr)_132px]"
             key={`${s.step}-${i}`}
           >
             <span className="inline-flex items-center gap-2 text-ink">
@@ -149,10 +150,10 @@ export function TraceTimeline({ steps, total }: { steps: TraceStepView[]; total?
             <span className="flex flex-wrap items-center gap-1.5">
               <Chips detail={s.detail} step={s.step} />
             </span>
-            <span className="flex items-center justify-end gap-2 text-xs text-ink-muted">
+            <span className="flex items-center gap-2 text-xs sm:justify-end text-ink-muted">
               {s.step === "result" ? (
                 total && total !== "-" ? <span>{`${total} total`}</span> : null
-              ) : ms === null || ms === 0 ? (
+              ) : ms === null ? null : ms === 0 ? (
                 <span className="text-ink-faint-text">instant</span>
               ) : (
                 <>
@@ -167,9 +168,9 @@ export function TraceTimeline({ steps, total }: { steps: TraceStepView[]; total?
                 </>
               )}
             </span>
-          </div>
+          </li>
         );
       })}
-    </>
+    </ol>
   );
 }
