@@ -1,3 +1,4 @@
+import { BRAIN_KNOWLEDGE_UNAVAILABLE } from "../agent/host-grounding";
 import { AccessJwtError, AccessJwtUnavailable } from "../auth/access-jwt";
 import { IdentityConfigError } from "../auth/identity-mode";
 import { PrincipalResolutionError } from "../auth/principal";
@@ -46,6 +47,19 @@ export class WorkerCancelledError extends Error {
   constructor() {
     super("The answer was stopped.");
     this.name = "WorkerCancelledError";
+  }
+}
+
+/**
+ * Retrieval failed for this turn (backend error or search timeout), or an
+ * ephemeral turn's run aborted (model error or exhausted wall-time budget).
+ * Never a refusal: the client sees the deterministic availability message
+ * and may retry.
+ */
+export class WorkerUnavailableError extends Error {
+  constructor() {
+    super(BRAIN_KNOWLEDGE_UNAVAILABLE);
+    this.name = "WorkerUnavailableError";
   }
 }
 
@@ -138,6 +152,14 @@ export function toPublicWorkerError(error: unknown, requestId: string): PublicWo
       code: "CANCELLED",
       message: "The answer was stopped.",
       retryable: false,
+      requestId,
+    };
+  }
+  if (error instanceof WorkerUnavailableError) {
+    return {
+      code: "UNAVAILABLE",
+      message: BRAIN_KNOWLEDGE_UNAVAILABLE,
+      retryable: true,
       requestId,
     };
   }

@@ -110,7 +110,12 @@ async function runRetrievalLayer(questions: EvalQuestion[], documents: Northwind
   return report;
 }
 
-async function brainJson<T>(brainUrl: string, pathName: string, init: RequestInit = {}): Promise<T> {
+/**
+ * Retries 429 and 5xx, then throws. A turn the Brain reports as unavailable
+ * (503 UNAVAILABLE: a retrieval backend or the model failed) is never scored:
+ * the run stops loudly and can resume with --resume once the Brain is healthy.
+ */
+export async function brainJson<T>(brainUrl: string, pathName: string, init: RequestInit = {}): Promise<T> {
   let lastError: unknown;
   for (let attempt = 0; attempt < 4; attempt += 1) {
     const response = await fetch(`${brainUrl}${pathName}`, {
@@ -121,7 +126,11 @@ async function brainJson<T>(brainUrl: string, pathName: string, init: RequestIni
       },
     });
     if (response.status === 429 || response.status >= 500) {
-      lastError = new Error(`Brain ${pathName} returned ${response.status}`);
+      lastError = new Error(
+        response.status === 503
+          ? `Brain ${pathName} was unavailable (503) on every attempt; the question was not scored`
+          : `Brain ${pathName} returned ${response.status}`,
+      );
       await sleep(1000 * 2 ** attempt);
       continue;
     }

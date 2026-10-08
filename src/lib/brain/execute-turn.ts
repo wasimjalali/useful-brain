@@ -18,6 +18,7 @@ import { recordTurnSteps } from "../store/turn-steps";
 import { withMemberEvidenceView } from "./member-view";
 import { buildTurnSteps, type SearchRecord } from "./turn-trace";
 import { structuredJsonFromGroundedProse } from "../answer/prose-to-structured";
+import { BRAIN_KNOWLEDGE_UNAVAILABLE } from "../agent/host-grounding";
 import {
   LIVE_KNOWLEDGE_SYSTEM_PROMPT,
   runKnowledgeAgent,
@@ -30,6 +31,7 @@ import {
   WorkerCancelledError,
   WorkerForbiddenError,
   WorkerNotFoundError,
+  WorkerUnavailableError,
   WorkerValidationError,
 } from "../cf/worker-errors";
 import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL } from "../embeddings/instructions";
@@ -192,6 +194,12 @@ async function executeTurnFull(
       runtime: baseRuntime,
       captureMessages: false,
     });
+    // No caller can cancel an ephemeral turn, so an aborted run is a model
+    // error or an exhausted wall-time budget. Like a failed search, it is
+    // unavailable, never an insufficient-evidence answer.
+    if (result.aborted || result.finalResponse === BRAIN_KNOWLEDGE_UNAVAILABLE) {
+      throw new WorkerUnavailableError();
+    }
     return withTurnDiagnostics(
       responseFromAgent(input.question, result.finalResponse, result.evidence, result.model),
       result,
@@ -347,6 +355,11 @@ async function executeTurnFull(
     if (result.aborted) {
       throw new WorkerCancelledError();
     }
+    // A failed search is not a refusal: the turn fails as unavailable
+    // instead of persisting an insufficient-evidence answer.
+    if (result.finalResponse === BRAIN_KNOWLEDGE_UNAVAILABLE) {
+      throw new WorkerUnavailableError();
+    }
     await markStage("writing");
     let rawModelJson = structuredJsonFromGroundedProse(result.finalResponse, result.evidence);
     let storedEvidence = result.evidence;
@@ -423,7 +436,12 @@ async function executeTurnFull(
     await failTurn(input.operations, {
       assistantMessageId: pending.assistantMessageId,
       ownerPrincipalId: input.principal.id,
-      errorCode: failure instanceof WorkerCancelledError ? "CANCELLED" : "INTERNAL_ERROR",
+      errorCode:
+        failure instanceof WorkerCancelledError
+          ? "CANCELLED"
+          : failure instanceof WorkerUnavailableError
+            ? "PROVIDER_TEMPORARY"
+            : "INTERNAL_ERROR",
       now: Date.now(),
     }).catch(() => undefined);
     await lock.release(pending.assistantMessageId).catch(() => undefined);

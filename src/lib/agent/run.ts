@@ -562,12 +562,22 @@ export async function runKnowledgeAgent(input: {
     refusalReason = "model_abstained_with_evidence";
   }
 
+  // A search that failed this turn (a backend error caught by the tool, or
+  // a tool that threw) makes the outcome unavailable whatever the draft
+  // says, so no repair or coverage model call is spent on it.
+  const searchFailed =
+    evidenceLedger.searchError ||
+    toolCallsFromMessages(agent.state.messages.slice(priorMessageCount)).some(
+      (call) => call.tool === SEARCH_KNOWLEDGE_TOOL && call.status === "error",
+    );
+
   // Re-evaluated before every repair attempt: an abort landing between
   // passes must not start another model call.
   const canRepair = () =>
     Boolean(input.runtime?.repairGroundedAnswer) &&
     !input.abort?.signal.aborted &&
     !wall.aborted &&
+    !searchFailed &&
     evidence.length > 0;
   if (grounded === BRAIN_INVALID_CITATION && canRepair()) {
     try {
@@ -697,6 +707,7 @@ export async function runKnowledgeAgent(input: {
     Boolean(input.runtime?.coverAnswerParts) &&
     !input.abort?.signal.aborted &&
     !wall.aborted &&
+    !searchFailed &&
     evidence.length > 0;
   if (
     canCover &&
@@ -734,11 +745,10 @@ export async function runKnowledgeAgent(input: {
 
   const recorded = toolCallsFromMessages(agent.state.messages);
   const pendingApproval = recorded.some((call) => call.status === "pending_approval");
-  const searchErrored = recorded.some((call) => call.tool === SEARCH_KNOWLEDGE_TOOL && call.status === "error");
   return {
     finalResponse:
-      (budgetErrorMessage ? BRAIN_KNOWLEDGE_UNAVAILABLE : grounded) ??
-      (searchErrored ? BRAIN_KNOWLEDGE_UNAVAILABLE : BRAIN_MUST_RETRIEVE),
+      (budgetErrorMessage || searchFailed ? BRAIN_KNOWLEDGE_UNAVAILABLE : grounded) ??
+      BRAIN_MUST_RETRIEVE,
     messages:
       input.captureMessages === false
         ? []
@@ -756,7 +766,7 @@ export async function runKnowledgeAgent(input: {
     errorMessage: agent.state.errorMessage ?? budgetErrorMessage,
     evidence,
     vectorDegradedCount: evidenceLedger.vectorDegradedCount,
-    refusalReason,
+    refusalReason: searchFailed ? undefined : refusalReason,
   };
 }
 
