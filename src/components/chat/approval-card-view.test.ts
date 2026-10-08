@@ -36,12 +36,15 @@ describe("approvalCardView", () => {
     expect(approvalCardView({ ...base, state: "expired" }, 1)).toEqual({ status: "expired" });
   });
 
-  it("maps an approved ticket with its id, priority and local time", () => {
+  it("maps an approved ticket with its id, priority, customer, subject and creation time", () => {
     const createdAt = new Date(2026, 8, 6, 9, 42).getTime();
     expect(approvalCardView({ ...base, state: "approved", ticket: { id: "SUP-4821", createdAt } }, 1)).toEqual({
       status: "done",
       ticketId: "SUP-4821",
-      meta: "create_ticket · P1 · 09:42",
+      priority: "P1",
+      customer: "Halvorsen Freight",
+      subject: "Atlas sync stalled",
+      createdAt,
     });
   });
 

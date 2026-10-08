@@ -83,6 +83,13 @@ export type ReaderDocumentView = {
 
 export type ApprovalView =
   | { status: "pending"; tool: string; args: Array<[key: string, value: string]> }
-  | { status: "done"; ticketId: string; meta: string }
+  | {
+      status: "done";
+      ticketId: string;
+      priority: string;
+      customer: string;
+      subject: string;
+      createdAt: number;
+    }
   | { status: "denied" }
   | { status: "expired" };
