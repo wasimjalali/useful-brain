@@ -38,6 +38,9 @@ The stack is:
 - Embeddings and reranking: Workers AI.
 - Model routing: AI Gateway.
 - Agent framework: `@earendil-works/pi-agent-core` with the minimum `pi-ai` provider imports.
+- Admin role: server-enforced on every `/admin/*` Brain route. It grants no document read rights. In session mode an admin can use View as: grants are resolved on the server, each use is audited and the state is ephemeral, never persisted.
+- Invites: admin-issued, single-use invites. This is not public signup, and the signup gate is unchanged.
+- Uploads: files stream to R2, an ingestion workflow builds a draft generation and draft checks (reconciliation plus the retrieval/ACL guard) must pass before promotion.
 - macOS shell: SwiftPM package in `macos/` that bundles `Useful Brain.app` (AppKit + WKWebView over the local stack on 127.0.0.1). Build and install with `make -C macos test|bundle|install`; see `docs/macos-app.md`.
 
 Do not introduce Convex. Do not propose or add Microsoft Foundry. Do not add LangChain, LangGraph, CrewAI, Cloudflare Agents SDK or another competing agent framework.

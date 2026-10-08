@@ -1,10 +1,45 @@
 # Useful Brain
 
-Useful Brain is a knowledge agent that answers questions about a company corpus and proves every answer. It retrieves only the evidence the asking principal is allowed to read, cites a verbatim source for every factual sentence and refuses when the evidence isn't there. It runs entirely on Cloudflare (Workers, D1, Vectorize, Workers AI) with a Next.js workspace UI.
+Useful Brain is a knowledge agent that answers questions about a company corpus and proves every answer. It retrieves only the evidence the asking principal is allowed to read, cites a verbatim source for every factual sentence and refuses when the evidence isn't there. It runs entirely on Cloudflare (Workers, D1, Vectorize, Workers AI) with a Next.js workspace.
 
 This is a portfolio knowledge agent: no billing and no tenant switching. Local development still uses loopback on `127.0.0.1`. Staging uses email/password sessions (`IDENTITY_MODE=session`).
 
-![Useful Brain chat with a cited answer and the evidence inspector open.](docs/images/ub-chat-evidence.png)
+![Useful Brain chat with a cited answer and the evidence panel open.](evals/results/2026-10-08-redesign/phase-7/02-chat-answer-evidence-light.png)
+
+The same view in the dark theme:
+
+![Useful Brain chat with a cited answer in the dark theme.](evals/results/2026-10-08-redesign/phase-7/02-chat-answer-evidence-dark.png)
+
+## What you can do
+
+**Members**
+
+- **Chat with cited answers.** Every factual sentence cites a source. Citations link to the evidence panel.
+- **Evidence panel.** Hovering a citation highlights the passage in graphite. Open a source in the document reader to see the exact spans the answer used.
+- **Honest refusals.** When the evidence isn't there, the answer says so and offers a document request.
+- **Approvals.** Actions bind the exact arguments you approve. Approved actions create a persisted SUP ticket.
+- **Library and Cmd+K search.** Browse the documents you can read, or jump to one from anywhere.
+- **Settings.** Light, dark or system theme.
+
+**Admins**
+
+- **Overview.** Questions, answer quality and system health at a glance.
+- **Sources.** Upload documents, build a draft, review its checks, then promote it.
+- **People.** Invite people, manage groups and use View as to see the product the way a member does.
+- **Evals.** The latest run, by category.
+- **Activity.** Every question with its redacted trace.
+
+The admin role grants no read rights. Admins see questions and traces, never evidence text.
+
+![A cited answer awaiting approval, then done with a SUP ticket.](evals/results/2026-10-08-redesign/phase-7/05-chat-approval-done-light.png)
+
+![The document reader with the cited spans highlighted.](evals/results/2026-10-08-redesign/phase-7/07-document-reader-spans-light.png)
+
+![The admin Overview.](evals/results/2026-10-08-redesign/phase-7/10-overview-light.png)
+
+![Sources with an uploaded draft whose checks passed.](evals/results/2026-10-08-redesign/phase-7/11-sources-draft-passed-light.png)
+
+![The evidence sheet on a phone.](evals/results/2026-10-08-redesign/phase-7/18-mobile-evidence-sheet.png)
 
 ## The eval story: 72% to 95% without touching the scorer
 
@@ -23,7 +58,7 @@ Every gain came from the answer layer. Retrieval metrics and every scoring rule 
 
 Frozen result snapshots back both reports in [`evals/results/`](evals/results/).
 
-![Useful Brain Evals dashboard for the locked Northwind campaign.](docs/images/ub-evaluations.png)
+![The admin Evals page for the locked Northwind campaign.](evals/results/2026-10-08-redesign/phase-7/14-evals-light.png)
 
 ## What it enforces
 
@@ -50,8 +85,6 @@ Hybrid retrieval fuses D1 FTS5 keyword search with Vectorize dense search (both 
 
 Models (all Cloudflare-hosted, selected by measured bake-off): `@cf/zai-org/glm-5.3-flash` for chat, `@cf/qwen/qwen3-embedding-0.6b` for embeddings, `@cf/baai/bge-reranker-base` for reranking.
 
-![Useful Brain Sources inventory with the operator corpus and document list.](docs/images/ub-knowledge.png)
-
 ## Run it locally
 
 Requires Node.js 22.19+ and npm.
@@ -61,7 +94,15 @@ npm install
 npm run preview:cf
 ```
 
-That builds OpenNext, applies local D1 migrations and starts `wrangler dev` with the web and Brain Workers connected over a Service Binding. The app serves on `http://127.0.0.1:8788` (the Brain Worker takes 8787). Seed the Northwind corpus from the Knowledge base page if it's empty, then ask a question and open the evidence inspector.
+That builds OpenNext, applies local D1 migrations and starts `wrangler dev` with the web, Brain and ingestion Workers connected over Service Bindings. The app serves on `http://127.0.0.1:8787`. If the corpus is empty, upload the Northwind Markdown files from `content/northwind/` in Sources as an admin, promote the draft once its checks pass, then ask a question and open the evidence panel.
+
+To seed demo people for the local database, set `DEMO_PASSWORD` in your environment and run:
+
+```bash
+DEMO_PASSWORD=<choose a password> npm run seed:demo
+```
+
+It seeds the local database only.
 
 Verify changes with:
 
@@ -81,7 +122,7 @@ npm run build
 - `workers/brain/`: identity, conversations, retrieval, grounding and evaluations.
 - `workers/ingestion/`: corpus ingest workflows.
 - `content/northwind/`: the 65-document synthetic corpus and 120-question battery.
-- `src/`: Next.js workspace UI, retrieval helpers and the eval battery.
+- `src/`: Next.js app (member and admin routes), UI components, retrieval helpers and the eval battery.
 - `evals/`: blog-ready eval reports and frozen result snapshots.
 - `docs/useful-brain-master-plan.md`: the full production architecture plan.
 

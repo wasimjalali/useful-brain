@@ -278,7 +278,7 @@ export function AppShell({
               >
                 <MenuIcon className="size-5" />
               </IconButton>
-              <span className="ub-header-title">{title}</span>
+              <h1 className="ub-header-title m-0">{title}</h1>
               <Link
                 aria-label="New chat"
                 className="ub-iconbtn ub-ring"

@@ -1,0 +1,190 @@
+{
+  "axe": [
+    {
+      "page": "login",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "page": "login",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "page": "chat-empty",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "page": "chat-empty",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "page": "chat-answer-evidence",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "page": "chat-answer-evidence",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "page": "library",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "page": "library",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "page": "settings-member",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "page": "settings-member",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "page": "/admin/overview",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "page": "/admin/overview",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "page": "/admin/sources",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "page": "/admin/sources",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "page": "/admin/people",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "page": "/admin/people",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "page": "/admin/evals",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "page": "/admin/evals",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "page": "/admin/activity",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "page": "/admin/activity",
+      "theme": "dark",
+      "violations": []
+    }
+  ],
+  "keyboard": [
+    {
+      "page": "login",
+      "stops": 7,
+      "withoutVisibleFocus": [
+        {
+          "tag": "input",
+          "name": "INPUT",
+          "ring": false
+        },
+        {
+          "tag": "input",
+          "name": "INPUT",
+          "ring": false
+        },
+        {
+          "tag": "input",
+          "name": "INPUT",
+          "ring": false
+        },
+        {
+          "tag": "input",
+          "name": "INPUT",
+          "ring": false
+        }
+      ]
+    },
+    {
+      "page": "chat-empty",
+      "stops": 19,
+      "withoutVisibleFocus": [
+        {
+          "tag": "textarea",
+          "name": "Ask a question",
+          "ring": false
+        }
+      ]
+    },
+    {
+      "page": "chat-answer-evidence",
+      "stops": 40,
+      "withoutVisibleFocus": [
+        {
+          "tag": "textarea",
+          "name": "Ask a follow-up",
+          "ring": false
+        }
+      ]
+    },
+    {
+      "page": "library",
+      "stops": 25,
+      "withoutVisibleFocus": [
+        {
+          "tag": "input",
+          "name": "Search titles and sections",
+          "ring": false
+        }
+      ]
+    },
+    {
+      "page": "/admin/overview",
+      "stops": 25,
+      "withoutVisibleFocus": []
+    },
+    {
+      "page": "/admin/sources",
+      "stops": 25,
+      "withoutVisibleFocus": []
+    },
+    {
+      "page": "/admin/people",
+      "stops": 25,
+      "withoutVisibleFocus": []
+    },
+    {
+      "page": "/admin/evals",
+      "stops": 25,
+      "withoutVisibleFocus": []
+    },
+    {
+      "page": "/admin/activity",
+      "stops": 25,
+      "withoutVisibleFocus": []
+    }
+  ]
+}

@@ -88,9 +88,11 @@ export function ChatWorkspace({
       {banner}
       {mobile ? null : (
         <header className="flex h-[52px] shrink-0 items-center gap-3 pl-6 pr-3">
-          <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink max-[1199px]:hidden">
-            {title}
-          </span>
+          {title ? (
+            <h1 className="m-0 min-w-0 flex-1 truncate text-sm font-medium text-ink max-[1199px]:hidden">{title}</h1>
+          ) : (
+            <span className="min-w-0 flex-1 max-[1199px]:hidden" />
+          )}
           <span className="min-[1200px]:hidden flex-1" />
           {panelToggle ? (
             <span

@@ -411,6 +411,16 @@ Product decision: stay a Cloudflare web application, no macOS packaging, no Acce
 - [ ] Known open behavior: complete-answer latency (control p50 ~15.6s, p95 ~56s measured under parallel load; ~19.6s p50 solo) exceeds the master plan's 15s p95 budget because the chat model reasons before answering; DeepSeek V4 Flash (p95 ~36s, 109/120) is the named latency alternative if that budget becomes binding.
 - [ ] Recorded low-risk follow-ups from the final adversarial pass (none block this PR): the browser-supplied `assumePrincipal` tuple is shape-validated but not checked against the principal directory server-side; an assumed-principal turn persisted into a conversation is not labeled in storage and its prose can enter later operator-scoped model context via bounded history; `completeProseCitations` and `markersValidForLedger` still accept section-heading matches (inherited answer-path convention; the salvage pass is already body-text-only); the post-answer repair/coverage calls consume agent-turn budget slots and their tokens are not metered.
 
+### Redesign (2026-10-08)
+
+Plan: `docs/design/2026-10-08-redesign-implementation-plan.md` (decisions D1-D20).
+
+- [x] Phases 1-6 merged into `feat/redesign-2026-10` ([PR #59](https://github.com/wasimjalali/useful-brain/pull/59), [PR #60](https://github.com/wasimjalali/useful-brain/pull/60)).
+- [x] Shipped: app shell with rail, Cmd+K search and Library. Member chat with cited answers, an evidence panel with graphite highlight and a document reader, honest refusals with document requests, and approvals that bind exact arguments with persisted SUP tickets. Admin Overview, Sources (uploads with draft checks), People (invites, View as), Evals and Activity. Settings with themes. Admin routes enforced in Brain. Operations migrations 0012-0015, corpus migrations 0004-0005.
+- [ ] Phase 7 verification in progress on `feat/redesign-p7-verify` (real-stack screenshots in `evals/results/2026-10-08-redesign/phase-7/`). Eval result: see the redesign eval write-up in `evals/results/2026-10-08-redesign/README.md`.
+- [ ] Open for Wasim, D20: draft reconciliation is binding-only (`getByIds`, no orphan enumeration). A full Vectorize inventory needs a Cloudflare API token as a Worker secret.
+- Deviation D16: validated answers are revealed, not streamed.
+
 ### Phase 7B: production launch and retirement
 
 Requires one final explicit Wasim approval. Do not start. This is not a commercial launch and must not add billing, public signup or required Cloudflare Access.

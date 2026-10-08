@@ -60,6 +60,8 @@ Migrations, all additive: operations `0012_turn_metrics_feedback`, `0013_tickets
 
 ## 4. Phases and work packages
 
+Status (2026-10-08): Phases 0-6 are delivered ([PR #59](https://github.com/wasimjalali/useful-brain/pull/59) and [PR #60](https://github.com/wasimjalali/useful-brain/pull/60), merged into `feat/redesign-2026-10`). Phase 7 is in progress on `feat/redesign-p7-verify`.
+
 | Phase | Packages (owner) | Exit |
 |---|---|---|
 | 1 Foundations | 1a tokens, theme (pre-paint, persisted, live OS), fonts, motion, `/open` light (Sonnet). 1b Lucide icon port keeping export names (Haiku). 1c primitives plus `/design-check` (dev only) and a11y role tests (Sonnet). 1d backend foundation: Brain test harness with `CORPUS_DB`, `WorkerNotFoundError`, admin role and `requireAdmin` on `/admin/*`, extended `whoami`, `countReadableDocuments`, corpus `0004` plus backfill, seed personas (Sonnet). | Primitives render in both themes; admin gate tested (401/403/200); whoami count equals the oracle. |
