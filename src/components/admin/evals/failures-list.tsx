@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { ChevronRightIcon } from "@/components/icons";
 import type { EvalFailureView } from "@/lib/contracts/admin-insights-view";
+import { roleLabel } from "@/lib/labels";
 
 export function FailuresList({
   failures,
@@ -44,27 +45,27 @@ export function FailuresList({
                 <ChevronRightIcon className="size-[15px]" />
               </span>
               <span className="font-mono text-xs">{f.id}</span>
-              <span className="text-xs text-ink-muted">{f.category}</span>
+              <span className="justify-self-start rounded-md bg-sunken px-[7px] py-px text-xs text-ink-muted">{f.category}</span>
               <span className="truncate text-[13px] leading-5">{f.question}</span>
             </button>
             {isOpen ? (
-              <div
-                className="mb-4 ml-7 grid grid-cols-[96px_minmax(0,1fr)] gap-x-4 gap-y-2 text-[13px] leading-5"
+              <dl
+                className="m-0 mb-3 ml-7 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 rounded-md bg-sunken px-3 py-2.5 text-[13px] leading-5"
                 id={panelId}
               >
-                <span className="text-ink-faint-text">Asked as</span>
-                <span className="font-mono text-xs text-ink">{f.askedAs}</span>
-                <span className="text-ink-faint-text">Expected</span>
-                <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
+                <dt className="text-ink-faint-text">Asked as</dt>
+                <dd className="m-0 text-ink">{roleLabel(f.askedAs)}</dd>
+                <dt className="text-ink-faint-text">Expected</dt>
+                <dd className="m-0 flex flex-col gap-0.5 text-ink">
                   {f.expected.map((e) => (
-                    <li className="text-ink" key={`${e.document}:${e.section}`}>
+                    <span key={`${e.document}:${e.section}`}>
                       {e.document} <span className="text-ink-faint-text">{`· ${e.section}`}</span>
-                    </li>
+                    </span>
                   ))}
-                </ul>
-                <span className="text-ink-faint-text">Note</span>
-                <span className="text-ink-muted">{f.note}</span>
-              </div>
+                </dd>
+                <dt className="text-ink-faint-text">Looks for</dt>
+                <dd className="m-0 text-ink-muted">{f.note}</dd>
+              </dl>
             ) : null}
           </li>
         );
