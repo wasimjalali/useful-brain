@@ -34,6 +34,14 @@ describe("ActivityFilters", () => {
 });
 
 describe("ActivityTable", () => {
+  it("scrolls the rows sideways on narrow screens while Load more keeps the screen width", () => {
+    render(<ActivityTable hasMore loadTrace={() => {}} onLoadMore={() => {}} rows={[row("a", "error", null)]} traces={{}} />);
+    const table = screen.getByRole("table", { name: "Activity" });
+    expect(table.className).toContain("overflow-x-auto");
+    expect(screen.getAllByRole("row")[0].className).toContain("min-w-[720px]");
+    expect(screen.getByRole("button", { name: "Load more" }).closest("[class*='min-w-']")).toBeNull();
+  });
+
   it("renders column headers and an outcome label per row, with a placeholder for missing sources", () => {
     render(<ActivityTable loadTrace={() => {}} rows={[row("a", "error", null), row("b", "no_evidence", 0)]} traces={{}} />);
     ["Time (UTC)", "Person", "Question", "Outcome", "Sources", "Latency"].forEach((h) =>

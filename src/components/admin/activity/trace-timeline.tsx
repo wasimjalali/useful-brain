@@ -150,7 +150,7 @@ export function TraceTimeline({ steps, total }: { steps: TraceStepView[]; total?
             <span className="flex flex-wrap items-center gap-1.5">
               <Chips detail={s.detail} step={s.step} />
             </span>
-            <span className="flex items-center gap-2 text-xs sm:justify-end text-ink-muted">
+            <span className="flex items-center gap-2 text-xs text-ink-muted sm:justify-end">
               {s.step === "result" ? (
                 total && total !== "-" ? <span>{`${total} total`}</span> : null
               ) : ms === null ? null : ms === 0 ? (
