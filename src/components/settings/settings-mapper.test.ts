@@ -74,6 +74,11 @@ describe("mapAdminSettings", () => {
     expect(connectors[2].connectable).toBe(true);
   });
 
+  it("says document, not documents, for a single upload", () => {
+    const { connectors } = mapAdminSettings(config, 1);
+    expect(connectors[0].description).toBe("Built in · 1 document");
+  });
+
   it("shows keyword retrieval and no generation honestly", () => {
     const { config: mapped } = mapAdminSettings(
       { ...config, retrieval: { ...config.retrieval, mode: "keyword" }, activeGenerationId: null },

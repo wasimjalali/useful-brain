@@ -69,8 +69,6 @@ function chipText(step: string, key: string, value: string): string {
       return plural(value, "candidate", "candidates");
     case "retrieve.readable":
       return plural(value, "readable document", "readable documents");
-    case "rerank.score1":
-      return `Top score ${value}`;
     case "rerank.floor":
       return `Floor ${value}`;
     case "generate.citations":
@@ -83,9 +81,17 @@ function chipText(step: string, key: string, value: string): string {
 }
 
 function Chips({ step, detail }: { step: string; detail: string }) {
-  const entries = parseDetail(detail);
+  const parsed = parseDetail(detail);
+  // Rerank reports its leading scores as score1, score2, ...: one chip lists them in rank order.
+  const scores = step === "rerank" ? parsed.filter(([k]) => /^score\d+$/.test(k)) : [];
+  const entries = scores.length > 0 ? parsed.filter(([k]) => !/^score\d+$/.test(k)) : parsed;
   return (
     <>
+      {scores.length > 0 ? (
+        <Chip key="scores">
+          {scores.length === 1 ? "Top score" : "Top scores"} {scores.map(([, v]) => v).join(" · ")}
+        </Chip>
+      ) : null}
       {entries.map(([k, v]) => {
         if (step === "result" && k === "answerType") {
           const o = RESULT[v] ?? { label: humanize(v), tone: "faint" as StatusTone };

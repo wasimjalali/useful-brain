@@ -73,6 +73,16 @@ describe("TraceTimeline", () => {
     expect(screen.queryByText(/total/)).toBeNull();
   });
 
+  it("lists several rerank scores in one chip, in rank order, without raw keys", () => {
+    render(
+      <TraceTimeline
+        steps={[{ step: "rerank", detail: "floor: 0.05 · score1: 0.999 · score2: 0.98 · score3: 0.835", duration: "-" }]}
+      />,
+    );
+    expect(screen.getByText("Top scores 0.999 · 0.98 · 0.835")).toBeTruthy();
+    expect(screen.queryByText(/Score2|Score3|score2/)).toBeNull();
+  });
+
   it("keeps an unknown step and a bare dash detail", () => {
     render(<TraceTimeline steps={[{ step: "new_step", detail: "-", duration: "-" }]} />);
     expect(screen.getByText("New step")).toBeInTheDocument();

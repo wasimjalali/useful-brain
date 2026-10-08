@@ -60,7 +60,7 @@ export function SourcesView({
         <div className="min-w-0 flex-1">
           <h1 className="text-2xl leading-8 font-semibold tracking-[-0.02em]">Sources</h1>
           <p className="mt-1 text-[13px] leading-5 text-ink-muted">
-            {documentCount} documents · readers only see the active generation
+            {documentCount} {documentCount === 1 ? "document" : "documents"} · readers only see the active generation
           </p>
         </div>
         <div className="flex shrink-0 gap-2 whitespace-nowrap">

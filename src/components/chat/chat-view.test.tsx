@@ -678,7 +678,8 @@ describe("approval", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1000);
     });
-    expect(screen.getAllByText("Created")).toHaveLength(2);
+    expect(screen.getAllByText("Created")).toHaveLength(1);
+    expect(screen.getByText("Time")).toBeTruthy();
     expect(screen.getByText("SUP-4821")).toBeInTheDocument();
     expect(screen.getByText("09:42")).toBeInTheDocument();
   });
@@ -840,7 +841,8 @@ describe("review fixes", () => {
       await vi.advanceTimersByTimeAsync(1000);
     });
     expect(loadConversation).toHaveBeenCalledTimes(2);
-    expect(screen.getAllByText("Created")).toHaveLength(2);
+    expect(screen.getAllByText("Created")).toHaveLength(1);
+    expect(screen.getByText("Time")).toBeTruthy();
   });
 
   it("opens the ticket page from the done state", async () => {

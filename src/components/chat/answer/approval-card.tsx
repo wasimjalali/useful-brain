@@ -80,7 +80,7 @@ export function ApprovalCard({
           <dd className="m-0 break-words text-ink">{approval.customer}</dd>
           <dt className="text-ink-faint-text">Subject</dt>
           <dd className="m-0 break-words text-ink">{approval.subject}</dd>
-          <dt className="text-ink-faint-text">Created</dt>
+          <dt className="text-ink-faint-text">Time</dt>
           <dd className="m-0 text-ink">{time}</dd>
         </dl>
       </section>

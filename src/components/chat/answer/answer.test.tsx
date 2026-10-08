@@ -201,7 +201,8 @@ describe("ApprovalCard", () => {
         onOpenTicket={onOpenTicket}
       />,
     );
-    expect(screen.getAllByText("Created")).toHaveLength(2);
+    expect(screen.getAllByText("Created")).toHaveLength(1);
+    expect(screen.getByText("Time")).toBeTruthy();
     expect(screen.getByText("SUP-4821")).toBeInTheDocument();
     expect(screen.getByText("P1")).toBeInTheDocument();
     expect(screen.getByText("Halvorsen Freight")).toBeInTheDocument();
