@@ -240,6 +240,15 @@ async function executeTurnFull(
     throw new WorkerBusyError();
   }
 
+  // From here on the turn is stored (possibly in a conversation this request
+  // created), so every failure names it: the client retries in place instead
+  // of starting a second conversation.
+  const storedTurnFailure = <T>(error: T): T =>
+    markFailedTurn(error, {
+      conversationId: pending.conversationId,
+      assistantMessageId: pending.assistantMessageId,
+    });
+
   const lock = input.lockFor(pending.conversationId);
   const acquired = await lock.acquire(pending.assistantMessageId);
   if (!acquired.ok) {
@@ -249,7 +258,7 @@ async function executeTurnFull(
       errorCode: "RATE_LIMITED",
       now,
     }).catch(() => undefined);
-    throw new WorkerBusyError();
+    throw storedTurnFailure(new WorkerBusyError());
   }
 
   const claimedTurn = await loadOwnedTurnHandleByRequestId(
@@ -259,7 +268,7 @@ async function executeTurnFull(
   );
   if (!claimedTurn || claimedTurn.status !== "pending") {
     await lock.release(pending.assistantMessageId).catch(() => undefined);
-    throw new WorkerCancelledError();
+    throw storedTurnFailure(new WorkerCancelledError());
   }
 
   const runAbort = new AbortController();
@@ -442,13 +451,7 @@ async function executeTurnFull(
       now: Date.now(),
     }).catch(() => undefined);
     await lock.release(pending.assistantMessageId).catch(() => undefined);
-    // The turn is stored (possibly in a conversation this request created),
-    // so the failure names it: the client retries in place instead of
-    // starting a second conversation.
-    throw markFailedTurn(mapStoreError(failure), {
-      conversationId: pending.conversationId,
-      assistantMessageId: pending.assistantMessageId,
-    });
+    throw storedTurnFailure(mapStoreError(failure));
   } finally {
     cancellationWatchStop.abort();
     await cancellationWatch;

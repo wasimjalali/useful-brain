@@ -287,20 +287,21 @@ export function useChatTurn({
           // Brain stored the failed turn (in a conversation it may have just
           // created): keep both ids so Retry and the next question stay in it.
           const storedTurn = result.error.turn;
-          setTurns(
-            place({
-              id: `turn_${turnSeq.current}`,
-              question,
-              answer: null,
-              error: cancelled ? null : result.error.message,
-              errorRetryable: result.error.retryable,
-              ...(cancelled ? {} : { errorCode: result.error.code }),
-              ...(storedTurn ? { messageId: storedTurn.assistantMessageId } : {}),
-              cancelled,
-            }),
-          );
+          const failedTurns = place({
+            id: `turn_${turnSeq.current}`,
+            question,
+            answer: null,
+            error: cancelled ? null : result.error.message,
+            errorRetryable: result.error.retryable,
+            ...(cancelled ? {} : { errorCode: result.error.code }),
+            ...(storedTurn ? { messageId: storedTurn.assistantMessageId } : {}),
+            cancelled,
+          });
+          setTurns(failedTurns);
           if (storedTurn && conversationId === null) {
+            // List the new conversation in the sidebar; a failure never navigates.
             setConversationId(storedTurn.conversationId);
+            latest.current.onConversationChange?.(storedTurn.conversationId, failedTurns);
           }
           return;
         }

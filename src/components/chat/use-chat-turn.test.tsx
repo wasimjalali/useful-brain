@@ -119,12 +119,20 @@ describe("useChatTurn failures first", () => {
         },
       })
       .mockResolvedValue(actionSuccess(answer));
-    const { result } = renderHook(() => useChatTurn({ askAction }));
+    const onConversationChange = vi.fn();
+    const onNavigate = vi.fn();
+    const { result } = renderHook(() => useChatTurn({ askAction, onConversationChange, onNavigate }));
     await act(async () => {
       await result.current.submit("first");
     });
     expect(result.current.conversationId).toBe("conversation-1");
     expect(result.current.turns[0]).toMatchObject({ messageId: "msg-failed", errorCode: "PROVIDER_TEMPORARY" });
+    // The sidebar lists the conversation Brain created; a failure never navigates.
+    expect(onConversationChange).toHaveBeenCalledWith(
+      "conversation-1",
+      [expect.objectContaining({ question: "first", answer: null })],
+    );
+    expect(onNavigate).not.toHaveBeenCalled();
 
     await act(async () => {
       await result.current.retryTurn(result.current.turns[0].id);

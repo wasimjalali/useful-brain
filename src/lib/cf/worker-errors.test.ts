@@ -3,10 +3,12 @@ import { describe, expect, it } from "vitest";
 import { AccessJwtError, AccessJwtUnavailable } from "../auth/access-jwt";
 import { IdentityConfigError } from "../auth/identity-mode";
 import {
+  markFailedTurn,
   toPublicWorkerError,
   WorkerBusyError,
   WorkerCancelledError,
   WorkerNotFoundError,
+  WorkerUnavailableError,
   WorkerValidationError,
   workerErrorResponse,
 } from "./worker-errors";
@@ -89,5 +91,21 @@ describe("worker error contracts", () => {
     );
     const body = (await response.json()) as { message: string };
     expect(body.message).not.toMatch(/cloudflareaccess|:\d{2,5}|127\.0\.0\.1/);
+  });
+
+  it("never lets two tagged failures share a turn reference", async () => {
+    const refA = { conversationId: "c-a", assistantMessageId: "m-a" };
+    const refB = { conversationId: "c-b", assistantMessageId: "m-b" };
+    const first = markFailedTurn(new WorkerUnavailableError(), refA);
+    const second = markFailedTurn(new WorkerUnavailableError(), refB);
+    // Mutating the caller's object after tagging changes nothing.
+    refA.conversationId = "c-mutated";
+
+    const turnOf = async (error: unknown) =>
+      ((await workerErrorResponse(error, "req").json()) as { turn?: unknown }).turn;
+    expect(await turnOf(first)).toEqual({ conversationId: "c-a", assistantMessageId: "m-a" });
+    expect(await turnOf(second)).toEqual({ conversationId: "c-b", assistantMessageId: "m-b" });
+    // A fresh error of the same class carries no tag.
+    expect(await turnOf(new WorkerUnavailableError())).toBeUndefined();
   });
 });

@@ -6,11 +6,13 @@ import { BRAIN_KNOWLEDGE_UNAVAILABLE, BRAIN_NOT_ENOUGH_EVIDENCE } from "../../..
 import { executeTurn } from "../../../src/lib/brain/execute-turn";
 import { TICKET_DESK } from "../../../src/lib/contracts/approvals";
 import {
+  WorkerBusyError,
   WorkerCancelledError,
   WorkerUnavailableError,
   workerErrorResponse,
 } from "../../../src/lib/cf/worker-errors";
 import { loadConversationForUi } from "../../../src/lib/store/conversation-queries";
+import { failTurn } from "../../../src/lib/store/conversations";
 import type { CorpusSql, VectorizeIndex } from "../../../src/lib/retrieve/cloudflare-pipeline";
 import { seedPrincipals } from "./seed";
 
@@ -422,6 +424,73 @@ describe("persisted turns that hit a backend failure", () => {
       answer: null,
       errorRetryable: true,
       errorCode: "PROVIDER_TEMPORARY",
+    });
+  });
+
+  it("names the stored turn when the conversation lock is busy", async () => {
+    await seedPrincipals();
+    let caught: unknown;
+    try {
+      await executeTurn({
+        operations: env.OPERATIONS_DB,
+        corpus: corpusDatabase(),
+        principal,
+        question: "What is the refund window?",
+        requestId: "req-avail-lock-busy",
+        lockFor: () => ({
+          acquire: async () => ({ ok: false, status: 409 }),
+          cancelled: async () => false,
+          release: async () => ({ ok: true as const }),
+        }),
+        ai: { run: aiStub({ finalReply: BRAIN_NOT_ENOUGH_EVIDENCE }) },
+      });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(WorkerBusyError);
+    const failed = await assistantRow("req-avail-lock-busy");
+    expect(failed).toMatchObject({ status: "failed", error_code: "RATE_LIMITED" });
+    expect(await workerErrorResponse(caught, "req-busy").json()).toMatchObject({
+      code: "RATE_LIMITED",
+      turn: { conversationId: failed!.conversation_id, assistantMessageId: failed!.id },
+    });
+  });
+
+  it("names the stored turn when it was cancelled before the run claimed it", async () => {
+    await seedPrincipals();
+    let caught: unknown;
+    try {
+      await executeTurn({
+        operations: env.OPERATIONS_DB,
+        corpus: corpusDatabase(),
+        principal,
+        question: "What is the refund window?",
+        requestId: "req-avail-claim-lost",
+        lockFor: () => ({
+          acquire: async (runId: string) => {
+            // The stop raced the lock: the pending row is already failed.
+            await failTurn(env.OPERATIONS_DB, {
+              assistantMessageId: runId,
+              ownerPrincipalId: principal.id,
+              errorCode: "CANCELLED",
+              now: Date.now(),
+            });
+            return { ok: true as const, runId };
+          },
+          cancelled: async () => false,
+          release: async () => ({ ok: true as const }),
+        }),
+        ai: { run: aiStub({ finalReply: BRAIN_NOT_ENOUGH_EVIDENCE }) },
+      });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(WorkerCancelledError);
+    const failed = await assistantRow("req-avail-claim-lost");
+    expect(failed).toMatchObject({ status: "failed", error_code: "CANCELLED" });
+    expect(await workerErrorResponse(caught, "req-claim").json()).toMatchObject({
+      code: "CANCELLED",
+      turn: { conversationId: failed!.conversation_id, assistantMessageId: failed!.id },
     });
   });
 
