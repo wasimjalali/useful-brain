@@ -28,3 +28,15 @@ export function roleLabel(name: string): string {
 export function shortGenerationId(id: string): string {
   return /^g-[0-9a-f]{8}/.exec(id)?.[0] ?? id;
 }
+
+const MODEL_NAMES: Record<string, string> = {
+  "@cf/zai-org/glm-5.3-flash": "GLM 5.3 Flash",
+  "@cf/zai-org/glm-5.3": "GLM 5.3",
+  "@cf/qwen/qwen3-embedding-0.6b": "Qwen3 Embedding 0.6B",
+  "@cf/baai/bge-reranker-base": "BGE Reranker Base",
+};
+
+/** A Workers AI model id as people read it. Unknown ids are returned unchanged. */
+export function modelDisplayName(id: string): string {
+  return MODEL_NAMES[id] ?? id;
+}

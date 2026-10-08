@@ -22,7 +22,7 @@ const adminData = {
     rerankFloor: 0.05,
     activeGeneration: "g-c305cf57",
   },
-  connectors: [{ id: "uploads", name: "Uploads", description: "Built in, 62 documents", status: "active" }],
+  connectors: [{ id: "uploads", name: "Uploads", description: "Built in · 62 documents", status: "active" }],
   totalDocuments: 62,
 };
 
@@ -43,8 +43,8 @@ describe("SettingsHost", () => {
     expect(loadAdminSettingsAction).not.toHaveBeenCalled();
     expect(screen.queryByText("Admin")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Account" }));
-    expect(screen.getByText("Can read 34 documents")).toBeInTheDocument();
-    expect(screen.queryByText(/ of \d+ documents/)).toBeNull();
+    expect(screen.getByText("34")).toBeInTheDocument();
+    expect(screen.queryByText(/ of \d+/)).toBeNull();
   });
 
   it("shows an admin the total and the live config", async () => {
@@ -53,7 +53,7 @@ describe("SettingsHost", () => {
       render(<SettingsHost identity={admin} onClose={vi.fn()} />);
     });
     fireEvent.click(screen.getByRole("button", { name: "Account" }));
-    expect(screen.getByText("Can read 34 of 62 documents")).toBeInTheDocument();
+    expect(screen.getByText("34 of 62")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Model and retrieval" }));
     expect(screen.getByText("@cf/qwen/qwen3-embedding-0.6b")).toBeInTheDocument();
     expect(screen.getByText("g-c305cf57")).toBeInTheDocument();

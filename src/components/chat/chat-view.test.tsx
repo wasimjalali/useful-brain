@@ -528,9 +528,12 @@ describe("evidence panel", () => {
 
     renderChat({ initialTurns: [turn()], identity: admin });
     fireEvent.click(screen.getByRole("button", { name: "Evidence" }));
+    fireEvent.click(within(panel()).getAllByRole("button", { name: "Retrieval details" })[0]);
     expect(panel()).toHaveTextContent("chunk_1");
     expect(panel()).toHaveTextContent("g-c305cf57");
-    expect(panel()).toHaveTextContent("Keyword 0.868 · Vector 0.840 · Rerank 0.991");
+    expect(panel()).toHaveTextContent("0.868");
+    expect(panel()).toHaveTextContent("0.840");
+    expect(panel()).toHaveTextContent("0.991");
   });
 
   it("opens the document with the message and citation, then goes back to evidence", async () => {
