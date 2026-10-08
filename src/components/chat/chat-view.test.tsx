@@ -840,7 +840,7 @@ describe("review fixes", () => {
       await vi.advanceTimersByTimeAsync(1000);
     });
     expect(loadConversation).toHaveBeenCalledTimes(2);
-    expect(screen.getByText("Ticket SUP-4821 created")).toBeInTheDocument();
+    expect(screen.getAllByText("Created")).toHaveLength(2);
   });
 
   it("opens the ticket page from the done state", async () => {
