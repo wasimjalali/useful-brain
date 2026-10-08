@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><script src="./ub-icon.js"></script><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&amp;display=swap"></helmet>
+<div style="position:relative; width:1440px; height:900px; overflow:hidden; font-family:var(--sans); color:var(--ink); -webkit-font-smoothing:antialiased; font-variant-numeric:tabular-nums;">
+  <dc-import name="Chat" state="empty" rail="none" admin="{{ true }}" hint-size="1440px,900px"></dc-import>
+  <div style="position:absolute; inset:0; background:var(--scrim); display:flex; align-items:center; justify-content:center;">
+    <div role="dialog" aria-modal="true" aria-label="Settings" style="width:780px; height:580px; display:flex; border-radius:16px; background:var(--bubble); box-shadow:0 0 0 1px var(--edge), var(--lift), 0 24px 64px -24px rgb(0 0 0 / 0.35); overflow:hidden;">
+      <nav style="width:212px; flex-shrink:0; padding:16px 10px; box-sizing:border-box; display:flex; flex-direction:column; gap:1px; box-shadow:inset -1px 0 0 var(--border);">
+        <span style="padding:4px 10px 12px; font-size:16px; font-weight:600; letter-spacing:-0.01em;">Settings</span>
+        <sc-for list="{{ navTop }}" as="n" hint-placeholder-count="2">
+          <sc-if value="{{ n.on }}" hint-placeholder-val="{{ false }}"><span style="height:34px; display:flex; align-items:center; gap:10px; padding:0 10px; border-radius:10px; background:var(--sunken); font-size:13px; font-weight:500;"><ub-icon name="{{ n.icon }}" size="16"></ub-icon>{{ n.label }}</span></sc-if>
+          <sc-if value="{{ n.off }}" hint-placeholder-val="{{ true }}"><span onClick="{{ n.pick }}" style="height:34px; display:flex; align-items:center; gap:10px; padding:0 10px; border-radius:10px; font-size:13px; color:var(--ink); cursor:pointer;" style-hover="background:var(--hover);"><span style="display:inline-flex; color:var(--ink-muted);"><ub-icon name="{{ n.icon }}" size="16"></ub-icon></span>{{ n.label }}</span></sc-if>
+        </sc-for>
+        <span style="padding:16px 10px 6px; font-size:12px; font-weight:500; color:var(--ink-faint-text);">Admin</span>
+        <sc-for list="{{ navAdmin }}" as="n" hint-placeholder-count="2">
+          <sc-if value="{{ n.on }}" hint-placeholder-val="{{ false }}"><span style="height:34px; display:flex; align-items:center; gap:10px; padding:0 10px; border-radius:10px; background:var(--sunken); font-size:13px; font-weight:500;"><ub-icon name="{{ n.icon }}" size="16"></ub-icon>{{ n.label }}</span></sc-if>
+          <sc-if value="{{ n.off }}" hint-placeholder-val="{{ true }}"><span onClick="{{ n.pick }}" style="height:34px; display:flex; align-items:center; gap:10px; padding:0 10px; border-radius:10px; font-size:13px; color:var(--ink); cursor:pointer;" style-hover="background:var(--hover);"><span style="display:inline-flex; color:var(--ink-muted);"><ub-icon name="{{ n.icon }}" size="16"></ub-icon></span>{{ n.label }}</span></sc-if>
+        </sc-for>
+      </nav>
+
+      <div style="flex:1; min-width:0; position:relative; overflow:hidden;">
+        <button aria-label="Close settings" style="position:absolute; top:12px; right:12px; width:32px; height:32px; border:0; border-radius:10px; display:grid; place-items:center; background:transparent; color:var(--ink-muted); cursor:pointer;" style-hover="background:var(--sunken); color:var(--ink);"><ub-icon name="x" size="16"></ub-icon></button>
+
+        <sc-if value="{{ isGeneral }}" hint-placeholder-val="{{ true }}">
+          <div style="padding:28px 32px; display:flex; flex-direction:column; gap:28px;">
+            <section style="display:flex; flex-direction:column; gap:14px;">
+              <h3 style="margin:0; font-size:14px; font-weight:600;">Appearance</h3>
+              <div style="display:flex; align-items:center; gap:16px;">
+                <span style="flex:1; font-size:13px; color:var(--ink);">Theme</span>
+                <div role="radiogroup" aria-label="Theme" style="display:inline-flex; gap:2px; padding:3px; border-radius:10px; background:var(--sunken);">
+                  <sc-for list="{{ themes }}" as="t" hint-placeholder-count="3">
+                    <sc-if value="{{ t.on }}" hint-placeholder-val="{{ false }}"><span role="radio" aria-checked="true" style="height:30px; display:inline-flex; align-items:center; gap:7px; padding:0 12px; border-radius:8px; background:var(--bubble); box-shadow:var(--sel); font-size:13px; font-weight:500; color:var(--ink);"><ub-icon name="{{ t.icon }}" size="15"></ub-icon>{{ t.label }}</span></sc-if>
+                    <sc-if value="{{ t.off }}" hint-placeholder-val="{{ true }}"><span role="radio" aria-checked="false" onClick="{{ t.pick }}" style="height:30px; display:inline-flex; align-items:center; gap:7px; padding:0 12px; border-radius:8px; font-size:13px; color:var(--ink-muted); cursor:pointer; transition:color 120ms cubic-bezier(0.22,1,0.36,1);" style-hover="color:var(--ink);"><ub-icon name="{{ t.icon }}" size="15"></ub-icon>{{ t.label }}</span></sc-if>
+                  </sc-for>
+                </div>
+              </div>
+              <span style="font-size:12px; color:var(--ink-faint-text);">{{ themeNote }}</span>
+            </section>
+            <div style="height:1px; background:var(--border);"></div>
+            <section style="display:flex; flex-direction:column; gap:14px;">
+              <h3 style="margin:0; font-size:14px; font-weight:600;">Account</h3>
+              <div style="display:grid; grid-template-columns:140px minmax(0,1fr); row-gap:12px; font-size:13px; line-height:20px;">
+                <span style="color:var(--ink-faint-text);">Name</span><span>Jordan Ellis</span>
+                <span style="color:var(--ink-faint-text);">Email</span><span>jordan.ellis@northwind.example</span>
+                <span style="color:var(--ink-faint-text);">Role</span><span>Admin</span>
+                <span style="color:var(--ink-faint-text);">Department</span><span>Operations</span>
+                <span style="color:var(--ink-faint-text);">Can read</span><span>31 of 62 documents</span>
+              </div>
+              <div><button style="height:34px; display:inline-flex; align-items:center; gap:7px; padding:0 14px 0 12px; border:0; border-radius:10px; background:var(--sunken); box-shadow:inset 0 0 0 1px var(--edge); font:500 13px/1 var(--sans); color:var(--ink); cursor:pointer;" style-hover="background:var(--border-strong);"><ub-icon name="log-out" size="15"></ub-icon>Sign out</button></div>
+            </section>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isModel }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:28px 32px; display:flex; flex-direction:column; gap:28px;">
+            <section style="display:flex; flex-direction:column; gap:14px;">
+              <div style="display:flex; align-items:center; gap:10px; padding-right:40px;">
+                <h3 style="margin:0; font-size:14px; font-weight:600;">Model and retrieval</h3>
+                <span style="display:inline-flex; align-items:center; gap:5px; font-size:12px; color:var(--ink-faint-text);"><ub-icon name="lock" size="13"></ub-icon>Read-only. Changes go through evals.</span>
+              </div>
+              <div style="display:grid; grid-template-columns:160px minmax(0,1fr); row-gap:10px; font-size:13px; line-height:20px;">
+                <span style="color:var(--ink-faint-text);">Answer model</span><span style="font-family:var(--mono); font-size:12px;">@cf/zai-org/glm-5.3-flash</span>
+                <span style="color:var(--ink-faint-text);">Embeddings</span><span style="font-family:var(--mono); font-size:12px;">@cf/qwen/qwen3-embedding-0.6b</span>
+                <span style="color:var(--ink-faint-text);">Reranker</span><span style="font-family:var(--mono); font-size:12px;">@cf/baai/bge-reranker-base</span>
+                <span style="color:var(--ink-faint-text);">Retrieval</span><span>Hybrid, keyword and vector</span>
+                <span style="color:var(--ink-faint-text);">Passages per answer</span><span style="font-family:var(--mono); font-size:12px;">8</span>
+                <span style="color:var(--ink-faint-text);">Rerank floor</span><span style="font-family:var(--mono); font-size:12px;">0.05</span>
+                <span style="color:var(--ink-faint-text);">Active generation</span><span style="font-family:var(--mono); font-size:12px;">g-c305cf57</span>
+              </div>
+            </section>
+            <div style="height:1px; background:var(--border);"></div>
+            <section style="display:flex; flex-direction:column; gap:6px;">
+              <h3 style="margin:0 0 8px; font-size:14px; font-weight:600;">Connectors</h3>
+              <div style="display:flex; align-items:center; gap:12px; height:44px;">
+                <span style="display:inline-flex; color:var(--ink-muted);"><ub-icon name="upload" size="16"></ub-icon></span>
+                <span style="flex:1; display:flex; flex-direction:column;"><span style="font-size:13px; font-weight:500;">Uploads</span><span style="font-size:12px; color:var(--ink-faint-text);">Built in · 65 documents</span></span>
+                <span style="display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--ink-muted);"><span style="width:7px; height:7px; border-radius:999px; background:var(--success);"></span>Active</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; height:44px;">
+                <span style="display:inline-flex; color:var(--ink-muted);"><ub-icon name="ticket" size="16"></ub-icon></span>
+                <span style="flex:1; display:flex; flex-direction:column;"><span style="font-size:13px; font-weight:500;">Support desk</span><span style="font-size:12px; color:var(--ink-faint-text);"><span style="font-family:var(--mono); font-size:11px;">create_ticket</span> · every call needs approval</span></span>
+                <span style="display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--ink-muted);"><span style="width:7px; height:7px; border-radius:999px; background:var(--success);"></span>Connected</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; height:44px;">
+                <span style="display:inline-flex; color:var(--ink-muted);"><ub-icon name="github" size="16"></ub-icon></span>
+                <span style="flex:1; display:flex; flex-direction:column;"><span style="font-size:13px; font-weight:500;">GitHub</span><span style="font-size:12px; color:var(--ink-faint-text);">Sync a repository folder into a draft</span></span>
+                <button style="height:30px; padding:0 12px; border:0; border-radius:10px; background:var(--sunken); box-shadow:inset 0 0 0 1px var(--edge); font:500 12px/1 var(--sans); color:var(--ink); cursor:pointer;" style-hover="background:var(--border-strong);">Connect</button>
+              </div>
+            </section>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;section&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;general&quot;,&quot;model&quot;],&quot;default&quot;:&quot;general&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  state = { nav: null, theme: 'System' };
+  renderVals() {
+    const nav = this.state.nav ?? (this.props.section === 'model' ? 'model' : 'appearance');
+    const pane = (nav === 'model' || nav === 'connectors') ? 'model' : 'general';
+    const mk = rows => rows.map(([id, label, icon]) => ({ label, icon, on: id === nav, off: id !== nav, pick: () => this.setState({ nav: id }) }));
+    const t = this.state.theme;
+    return {
+      navTop: mk([['appearance', 'Appearance', 'sun'], ['account', 'Account', 'user-round']]),
+      navAdmin: mk([['model', 'Model and retrieval', 'cpu'], ['connectors', 'Connectors', 'plug']]),
+      isGeneral: pane === 'general', isModel: pane === 'model',
+      themes: [['System', 'monitor'], ['Light', 'sun'], ['Dark', 'moon']].map(([label, icon]) => ({ label, icon, on: label === t, off: label !== t, pick: () => this.setState({ theme: label }) })),
+      themeNote: t === 'System' ? 'Follows your device. Light right now.' : `Always ${t.toLowerCase()}, whatever your device uses.`,
+    };
+  }
+}
+</script>
+</body>
+</html>

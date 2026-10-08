@@ -36,6 +36,7 @@ const REGISTRY: Record<string, ToolPolicy> = {
   fetch_allowlisted_http: { name: "fetch_allowlisted_http", risk: "read", executionMode: "parallel" },
   mcp_lookup: { name: "mcp_lookup", risk: "read", executionMode: "parallel" },
   mcp_create_ticket: { name: "mcp_create_ticket", risk: "external_write", executionMode: "sequential" },
+  create_ticket: { name: "create_ticket", risk: "external_write", executionMode: "sequential" },
   action_sink_write: { name: "action_sink_write", risk: "external_write", executionMode: "sequential" },
   plugin_echo: { name: "plugin_echo", risk: "read", executionMode: "parallel" },
   create_draft: { name: "create_draft", risk: "reversible_write", executionMode: "sequential" },
@@ -49,6 +50,10 @@ export function toolPolicy(name: string): ToolPolicy {
     throw new PolicyError(`unknown tool ${name}`);
   }
   return policy;
+}
+
+export function nonReadToolPolicies(): ToolPolicy[] {
+  return Object.values(REGISTRY).filter((policy) => policy.risk !== "read");
 }
 
 export function assertMutatingToolsSequential(name: string): void {

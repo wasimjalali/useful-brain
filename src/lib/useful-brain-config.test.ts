@@ -6,6 +6,7 @@ describe("DEFAULT_USEFUL_BRAIN_CONFIG", () => {
   it("defines the client-facing Useful Brain terminology", () => {
     expect(DEFAULT_USEFUL_BRAIN_CONFIG).toEqual({
       productName: "Useful Brain",
+      companyName: "Northwind",
       productSubtitle: "Company knowledge",
       supportRoleLabel: "Knowledge agent",
       knowledgeLabel: "Sources",

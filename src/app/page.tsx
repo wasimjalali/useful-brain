@@ -2,9 +2,8 @@ import { cookies } from "next/headers";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { redirect } from "next/navigation";
 
-import { loadWorkspaceSnapshot } from "@/app/actions";
+import { loadHomeDestination } from "@/app/shell-data";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/session-cookie";
-import { isRetrievalReady } from "@/lib/rag/workspace-status";
 
 export const dynamic = "force-dynamic";
 
@@ -35,8 +34,5 @@ export default async function Home() {
     redirect("/login");
   }
 
-  const snapshot = await loadWorkspaceSnapshot();
-  redirect(
-    isRetrievalReady(snapshot.embeddingStorageStatus) ? "/chat" : "/knowledge",
-  );
+  redirect(await loadHomeDestination());
 }

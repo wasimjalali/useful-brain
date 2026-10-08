@@ -1,3 +1,4 @@
+import { ADMIN_ROLE } from "../auth/admin";
 import { aclGroupKey, ownerOf, type AccessScope, type AclShape } from "./acl-group";
 import { MAX_CANDIDATE_LIMIT, type ChunkRecord } from "../retrieve/types";
 import { VECTORIZE_FILTER_MAX_BYTES } from "../store/vectorize-projection";
@@ -32,7 +33,8 @@ export type AccessControlled = {
 };
 
 export function aclFilterFor(principal: Principal): AclFilter {
-  const roles = [...new Set(principal.roles)];
+  // admin is an operator capability, never a document read grant.
+  const roles = [...new Set(principal.roles)].filter((role) => role !== ADMIN_ROLE);
   const departments = [...new Set(principal.departments)];
   if (roles.length > MAX_FILTER_TERMS || departments.length > MAX_FILTER_TERMS) {
     throw new AclTooWide(
@@ -70,7 +72,7 @@ export function canAccessChunk(
     if (!chunk.allowedRoles.length) {
       return { allowed: false, reason: "role_scope_empty" };
     }
-    if (chunk.allowedRoles.some((role) => principal.roles.includes(role))) {
+    if (chunk.allowedRoles.some((role) => role !== ADMIN_ROLE && principal.roles.includes(role))) {
       return { allowed: true, reason: null };
     }
     return { allowed: false, reason: "role_denied" };
@@ -169,28 +171,54 @@ export function assertSerializedFilterSize(serialized: string): void {
   }
 }
 
-export function aclSqlAndParams(acl: AclFilter): { sql: string; params: string[] } {
-  const branches = ["c.access_scope = 'public'"];
+export function aclSqlAndParams(acl: AclFilter, alias = "c"): { sql: string; params: string[] } {
+  const a = alias;
+  const branches = [`${a}.access_scope = 'public'`];
   const params: string[] = [];
   if (acl.departments.length) {
     const placeholders = acl.departments.map(() => "?").join(",");
     branches.push(
-      `(c.access_scope = 'department' AND EXISTS (SELECT 1 FROM json_each(c.allowed_departments) AS d WHERE d.value IN (${placeholders})))`,
+      `(${a}.access_scope = 'department' AND EXISTS (SELECT 1 FROM json_each(${a}.allowed_departments) AS d WHERE d.value IN (${placeholders})))`,
     );
     params.push(...acl.departments);
   }
   if (acl.roles.length) {
     const placeholders = acl.roles.map(() => "?").join(",");
     branches.push(
-      `(c.access_scope = 'role' AND EXISTS (SELECT 1 FROM json_each(c.allowed_roles) AS r WHERE r.value IN (${placeholders})))`,
+      `(${a}.access_scope = 'role' AND EXISTS (SELECT 1 FROM json_each(${a}.allowed_roles) AS r WHERE r.value IN (${placeholders})))`,
     );
     params.push(...acl.roles);
   }
   branches.push(
-    "(c.access_scope = 'private' AND json_type(c.metadata, '$.owner_user_id') = 'text' AND json_extract(c.metadata, '$.owner_user_id') <> '' AND json_extract(c.metadata, '$.owner_user_id') = ?)",
+    `(${a}.access_scope = 'private' AND json_type(${a}.metadata, '$.owner_user_id') = 'text' AND json_extract(${a}.metadata, '$.owner_user_id') <> '' AND json_extract(${a}.metadata, '$.owner_user_id') = ?)`,
   );
   params.push(acl.userId);
   return { sql: `(${branches.join(" OR ")})`, params };
+}
+
+/**
+ * A document is readable when its catalog row passes the retrieval ACL
+ * predicate, it has a body and chunks, and EVERY one of its chunks passes it
+ * too, so a mixed document is rejected whole. The chunk test is written
+ * `<acl> IS NOT 1` so a NULL result (a private chunk with no owner in its
+ * metadata) counts as denied: missing ACL metadata fails closed.
+ * document_bodies and document_catalog_fts carry no ACL, so every read of the
+ * catalog goes through this predicate on `c`.
+ */
+export function readableDocumentPredicate(
+  generationId: string,
+  principal: Principal,
+): { sql: string; params: string[] } {
+  const filter = aclFilterFor(principal);
+  const catalogAcl = aclSqlAndParams(filter, "c");
+  const chunkAcl = aclSqlAndParams(filter, "k");
+  return {
+    sql: `c.generation_id = ? AND ${catalogAcl.sql}
+      AND EXISTS (SELECT 1 FROM document_bodies b0 WHERE b0.generation_id = c.generation_id AND b0.document_id = c.document_id)
+      AND EXISTS (SELECT 1 FROM chunks k0 WHERE k0.generation_id = c.generation_id AND k0.document_id = c.document_id)
+      AND NOT EXISTS (SELECT 1 FROM chunks k WHERE k.generation_id = c.generation_id AND k.document_id = c.document_id AND (${chunkAcl.sql}) IS NOT 1)`,
+    params: [generationId, ...catalogAcl.params, ...chunkAcl.params],
+  };
 }
 
 export const FTS_MATCH_STRATEGY = "stopword-or-v1" as const;
@@ -258,6 +286,27 @@ export function ftsCandidateFetchLimit(candidateLimit: number): number {
 
 export function keywordSearchSql(aclSql: string): string {
   return `SELECT c.chunk_id AS chunk_id, 0.0 AS rank FROM chunks_fts JOIN chunks c ON c.id = chunks_fts.rowid WHERE chunks_fts MATCH ? AND c.generation_id = ? AND ${aclSql} ORDER BY bm25(chunks_fts), c.chunk_id LIMIT ?`;
+}
+
+/**
+ * Documents of one generation the principal may read. Same predicate as the
+ * Library, document route and search (readableDocumentPredicate), so the
+ * number a person is shown equals what they can open.
+ */
+export async function countReadableDocuments(
+  db: { prepare(query: string): { bind(...values: Array<string | number>): { first<T>(): Promise<T | null> } } },
+  generationId: string,
+  principal: Principal,
+): Promise<number> {
+  const { sql, params } = readableDocumentPredicate(generationId, principal);
+  const row = await db
+    .prepare(`SELECT COUNT(*) AS n FROM document_catalog c WHERE ${sql}`)
+    .bind(...params)
+    .first<{ n: number }>();
+  if (!row) {
+    throw new Error("readable document count returned no row");
+  }
+  return Number(row.n);
 }
 
 function quoteFtsTerm(term: string): string {

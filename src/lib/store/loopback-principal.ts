@@ -11,6 +11,7 @@ export const LOOPBACK_PRINCIPAL_ID = "principal-dev";
  * because ownership, not roles, gates them.
  */
 export const LOOPBACK_ROLES = [
+  "admin",
   "operator",
   "standard",
   "manager",

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><script src="./ub-icon.js"></script><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&amp;display=swap"><style>@keyframes ub-spin{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}</style></helmet>
+<div style="width:1440px; height:900px; display:flex; overflow:hidden; background:var(--canvas); color:var(--ink); font-family:var(--sans); -webkit-font-smoothing:antialiased; font-variant-numeric:tabular-nums;">
+  <dc-import name="Rail" active="sources" chat="" admin="{{ true }}" hint-size="248px,900px"></dc-import>
+  <main style="flex:1; min-width:0; margin:10px 10px 10px 0; display:flex; flex-direction:column; background:var(--surface); border-radius:24px; box-shadow:0 0 0 1px var(--edge), var(--stage-shadow); overflow:hidden;">
+    <div style="padding:36px 48px 0; display:flex; align-items:flex-end; gap:8px;">
+      <div style="flex:1; min-width:0;">
+        <h1 style="margin:0; font-size:24px; line-height:32px; font-weight:600; letter-spacing:-0.02em;">Sources</h1>
+        <p style="margin:4px 0 0; font-size:13px; line-height:20px; color:var(--ink-muted);">65 documents · readers only see the active generation</p>
+      </div>
+      <button style="height:36px; flex-shrink:0; white-space:nowrap; display:inline-flex; align-items:center; gap:7px; padding:0 14px 0 12px; border:0; border-radius:10px; background:var(--sunken); box-shadow:inset 0 0 0 1px var(--edge); font:500 13px/1 var(--sans); color:var(--ink); cursor:pointer; transition:background-color 120ms cubic-bezier(0.22,1,0.36,1);" style-hover="background:var(--border-strong);"><ub-icon name="refresh-cw" size="15"></ub-icon>Re-index</button>
+      <button style="height:36px; flex-shrink:0; white-space:nowrap; display:inline-flex; align-items:center; gap:7px; padding:0 14px 0 12px; border:0; border-radius:10px; background:var(--accent); font:500 13px/1 var(--sans); color:var(--accent-ink); cursor:pointer; transition:opacity 120ms cubic-bezier(0.22,1,0.36,1);" style-hover="opacity:0.86;"><ub-icon name="upload" size="15"></ub-icon>Upload documents</button>
+    </div>
+
+    <div style="margin:24px 48px 0; border-radius:16px; background:var(--bubble); box-shadow:0 0 0 1px var(--edge), var(--lift);">
+      <div style="display:grid; grid-template-columns:minmax(0,1.4fr) repeat(4, minmax(0,1fr)); align-items:center; padding:16px 20px;">
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          <span style="font-size:12px; font-weight:500; color:var(--ink-faint-text);">Active generation</span>
+          <span style="display:inline-flex; align-items:center; gap:8px; font-family:var(--mono); font-size:14px; font-weight:500; color:var(--ink);"><span style="width:7px; height:7px; border-radius:999px; background:var(--success);"></span>{{ gen }}</span>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:4px;"><span style="font-size:12px; font-weight:500; color:var(--ink-faint-text);">Promoted</span><span style="font-size:14px; font-weight:500;">{{ promoted }}</span></div>
+        <div style="display:flex; flex-direction:column; gap:4px;"><span style="font-size:12px; font-weight:500; color:var(--ink-faint-text);">Documents</span><span style="font-size:14px; font-weight:500;">{{ docCount }}</span></div>
+        <div style="display:flex; flex-direction:column; gap:4px;"><span style="font-size:12px; font-weight:500; color:var(--ink-faint-text);">Chunks</span><span style="font-size:14px; font-weight:500;">{{ chunkCount }}</span></div>
+        <div style="display:flex; flex-direction:column; gap:4px;"><span style="font-size:12px; font-weight:500; color:var(--ink-faint-text);">Retrieval</span><span style="font-size:14px; font-weight:500;">Hybrid</span></div>
+      </div>
+
+      <sc-if value="{{ building }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex; align-items:center; gap:12px; padding:12px 16px 12px 20px; border-top:1px solid var(--border);">
+          <span style="display:inline-flex; color:var(--ink-muted); animation:ub-spin 1.4s linear infinite;"><ub-icon name="loader-circle" size="16"></ub-icon></span>
+          <span style="font-size:13px; font-weight:500; color:var(--ink);">Draft</span>
+          <span style="font-family:var(--mono); font-size:12px; color:var(--ink-muted);">g-7d19a4e0</span>
+          <span style="font-size:13px; color:var(--ink-muted);">Embedding 41 of 58 chunks · 2 documents · 1 failed</span>
+          <span style="flex:1;"></span>
+          <span aria-hidden="true" style="width:160px; height:4px; border-radius:999px; background:var(--sunken); overflow:hidden;"><span style="display:block; width:71%; height:100%; border-radius:999px; background:var(--ink);"></span></span>
+          <span style="font-size:12px; color:var(--ink-faint-text); width:36px; text-align:right;">71%</span>
+          <button disabled style="height:32px; padding:0 12px; border:0; border-radius:10px; background:var(--sunken); font:500 13px/1 var(--sans); color:var(--ink-faint-text); cursor:not-allowed;">Promote draft</button>
+        </div>
+      </sc-if>
+      <sc-if value="{{ passed }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex; align-items:center; gap:12px; padding:12px 16px 12px 20px; border-top:1px solid var(--border);">
+          <span style="display:inline-flex; color:var(--success);"><ub-icon name="circle-check" size="16"></ub-icon></span>
+          <span style="font-size:13px; font-weight:500; color:var(--ink);">Checks passed</span>
+          <span style="font-family:var(--mono); font-size:12px; color:var(--ink-muted);">g-7d19a4e0</span>
+          <span style="font-size:13px; color:var(--ink-muted);">2 documents, 58 chunks · reconciled · ACL leaks 0 · live recall 0.995</span>
+          <span style="flex:1;"></span>
+          <button style="height:32px; padding:0 12px; border:0; border-radius:10px; background:transparent; font:500 13px/1 var(--sans); color:var(--ink-muted); cursor:pointer;" style-hover="background:var(--sunken); color:var(--ink);">Discard</button>
+          <button onClick="{{ promote }}" style="height:32px; padding:0 12px; border:0; border-radius:10px; background:var(--accent); font:500 13px/1 var(--sans); color:var(--accent-ink); cursor:pointer;" style-hover="opacity:0.86;">Promote draft</button>
+        </div>
+      </sc-if>
+    </div>
+
+    <div style="padding:28px 48px 0; display:flex; align-items:center; gap:12px;">
+      <label style="width:300px; height:36px; display:flex; align-items:center; gap:8px; padding:0 12px; box-sizing:border-box; border-radius:14px; background:var(--sunken); box-shadow:inset 0 0 0 1px var(--edge); color:var(--ink-faint-text); font-size:13px;"><ub-icon name="search" size="15"></ub-icon>Search documents and file names</label>
+      <div style="display:flex; gap:6px;">
+        <sc-for list="{{ chips }}" as="c" hint-placeholder-count="4">
+          <sc-if value="{{ c.on }}" hint-placeholder-val="{{ false }}">
+            <button aria-pressed="true" style="height:30px; display:inline-flex; align-items:center; gap:6px; padding:0 10px; border:0; border-radius:6px; background:var(--accent); color:var(--accent-ink); font:500 13px/1 var(--sans); cursor:pointer;">{{ c.label }}<span style="font-weight:400;">{{ c.count }}</span></button>
+          </sc-if>
+          <sc-if value="{{ c.off }}" hint-placeholder-val="{{ true }}">
+            <button onClick="{{ c.pick }}" style="height:30px; display:inline-flex; align-items:center; gap:6px; padding:0 10px; border:0; border-radius:6px; background:var(--sunken); color:var(--ink); font:400 13px/1 var(--sans); cursor:pointer;" style-hover="background:var(--border-strong);">{{ c.label }}<span style="color:var(--ink-faint-text);">{{ c.count }}</span></button>
+          </sc-if>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="flex:1; min-height:0; overflow:hidden; padding:14px 36px 24px;">
+      <div style="display:grid; grid-template-columns:minmax(0,1fr) 112px 200px 64px 104px 84px; column-gap:16px; align-items:center; height:32px; padding:0 12px; font-size:12px; font-weight:500; color:var(--ink-faint-text); border-bottom:1px solid var(--border);">
+        <span>Document</span><span>Department</span><span>Who can read</span><span style="text-align:right;">Chunks</span><span>Updated</span><span>Status</span>
+      </div>
+      <sc-for list="{{ rows }}" as="r" hint-placeholder-count="10">
+        <div style="display:grid; grid-template-columns:minmax(0,1fr) 112px 200px 64px 104px 84px; column-gap:16px; align-items:center; min-height:52px; padding:7px 12px; box-sizing:border-box; border-radius:10px; cursor:pointer; transition:background-color 120ms cubic-bezier(0.22,1,0.36,1);" style-hover="background:var(--sunken);">
+          <div style="min-width:0; display:flex; flex-direction:column; gap:2px;">
+            <span title="{{ r.title }}" style="font-size:13px; font-weight:500; line-height:18px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ r.title }}</span>
+            <span style="font-family:var(--mono); font-size:11px; line-height:16px; color:{{ r.subTone }}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ r.sub }}</span>
+          </div>
+          <span style="font-size:13px; color:var(--ink-muted);">{{ r.dept }}</span>
+          <span style="font-size:13px; color:var(--ink-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ r.readers }}</span>
+          <span style="font-size:13px; color:var(--ink); text-align:right;">{{ r.chunks }}</span>
+          <span style="font-size:13px; color:var(--ink-muted);">{{ r.updated }}</span>
+          <span><span style="height:22px; display:inline-flex; align-items:center; padding:0 8px; border-radius:6px; font-size:12px; font-weight:500; background:{{ r.sBg }}; color:{{ r.sFg }};">{{ r.status }}</span></span>
+        </div>
+      </sc-for>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;draft&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;building&quot;,&quot;passed&quot;],&quot;default&quot;:&quot;building&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  state = { filter: 'All', promoted: false };
+  renderVals() {
+    const draft = this.props.draft ?? 'building';
+    const pr = this.state.promoted;
+    const st = {
+      Active: ['var(--success-soft)', 'var(--success)'],
+      Draft: ['var(--sunken)', 'var(--ink-muted)'],
+      Failed: ['var(--danger-soft)', 'var(--danger)'],
+    };
+    const E = 'Everyone';
+    const all = [
+      ['Holiday Calendar 2027', 'holiday-calendar-2027.pdf', 'HR', E, '6', '7 Oct 2026', 'Draft'],
+      ['Home Office Stipend Policy', 'home-office-stipend-policy.docx', 'Operations', E, '4', '7 Oct 2026', 'Draft'],
+      ['northwind-core-release-notes-2026-q3-addendum-final-v4-signed (1).pdf', 'Could not read page 14: scanned image with no text layer', 'Engineering', 'Engineering', '—', '7 Oct 2026', 'Failed'],
+      ['Agent Performance Scorecard', 'agent-performance-scorecard.md', 'Support', 'Support managers, Directors', '5', '6 Sep 2026', 'Active'],
+      ['Anti-Harassment Policy', 'anti-harassment-policy.md', 'HR', E, '5', '6 Sep 2026', 'Active'],
+      ['API and Integration Standards', 'api-and-integration-standards.md', 'Engineering', E, '5', '6 Sep 2026', 'Active'],
+      ['Atlas Connector Catalog', 'atlas-connector-catalog.md', 'Engineering', 'Engineering, Support, Sales', '44', '6 Sep 2026', 'Active'],
+      ['Atlas Sync Troubleshooting Runbook', 'atlas-sync-troubleshooting-runbook.md', 'Support', 'Support, Engineering', '50', '6 Sep 2026', 'Active'],
+      ['Board Reporting Calendar', 'board-reporting-calendar.md', 'Executive', 'Executive only', '5', '6 Sep 2026', 'Active'],
+      ['Budget Planning and Forecasting', 'budget-planning-and-forecasting.md', 'Finance', 'Finance, Executive', '5', '6 Sep 2026', 'Active'],
+      ['Business Continuity Policy', 'business-continuity-policy.md', 'Operations', 'Operations, Engineering, Executive', '5', '6 Sep 2026', 'Active'],
+      ['Change Management Policy', 'change-management-policy.md', 'Engineering', E, '4', '6 Sep 2026', 'Active'],
+    ].map(r => (pr && r[6] === 'Draft') ? [...r.slice(0, 6), 'Active'] : r);
+    const f = this.state.filter;
+    const counts = pr ? { All: 65, Active: 64, Draft: 0, Failed: 1 } : { All: 65, Active: 62, Draft: 2, Failed: 1 };
+    const rows = all.filter(r => f === 'All' || r[6] === f);
+    return {
+      gen: pr ? 'g-7d19a4e0' : 'g-c305cf57',
+      promoted: pr ? '7 Oct 2026' : '6 Sep 2026',
+      docCount: pr ? '64' : '62', chunkCount: pr ? '845' : '787',
+      building: !pr && draft === 'building', passed: !pr && draft === 'passed',
+      promote: () => this.setState({ promoted: true }),
+      chips: ['All', 'Active', 'Draft', 'Failed'].map(label => ({ label, count: counts[label], on: f === label, off: f !== label, pick: () => this.setState({ filter: label }) })),
+      rows: rows.map(([title, sub, dept, readers, chunks, updated, status]) => ({ title, sub, dept, readers, chunks, updated, status, sBg: st[status][0], sFg: st[status][1], subTone: status === 'Failed' ? 'var(--danger)' : 'var(--ink-faint-text)' })),
+    };
+  }
+}
+</script>
+</body>
+</html>

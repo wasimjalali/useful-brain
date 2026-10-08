@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><script src="./ub-icon.js"></script><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&amp;display=swap"></helmet>
+<div style="width:1440px; height:900px; display:flex; overflow:hidden; background:var(--canvas); color:var(--ink); font-family:var(--sans); -webkit-font-smoothing:antialiased; font-variant-numeric:tabular-nums;">
+  <dc-import name="Rail" active="activity" chat="" admin="{{ true }}" hint-size="248px,900px"></dc-import>
+  <main style="flex:1; min-width:0; margin:10px 10px 10px 0; display:flex; flex-direction:column; background:var(--surface); border-radius:24px; box-shadow:0 0 0 1px var(--edge), var(--stage-shadow); overflow:hidden;">
+    <div style="padding:36px 48px 0;">
+      <h1 style="margin:0; font-size:24px; line-height:32px; font-weight:600; letter-spacing:-0.02em;">Activity</h1>
+      <p style="margin:4px 0 0; font-size:13px; line-height:20px; color:var(--ink-muted);">Every turn this week, with what was retrieved and what ran</p>
+    </div>
+    <div style="padding:24px 48px 0; display:flex; flex-wrap:wrap; gap:6px;">
+      <sc-for list="{{ chips }}" as="c" hint-placeholder-count="6">
+        <sc-if value="{{ c.on }}" hint-placeholder-val="{{ false }}">
+          <button aria-pressed="true" style="height:30px; display:inline-flex; align-items:center; gap:6px; padding:0 10px; border:0; border-radius:6px; background:var(--accent); color:var(--accent-ink); font:500 13px/1 var(--sans); cursor:pointer;">{{ c.label }}<span style="font-weight:400;">{{ c.count }}</span></button>
+        </sc-if>
+        <sc-if value="{{ c.off }}" hint-placeholder-val="{{ true }}">
+          <button onClick="{{ c.pick }}" style="height:30px; display:inline-flex; align-items:center; gap:6px; padding:0 10px; border:0; border-radius:6px; background:var(--sunken); color:var(--ink); font:400 13px/1 var(--sans); cursor:pointer;" style-hover="background:var(--border-strong);">{{ c.label }}<span style="color:var(--ink-faint-text);">{{ c.count }}</span></button>
+        </sc-if>
+      </sc-for>
+    </div>
+
+    <div style="flex:1; min-height:0; overflow:hidden; padding:16px 36px 24px;">
+      <div style="display:grid; grid-template-columns:20px 52px 132px minmax(0,1fr) 108px 64px 64px; column-gap:14px; align-items:center; height:32px; padding:0 12px; font-size:12px; font-weight:500; color:var(--ink-faint-text); border-bottom:1px solid var(--border);">
+        <span></span><span>Time</span><span>Person</span><span>Question</span><span>Outcome</span><span style="text-align:right;">Sources</span><span style="text-align:right;">Latency</span>
+      </div>
+      <sc-for list="{{ rows }}" as="r" hint-placeholder-count="9">
+        <div>
+          <button aria-expanded="{{ r.open }}" onClick="{{ r.toggle }}" style="width:100%; display:grid; grid-template-columns:20px 52px 132px minmax(0,1fr) 108px 64px 64px; column-gap:14px; align-items:center; height:48px; padding:0 12px; border:0; border-radius:10px; background:{{ r.bg }}; text-align:left; font:inherit; color:var(--ink); cursor:pointer; transition:background-color 120ms cubic-bezier(0.22,1,0.36,1);" style-hover="background:var(--sunken);">
+            <span style="display:inline-flex; color:var(--ink-muted); transform:rotate({{ r.rot }}); transition:transform 160ms cubic-bezier(0.22,1,0.36,1);"><ub-icon name="chevron-right" size="15"></ub-icon></span>
+            <span style="font-family:var(--mono); font-size:12px; color:var(--ink-muted);">{{ r.time }}</span>
+            <span style="font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ r.who }}</span>
+            <span style="font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ r.q }}</span>
+            <span style="display:inline-flex; align-items:center; gap:7px; font-size:13px; color:var(--ink);"><span style="width:7px; height:7px; border-radius:999px; background:{{ r.dot }};"></span>{{ r.outcome }}</span>
+            <span style="font-size:13px; text-align:right; color:var(--ink-muted);">{{ r.src }}</span>
+            <span style="font-family:var(--mono); font-size:12px; text-align:right; color:var(--ink-muted);">{{ r.lat }}</span>
+          </button>
+          <sc-if value="{{ r.open }}" hint-placeholder-val="{{ false }}">
+            <div style="margin:4px 12px 12px 46px; padding:14px 16px; border-radius:14px; background:var(--sunken); display:grid; grid-template-columns:96px minmax(0,1fr) 64px; row-gap:9px; column-gap:16px; font-family:var(--mono); font-size:12px; line-height:18px;">
+              <sc-for list="{{ trace }}" as="t" hint-placeholder-count="6">
+                <span style="color:var(--ink-faint-text);">{{ t.step }}</span>
+                <span style="color:var(--ink); white-space:pre-wrap; word-break:break-word;">{{ t.detail }}</span>
+                <span style="color:var(--ink-muted); text-align:right;">{{ t.ms }}</span>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+      </sc-for>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  state = { filter: 'All', open: 0 };
+  renderVals() {
+    const dot = { Answered: 'var(--success)', 'No evidence': 'var(--ink-faint)', Approved: 'var(--success)', Denied: 'var(--ink-muted)', Error: 'var(--danger)' };
+    const R = [
+      ['09:42', 'Maya Chen', 'Open a P1 ticket for Halvorsen Freight. Atlas sync has been stalled since 06:10 and their orders aren\'t flowing.', 'Approved', '2', '3.4 s'],
+      ['09:31', 'Priya Shah', 'What\'s the first-response target for a P1 ticket?', 'Answered', '1', '1.8 s'],
+      ['09:27', 'Maya Chen', 'How much parental leave do I get, and when am I eligible?', 'Answered', '2', '2.1 s'],
+      ['09:15', 'Maya Chen', 'When is the 2027 company holiday calendar published?', 'No evidence', '0', '1.4 s'],
+      ['09:08', 'Sofia Marquez', 'What\'s the travel per diem for a trip to Berlin?', 'Error', '—', '6.0 s'],
+      ['09:02', 'Nadia Petrov', 'What credit applies when a P0 response target is missed?', 'Answered', '2', '2.6 s'],
+      ['08:51', 'Daniel Okafor', 'Who approves a discount over 20%?', 'Answered', '1', '1.9 s'],
+      ['08:44', 'Priya Shah', 'Close SUP-4790 as resolved.', 'Denied', '0', '1.2 s'],
+      ['08:30', 'Tomás Lindqvist', 'Can I keep my laptop when I leave Northwind?', 'Answered', '1', '1.7 s'],
+      ['08:12', 'Ravi Iyer', 'How long are system logs kept?', 'Answered', '1', '2.0 s'],
+    ];
+    const f = this.state.filter;
+    const counts = { All: 214, Answered: 189, 'No evidence': 18, Approved: 4, Denied: 1, Error: 2 };
+    const rows = R.map((r, i) => [i, ...r]).filter(r => f === 'All' || r[4] === f);
+    return {
+      chips: Object.keys(counts).map(label => ({ label, count: counts[label], on: label === f, off: label !== f, pick: () => this.setState({ filter: label }) })),
+      rows: rows.map(([i, time, who, q, outcome, src, lat]) => {
+        const open = this.state.open === i;
+        return { time, who, q, outcome, src, lat, dot: dot[outcome], open, rot: open ? '90deg' : '0deg', bg: open ? 'var(--sunken)' : 'transparent', toggle: () => this.setState(s => ({ open: s.open === i ? -1 : i })) };
+      }),
+      trace: [
+        ['rewrite', 'p1 ticket halvorsen freight atlas sync stalled orders', '38 ms'],
+        ['retrieve', 'hybrid · g-c305cf57 · 34 readable documents · 24 candidates', '112 ms'],
+        ['rerank', 'top 8 · floor 0.05 · nw_support_ticket_priority:c03 0.962, nw_support_sla_policy:c04 0.948', '204 ms'],
+        ['generate', '@cf/zai-org/glm-5.3-flash · 2 citations · 1 tool proposal', '1.9 s'],
+        ['tool call', 'create_ticket { desk: "Support", priority: "P1", customer: "Halvorsen Freight", subject: "Atlas sync stalled since 06:10, orders not flowing" }', '—'],
+        ['approval', 'approved by Maya Chen at 09:42 · exact arguments', '—'],
+        ['result', 'SUP-4821 created', '1.1 s'],
+      ].map(([step, detail, ms]) => ({ step, detail, ms })),
+    };
+  }
+}
+</script>
+</body>
+</html>

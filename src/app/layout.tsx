@@ -1,15 +1,11 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist_Mono } from "next/font/google";
 
 import { ScrollChrome } from "@/components/ui/scroll-chrome";
+import { ThemeSync } from "@/components/ui/theme-sync";
+import { THEME_INIT_SCRIPT } from "@/lib/theme-init";
 
 import "./globals.css";
-
-const geist = Geist({
-  subsets: ["latin"],
-  variable: "--font-geist",
-  display: "swap",
-});
 
 const geistMono = Geist_Mono({
   subsets: ["latin"],
@@ -31,10 +27,15 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`h-full antialiased ${geist.variable} ${geistMono.variable}`}
+      className={`h-full antialiased ${geistMono.variable}`}
+      suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body className="flex min-h-full flex-col">
         <ScrollChrome />
+        <ThemeSync />
         {children}
       </body>
     </html>

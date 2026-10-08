@@ -1,5 +1,7 @@
 import type { AccessScope } from "../acl/acl-group";
 import { aclGroupKey } from "../acl/acl-group";
+import { ADMIN_ROLE } from "../auth/admin";
+import { WorkerValidationError } from "../cf/worker-errors";
 import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL } from "../embeddings/instructions";
 import { embedWithWorkersAi, type WorkersAiRunner } from "../embeddings/workers-ai-embed";
 import { chunkDocument } from "../ingest/chunker";
@@ -14,6 +16,12 @@ import {
   recordAudit,
   type SqlExecutor,
 } from "./corpus-d1";
+import {
+  fileNameOf,
+  optionalMetadataText,
+  UPSERT_BODY_SQL,
+  UPSERT_CATALOG_SQL,
+} from "./document-catalog";
 import { canMarkReady, UPSERT_CHUNK_SQL } from "./generations";
 import { newBoundedId } from "./conversations";
 
@@ -32,6 +40,20 @@ export type SeedDocumentInput = {
 const NORTHWIND_SOURCE_ID = "src-northwind";
 const EMBED_BATCH = 8;
 const UPSERT_BATCH = 20;
+export const MAX_SEED_BODY_BYTES = 1_000_000;
+
+/** Runs before any write: bounded UTF-8 body size, and admin is never a read grant. */
+export function assertSeedDocumentsValid(documents: SeedDocumentInput[]): void {
+  const encoder = new TextEncoder();
+  for (const document of documents) {
+    if (typeof document.body !== "string" || encoder.encode(document.body).length > MAX_SEED_BODY_BYTES) {
+      throw new WorkerValidationError();
+    }
+    if (document.allowedRoles.includes(ADMIN_ROLE)) {
+      throw new WorkerValidationError();
+    }
+  }
+}
 
 export async function seedNorthwindCorpus(input: {
   db: SqlExecutor;
@@ -43,6 +65,7 @@ export async function seedNorthwindCorpus(input: {
   if (input.documents.length === 0) {
     throw new Error("seed requires at least one document");
   }
+  assertSeedDocumentsValid(input.documents);
   const now = input.now ?? Date.now();
   const generationId = newBoundedId("g");
   await ensureDraftGeneration(input.db, generationId, now);
@@ -157,6 +180,27 @@ export async function seedNorthwindCorpus(input: {
     if (chunkWrites.length > 0) {
       await input.db.batch(chunkWrites);
     }
+    // The body is the full original text: chunk start_offset/end_offset index
+    // into it, which the chunk-join reconstruction cannot guarantee.
+    await input.db.batch([
+      input.db.prepare(UPSERT_CATALOG_SQL).bind(
+        document.documentId,
+        generationId,
+        document.title,
+        optionalMetadataText(document.metadata, "department"),
+        optionalMetadataText(document.metadata, "version"),
+        optionalMetadataText(document.metadata, "effective_date"),
+        JSON.stringify([...new Set(chunks.map((chunk) => chunk.sectionHeading).filter(Boolean))]),
+        document.accessScope,
+        JSON.stringify(document.allowedRoles),
+        JSON.stringify(document.allowedDepartments),
+        metadata,
+        chunks.length,
+        fileNameOf(document.sourcePath),
+        now,
+      ),
+      input.db.prepare(UPSERT_BODY_SQL).bind(document.documentId, generationId, document.body, 0),
+    ]);
   }
 
   let vectorizeStatus: "upserted" | "skipped" = "skipped";

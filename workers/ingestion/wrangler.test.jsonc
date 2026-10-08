@@ -18,6 +18,12 @@
       "migrations_dir": "../../migrations/corpus"
     }
   ],
+  "r2_buckets": [
+    {
+      "binding": "SOURCES",
+      "bucket_name": "useful-brain-sources-test"
+    }
+  ],
   "workflows": [
     {
       "name": "useful-brain-ingestion-test",

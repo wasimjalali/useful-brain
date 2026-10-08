@@ -5,14 +5,22 @@
  * closed union; unknown stages are rejected rather than defaulted.
  */
 
-export const TURN_STAGES = [
-  "searching",
-  "drafting",
-  "checking_citations",
-  "saving",
-] as const;
+export const TURN_STAGES = ["searching", "reading", "writing"] as const;
 
 export type TurnStage = (typeof TURN_STAGES)[number];
+
+/**
+ * Stage names written by earlier Brain builds. They are accepted so a run
+ * that started before a deploy keeps reporting, and map onto "writing".
+ */
+const LEGACY_STAGE_TO_STAGE: Readonly<Record<string, TurnStage>> = {
+  drafting: "writing",
+  checking_citations: "writing",
+  saving: "writing",
+};
+
+/** Inclusive upper bound for a progress count. */
+export const TURN_PROGRESS_MAX_COUNT = 100_000;
 
 /**
  * Stored turn failure codes surfaced by the progress endpoint. These are the
@@ -29,16 +37,62 @@ export const TURN_FAILURE_CODES = [
 
 export type TurnFailureCode = (typeof TURN_FAILURE_CODES)[number];
 
+/**
+ * Closed progress union. Counts are integers only and no variant has a field
+ * that could hold text, so the payload cannot carry model output.
+ */
 export type TurnProgress =
-  | { stage: TurnStage }
+  | { stage: "searching"; readableDocuments: number }
+  | { stage: "reading"; passages: number }
+  | { stage: "writing"; passages?: number }
   | { stage: "done" }
   | { stage: "failed"; errorCode: TurnFailureCode };
+
+/** Stages that must carry a count, and the payload field that holds it. */
+export const COUNTED_STAGE_FIELD = {
+  searching: "readableDocuments",
+  reading: "passages",
+} as const;
 
 export function isTurnStage(value: unknown): value is TurnStage {
   return (
     typeof value === "string" &&
     (TURN_STAGES as readonly string[]).includes(value)
   );
+}
+
+/** Maps a stored or incoming stage name onto the closed set, or null. */
+export function normalizeTurnStage(value: unknown): TurnStage | null {
+  if (isTurnStage(value)) {
+    return value;
+  }
+  if (typeof value === "string" && Object.hasOwn(LEGACY_STAGE_TO_STAGE, value)) {
+    return LEGACY_STAGE_TO_STAGE[value];
+  }
+  return null;
+}
+
+export function isTurnProgressCount(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= 0 &&
+    value <= TURN_PROGRESS_MAX_COUNT
+  );
+}
+
+/**
+ * A counted stage requires a valid count; writing carries none. Returns the
+ * count to store (null for writing) or undefined when the pair is invalid.
+ */
+export function turnStageCount(
+  stage: TurnStage,
+  count: unknown,
+): number | null | undefined {
+  if (stage === "writing") {
+    return count === undefined || count === null ? null : undefined;
+  }
+  return isTurnProgressCount(count) ? count : undefined;
 }
 
 /**

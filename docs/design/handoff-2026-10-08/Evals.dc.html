@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><script src="./ub-icon.js"></script><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&amp;display=swap"></helmet>
+<div style="width:1440px; height:900px; display:flex; overflow:hidden; background:var(--canvas); color:var(--ink); font-family:var(--sans); -webkit-font-smoothing:antialiased; font-variant-numeric:tabular-nums;">
+  <dc-import name="Rail" active="evals" chat="" admin="{{ true }}" hint-size="248px,900px"></dc-import>
+  <main style="flex:1; min-width:0; margin:10px 10px 10px 0; display:flex; flex-direction:column; background:var(--surface); border-radius:24px; box-shadow:0 0 0 1px var(--edge), var(--stage-shadow); overflow:hidden;">
+    <div style="padding:36px 48px 0; display:flex; align-items:flex-end; gap:12px;">
+      <div style="flex:1; min-width:0;">
+        <h1 style="margin:0; font-size:24px; line-height:32px; font-weight:600; letter-spacing:-0.02em;">Evals</h1>
+        <p style="margin:4px 0 0; font-size:13px; line-height:20px; color:var(--ink-muted);">120 questions across five categories, run against the active generation</p>
+      </div>
+      <span style="height:30px; display:inline-flex; align-items:center; gap:8px; padding:0 10px; border-radius:10px; background:var(--sunken); font-size:12px; color:var(--ink-muted);"><ub-icon name="cpu" size="14"></ub-icon><span style="font-family:var(--mono); color:var(--ink);">@cf/zai-org/glm-5.3-flash</span></span>
+    </div>
+
+    <div style="flex:1; min-height:0; overflow:hidden; padding:28px 48px 0; display:grid; grid-template-columns:minmax(0,1fr) 340px; column-gap:56px;">
+      <div style="min-width:0; display:flex; flex-direction:column; gap:32px;">
+        <section style="display:flex; flex-direction:column;">
+          <div style="display:flex; align-items:baseline; gap:10px; padding-bottom:10px; border-bottom:1px solid var(--border);">
+            <h2 style="margin:0; font-size:12px; font-weight:500; color:var(--ink-faint-text);">Runs</h2>
+            <span style="margin-left:auto; font-size:12px; color:var(--ink-faint-text);">Pass rate</span>
+          </div>
+          <div style="position:relative; height:262px; margin-top:4px;">
+            <sc-for list="{{ grid }}" as="g" hint-placeholder-count="4">
+              <div style="position:absolute; left:0; right:0; top:{{ g.top }}; display:flex; align-items:center; gap:10px;">
+                <span style="width:34px; font-size:11px; color:var(--ink-faint-text); text-align:right;">{{ g.label }}</span>
+                <span style="flex:1; height:1px; background:var(--border);"></span>
+              </div>
+            </sc-for>
+            <div style="position:absolute; left:44px; right:24px; top:28px; height:180px;">
+              <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" style="position:absolute; inset:0; width:100%; height:100%; overflow:visible;">
+                <polyline points="{{ linePts }}" fill="none" stroke="var(--ink)" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"></polyline>
+              </svg>
+              <sc-for list="{{ runs }}" as="r" hint-placeholder-count="4">
+                <div style="position:absolute; left:{{ r.x }}; top:{{ r.y }}; width:0; height:0;">
+                  <span style="position:absolute; left:-5px; top:-5px; width:10px; height:10px; box-sizing:border-box; border-radius:999px; background:{{ r.dotBg }}; box-shadow:0 0 0 2px var(--surface), inset 0 0 0 2px var(--ink);"></span>
+                  <span style="position:absolute; left:-60px; width:120px; top:-30px; text-align:center; font-size:13px; font-weight:{{ r.weight }}; color:var(--ink); white-space:nowrap;">{{ r.score }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="position:absolute; left:44px; right:24px; top:222px; height:36px;">
+              <sc-for list="{{ runs }}" as="r" hint-placeholder-count="4">
+                <div style="position:absolute; left:{{ r.x }}; width:120px; margin-left:-60px; display:flex; flex-direction:column; align-items:center; gap:2px;">
+                  <span style="font-size:12px; font-weight:500; color:var(--ink);">{{ r.name }}</span>
+                  <span style="font-size:11px; color:var(--ink-faint-text);">{{ r.date }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </section>
+
+        <section style="display:flex; flex-direction:column;">
+          <div style="display:flex; align-items:baseline; gap:10px; padding-bottom:10px; border-bottom:1px solid var(--border);">
+            <h2 style="margin:0; font-size:12px; font-weight:500; color:var(--ink-faint-text);">Remaining failures</h2>
+            <span style="margin-left:auto; font-size:12px; color:var(--ink-faint-text);">2 of 120</span>
+          </div>
+          <sc-for list="{{ fails }}" as="f" hint-placeholder-count="2">
+            <div style="border-bottom:1px solid var(--border);">
+              <button aria-expanded="{{ f.open }}" onClick="{{ f.toggle }}" style="width:100%; display:grid; grid-template-columns:16px 44px 88px minmax(0,1fr); column-gap:12px; align-items:center; min-height:48px; padding:0; border:0; background:transparent; text-align:left; font:inherit; color:var(--ink); cursor:pointer;">
+                <span style="display:inline-flex; color:var(--ink-muted); transform:rotate({{ f.rot }}); transition:transform 160ms cubic-bezier(0.22,1,0.36,1);"><ub-icon name="chevron-right" size="15"></ub-icon></span>
+                <span style="font-family:var(--mono); font-size:12px; color:var(--ink);">{{ f.id }}</span>
+                <span style="font-size:12px; color:var(--ink-muted);">{{ f.cat }}</span>
+                <span style="font-size:13px; line-height:20px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ f.q }}</span>
+              </button>
+              <sc-if value="{{ f.open }}" hint-placeholder-val="{{ false }}">
+                <div style="margin:0 0 16px 28px; display:grid; grid-template-columns:96px minmax(0,1fr); row-gap:8px; column-gap:16px; font-size:13px; line-height:20px;">
+                  <span style="color:var(--ink-faint-text);">Asked as</span><span style="font-family:var(--mono); font-size:12px; color:var(--ink);">{{ f.who }}</span>
+                  <span style="color:var(--ink-faint-text);">Expected</span>
+                  <span style="display:flex; flex-direction:column; gap:2px;">
+                    <sc-for list="{{ f.expect }}" as="e" hint-placeholder-count="1"><span style="color:var(--ink);">{{ e.doc }} <span style="color:var(--ink-faint-text);">· {{ e.sec }}</span></span></sc-for>
+                  </span>
+                  <span style="color:var(--ink-faint-text);">Note</span><span style="color:var(--ink-muted); text-wrap:pretty;">{{ f.note }}</span>
+                </div>
+              </sc-if>
+            </div>
+          </sc-for>
+        </section>
+      </div>
+
+      <div style="min-width:0; display:flex; flex-direction:column; gap:32px;">
+        <section style="display:flex; flex-direction:column;">
+          <div style="display:flex; align-items:baseline; padding-bottom:10px; border-bottom:1px solid var(--border);">
+            <h2 style="margin:0; font-size:12px; font-weight:500; color:var(--ink-faint-text);">Latest run by category</h2>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:14px; padding-top:16px;">
+            <sc-for list="{{ cats }}" as="c" hint-placeholder-count="5">
+              <div style="display:grid; grid-template-columns:96px minmax(0,1fr) 48px; column-gap:12px; align-items:center;">
+                <span style="font-size:13px; color:var(--ink);">{{ c.name }}</span>
+                <span aria-hidden="true" style="height:6px; border-radius:999px; background:var(--sunken); overflow:hidden;"><span style="display:block; height:100%; width:{{ c.pct }}; border-radius:999px; background:var(--ink);"></span></span>
+                <span style="font-size:13px; text-align:right; color:{{ c.tone }};">{{ c.val }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </section>
+
+        <section style="display:flex; flex-direction:column;">
+          <div style="display:flex; align-items:baseline; padding-bottom:10px; border-bottom:1px solid var(--border);">
+            <h2 style="margin:0; font-size:12px; font-weight:500; color:var(--ink-faint-text);">Retrieval</h2>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; row-gap:20px; padding-top:16px;">
+            <div style="display:flex; flex-direction:column; gap:2px;"><span style="font-family:var(--mono); font-size:20px; line-height:28px; font-weight:500; color:var(--success);">0</span><span style="font-size:12px; color:var(--ink-muted);">ACL leaks</span></div>
+            <div style="display:flex; flex-direction:column; gap:2px;"><span style="font-family:var(--mono); font-size:20px; line-height:28px; font-weight:500;">0.995</span><span style="font-size:12px; color:var(--ink-muted);">Live recall</span></div>
+            <div style="display:flex; flex-direction:column; gap:2px;"><span style="font-family:var(--mono); font-size:20px; line-height:28px; font-weight:500;">0.912</span><span style="font-size:12px; color:var(--ink-muted);">Recall@3</span></div>
+            <div style="display:flex; flex-direction:column; gap:2px;"><span style="font-family:var(--mono); font-size:20px; line-height:28px; font-weight:500;">0.825</span><span style="font-size:12px; color:var(--ink-muted);">MRR</span></div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div style="flex-shrink:0; height:52px; margin:0 48px; display:flex; align-items:center; gap:10px; border-top:1px solid var(--border); font-size:12px; color:var(--ink-faint-text);">
+      <ub-icon name="lock" size="13"></ub-icon><span>Read-only here. Run the suite from the repo:</span>
+      <span style="font-family:var(--mono); font-size:12px; color:var(--ink-muted);">npm run eval:northwind</span>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  state = { open: { q093: true } };
+  renderVals() {
+    const lo = 60, hi = 100;
+    const y = v => (100 - (v - lo) / (hi - lo) * 100);
+    const R = [['Baseline', '30 Aug', 77, 107], ['Pass 1', '31 Aug', 95, 120], ['Pass 2', '31 Aug', 114, 120], ['Latest', '6 Sep 2026', 118, 120]];
+    const runs = R.map(([name, date, a, b], i) => {
+      const pct = a / b * 100, x = i / (R.length - 1) * 100;
+      return { name, date, score: `${a}/${b}`, x: x + '%', y: y(pct) + '%', px: x, py: y(pct), last: i === R.length - 1 };
+    }).map(r => ({ ...r, dotBg: r.last ? 'var(--ink)' : 'var(--surface)', weight: r.last ? 600 : 400 }));
+    const F = [
+      ['q093', 'Factual', 'What is ERR-7702 and who do I hand it to?', 'support_agent', [['Northwind Core Error Code Reference', 'Billing and Entitlement Errors (ERR-7xxx)']], 'Exact token: a missing entitlement grant for a purchased module.'],
+      ['q120', 'Multi-hop', 'A P0 response target was missed and the customer demands compensation above the standard SLA credit. What credit and complaint escalation rules apply?', 'support_manager', [['Support SLA Policy', 'SLA Credits'], ['Customer Complaint Escalation Path', 'Goodwill and Compensation Rules']], 'The SLA defines the credit; extra compensation follows the complaint path.'],
+    ];
+    const C = [['Factual', 69, 70], ['Trap', 17, 17], ['Permission', 13, 13], ['Unanswerable', 10, 10], ['Multi-hop', 9, 10]];
+    return {
+      grid: [100, 90, 80, 70, 60].map(v => ({ label: v + '%', top: (28 + y(v) / 100 * 180 - 8) + 'px' })),
+      linePts: runs.map(r => `${r.px},${r.py}`).join(' '),
+      runs,
+      fails: F.map(([id, cat, q, who, ex, note]) => {
+        const open = !!this.state.open[id];
+        return { id, cat, q, who, note, open, rot: open ? '90deg' : '0deg', expect: ex.map(([doc, sec]) => ({ doc, sec })), toggle: () => this.setState(s => ({ open: { ...s.open, [id]: !s.open[id] } })) };
+      }),
+      cats: C.map(([name, a, b]) => ({ name, val: `${a}/${b}`, pct: (a / b * 100) + '%', tone: a === b ? 'var(--ink-muted)' : 'var(--ink)' })),
+    };
+  }
+}
+</script>
+</body>
+</html>

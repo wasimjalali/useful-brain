@@ -35,16 +35,16 @@ function mockJwks(keys: object[]): void {
   };
 }
 
-async function fetchWorker(request: Request): Promise<Response> {
+async function fetchWorker(request: Request, workerEnv: typeof env = env): Promise<Response> {
   const ctx = createExecutionContext();
-  const response = await worker.fetch(request, env, ctx);
+  const response = await worker.fetch(request, workerEnv, ctx);
   await waitOnExecutionContext(ctx);
   return response;
 }
 
 async function authed(
   path: string,
-  init: { method?: string; json?: unknown; email?: string } = {},
+  init: { method?: string; json?: unknown; email?: string; withoutCorpus?: boolean } = {},
 ): Promise<Response> {
   const token = await signToken(signing.privateKey, signing.kid, {
     email: init.email ?? "alice@karkoai.com",
@@ -57,6 +57,7 @@ async function authed(
       method: init.method ?? (body ? "POST" : "GET"),
       body,
     }),
+    init.withoutCorpus ? ({ ...env, CORPUS_DB: undefined } as unknown as typeof env) : env,
   );
 }
 
@@ -146,7 +147,7 @@ describe("Brain UI APIs", () => {
   });
 
   it("returns an empty knowledge inventory without CORPUS_DB", async () => {
-    const response = await authed("/knowledge");
+    const response = await authed("/knowledge", { withoutCorpus: true });
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
       documents: [],
@@ -157,13 +158,14 @@ describe("Brain UI APIs", () => {
   });
 
   it("rejects corpus re-indexing without a corpus database", async () => {
-    const response = await authed("/knowledge/reindex", { method: "POST" });
+    const response = await authed("/knowledge/reindex", { method: "POST", withoutCorpus: true });
     expect(response.status).toBe(400);
   });
 
   it("rejects corpus seed without a corpus database", async () => {
     const response = await authed("/knowledge/seed", {
       method: "POST",
+      withoutCorpus: true,
       json: {
         documents: [
           {
@@ -180,6 +182,33 @@ describe("Brain UI APIs", () => {
       },
     });
     expect(response.status).toBe(400);
+  });
+
+  it("rejects an oversize body (UTF-8 bytes) and an admin allowed role before any write", async () => {
+    const base = {
+      documentId: "nw-test",
+      title: "Test",
+      sourceName: "Test",
+      sourcePath: "northwind/test.md",
+      accessScope: "public",
+      allowedRoles: [] as string[],
+      allowedDepartments: [] as string[],
+    };
+    const generations = async () =>
+      (await env.CORPUS_DB.prepare(`SELECT COUNT(*) AS n FROM corpus_generations`).first<{ n: number }>())!.n;
+    const before = await generations();
+    // 400,000 three-byte characters: under 1,000,000 characters, over 1,000,000 bytes.
+    const oversize = await authed("/knowledge/seed", {
+      method: "POST",
+      json: { documents: [{ ...base, body: "\u20ac".repeat(400_000) }] },
+    });
+    expect(oversize.status).toBe(400);
+    const adminRole = await authed("/knowledge/seed", {
+      method: "POST",
+      json: { documents: [{ ...base, accessScope: "role", allowedRoles: ["admin"], body: "Hello." }] },
+    });
+    expect(adminRole.status).toBe(400);
+    expect(await generations()).toBe(before);
   });
 
   it("forbids corpus seed for a non-operator", async () => {

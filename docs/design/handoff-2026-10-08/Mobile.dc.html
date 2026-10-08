@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><script src="./ub-icon.js"></script><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&amp;display=swap"></helmet>
+<div style="position:relative; width:390px; height:844px; overflow:hidden; background:var(--surface); color:var(--ink); font-family:var(--sans); -webkit-font-smoothing:antialiased; font-variant-numeric:tabular-nums; display:flex; flex-direction:column;">
+  <div style="height:47px; flex-shrink:0; display:flex; align-items:flex-end; padding:0 30px 6px; font-size:15px; font-weight:600;">9:41</div>
+  <header style="height:52px; flex-shrink:0; display:flex; align-items:center; gap:4px; padding:0 6px;">
+    <button aria-label="Open menu" onClick="{{ openRail }}" style="width:44px; height:44px; border:0; border-radius:10px; display:grid; place-items:center; background:transparent; color:var(--ink); cursor:pointer;"><ub-icon name="menu" size="20"></ub-icon></button>
+    <span style="flex:1; min-width:0; font-size:15px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Parental leave eligibility</span>
+    <button aria-label="New chat" style="width:44px; height:44px; border:0; border-radius:10px; display:grid; place-items:center; background:transparent; color:var(--ink); cursor:pointer;"><ub-icon name="square-pen" size="19"></ub-icon></button>
+  </header>
+
+  <div style="flex:1; min-height:0; overflow:hidden; padding:12px 16px 16px; display:flex; flex-direction:column; gap:22px;">
+    <div style="align-self:flex-end; max-width:300px; padding:10px 14px; border-radius:14px; background:var(--sunken); font-size:15px; line-height:24px;">How much parental leave do I get, and when am I eligible?</div>
+    <div style="display:flex; flex-direction:column; gap:14px;">
+      <p style="margin:0; font-size:15px; line-height:24px; text-wrap:pretty;">You get sixteen weeks of fully paid parental leave per child, at 100% of base salary <span role="button" onClick="{{ openSheet }}" style="display:inline-flex; align-items:center; justify-content:center; min-width:22px; height:20px; padding:0 6px; box-sizing:border-box; margin:0 1px; border-radius:6px; vertical-align:1px; font-family:var(--mono); font-size:11px; font-weight:500; line-height:1; background:{{ c1Bg }}; color:{{ c1Fg }}; cursor:pointer;">1</span>. You're eligible after six months of continuous service <span role="button" onClick="{{ openSheet }}" style="display:inline-flex; align-items:center; justify-content:center; min-width:22px; height:20px; padding:0 6px; box-sizing:border-box; margin:0 1px; border-radius:6px; vertical-align:1px; font-family:var(--mono); font-size:11px; font-weight:500; line-height:1; background:var(--sunken); color:var(--ink-muted); cursor:pointer;">2</span>. It's on top of your annual leave, so it doesn't reduce your vacation or sick days <span role="button" onClick="{{ openSheet }}" style="display:inline-flex; align-items:center; justify-content:center; min-width:22px; height:20px; padding:0 6px; box-sizing:border-box; margin:0 1px; border-radius:6px; vertical-align:1px; font-family:var(--mono); font-size:11px; font-weight:500; line-height:1; background:var(--sunken); color:var(--ink-muted); cursor:pointer;">2</span>.</p>
+      <button onClick="{{ openSheet }}" style="height:44px; display:flex; align-items:center; gap:10px; padding:0 14px 0 10px; border:0; border-radius:10px; background:var(--sunken); box-shadow:inset 0 0 0 1px var(--edge); font:400 13px/1 var(--sans); color:var(--ink); text-align:left; cursor:pointer;">
+        <span style="display:inline-flex; align-items:center; gap:3px;"><span style="min-width:20px; height:20px; display:inline-grid; place-items:center; border-radius:6px; background:var(--bubble); font-family:var(--mono); font-size:11px; font-weight:500; color:var(--ink-muted);">1</span><span style="min-width:20px; height:20px; display:inline-grid; place-items:center; border-radius:6px; background:var(--bubble); font-family:var(--mono); font-size:11px; font-weight:500; color:var(--ink-muted);">2</span></span>
+        <span style="flex:1; font-weight:500;">Parental Leave Policy</span>
+        <span style="font-size:12px; color:var(--ink-faint-text);">2 passages</span>
+        <span style="display:inline-flex; color:var(--ink-muted);"><ub-icon name="chevron-up" size="16"></ub-icon></span>
+      </button>
+      <div style="display:flex; align-items:center; gap:0; margin-left:-10px;">
+        <button aria-label="Copy" style="width:44px; height:44px; border:0; border-radius:10px; display:grid; place-items:center; background:transparent; color:var(--ink-muted);"><ub-icon name="copy" size="17"></ub-icon></button>
+        <button aria-label="Retry" style="width:44px; height:44px; border:0; border-radius:10px; display:grid; place-items:center; background:transparent; color:var(--ink-muted);"><ub-icon name="rotate-ccw" size="17"></ub-icon></button>
+        <button aria-label="Good answer" style="width:44px; height:44px; border:0; border-radius:10px; display:grid; place-items:center; background:transparent; color:var(--ink-muted);"><ub-icon name="thumbs-up" size="17"></ub-icon></button>
+        <button aria-label="Bad answer" style="width:44px; height:44px; border:0; border-radius:10px; display:grid; place-items:center; background:transparent; color:var(--ink-muted);"><ub-icon name="thumbs-down" size="17"></ub-icon></button>
+        <span style="margin-left:6px; font-family:var(--mono); font-size:11px; color:var(--ink-faint-text);">8 passages · 2.1 s</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="flex-shrink:0; padding:8px 12px 30px;">
+    <div style="height:52px; box-sizing:border-box; display:flex; align-items:center; gap:8px; padding:0 8px 0 18px; border-radius:999px; background:var(--bubble); box-shadow:0 0 0 1px var(--edge), var(--lift);">
+      <span style="flex:1; font-size:15px; color:var(--ink-faint-text);">Ask a follow-up</span>
+      <span aria-label="Send" style="width:36px; height:36px; border-radius:999px; display:grid; place-items:center; background:var(--sunken); color:var(--ink-faint);"><ub-icon name="arrow-up" size="18" stroke="2"></ub-icon></span>
+    </div>
+  </div>
+  <span aria-hidden="true" style="position:absolute; left:50%; bottom:8px; width:134px; height:5px; margin-left:-67px; border-radius:999px; background:var(--ink); z-index:5;"></span>
+
+  <sc-if value="{{ railOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ close }}" style="position:absolute; inset:0; background:var(--scrim); z-index:2;"></div>
+    <aside aria-label="Navigation" style="position:absolute; top:0; bottom:0; left:0; width:308px; z-index:3; background:var(--canvas); box-shadow:var(--stage-shadow), 0 0 0 1px var(--edge); border-radius:0 24px 24px 0; display:flex; flex-direction:column; padding:47px 12px 30px; box-sizing:border-box;">
+      <div style="display:flex; align-items:center; gap:9px; height:52px; padding:0 10px;">
+        <svg viewBox="0 0 220 242" fill="none" aria-hidden="true" style="height:22px; width:20px; color:var(--ink); flex-shrink:0;"><path fill="currentColor" fill-rule="evenodd" d="M17 0h116l52 52v173a17 17 0 0 1-17 17H17A17 17 0 0 1 0 225V17A17 17 0 0 1 17 0ZM17 10h113V48l8 8H175V225a7 7 0 0 1-7 7H17a7 7 0 0 1-7-7V17a7 7 0 0 1 7-7Z"></path><g fill="currentColor" transform="translate(110 121) scale(2) translate(-181.5 -153)"><path d="M164.2 139h11.6c1.7 0 2.8 1.2 2.8 2.9v9.4c0 1.1-.7 2-1.8 2.3c1.2.6 1.6 2.2 1.4 3.8-.5 4-3.4 8.2-8.2 10-2.2.8-5 .2-5.6-1.8-.5-1.4.2-2.8 1.4-3.4 1.6 1.6 4.6 1.4 5.4-1 .6-1.8-.4-3.6-2.2-4.4l-1.2-1.2h-5.2c-1.3 0-2.4-1.1-2.4-2.4V142c0-1.7 1.2-3 2.9-3z"></path><path d="M164.2 139h11.6c1.7 0 2.8 1.2 2.8 2.9v9.4c0 1.1-.7 2-1.8 2.3c1.2.6 1.6 2.2 1.4 3.8-.5 4-3.4 8.2-8.2 10-2.2.8-5 .2-5.6-1.8-.5-1.4.2-2.8 1.4-3.4 1.6 1.6 4.6 1.4 5.4-1 .6-1.8-.4-3.6-2.2-4.4l-1.2-1.2h-5.2c-1.3 0-2.4-1.1-2.4-2.4V142c0-1.7 1.2-3 2.9-3z" transform="translate(25 0)"></path></g></svg>
+        <span style="flex:1; font-size:15px; font-weight:650; letter-spacing:-0.02em;">Useful Brain</span>
+        <button aria-label="Close menu" onClick="{{ close }}" style="width:44px; height:44px; margin-right:-10px; border:0; border-radius:10px; display:grid; place-items:center; background:transparent; color:var(--ink-muted);"><ub-icon name="x" size="18"></ub-icon></button>
+      </div>
+      <nav style="display:flex; flex-direction:column; gap:1px; margin-top:6px;">
+        <span style="height:44px; display:flex; align-items:center; gap:12px; padding:0 10px; border-radius:10px; font-size:15px;"><span style="display:inline-flex; color:var(--ink-muted);"><ub-icon name="square-pen" size="18"></ub-icon></span>New chat</span>
+        <span style="height:44px; display:flex; align-items:center; gap:12px; padding:0 10px; border-radius:10px; font-size:15px;"><span style="display:inline-flex; color:var(--ink-muted);"><ub-icon name="search" size="18"></ub-icon></span>Search</span>
+        <span style="height:44px; display:flex; align-items:center; gap:12px; padding:0 10px; border-radius:10px; font-size:15px;"><span style="display:inline-flex; color:var(--ink-muted);"><ub-icon name="library" size="18"></ub-icon></span>Library</span>
+      </nav>
+      <div style="flex:1; min-height:0; overflow:hidden; margin-top:18px; display:flex; flex-direction:column; gap:14px;">
+        <div style="display:flex; flex-direction:column; gap:1px;">
+          <span style="padding:0 10px 6px; font-size:12px; font-weight:500; color:var(--ink-faint-text);">Today</span>
+          <span style="height:44px; display:flex; align-items:center; padding:0 10px; border-radius:10px; background:var(--bubble); box-shadow:var(--sel); font-size:15px; font-weight:500;">Parental leave eligibility</span>
+          <span style="height:44px; display:flex; align-items:center; padding:0 10px; border-radius:10px; font-size:15px; color:var(--ink-muted);">P1 first-response target</span>
+          <span style="height:44px; display:flex; align-items:center; padding:0 10px; border-radius:10px; font-size:15px; color:var(--ink-muted);">2027 holiday calendar</span>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:1px;">
+          <span style="padding:0 10px 6px; font-size:12px; font-weight:500; color:var(--ink-faint-text);">Previous 7 days</span>
+          <span style="height:44px; display:flex; align-items:center; padding:0 10px; border-radius:10px; font-size:15px; color:var(--ink-muted);">Halvorsen sync ticket</span>
+          <span style="height:44px; display:flex; align-items:center; padding:0 10px; border-radius:10px; font-size:15px; color:var(--ink-muted);">Corporate card monthly limit</span>
+          <span style="height:44px; display:flex; align-items:center; padding:0 10px; border-radius:10px; font-size:15px; color:var(--ink-muted);">Berlin travel per diem</span>
+          <span style="height:44px; display:flex; align-items:center; padding:0 10px; border-radius:10px; font-size:15px; color:var(--ink-muted);">ERR-7702 handoff</span>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px; height:52px; padding:0 0 0 8px;">
+        <span style="width:30px; height:30px; border-radius:999px; display:grid; place-items:center; background:var(--border-strong); font-size:11px; font-weight:600;">MC</span>
+        <span style="flex:1; display:flex; flex-direction:column;"><span style="font-size:14px; font-weight:500;">Maya Chen</span><span style="font-size:12px; color:var(--ink-faint-text);">Engineering</span></span>
+        <button aria-label="Settings" style="width:44px; height:44px; border:0; border-radius:10px; display:grid; place-items:center; background:transparent; color:var(--ink-muted);"><ub-icon name="settings" size="18"></ub-icon></button>
+      </div>
+    </aside>
+  </sc-if>
+
+  <sc-if value="{{ sheetOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ close }}" style="position:absolute; inset:0; background:var(--scrim); z-index:2;"></div>
+    <section role="dialog" aria-label="Evidence" style="position:absolute; left:0; right:0; bottom:0; height:612px; z-index:3; background:var(--surface); border-radius:24px 24px 0 0; box-shadow:0 0 0 1px var(--edge), 0 -18px 40px -24px rgb(0 0 0 / 0.3); display:flex; flex-direction:column; overflow:hidden;">
+      <span aria-hidden="true" style="align-self:center; width:36px; height:5px; margin-top:8px; border-radius:999px; background:var(--border-strong);"></span>
+      <div style="height:52px; display:flex; align-items:center; padding:0 6px 0 20px;">
+        <span style="flex:1; font-size:16px; font-weight:600;">Evidence</span>
+        <button aria-label="Close evidence" onClick="{{ close }}" style="width:44px; height:44px; border:0; border-radius:10px; display:grid; place-items:center; background:transparent; color:var(--ink-muted);"><ub-icon name="x" size="18"></ub-icon></button>
+      </div>
+      <div style="padding:0 20px 8px;">
+        <div style="display:flex; gap:2px; padding:3px; border-radius:10px; background:var(--sunken);">
+          <span style="flex:1; height:36px; display:inline-flex; align-items:center; justify-content:center; gap:6px; border-radius:8px; background:var(--bubble); box-shadow:var(--sel); font-size:14px; font-weight:500;">Cited <span style="color:var(--ink-faint-text); font-weight:400;">2</span></span>
+          <span style="flex:1; height:36px; display:inline-flex; align-items:center; justify-content:center; gap:6px; border-radius:8px; font-size:14px; color:var(--ink-muted);">Retrieved <span style="color:var(--ink-faint-text);">8</span></span>
+        </div>
+      </div>
+      <div style="flex:1; min-height:0; overflow:hidden; padding:16px 20px 34px; display:flex; flex-direction:column; gap:18px;">
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <div style="display:flex; align-items:center; gap:8px;"><span style="min-width:20px; height:20px; display:inline-grid; place-items:center; border-radius:6px; background:var(--accent); color:var(--accent-ink); font-family:var(--mono); font-size:11px; font-weight:500;">1</span><span style="font-size:14px; font-weight:500;">Parental Leave Policy</span><span style="font-size:12px; color:var(--ink-faint-text);">Paid Leave Duration</span></div>
+          <p style="margin:0; font-size:14px; line-height:23px; color:var(--ink-muted); text-wrap:pretty;"><mark style="background:var(--hl-strong); color:var(--ink); border-radius:3px; padding:1px 2px; -webkit-box-decoration-break:clone; box-decoration-break:clone;">Every eligible parent receives sixteen weeks of fully paid parental leave per child. The sixteen weeks are paid at 100% of base salary</mark> and are available to each parent individually: if both parents work at Northwind, both may take the full sixteen weeks.</p>
+          <span style="height:44px; display:inline-flex; align-items:center; gap:4px; font-size:13px; font-weight:500; color:var(--ink-muted);">Open document<ub-icon name="arrow-right" size="14"></ub-icon></span>
+        </div>
+        <div style="height:1px; background:var(--border);"></div>
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <div style="display:flex; align-items:center; gap:8px;"><span style="min-width:20px; height:20px; display:inline-grid; place-items:center; border-radius:6px; background:var(--sunken); color:var(--ink-muted); font-family:var(--mono); font-size:11px; font-weight:500;">2</span><span style="font-size:14px; font-weight:500;">Parental Leave Policy</span><span style="font-size:12px; color:var(--ink-faint-text);">Overview and Eligibility</span></div>
+          <p style="margin:0; font-size:14px; line-height:23px; color:var(--ink-muted); text-wrap:pretty;">Northwind Systems offers paid parental leave to all regular employees, regardless of gender, office location, or how a child joins the family. <mark style="background:var(--hl); color:var(--ink); border-radius:3px; padding:1px 2px; -webkit-box-decoration-break:clone; box-decoration-break:clone;">Eligibility requires six months of continuous service before the leave starts.</mark></p>
+        </div>
+      </div>
+    </section>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:390,&quot;height&quot;:844},&quot;view&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;chat&quot;,&quot;rail&quot;,&quot;evidence&quot;],&quot;default&quot;:&quot;chat&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  state = { view: null };
+  renderVals() {
+    const v = this.state.view ?? this.props.view ?? 'chat';
+    return {
+      railOpen: v === 'rail', sheetOpen: v === 'evidence',
+      c1Bg: v === 'evidence' ? 'var(--accent)' : 'var(--sunken)', c1Fg: v === 'evidence' ? 'var(--accent-ink)' : 'var(--ink-muted)',
+      openRail: () => this.setState({ view: 'rail' }), openSheet: () => this.setState({ view: 'evidence' }), close: () => this.setState({ view: 'chat' }),
+    };
+  }
+}
+</script>
+</body>
+</html>

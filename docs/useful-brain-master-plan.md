@@ -2,7 +2,7 @@
 
 Status: finalized and approved for phased implementation, version 1.5
 
-Date: 2026-08-26; product-boundary update 2026-08-27
+Date: 2026-08-26; product-boundary update 2026-08-27; redesign update 2026-10-08
 
 Implementation status: approved. Phase 0 is merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10)). Phase 1 code is merged ([PR #11](https://github.com/wasimjalali/useful-brain/pull/11)). Staging resources are provisioned. Wasim 2026-08-27: this is a local portfolio product, not a billed or public company SaaS. Cloudflare Access is not a launch requirement. Standing authorization (2026-08-26) covers Phase 1 through Phase 6 and Phase 7A. Phase 7B remains closed.
 
@@ -208,6 +208,8 @@ Vectorize stores only vector IDs, embeddings and indexed metadata needed for fil
 
 Every Vectorize query requires both the active-generation namespace and an `acl_group` metadata filter. Omitting either is an error. A partially indexed generation is never visible. If the D1 ledger or Vectorize mutation watermark changes during an audit, the result is partial and promotion is refused.
 
+Redesign decision D20 (2026-10-08): the Vectorize Worker binding has no list operation, so draft reconciliation is binding-only. It waits for exact mutation equality, fetches every ledger vector with `getByIds`, checks namespace and `acl_group`, and marks the audit partial if `describe()` moves during the scan. It cannot find orphan vectors. A full paginated inventory needs a Cloudflare API token as a Worker secret. That is open for Wasim.
+
 ### Capacity plan
 
 - One corpus D1 database, one operations D1 database, one R2 prefix and one Vectorize index for this operator deployment.
@@ -339,6 +341,7 @@ If this fails, the agent milestone pauses. Knowledge-only RAG may ship first if 
 - Every mutating API uses an idempotency key. Queue consumers deduplicate in application state because delivery is at least once. No design relies on platform deduplication.
 - WAF and rate-limit rules protect upload, search, agent-run and approval endpoints.
 - D1 Time Travel is destructive whole-database disaster recovery. Scheduled R2 exports and tested restore procedures are the durable backup plan. Corpus rollback always uses the generation pointer.
+- Redesign update (2026-10-08): the admin role is server-enforced on `/admin/*` and grants no read rights. In session mode an admin can use View as: grants are resolved on the server, each use is audited and the state is ephemeral, never persisted. Admins issue single-use invites. This is not public signup and the signup gate is unchanged.
 - The current unauthenticated Nura mutation actions must be removed or protected before any Cloudflare deployment can receive non-synthetic data.
 
 ## 9. Observability and cost controls
@@ -353,6 +356,8 @@ The restricted operator view must expose:
 - latency percentiles and usage per operator, model, connector and operation class
 
 Use Workers Logs for structured operational logs, Analytics Engine for high-cardinality product metrics and AI Gateway for model latency, token and error telemetry. Configure CPU and subrequest caps in Wrangler, upload limits, model budgets, connector rate limits and daily usage alerts. Do not enable response caching for private RAG or agent requests by default.
+
+Redesign update (2026-10-08): admin Overview, Activity and Health pages exist. Admins can see questions and redacted traces, never evidence text. Titles of private-owner documents are hidden from them.
 
 Employee chat and citation inspectors are a different surface from restricted operator diagnostics. They never expose ACL removal counts or any value derived from denied candidates.
 
@@ -520,7 +525,7 @@ Exit: all ACL blockers pass and retrieval meets or beats the locked baseline.
 
 - Port the structured answer contract, citation validation, evidence snapshots and server-owned history.
 - Port the Tabari host-grounding finalizer and current-turn evidence ledger before agent work begins.
-- Add streaming through the conversation Durable Object.
+- Add streaming through the conversation Durable Object. Deviation D16 (2026-10-08): validated answers are revealed after the turn returns, not streamed, because unvalidated tokens must not reach the user.
 - Shadow current Convex answers without changing user-visible behavior.
 
 Exit: citation, refusal, replay and shadow-parity gates pass.

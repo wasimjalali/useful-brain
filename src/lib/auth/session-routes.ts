@@ -3,6 +3,7 @@ import {
   createAccount,
   revokeSession,
 } from "./session-account";
+import { handleInviteAccept, INVITE_ACCEPT_PATH } from "./invite-routes";
 import { readSessionToken } from "./session-cookie";
 import { assertSignupAllowed } from "./signup-gate";
 import type { IdentityMode } from "./identity-mode";
@@ -27,6 +28,9 @@ export function isPublicAuthPath(method: string, path: string): boolean {
   if (path === "/auth/logout" && method === "POST") {
     return true;
   }
+  if (path === INVITE_ACCEPT_PATH && method === "POST") {
+    return true;
+  }
   return false;
 }
 
@@ -43,6 +47,9 @@ export async function handlePublicAuthRoute(input: {
   }
   if (input.identityMode !== "session" && input.identityMode !== "loopback") {
     return workerErrorResponse(new Error("auth is not enabled"), input.requestId);
+  }
+  if (input.path === INVITE_ACCEPT_PATH) {
+    return handleInviteAccept({ request: input.request, db: input.db, requestId: input.requestId });
   }
   try {
     await input.db.prepare("PRAGMA foreign_keys = ON").run();

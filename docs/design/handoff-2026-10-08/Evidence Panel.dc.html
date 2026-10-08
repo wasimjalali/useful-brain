@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><script src="./ub-icon.js"></script></helmet>
+<aside style="width:380px; height:100%; flex-shrink:0; display:flex; flex-direction:column; background:var(--surface); border-radius:24px; box-shadow:0 0 0 1px var(--edge), var(--stage-shadow); overflow:hidden; font-family:var(--sans); color:var(--ink); font-variant-numeric:tabular-nums;">
+  <sc-if value="{{ isEvidence }}" hint-placeholder-val="{{ true }}">
+    <div style="height:52px; flex-shrink:0; display:flex; align-items:center; justify-content:space-between; padding:0 12px 0 20px;">
+      <span style="font-size:14px; font-weight:600;">Evidence</span>
+      <span role="button" aria-label="Close evidence" style="width:32px; height:32px; border-radius:10px; display:grid; place-items:center; color:var(--ink-muted); cursor:pointer; transition:background-color 120ms cubic-bezier(0.22,1,0.36,1);" style-hover="background:var(--sunken); color:var(--ink);"><ub-icon name="x" size="16"></ub-icon></span>
+    </div>
+    <div style="padding:0 20px 8px;">
+      <div style="display:inline-flex; gap:2px; padding:3px; border-radius:10px; background:var(--sunken);">
+        <sc-if value="{{ cited }}" hint-placeholder-val="{{ true }}">
+          <span style="height:26px; padding:0 12px; display:inline-flex; align-items:center; gap:6px; border-radius:8px; background:var(--bubble); box-shadow:var(--sel); font-size:13px; font-weight:500; color:var(--ink);">Cited <span style="color:var(--ink-faint-text); font-weight:400;">2</span></span>
+          <span onClick="{{ showRetrieved }}" style="height:26px; padding:0 12px; display:inline-flex; align-items:center; gap:6px; border-radius:8px; font-size:13px; color:var(--ink-muted); cursor:pointer;" style-hover="color:var(--ink);">Retrieved <span style="color:var(--ink-faint-text);">8</span></span>
+        </sc-if>
+        <sc-if value="{{ retrieved }}" hint-placeholder-val="{{ false }}">
+          <span onClick="{{ showCited }}" style="height:26px; padding:0 12px; display:inline-flex; align-items:center; gap:6px; border-radius:8px; font-size:13px; color:var(--ink-muted); cursor:pointer;" style-hover="color:var(--ink);">Cited <span style="color:var(--ink-faint-text);">2</span></span>
+          <span style="height:26px; padding:0 12px; display:inline-flex; align-items:center; gap:6px; border-radius:8px; background:var(--bubble); box-shadow:var(--sel); font-size:13px; font-weight:500; color:var(--ink);">Retrieved <span style="color:var(--ink-faint-text); font-weight:400;">8</span></span>
+        </sc-if>
+      </div>
+    </div>
+
+    <sc-if value="{{ cited }}" hint-placeholder-val="{{ true }}">
+      <div style="flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column;">
+        <div style="padding:16px 20px 20px; display:flex; flex-direction:column; gap:10px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="min-width:18px; height:18px; padding:0 5px; box-sizing:border-box; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:11px; font-weight:500; background:{{ n1Bg }}; color:{{ n1Fg }}; transition:background-color 160ms cubic-bezier(0.22,1,0.36,1), color 160ms cubic-bezier(0.22,1,0.36,1);">1</span>
+            <span style="font-size:13px; font-weight:500; color:var(--ink);">Parental Leave Policy</span>
+            <span style="font-size:12px; color:var(--ink-faint-text);">Paid Leave Duration</span>
+          </div>
+          <p style="margin:0 0 0 26px; font-size:13px; line-height:21px; color:var(--ink-muted); text-wrap:pretty;"><mark style="background:{{ hl1 }}; color:var(--ink); border-radius:3px; padding:1px 2px; -webkit-box-decoration-break:clone; box-decoration-break:clone; transition:background-color 160ms cubic-bezier(0.22,1,0.36,1);">Every eligible parent receives sixteen weeks of fully paid parental leave per child. The sixteen weeks are paid at 100% of base salary</mark> and are available to each parent individually: if both parents work at Northwind, both may take the full sixteen weeks. Leave can be taken all at once or in up to two blocks, but each block must be at least two weeks long.</p>
+          <sc-if value="{{ admin }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-left:26px; display:grid; grid-template-columns:auto 1fr; column-gap:12px; row-gap:3px; font-family:var(--mono); font-size:11px; line-height:16px; color:var(--ink-faint-text);">
+              <span>chunk</span><span style="color:var(--ink-muted);">nw_hr_parental_leave:c02</span>
+              <span>generation</span><span style="color:var(--ink-muted);">g-c305cf57</span>
+              <span>scores</span><span style="color:var(--ink-muted);">Keyword 0.868 · Vector 0.840 · Rerank 0.991</span>
+            </div>
+          </sc-if>
+          <span role="button" onClick="{{ openDoc }}" style="margin-left:26px; display:inline-flex; align-items:center; gap:4px; font-size:12px; font-weight:500; color:var(--ink-muted); cursor:pointer; width:max-content;" style-hover="color:var(--ink);">Open document<ub-icon name="arrow-right" size="13"></ub-icon></span>
+        </div>
+        <div style="height:1px; background:var(--border); margin:0 20px;"></div>
+        <div style="padding:20px 20px 20px; display:flex; flex-direction:column; gap:10px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="min-width:18px; height:18px; padding:0 5px; box-sizing:border-box; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:11px; font-weight:500; background:{{ n2Bg }}; color:{{ n2Fg }}; transition:background-color 160ms cubic-bezier(0.22,1,0.36,1), color 160ms cubic-bezier(0.22,1,0.36,1);">2</span>
+            <span style="font-size:13px; font-weight:500; color:var(--ink);">Parental Leave Policy</span>
+            <span style="font-size:12px; color:var(--ink-faint-text);">Overview and Eligibility</span>
+          </div>
+          <p style="margin:0 0 0 26px; font-size:13px; line-height:21px; color:var(--ink-muted); text-wrap:pretty;">Northwind Systems offers paid parental leave to all regular employees, regardless of gender, office location, or how a child joins the family. <mark style="background:{{ hl2 }}; color:var(--ink); border-radius:3px; padding:1px 2px; -webkit-box-decoration-break:clone; box-decoration-break:clone; transition:background-color 160ms cubic-bezier(0.22,1,0.36,1);">Eligibility requires six months of continuous service before the leave starts.</mark> The policy covers birth parents, non-birth parents, adoptive parents, and parents via surrogacy. <mark style="background:{{ hl2 }}; color:var(--ink); border-radius:3px; padding:1px 2px; -webkit-box-decoration-break:clone; box-decoration-break:clone; transition:background-color 160ms cubic-bezier(0.22,1,0.36,1);">Parental leave is an entitlement on top of the annual leave in the Leave and Time Off Policy; it does not reduce your 20/25/18 annual days, your sick days, or your sabbatical eligibility.</mark></p>
+          <sc-if value="{{ admin }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-left:26px; display:grid; grid-template-columns:auto 1fr; column-gap:12px; row-gap:3px; font-family:var(--mono); font-size:11px; line-height:16px; color:var(--ink-faint-text);">
+              <span>chunk</span><span style="color:var(--ink-muted);">nw_hr_parental_leave:c01</span>
+              <span>generation</span><span style="color:var(--ink-muted);">g-c305cf57</span>
+              <span>scores</span><span style="color:var(--ink-muted);">Keyword 0.812 · Vector 0.866 · Rerank 0.974</span>
+            </div>
+          </sc-if>
+          <span role="button" onClick="{{ openDoc }}" style="margin-left:26px; display:inline-flex; align-items:center; gap:4px; font-size:12px; font-weight:500; color:var(--ink-muted); cursor:pointer; width:max-content;" style-hover="color:var(--ink);">Open document<ub-icon name="arrow-right" size="13"></ub-icon></span>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ retrieved }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1; min-height:0; overflow:hidden; padding:8px 0;">
+        <sc-for list="{{ rows }}" as="it" hint-placeholder-count="8">
+          <div style="display:grid; grid-template-columns:18px minmax(0,1fr) auto; column-gap:10px; align-items:start; padding:10px 20px; cursor:pointer; transition:background-color 120ms cubic-bezier(0.22,1,0.36,1);" style-hover="background:var(--sunken);">
+            <span style="font-family:var(--mono); font-size:11px; line-height:18px; color:var(--ink-faint-text);">{{ it.rank }}</span>
+            <div style="min-width:0; display:flex; flex-direction:column; gap:1px;">
+              <span style="font-size:13px; font-weight:500; line-height:18px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ it.doc }}</span>
+              <span style="font-size:12px; line-height:16px; color:var(--ink-faint-text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ it.section }}</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; height:18px;">
+              <sc-if value="{{ it.isCited }}" hint-placeholder-val="{{ false }}">
+                <span style="font-size:12px; color:var(--ink-muted);">Cited</span>
+              </sc-if>
+              <sc-if value="{{ admin }}" hint-placeholder-val="{{ false }}">
+                <span style="font-family:var(--mono); font-size:11px; color:var(--ink-muted);">{{ it.score }}</span>
+              </sc-if>
+            </div>
+          </div>
+        </sc-for>
+        <sc-if value="{{ admin }}" hint-placeholder-val="{{ false }}">
+          <div style="margin:10px 20px 0; padding-top:12px; border-top:1px solid var(--border); font-family:var(--mono); font-size:11px; line-height:17px; color:var(--ink-faint-text);">Rerank score · floor 0.05 · g-c305cf57</div>
+        </sc-if>
+      </div>
+    </sc-if>
+  </sc-if>
+
+  <sc-if value="{{ isDoc }}" hint-placeholder-val="{{ false }}">
+    <div style="height:52px; flex-shrink:0; display:flex; align-items:center; gap:6px; padding:0 12px 0 10px;">
+      <span role="button" aria-label="Back to evidence" onClick="{{ backToEvidence }}" style="width:32px; height:32px; border-radius:10px; display:grid; place-items:center; color:var(--ink-muted); cursor:pointer; transition:background-color 120ms cubic-bezier(0.22,1,0.36,1);" style-hover="background:var(--sunken); color:var(--ink);"><ub-icon name="arrow-left" size="16"></ub-icon></span>
+      <span style="flex:1; min-width:0; font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Parental Leave Policy</span>
+      <span role="button" aria-label="Open in Library" style="width:32px; height:32px; border-radius:10px; display:grid; place-items:center; color:var(--ink-muted); cursor:pointer;" style-hover="background:var(--sunken); color:var(--ink);"><ub-icon name="external-link" size="15"></ub-icon></span>
+      <span role="button" aria-label="Close" style="width:32px; height:32px; border-radius:10px; display:grid; place-items:center; color:var(--ink-muted); cursor:pointer;" style-hover="background:var(--sunken); color:var(--ink);"><ub-icon name="x" size="16"></ub-icon></span>
+    </div>
+    <div style="padding:2px 20px 16px; display:grid; grid-template-columns:auto 1fr; column-gap:16px; row-gap:6px; font-size:12px; line-height:16px;">
+      <span style="color:var(--ink-faint-text);">Version</span><span style="color:var(--ink);">2.0</span>
+      <span style="color:var(--ink-faint-text);">Effective</span><span style="color:var(--ink);">1 Feb 2026</span>
+      <span style="color:var(--ink-faint-text);">Readable by</span><span style="display:inline-flex; align-items:center; gap:5px; color:var(--ink);"><ub-icon name="globe" size="13"></ub-icon>Everyone</span>
+      <span style="color:var(--ink-faint-text);">Owner</span><span style="color:var(--ink);">HR</span>
+    </div>
+    <div style="height:1px; background:var(--border); margin:0 20px; flex-shrink:0;"></div>
+    <div style="flex:1; min-height:0; overflow:hidden; padding:20px 20px 24px; display:flex; flex-direction:column; gap:20px;">
+      <section style="display:flex; flex-direction:column; gap:6px;">
+        <h3 style="margin:0; font-size:13px; font-weight:600; line-height:20px; color:var(--ink);">Overview and Eligibility</h3>
+        <p style="margin:0; font-size:13px; line-height:22px; color:var(--ink-muted); text-wrap:pretty;">Northwind Systems offers paid parental leave to all regular employees, regardless of gender, office location, or how a child joins the family. <mark style="background:var(--hl); color:var(--ink); border-radius:3px; padding:1px 2px; -webkit-box-decoration-break:clone; box-decoration-break:clone;">Eligibility requires six months of continuous service before the leave starts.</mark> The policy covers birth parents, non-birth parents, adoptive parents, and parents via surrogacy. <mark style="background:var(--hl); color:var(--ink); border-radius:3px; padding:1px 2px; -webkit-box-decoration-break:clone; box-decoration-break:clone;">Parental leave is an entitlement on top of the annual leave in the Leave and Time Off Policy; it does not reduce your 20/25/18 annual days, your sick days, or your sabbatical eligibility.</mark> This policy is administered by the HR team and was updated on February 1, 2026.</p>
+      </section>
+      <section style="display:flex; flex-direction:column; gap:6px;">
+        <h3 style="margin:0; font-size:13px; font-weight:600; line-height:20px; color:var(--ink);">Paid Leave Duration</h3>
+        <p style="margin:0; font-size:13px; line-height:22px; color:var(--ink-muted); text-wrap:pretty;"><span style="display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; padding:0 5px; box-sizing:border-box; margin-right:4px; border-radius:6px; vertical-align:1px; font-family:var(--mono); font-size:11px; font-weight:500; line-height:1; background:var(--accent); color:var(--accent-ink);">1</span><mark style="background:var(--hl-strong); color:var(--ink); border-radius:3px; padding:1px 2px; -webkit-box-decoration-break:clone; box-decoration-break:clone;">Every eligible parent receives sixteen weeks of fully paid parental leave per child. The sixteen weeks are paid at 100% of base salary</mark> and are available to each parent individually: if both parents work at Northwind, both may take the full sixteen weeks. Leave can be taken all at once or in up to two blocks, but each block must be at least two weeks long. The sixteen weeks are per child, not per year, so twins do not double the entitlement.</p>
+      </section>
+      <section style="display:flex; flex-direction:column; gap:6px;">
+        <h3 style="margin:0; font-size:13px; font-weight:600; line-height:20px; color:var(--ink);">Timing and Notice</h3>
+        <p style="margin:0; font-size:13px; line-height:22px; color:var(--ink-muted); text-wrap:pretty;">Parental leave must start within twelve months of the child's birth, adoption placement, or surrogacy arrangement completion. You must give your manager at least four weeks of notice before the leave start date, or as much notice as practicable for early arrivals.</p>
+      </section>
+    </div>
+  </sc-if>
+</aside>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:380,&quot;height&quot;:900},&quot;admin&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;hover&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[0,1,2],&quot;default&quot;:0,&quot;tsType&quot;:&quot;number&quot;},&quot;tab&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;cited&quot;,&quot;retrieved&quot;],&quot;default&quot;:&quot;cited&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;view&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;evidence&quot;,&quot;document&quot;],&quot;default&quot;:&quot;evidence&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  state = { tab: null, view: null };
+  renderVals() {
+    const tab = this.state.tab ?? this.props.tab ?? 'cited';
+    const view = this.state.view ?? this.props.view ?? 'evidence';
+    const h = Number(this.props.hover ?? 0);
+    const admin = !!this.props.admin;
+    const rows = [
+      ['Parental Leave Policy', 'Paid Leave Duration', '0.991', true],
+      ['Parental Leave Policy', 'Overview and Eligibility', '0.974', true],
+      ['Parental Leave Policy', 'Pay and Benefits During Leave', '0.903'],
+      ['Parental Leave Policy', 'Timing and Notice', '0.861'],
+      ['Leave and Time Off Policy', 'Annual Leave', '0.644'],
+      ['Parental Leave Policy', 'Interaction with Other Leave Types', '0.612'],
+      ['Employee Handbook', 'Time Away from Work', '0.388'],
+      ['New Hire Onboarding Program Guide', 'Benefits Enrollment', '0.214'],
+    ].map(([doc, section, score, isCited], i) => ({ rank: i + 1, doc, section, score, isCited: !!isCited }));
+    return {
+      isEvidence: view === 'evidence', isDoc: view === 'document',
+      cited: tab === 'cited', retrieved: tab === 'retrieved', admin, rows,
+      showCited: () => this.setState({ tab: 'cited' }),
+      showRetrieved: () => this.setState({ tab: 'retrieved' }),
+      openDoc: () => this.setState({ view: 'document' }),
+      backToEvidence: () => this.setState({ view: 'evidence' }),
+      hl1: h === 1 ? 'var(--hl-strong)' : 'var(--hl)',
+      hl2: h === 2 ? 'var(--hl-strong)' : 'var(--hl)',
+      n1Bg: h === 1 ? 'var(--accent)' : 'var(--sunken)', n1Fg: h === 1 ? 'var(--accent-ink)' : 'var(--ink-muted)',
+      n2Bg: h === 2 ? 'var(--accent)' : 'var(--sunken)', n2Fg: h === 2 ? 'var(--accent-ink)' : 'var(--ink-muted)',
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,7 +1,7 @@
 export const INSUFFICIENT_EVIDENCE_ANSWER =
   "I do not have enough retrieved evidence to answer that question.";
 
-export const PROMPT_VERSION = "grounded-answer.v9";
+export const PROMPT_VERSION = "grounded-answer.v10";
 
 export type ChatMessage = {
   role: "system" | "user" | "assistant";
@@ -27,9 +27,18 @@ export type CitedRetrievalResult = RetrievalResultForAnswer & {
   citationLabel: string;
 };
 
+/**
+ * Fixed host sentence appended after a proposed action. It is not a factual
+ * claim, so it needs no citation. Only the host adds it (answerFromEvidence
+ * with actionNote); model text, including a model-supplied kind, never can.
+ */
+export const ACTION_NOTE_TEXT = "I've prepared the ticket for the Support desk.";
+
 export type GroundedAnswerParagraph = {
   text: string;
   citations: string[];
+  /** Host-typed paragraph. Absent on every grounded (cited) paragraph. */
+  kind?: "action_note";
 };
 
 export type StructuredGroundedAnswer = {
@@ -126,11 +135,22 @@ export function buildInsufficientEvidenceAnswer(): StructuredGroundedAnswer {
 export function answerFromEvidence(
   rawContent: string,
   evidence: CitedRetrievalResult[],
+  options: { actionNote?: boolean } = {},
 ): StructuredGroundedAnswer {
-  if (evidence.length === 0) {
-    return buildInsufficientEvidenceAnswer();
+  const answer =
+    evidence.length === 0
+      ? buildInsufficientEvidenceAnswer()
+      : parseStructuredGroundedAnswer(rawContent, evidence);
+  if (!options.actionNote) {
+    return answer;
   }
-  return parseStructuredGroundedAnswer(rawContent, evidence);
+  // A proposed action: the validated grounded paragraphs (if any) followed by
+  // the fixed host sentence. A refusal is never shown next to the card.
+  const note: GroundedAnswerParagraph = { text: ACTION_NOTE_TEXT, citations: [], kind: "action_note" };
+  return {
+    answerType: "grounded",
+    paragraphs: answer.answerType === "grounded" ? [...answer.paragraphs, note] : [note],
+  };
 }
 
 export function parseStructuredGroundedAnswer(

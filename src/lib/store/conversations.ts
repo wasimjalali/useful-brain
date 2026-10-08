@@ -92,6 +92,8 @@ export type ConversationAnswerType =
   | "invalid_citation";
 
 export type CompleteTurnInput = {
+  /** Host-set when the run ended with a recorded pending approval. */
+  actionNote?: boolean;
   ownerPrincipalId: string;
   requestId: string;
   rawModelJson: string;
@@ -102,8 +104,19 @@ export type CompleteTurnInput = {
   promptVersion: string;
   retrievalConfigVersion: string;
   corpusGenerationId: string;
+  /**
+   * Turn metrics. Stored on the assistant message in the same guarded update
+   * and deliberately left out of the completion digest, so an idempotent
+   * replay of a completed turn is unchanged by them.
+   */
+  latencyMs?: number;
+  passagesRetrieved?: number;
   now: number;
 };
+
+function metricOrNull(value: number | undefined): number | null {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : null;
+}
 
 export type ReplayedTurn = {
   conversationId: string;
@@ -319,8 +332,20 @@ type RequestIdClaim = {
   payload_digest: string | null;
 };
 
-async function requestPayloadDigest(question: string): Promise<string> {
-  return sha256Hex(question);
+/**
+ * Binds the request id to the question and, when the turn is scoped, to the
+ * document scope: replaying a request id with a different scope must not
+ * return the stored answer produced under the first one. An unscoped request
+ * keeps the plain question digest, which is also what claims written before
+ * scoping existed hold.
+ */
+async function requestPayloadDigest(question: string, scopeDocumentId?: string): Promise<string> {
+  if (scopeDocumentId === undefined) {
+    return sha256Hex(question);
+  }
+  // Length-prefixed fields behind a leading NUL, which /turns rejects in a
+  // question, so no unscoped question can produce the same preimage.
+  return sha256Hex(`\u0000scope1\u0000${question.length}:${question}\u0000${scopeDocumentId.length}:${scopeDocumentId}`);
 }
 
 async function loadRequestIdClaim(
@@ -446,12 +471,16 @@ export async function createPendingTurn(
     conversationId?: string;
     requestId: string;
     question: string;
+    /** Document scope of the turn; part of the replay binding of the request id. */
+    scopeDocumentId?: string;
+    /** Retry: answer this existing user message again instead of inserting a new one. */
+    reuseUserMessageId?: string;
     now: number;
   },
 ): Promise<{ conversationId: string; assistantMessageId: string; duplicate: boolean }> {
   const ownerPrincipalId = parseBoundedId(input.ownerPrincipalId, "principal id");
   const requestId = parseBoundedId(input.requestId, "request id");
-  const payloadDigest = await requestPayloadDigest(input.question);
+  const payloadDigest = await requestPayloadDigest(input.question, input.scopeDocumentId);
   const duplicate = await db
     .prepare(
       `SELECT id, conversation_id, status FROM messages WHERE request_id = ? AND role = 'assistant'`,
@@ -508,7 +537,21 @@ export async function createPendingTurn(
   } else {
     conversationId = newBoundedId("c");
   }
-  const userId = newBoundedId("m");
+  let userId: string;
+  if (input.reuseUserMessageId) {
+    userId = parseBoundedId(input.reuseUserMessageId, "message id");
+    const reusable = await db
+      .prepare(
+        `SELECT 1 AS ok FROM messages WHERE id = ? AND role = 'user' AND conversation_id = ?`,
+      )
+      .bind(userId, conversationId)
+      .first<{ ok: number }>();
+    if (!reusable) {
+      throw new ConversationStoreError("FORBIDDEN");
+    }
+  } else {
+    userId = newBoundedId("m");
+  }
   const assistantMessageId = newBoundedId("m");
   await db
     .prepare(
@@ -590,7 +633,9 @@ export async function completeTurn(
     throw new ConversationStoreError("assistant turn is not pending");
   }
 
-  const structured = answerFromEvidence(input.rawModelJson, input.evidence);
+  const structured = answerFromEvidence(input.rawModelJson, input.evidence, {
+    actionNote: input.actionNote,
+  });
   const content = structuredAnswerToText(structured);
   const completionDigest = await sha256Hex(
     JSON.stringify({
@@ -654,7 +699,7 @@ export async function completeTurn(
          SET content = ?, status = 'completed', answer_type = ?, answer_model = ?,
              embedding_model = ?, embedding_dimensions = ?, structured_paragraphs_json = ?,
              prompt_version = ?, retrieval_config_version = ?, corpus_generation_id = ?,
-             completion_token = ?, updated_at = ?
+             completion_token = ?, latency_ms = ?, passages_retrieved = ?, updated_at = ?
          WHERE id = ? AND status = 'pending'
            AND conversation_id IN (
              SELECT id FROM conversations WHERE owner_principal_id = ?
@@ -675,6 +720,8 @@ export async function completeTurn(
         input.retrievalConfigVersion,
         input.corpusGenerationId,
         completionToken,
+        metricOrNull(input.latencyMs),
+        metricOrNull(input.passagesRetrieved),
         input.now,
         assistantMessageId,
         parseBoundedId(input.ownerPrincipalId, "principal id"),

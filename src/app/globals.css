@@ -1,16 +1,24 @@
 @import "tailwindcss";
 
-/* Useful Brain role-named tokens. */
-:root {
+/* Useful Brain role-named tokens.
+   Light lives on :root and [data-theme="light"] so a subtree can force light.
+   Dark applies when the OS prefers it and the theme is not forced light, or
+   when [data-theme="dark"] is set on the root or any subtree. */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+
   /* Brand ground. Rail and the page behind the white stage share this shade. */
-  --canvas: #f8f8f8;
-  --rail: #f8f8f8;
+  --canvas: #f3f3f3;
+  --rail: #f3f3f3;
   --surface: #ffffff;
   --sunken: #f0f0f0;
+  --bubble: #ffffff;
 
   --ink: #171717;
   --ink-muted: #5c5c5c;
   --ink-faint: #a3a3a3;
+  --ink-faint-text: #6b6b6b;
 
   --brand: #171717;
   --brand-ink: #fafafa;
@@ -24,6 +32,11 @@
 
   --border: #ebebeb;
   --border-strong: #e0e0e0;
+  --edge: rgb(0 0 0 / 0.05);
+  --hover: rgb(0 0 0 / 0.04);
+  --hl: rgb(23 23 23 / 0.12);
+  --hl-strong: rgb(23 23 23 / 0.24);
+  --scrim: rgb(23 23 23 / 0.28);
 
   /* Overlay scrollbar knob (Useful Voice parity): lighter than ink-faint so
      it reads as chrome, not content. */
@@ -37,13 +50,115 @@
   --danger: #b23c22;
   --danger-soft: #fbeae5;
 
-  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --lift: 0 0.5px 1px rgb(23 23 23 / 0.04), 0 3px 16px rgb(23 23 23 / 0.08);
+  --stage-shadow: 0 1px 0 rgb(23 23 23 / 0.03), 0 18px 40px -24px rgb(23 23 23 / 0.18);
+  --sel: 0 0 0 1px var(--edge), 0 1px 2px rgb(23 23 23 / 0.07);
+  --dialog-shadow: 0 0 0 1px var(--edge), var(--lift), 0 24px 64px -24px rgb(0 0 0 / 0.35);
 
   --shadow-sm: 0 1px 2px rgb(23 23 23 / 0.04);
   --shadow-card: 0 1px 0 rgb(23 23 23 / 0.03), 0 18px 40px -24px rgb(23 23 23 / 0.18);
   --shadow-raise: 0 1px 0 rgb(23 23 23 / 0.04), 0 22px 44px -22px rgb(23 23 23 / 0.22);
   --shadow-pop: 0 24px 56px -28px rgb(23 23 23 / 0.28);
   --shadow-rail: inset 0 1px 0 rgb(255 255 255 / 0.78), inset 0 -1px 0 rgb(23 23 23 / 0.03);
+
+  /* Motion: one easing, three durations. */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-tone: 120ms;
+  --dur-color: 160ms;
+  --dur-rise: 260ms;
+
+  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --canvas: #0f0f0f;
+    --rail: #0f0f0f;
+    --surface: #171717;
+    --sunken: #2c2c2c;
+    --bubble: #202020;
+    --ink: #ededed;
+    --ink-muted: #a3a3a3;
+    --ink-faint: #6e6e6e;
+    --ink-faint-text: #949494;
+    --brand: #ededed;
+    --brand-ink: #141414;
+    --accent: #ededed;
+    --accent-strong: #ffffff;
+    --accent-soft: #2c2c2c;
+    --accent-deep: #ededed;
+    --accent-on-dark: #d4d4d4;
+    --accent-ink: #141414;
+    --border: #262626;
+    --border-strong: #333333;
+    --edge: rgb(255 255 255 / 0.07);
+    --hover: rgb(255 255 255 / 0.045);
+    --hl: rgb(237 237 237 / 0.15);
+    --hl-strong: rgb(237 237 237 / 0.3);
+    --scrim: rgb(0 0 0 / 0.55);
+    --scroll-knob: #333333;
+    --scroll-knob-active: #444444;
+    --success: #4cc39b;
+    --success-soft: #13302a;
+    --warning: #e3a64a;
+    --warning-soft: #33260f;
+    --danger: #f0795c;
+    --danger-soft: #3a1b14;
+    --lift: 0 0.5px 1px rgb(0 0 0 / 0.3), 0 3px 16px rgb(0 0 0 / 0.36);
+    --stage-shadow: 0 1px 0 rgb(0 0 0 / 0.2), 0 18px 40px -24px rgb(0 0 0 / 0.6);
+    --sel: 0 0 0 1px var(--edge), 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+    --shadow-card: var(--stage-shadow);
+    --shadow-raise: 0 1px 0 rgb(0 0 0 / 0.3), 0 22px 44px -22px rgb(0 0 0 / 0.6);
+    --shadow-pop: 0 24px 56px -28px rgb(0 0 0 / 0.6);
+    --shadow-rail: none;
+  }
+}
+
+:root[data-theme="dark"],
+[data-theme="dark"] {
+  color-scheme: dark;
+  --canvas: #0f0f0f;
+  --rail: #0f0f0f;
+  --surface: #171717;
+  --sunken: #2c2c2c;
+  --bubble: #202020;
+  --ink: #ededed;
+  --ink-muted: #a3a3a3;
+  --ink-faint: #6e6e6e;
+  --ink-faint-text: #949494;
+  --brand: #ededed;
+  --brand-ink: #141414;
+  --accent: #ededed;
+  --accent-strong: #ffffff;
+  --accent-soft: #2c2c2c;
+  --accent-deep: #ededed;
+  --accent-on-dark: #d4d4d4;
+  --accent-ink: #141414;
+  --border: #262626;
+  --border-strong: #333333;
+  --edge: rgb(255 255 255 / 0.07);
+  --hover: rgb(255 255 255 / 0.045);
+  --hl: rgb(237 237 237 / 0.15);
+  --hl-strong: rgb(237 237 237 / 0.3);
+  --scrim: rgb(0 0 0 / 0.55);
+  --scroll-knob: #333333;
+  --scroll-knob-active: #444444;
+  --success: #4cc39b;
+  --success-soft: #13302a;
+  --warning: #e3a64a;
+  --warning-soft: #33260f;
+  --danger: #f0795c;
+  --danger-soft: #3a1b14;
+  --lift: 0 0.5px 1px rgb(0 0 0 / 0.3), 0 3px 16px rgb(0 0 0 / 0.36);
+  --stage-shadow: 0 1px 0 rgb(0 0 0 / 0.2), 0 18px 40px -24px rgb(0 0 0 / 0.6);
+  --sel: 0 0 0 1px var(--edge), 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-card: var(--stage-shadow);
+  --shadow-raise: 0 1px 0 rgb(0 0 0 / 0.3), 0 22px 44px -22px rgb(0 0 0 / 0.6);
+  --shadow-pop: 0 24px 56px -28px rgb(0 0 0 / 0.6);
+  --shadow-rail: none;
 }
 
 @theme inline {
@@ -51,10 +166,12 @@
   --color-rail: var(--rail);
   --color-surface: var(--surface);
   --color-sunken: var(--sunken);
+  --color-bubble: var(--bubble);
 
   --color-ink: var(--ink);
   --color-ink-muted: var(--ink-muted);
   --color-ink-faint: var(--ink-faint);
+  --color-ink-faint-text: var(--ink-faint-text);
 
   --color-brand: var(--brand);
   --color-brand-ink: var(--brand-ink);
@@ -68,6 +185,11 @@
 
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
+  --color-edge: var(--edge);
+  --color-hover: var(--hover);
+  --color-hl: var(--hl);
+  --color-hl-strong: var(--hl-strong);
+  --color-scrim: var(--scrim);
 
   --color-success: var(--success);
   --color-success-soft: var(--success-soft);
@@ -76,7 +198,12 @@
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
 
-  --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+  --shadow-lift: var(--lift);
+  --shadow-stage: var(--stage-shadow);
+  --shadow-sel: var(--sel);
+  --shadow-dialog: var(--dialog-shadow);
+
+  --font-sans: var(--font-ui);
   --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
 }
 
@@ -86,7 +213,8 @@
 body {
   background: var(--canvas);
   color: var(--ink);
-  font-family: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-ui);
+  font-variant-numeric: tabular-nums;
 }
 
 /* Base resets live in @layer base so Tailwind utilities (e.g. outline-none on
@@ -98,16 +226,38 @@ body {
     cursor: pointer;
   }
 
+  /* Ring: 2px gap in the surface behind, 2px ink, following the element radius.
+     Set --ring-bg on a subtree whose ground is not --surface (rail, canvas). */
   :focus-visible {
+    outline: 2px solid transparent; /* forced-colors mode still shows focus */
+    box-shadow: 0 0 0 2px var(--ring-bg, var(--surface)), 0 0 0 4px var(--ink);
+  }
+
+  /* Text entry keeps an outline so wrappers and utilities (outline-none) stay in control. */
+  input:focus-visible,
+  textarea:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
-    border-radius: 4px;
+    box-shadow: none;
   }
 
   ::selection {
     background-color: var(--accent-soft);
     color: var(--brand);
   }
+}
+
+/* /open keeps its current look: old canvas, no tabular figures, legacy outline ring. */
+.open-scope {
+  --canvas: #f8f8f8;
+  --rail: #f8f8f8;
+  font-variant-numeric: normal;
+}
+.open-scope :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+  box-shadow: none;
 }
 
 .tnum {
@@ -659,24 +809,32 @@ body {
   }
 }
 
-/* Dialog: solid scrim, no blur; ease-out, no spring. */
+/* Dialog: scrim, 16px radius, edge + lift shadow; ease-out, no spring. */
 .dialog-overlay {
   position: fixed;
   inset: 0;
   z-index: 50;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 16px;
-  background: rgb(23 23 23 / 0.18);
-  animation: overlay-fade 200ms var(--ease-out) both;
+  background: var(--scrim);
+  animation: overlay-fade 160ms var(--ease-out) both;
+}
+.dialog-overlay[data-top="true"] {
+  align-items: flex-start;
+  overflow-y: auto;
+}
+.dialog-panel:focus-visible {
+  box-shadow: var(--dialog-shadow);
 }
 .dialog-panel {
   width: 100%;
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 22px;
-  box-shadow: var(--shadow-pop);
-  animation: dialog-in 250ms var(--ease-out) both;
+  color: var(--ink);
+  border-radius: 16px;
+  box-shadow: var(--dialog-shadow);
+  animation: dialog-in 260ms var(--ease-out) both;
 }
 @keyframes overlay-fade {
   from {
@@ -686,7 +844,7 @@ body {
 @keyframes dialog-in {
   from {
     opacity: 0;
-    transform: translateY(12px) scale(0.98);
+    transform: translateY(8px);
   }
 }
 
@@ -702,13 +860,375 @@ body {
 }
 } /* @layer components */
 
+/* ------------------------------------------------------------------ *
+ * Motion keyframes (one easing; see --dur-* tokens)
+ * ------------------------------------------------------------------ */
+@keyframes status-rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@keyframes pulse-dot {
+  50% {
+    opacity: 0.35;
+  }
+}
+@keyframes page-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes ub-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.status-rise {
+  animation: status-rise var(--dur-rise) var(--ease-out) both;
+}
+.pulse-dot {
+  animation: pulse-dot 1.2s ease-in-out infinite;
+}
+.page-out {
+  animation: page-out var(--dur-tone) var(--ease-out) both;
+}
+.page-in {
+  animation: page-in var(--dur-rise) var(--ease-out) both;
+}
+.ub-spin {
+  animation: ub-spin 900ms linear infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
+    animation: none !important;
     scroll-behavior: auto !important;
-    transition-duration: 0.01ms !important;
+    transition: none !important;
   }
+}
+
+/* ------------------------------------------------------------------ *
+ * Primitives (src/components/ui). Tokens only. Ring = 2px gap + 2px ink.
+ * ------------------------------------------------------------------ */
+@layer components {
+.ub-ring:focus-visible {
+  outline: 2px solid transparent;
+  box-shadow: 0 0 0 2px var(--ring-bg, var(--surface)), 0 0 0 4px var(--ink);
+}
+
+.ub-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  transition: background-color var(--dur-tone) var(--ease-out),
+    opacity var(--dur-tone) var(--ease-out), transform var(--dur-tone) var(--ease-out),
+    color var(--dur-tone) var(--ease-out);
+}
+.ub-btn[data-size="32"] { height: 32px; padding: 0 12px; }
+.ub-btn[data-size="34"] { height: 34px; padding: 0 14px; }
+.ub-btn[data-size="36"] { height: 36px; padding: 0 14px; }
+.ub-btn[data-icon="true"] { padding-left: 12px; }
+.ub-btn[data-variant="primary"] { background: var(--accent); color: var(--accent-ink); }
+.ub-btn[data-variant="primary"]:not(:disabled):hover { opacity: 0.86; }
+.ub-btn[data-variant="primary"]:not(:disabled):active { opacity: 0.76; transform: scale(0.98); }
+.ub-btn[data-variant="secondary"] {
+  background: var(--sunken);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--edge);
+}
+.ub-btn[data-variant="secondary"]:not(:disabled):hover { background: var(--border-strong); }
+.ub-btn[data-variant="secondary"]:not(:disabled):active { background: var(--border-strong); transform: scale(0.98); }
+.ub-btn[data-variant="secondary"]:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--edge), 0 0 0 2px var(--ring-bg, var(--surface)), 0 0 0 4px var(--ink);
+}
+.ub-btn[data-variant="ghost"] { background: transparent; color: var(--ink); }
+.ub-btn[data-variant="ghost"]:not(:disabled):hover { background: var(--sunken); }
+.ub-btn[data-variant="ghost"]:not(:disabled):active { background: var(--border-strong); transform: scale(0.98); }
+.ub-btn:disabled,
+.ub-btn[data-variant]:disabled {
+  background: var(--sunken);
+  color: var(--ink-faint-text);
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 1;
+  transform: none;
+}
+
+.ub-iconbtn {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  color: var(--ink-muted);
+  transition: background-color var(--dur-tone) var(--ease-out), color var(--dur-tone) var(--ease-out),
+    transform var(--dur-tone) var(--ease-out);
+}
+.ub-iconbtn:not(:disabled):hover { background: var(--sunken); color: var(--ink); }
+.ub-iconbtn:not(:disabled):active { background: var(--border-strong); color: var(--ink); }
+.ub-iconbtn[aria-pressed="true"] { background: var(--sunken); color: var(--ink); }
+.ub-iconbtn:disabled { color: var(--ink-faint); cursor: not-allowed; }
+
+.ub-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 6px;
+  background: var(--sunken);
+  color: var(--ink);
+  font-size: 13px;
+  white-space: nowrap;
+  transition: background-color var(--dur-tone) var(--ease-out), color var(--dur-tone) var(--ease-out);
+}
+.ub-chip-count { color: var(--ink-faint-text); }
+.ub-chip:not(:disabled):not([aria-pressed="true"]):hover { background: var(--border-strong); }
+.ub-chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.ub-chip[aria-pressed="true"] .ub-chip-count { color: var(--accent-ink); font-weight: 400; }
+.ub-chip:disabled { color: var(--ink-faint-text); cursor: not-allowed; }
+
+.ub-cite {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  box-sizing: border-box;
+  vertical-align: 2px;
+  border-radius: 6px;
+  background: var(--sunken);
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  transition: background-color var(--dur-color) var(--ease-out), color var(--dur-color) var(--ease-out);
+}
+.ub-cite[data-active="true"],
+.ub-cite:hover {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.ub-cite:focus-visible:not([data-active="true"]):not(:hover) { color: var(--ink); }
+
+.ub-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--sunken);
+}
+.ub-seg-opt {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: 8px;
+  color: var(--ink-muted);
+  font-size: 13px;
+  transition: background-color var(--dur-tone) var(--ease-out), color var(--dur-tone) var(--ease-out);
+}
+.ub-seg-opt:not(:disabled):hover { color: var(--ink); }
+.ub-seg-opt[data-selected="true"] {
+  background: var(--bubble);
+  box-shadow: var(--sel);
+  color: var(--ink);
+  font-weight: 500;
+}
+.ub-seg-opt[data-selected="true"]:focus-visible {
+  box-shadow: var(--sel), 0 0 0 2px var(--ring-bg, var(--surface)), 0 0 0 4px var(--ink);
+}
+.ub-seg-opt:disabled { color: var(--ink-faint-text); cursor: not-allowed; }
+
+.ub-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-radius: 14px;
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--edge);
+  transition: background-color var(--dur-tone) var(--ease-out), box-shadow var(--dur-tone) var(--ease-out);
+}
+.ub-field[data-size="40"] { height: 40px; }
+.ub-field[data-size="44"] { height: 44px; }
+.ub-field[data-size="36"] { height: 36px; }
+.ub-field:focus-within {
+  background: var(--bubble);
+  box-shadow: 0 0 0 1px var(--edge), 0 0 0 2px var(--ring-bg, var(--surface)), 0 0 0 4px var(--ink);
+  outline: 2px solid transparent;
+}
+.ub-field[data-invalid="true"] {
+  background: var(--bubble);
+  box-shadow: 0 0 0 1px var(--danger);
+}
+.ub-field[data-invalid="true"]:focus-within {
+  box-shadow: 0 0 0 1px var(--danger), 0 0 0 2px var(--ring-bg, var(--surface)), 0 0 0 4px var(--ink);
+}
+.ub-field[data-disabled="true"] {
+  background: var(--sunken);
+  box-shadow: none;
+  color: var(--ink-faint-text);
+  cursor: not-allowed;
+}
+.ub-field-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+  outline: none;
+  box-shadow: none;
+}
+.ub-field-input::placeholder { color: var(--ink-faint-text); }
+.ub-field-input:disabled { color: var(--ink-faint-text); cursor: not-allowed; }
+.ub-field-input:focus-visible { outline: none; box-shadow: none; }
+
+.ub-tr {
+  display: grid;
+  grid-template-columns: var(--ub-cols);
+  align-items: center;
+  gap: 16px;
+  min-height: 46px;
+  padding: 0 12px;
+  border-radius: 10px;
+  transition: background-color var(--dur-tone) var(--ease-out);
+}
+.ub-tr[data-tall="true"] { min-height: 56px; }
+.ub-tr:hover { background: var(--sunken); }
+.ub-tr-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity var(--dur-tone) var(--ease-out);
+}
+.ub-tr:hover .ub-tr-actions,
+.ub-tr:focus-within .ub-tr-actions { opacity: 1; }
+.ub-th {
+  display: grid;
+  grid-template-columns: var(--ub-cols);
+  align-items: center;
+  gap: 16px;
+  height: 32px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--ink-faint-text);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.ub-skel {
+  display: block;
+  border-radius: 6px;
+  background: var(--sunken);
+}
+
+.ub-mark {
+  background: var(--hl);
+  color: var(--ink);
+  border-radius: 3px;
+  padding: 1px 2px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  transition: background-color var(--dur-color) var(--ease-out);
+}
+.ub-mark[data-active="true"] { background: var(--hl-strong); }
+
+.ub-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  box-sizing: border-box;
+  border-radius: 6px;
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--edge);
+  color: var(--ink-faint-text);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.ub-alert {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 8px 8px 14px;
+  border-radius: 14px;
+  background: var(--danger-soft);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.ub-alert .ub-btn { background: var(--bubble); box-shadow: var(--sel); }
+.ub-alert .ub-btn:not(:disabled):hover { background: var(--bubble); opacity: 0.86; }
+.ub-alert .ub-btn:focus-visible {
+  box-shadow: var(--sel), 0 0 0 2px var(--ring-bg, var(--surface)), 0 0 0 4px var(--ink);
+}
+
+.ub-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.ub-pill[data-tone="active"] { background: var(--success-soft); color: var(--success); }
+.ub-pill[data-tone="draft"] { background: var(--sunken); color: var(--ink-muted); }
+.ub-pill[data-tone="failed"] { background: var(--danger-soft); color: var(--danger); }
+}
+
+/* Legacy focusables keep an outline ring: their component-layer shadows would
+   otherwise cover the box-shadow ring. Remove as each class migrates. */
+@layer components {
+.btn:focus-visible,
+.btn-primary:focus-visible,
+.btn-secondary:focus-visible,
+.icon-btn:focus-visible,
+.field-input:focus-visible,
+.chip:focus-visible,
+.suggestion-button:focus-visible,
+.evidence-card:focus-visible,
+.cite:focus-visible,
+.nav-item:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+}
+
+/* /open is light-only: keep its ground and form controls light under OS dark. */
+body:has(.open-scope) {
+  background: #f8f8f8;
+  color-scheme: light;
 }

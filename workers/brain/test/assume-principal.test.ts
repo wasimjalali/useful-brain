@@ -2,10 +2,15 @@ import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test"
 import { env } from "cloudflare:workers";
 import { beforeAll, beforeEach, afterEach, describe, expect, it } from "vitest";
 
+import { fauxAssistantMessage, fauxProvider, fauxText, fauxToolCall } from "@earendil-works/pi-ai";
+
+import { runViewAsTurn } from "../../../src/lib/brain/view-as-turn";
+import type { OperationsDatabase } from "../../../src/lib/store/conversations";
 import { LOOPBACK_ROLES } from "../../../src/lib/store/loopback-principal";
 import worker from "../src";
+import { call, seedChatCorpus } from "./chat-helpers";
 import { generateSigning, jwksResponse, signToken } from "./jwt";
-import { seedPrincipals } from "./seed";
+import { EXPECTED_READABLE, seedPersonas, seedPrincipals, type PersonaId } from "./seed";
 
 const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
 
@@ -137,5 +142,361 @@ describe("assumed retrieval principal on /turns", () => {
     }
     expect(LOOPBACK_ROLES).toContain("hr_manager");
     expect(LOOPBACK_ROLES).toContain("director");
+  });
+});
+
+describe("view as another person (assumePrincipalId)", () => {
+  let cookies: Record<PersonaId, string>;
+
+  beforeAll(async () => {
+    await seedPrincipals();
+    cookies = await seedPersonas();
+    await seedChatCorpus();
+  });
+
+  const total = async (table: string) =>
+    Number(
+      (await env.OPERATIONS_DB.prepare(`SELECT COUNT(*) AS n FROM ${table}`).first<{ n: number }>())?.n ?? 0,
+    );
+
+  const audit = (requestId: string) =>
+    env.OPERATIONS_DB.prepare(
+      `SELECT admin_principal_id, assumed_principal_id, question_sha256, answer_type, diagnostic_shown
+       FROM view_as_audits WHERE request_id = ?`,
+    )
+      .bind(requestId)
+      .first<{
+        admin_principal_id: string;
+        assumed_principal_id: string;
+        question_sha256: string;
+        answer_type: string | null;
+        diagnostic_shown: number;
+      }>();
+
+  const asPriya = (cookie: string, requestId: string, extra: Record<string, unknown> = {}) =>
+    call("/turns", cookie, {
+      json: { question: "What are the final pay rules?", requestId, assumePrincipalId: "member-priya", ...extra },
+    });
+
+  it("refuses a non-admin before looking the person up", async () => {
+    const real = await asPriya(cookies["member-maya"], "va-nonadmin-1");
+    const unknown = await call("/turns", cookies["member-maya"], {
+      json: { question: "Hello there", requestId: "va-nonadmin-2", assumePrincipalId: "no-such-person" },
+    });
+    expect(real.status).toBe(403);
+    expect(unknown.status).toBe(403);
+    expect(await audit("va-nonadmin-1")).toBeNull();
+  });
+
+  it("is forbidden outside loopback and session identity modes", async () => {
+    const token = await signToken(signing.privateKey, signing.kid);
+    const response = await fetchWorker(
+      turnRequest(
+        { question: "Hello there", requestId: "va-access", assumePrincipalId: "member-priya" },
+        { "cf-access-jwt-assertion": token },
+      ),
+    );
+    expect(response.status).toBe(403);
+  });
+
+  it("is NOT_FOUND for an unknown id and for a service token", async () => {
+    const unknown = await call("/turns", cookies["member-jordan"], {
+      json: { question: "Hello there", requestId: "va-unknown", assumePrincipalId: "no-such-person" },
+    });
+    const bot = await call("/turns", cookies["member-jordan"], {
+      json: { question: "Hello there", requestId: "va-bot", assumePrincipalId: "principal-bot" },
+    });
+    expect(unknown.status).toBe(404);
+    expect(bot.status).toBe(404);
+    expect(await audit("va-unknown")).toBeNull();
+  });
+
+  it("rejects a malformed id", async () => {
+    const response = await call("/turns", cookies["member-jordan"], {
+      json: { question: "Hello there", requestId: "va-bad", assumePrincipalId: 7 },
+    });
+    expect(response.status).toBe(400);
+  });
+
+  it("answers as the person, echoes only the public card, and stores nothing", async () => {
+    const before = {
+      conversations: await total("conversations"),
+      messages: await total("messages"),
+      steps: await total("turn_steps"),
+    };
+    const response = await asPriya(cookies["member-jordan"], "va-success");
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as Record<string, unknown>;
+    expect(body.assumedPerson).toEqual({
+      id: "member-priya",
+      displayName: "Priya Shah",
+      department: "support",
+      // Priya's 3 seeded documents plus the 7 public Northwind documents.
+      readableDocuments: EXPECTED_READABLE["member-priya"] + 7,
+    });
+    expect(body).not.toHaveProperty("assumedPrincipal");
+    expect(body).not.toHaveProperty("conversationId");
+    expect(JSON.stringify(body)).not.toContain("roles");
+    expect(await total("conversations")).toBe(before.conversations);
+    expect(await total("messages")).toBe(before.messages);
+    expect(await total("turn_steps")).toBe(before.steps);
+    const row = await audit("va-success");
+    expect(row).toMatchObject({
+      admin_principal_id: "member-jordan",
+      assumed_principal_id: "member-priya",
+      answer_type: "insufficient_evidence",
+      diagnostic_shown: 0,
+    });
+    expect(row?.question_sha256).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("writes the audit row even when the turn fails, and completes it", async () => {
+    const response = await asPriya(cookies["member-jordan"], "va-failure", {
+      scopeDocumentId: "doc-finance-policy",
+    });
+    expect(response.status).toBe(404);
+    expect(await audit("va-failure")).toMatchObject({
+      admin_principal_id: "member-jordan",
+      assumed_principal_id: "member-priya",
+      answer_type: "error",
+    });
+  });
+
+  it("refuses a request id owned by another turn and never re-executes a used one", async () => {
+    const first = await asPriya(cookies["member-jordan"], "va-idem");
+    expect(first.status).toBe(200);
+    const before = await audit("va-idem");
+    const repeated = await asPriya(cookies["member-jordan"], "va-idem");
+    expect(repeated.status).toBe(400);
+    expect(await audit("va-idem")).toEqual(before);
+    expect(
+      Number(
+        (
+          await env.OPERATIONS_DB.prepare(`SELECT COUNT(*) AS n FROM view_as_audits WHERE request_id = ?`)
+            .bind("va-idem")
+            .first<{ n: number }>()
+        )?.n,
+      ),
+    ).toBe(1);
+    const other = await call("/turns", cookies["member-jordan"], {
+      json: { question: "Hello there", requestId: "va-idem", assumePrincipalId: "member-maya" },
+    });
+    expect(other.status).toBe(400);
+  });
+
+  it("refuses a reused request id with a different question or scope before executing", async () => {
+    const first = await asPriya(cookies["member-jordan"], "va-reuse");
+    expect(first.status).toBe(200);
+    const before = await audit("va-reuse");
+    const otherQuestion = await call("/turns", cookies["member-jordan"], {
+      json: { question: "Who gives approval for spending?", requestId: "va-reuse", assumePrincipalId: "member-priya" },
+    });
+    expect(otherQuestion.status).toBe(400);
+    const otherScope = await asPriya(cookies["member-jordan"], "va-reuse", { scopeDocumentId: "doc-public-handbook" });
+    expect(otherScope.status).toBe(400);
+    expect(await audit("va-reuse")).toEqual(before);
+  });
+
+  it("lets only one of two concurrent duplicates execute, so outcomes never mix", async () => {
+    const [left, right] = await Promise.all([
+      asPriya(cookies["member-jordan"], "va-concurrent"),
+      call("/turns", cookies["member-jordan"], {
+        json: { question: "Who gives approval for spending?", requestId: "va-concurrent", assumePrincipalId: "member-priya" },
+      }),
+    ]);
+    expect([left.status, right.status].sort()).toEqual([200, 400]);
+    const row = await audit("va-concurrent");
+    const winnerQuestion = left.status === 200 ? "What are the final pay rules?" : "Who gives approval for spending?";
+    const { sha256Hex } = await import("../../../src/lib/ingest/digests");
+    expect(row?.question_sha256).toBe(await sha256Hex(winnerQuestion));
+    expect(row?.answer_type).not.toBeNull();
+  });
+
+  describe("audit completion", () => {
+    const admin = { id: "member-jordan", subject: "jordan.ellis@northwind.example", kind: "user" as const, roles: ["admin"], departments: ["operations"] };
+    const failingFinish = (failures: { count: number }, times = Infinity) =>
+      ({
+        prepare: (sql: string) => {
+          if (/UPDATE view_as_audits/.test(sql) && failures.count < times) {
+            failures.count += 1;
+            throw new Error("audit write failed");
+          }
+          return env.OPERATIONS_DB.prepare(sql);
+        },
+        batch: (statements: never) => env.OPERATIONS_DB.batch(statements),
+      }) as unknown as OperationsDatabase;
+
+    it("never releases a diagnostic when the final audit write fails", async () => {
+      const failures = { count: 0 };
+      await expect(
+        runViewAsTurn({
+          operations: failingFinish(failures),
+          corpus: env.CORPUS_DB as never,
+          lockFor: (id: string) => env.CONVERSATION.getByName(id),
+          admin,
+          assumePrincipalId: "member-maya",
+          question: "Who gives approval for spending?",
+          requestId: "va-audit-fails",
+        }),
+      ).rejects.toThrow("view_as_audit_incomplete");
+      expect(failures.count).toBeGreaterThan(0);
+      const row = await audit("va-audit-fails");
+      expect(row?.diagnostic_shown).toBe(0);
+    });
+
+    it("retries the final audit write once before giving up", async () => {
+      const failures = { count: 0 };
+      const answer = await runViewAsTurn({
+        operations: failingFinish(failures, 1),
+        corpus: env.CORPUS_DB as never,
+        lockFor: (id: string) => env.CONVERSATION.getByName(id),
+        admin,
+        assumePrincipalId: "member-maya",
+        question: "Who gives approval for spending?",
+        requestId: "va-audit-retry",
+      });
+      expect(answer.adminDiagnostic?.length).toBeGreaterThan(0);
+      expect((await audit("va-audit-retry"))?.diagnostic_shown).toBe(1);
+    });
+
+    it("keeps the original failure when the run failed and the audit write fails too", async () => {
+      const failures = { count: 0 };
+      await expect(
+        runViewAsTurn({
+          operations: failingFinish(failures),
+          corpus: env.CORPUS_DB as never,
+          lockFor: (id: string) => env.CONVERSATION.getByName(id),
+          admin,
+          assumePrincipalId: "member-priya",
+          question: "What are the final pay rules?",
+          scopeDocumentId: "doc-finance-policy",
+          requestId: "va-audit-both",
+        }),
+      ).rejects.not.toThrow("view_as_audit_incomplete");
+    });
+  });
+
+  it("ignores a client grant list in session mode and resolves grants from the directory", async () => {
+    const response = await asPriya(cookies["member-jordan"], "va-grants", {
+      assumePrincipal: { userId: "member-priya", roles: ["admin", "finance_manager"], departments: ["finance"] },
+    });
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { assumedPerson: { readableDocuments: number } };
+    const honest = await asPriya(cookies["member-jordan"], "va-grants-honest");
+    const honestBody = (await honest.json()) as { assumedPerson: { readableDocuments: number } };
+    expect(body.assumedPerson.readableDocuments).toBe(honestBody.assumedPerson.readableDocuments);
+  });
+
+  it("ignores a lone grant list in session mode: the turn runs as the caller", async () => {
+    const response = await call("/turns", cookies["member-maya"], {
+      json: {
+        question: "What are the final pay rules?",
+        requestId: "va-lone-grants",
+        persistConversation: false,
+        assumePrincipal: { userId: "x", roles: ["admin"], departments: ["finance"] },
+      },
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).not.toHaveProperty("assumedPrincipal");
+  });
+
+  it("refuses an evalModel or a persisted view-as turn", async () => {
+    const evalModel = await asPriya(cookies["member-jordan"], "va-eval", { evalModel: "glm" });
+    const persisted = await asPriya(cookies["member-jordan"], "va-persist", { persistConversation: true });
+    expect(evalModel.status).toBe(400);
+    expect(persisted.status).toBe(400);
+  });
+
+  it("works in loopback mode for an admin and refuses grants next to the id", async () => {
+    await env.OPERATIONS_DB.prepare(
+      `INSERT OR IGNORE INTO roles (principal_id, role) VALUES ('principal-dev', 'admin')`,
+    ).run();
+    const ok = await fetchWorker(
+      turnRequest({ question: "Hello there", requestId: "va-loop", assumePrincipalId: "member-priya" }),
+      loopbackEnv,
+    );
+    expect(ok.status).toBe(200);
+    const both = await fetchWorker(
+      turnRequest({
+        question: "Hello there",
+        requestId: "va-loop-both",
+        assumePrincipalId: "member-priya",
+        assumePrincipal: EVAL_PRINCIPAL,
+      }),
+      loopbackEnv,
+    );
+    expect(both.status).toBe(400);
+  });
+
+  describe("exists-but-restricted diagnostic", () => {
+    it("is returned to the admin after a refusal: title and readers label only", async () => {
+      const response = await call("/turns", cookies["member-jordan"], {
+        json: {
+          question: "Who gives approval for spending?",
+          requestId: "va-diag",
+          assumePrincipalId: "member-maya",
+        },
+      });
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as {
+        structuredAnswer: { answerType: string };
+        adminDiagnostic?: Array<Record<string, unknown>>;
+      };
+      expect(body.structuredAnswer.answerType).toBe("insufficient_evidence");
+      expect(body.adminDiagnostic).toContainEqual({
+        title: "Budget Approval Policy",
+        readers: { kind: "roles", names: ["finance_manager"] },
+      });
+      for (const entry of body.adminDiagnostic ?? []) {
+        expect(Object.keys(entry).sort()).toEqual(["readers", "title"]);
+      }
+      expect((await audit("va-diag"))?.diagnostic_shown).toBe(1);
+    });
+
+    it("never lists a private-owner document", async () => {
+      const response = await call("/turns", cookies["member-jordan"], {
+        json: { question: "Show the private notes", requestId: "va-private", assumePrincipalId: "member-priya" },
+      });
+      const body = (await response.json()) as { adminDiagnostic?: Array<{ title: string }> };
+      expect((body.adminDiagnostic ?? []).map((entry) => entry.title)).not.toContain("Maya Private Notes");
+    });
+
+    it("is absent from an ordinary refusal and for a non-view-as turn", async () => {
+      const response = await call("/turns", cookies["member-maya"], {
+        json: { question: "Who gives approval for spending?", requestId: "va-plain" },
+      });
+      expect(response.status).toBe(200);
+      expect(await response.json()).not.toHaveProperty("adminDiagnostic");
+    });
+
+    it("never enters the model context", async () => {
+      const faux = fauxProvider({ provider: "view-as-faux" });
+      faux.setResponses([
+        fauxAssistantMessage([fauxToolCall("search_knowledge", { query: "approval spending" })], {
+          stopReason: "toolUse",
+        }),
+        fauxAssistantMessage([fauxText("x")], { stopReason: "stop" }),
+      ]);
+      const seen: unknown[] = [];
+      const answer = await runViewAsTurn({
+        operations: env.OPERATIONS_DB as OperationsDatabase,
+        corpus: env.CORPUS_DB as never,
+        lockFor: (id: string) => env.CONVERSATION.getByName(id),
+        admin: { id: "member-jordan", subject: "jordan.ellis@northwind.example", kind: "user", roles: ["admin"], departments: ["operations"] },
+        assumePrincipalId: "member-maya",
+        question: "Who gives approval for spending?",
+        requestId: "va-prompt",
+        runtime: {
+          model: faux.getModel(),
+          stream: ((model: never, context: unknown, options: never) => {
+            seen.push(context);
+            return faux.provider.streamSimple(model, context as never, options);
+          }) as never,
+        },
+      });
+      expect(answer.adminDiagnostic?.length).toBeGreaterThan(0);
+      expect(JSON.stringify(seen)).not.toContain("Budget Approval Policy");
+      expect(JSON.stringify(seen)).not.toContain("finance_manager");
+    });
   });
 });

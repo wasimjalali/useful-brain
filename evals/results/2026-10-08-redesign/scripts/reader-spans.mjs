@@ -1,0 +1,30 @@
+import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
+const [pwDir, out, passFile] = process.argv.slice(2);
+const { chromium } = createRequire(import.meta.url)(pwDir);
+const pass = readFileSync(passFile, "utf8").trim();
+const browser = await chromium.launch({ channel: "chrome", headless: true });
+const page = await (await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 })).newPage();
+page.setDefaultTimeout(60000);
+const log = (m) => console.log(m);
+try {
+  await page.goto("http://127.0.0.1:8787/login");
+  await page.getByLabel("Email").fill("maya.chen@northwind.example");
+  await page.getByLabel("Password", { exact: true }).fill(pass);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.waitForURL(/\/chat/);
+  const box = page.getByLabel("Question");
+  await box.fill("Where can visitors park when they come to the Northwind office?");
+  await box.press("Enter");
+  await page.waitForFunction(() => !document.querySelector('[role="status"][aria-live="polite"]'), null, { timeout: 150000 });
+  await page.waitForTimeout(1000);
+  await page.getByRole("button", { name: /^Citation 1/ }).first().click();
+  await page.waitForTimeout(800);
+  await page.screenshot({ path: `${out}/02-uploaded-doc-answer-light.png` });
+  await page.getByRole("button", { name: /Open document/ }).first().click();
+  await page.waitForTimeout(2000);
+  await page.screenshot({ path: `${out}/07-document-reader-spans-light.png` });
+  log(`marks in reader: ${await page.locator("aside mark, [aria-label='Evidence'] mark").count()}`);
+  log((await page.evaluate(() => document.body.innerText)).slice(0, 400));
+} catch (e) { log(`ERROR ${e.message.split("\n")[0]}`); await page.screenshot({ path: `${out}/reader-error.png` }); }
+await browser.close();
