@@ -39,6 +39,7 @@ import {
 import { extractUploadText } from "../../../src/lib/ingest/extract";
 import { MAX_UPLOAD_BYTES, uploadSourcePath } from "../../../src/lib/ingest/upload-validation";
 import { acknowledgeIngestJob } from "../../../src/lib/ingest/queue-message";
+import { inventoryFromSettings, type InventorySettings } from "../../../src/lib/ingest/vector-inventory";
 import type { VectorizeIndex } from "../../../src/lib/retrieve/cloudflare-pipeline";
 import type { SqlExecutor } from "../../../src/lib/store/corpus-d1";
 import { draftAcceptsWrites, failDraft, getDraft, markBaseCopied } from "../../../src/lib/store/drafts";
@@ -98,7 +99,17 @@ export async function reconcileWithFinalRecord(
     return await step.do("reconcile-final", STEP_CONFIG, async () => run(false));
   } catch (error) {
     console.error("reconcile-final failed", sanitizedErrorName(error));
-    return { mode, reconciled: false, status: "partial", missing: 0, expected: null, reason: "reconcile could not record an audit" };
+    return {
+      mode,
+      reconciled: false,
+      status: "partial",
+      missing: 0,
+      expected: null,
+      reason: "reconcile could not record an audit",
+      inventoryChecked: false,
+      orphanVectors: null,
+      orphanVectorsInDraft: null,
+    };
   }
 }
 const WAIT_BASE_ITERATIONS = 60;
@@ -133,6 +144,20 @@ export class IngestionWorkflow extends WorkflowEntrypoint<Env, IngestionWorkflow
       ai: (this.env.AI as unknown as IndexContext["ai"]) ?? null,
       vectors: (this.env.VECTORIZE as unknown as VectorPort | undefined) ?? null,
     };
+  }
+
+  /**
+   * Full-index listing for draft reconciliation. Present only when the token,
+   * the account id and the index name are all configured. None configured is
+   * binding-only; some but not all fails closed in reconcileDraft. Secrets are
+   * read here and nowhere else, and a warning names settings, never values.
+   */
+  private inventorySettings(): ReturnType<typeof inventoryFromSettings> {
+    const result = inventoryFromSettings(this.env as unknown as InventorySettings);
+    if (result.partlyConfigured) {
+      console.warn("vectorize inventory partly configured, missing:", result.missing.join(", "));
+    }
+    return result;
   }
 
   private async assertOpen(generationId: string): Promise<void> {
@@ -578,12 +603,20 @@ export class IngestionWorkflow extends WorkflowEntrypoint<Env, IngestionWorkflow
       return;
     }
     const context = this.context();
+    const { inventory, partlyConfigured } = this.inventorySettings();
     // A MutationPendingError is thrown on purpose: the step retries until every
     // ledger vector is visible in the index.
     const reconciled = await reconcileWithFinalRecord(
       step,
       (missingIsPending) =>
-        reconcileDraft({ db: context.db, vectors: context.vectors, generationId, missingIsPending }),
+        reconcileDraft({
+          db: context.db,
+          vectors: context.vectors,
+          inventory,
+          inventoryPartlyConfigured: partlyConfigured,
+          generationId,
+          missingIsPending,
+        }),
       context.vectors ? "ledger_getbyids" : "keyword_only",
     );
     const probe = await step.do("acl-parity", STEP_CONFIG, async () => {
@@ -637,6 +670,9 @@ export class IngestionWorkflow extends WorkflowEntrypoint<Env, IngestionWorkflow
         status,
         reconciled: reconciled.reconciled,
         mode: reconciled.mode,
+        inventoryChecked: reconciled.inventoryChecked,
+        orphanVectors: reconciled.orphanVectors,
+        orphanVectorsInDraft: reconciled.orphanVectorsInDraft,
         aclLeaks: probe.leaks + summary.leaks,
         liveRecall: summary.liveRecall,
         questionsRun: summary.questionsRun,
