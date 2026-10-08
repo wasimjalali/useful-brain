@@ -12,8 +12,10 @@ import type {
 } from "../../../src/lib/contracts/sources";
 import { readersToAcl } from "../../../src/lib/ingest/upload-validation";
 import { activeGenerationId, promoteGeneration } from "../../../src/lib/store/corpus-d1";
-import { ensureOpenDraft } from "../../../src/lib/store/drafts";
+import { claimDiscard, ensureOpenDraft, failDraft } from "../../../src/lib/store/drafts";
 import { createUploadBatch } from "../../../src/lib/store/uploads";
+import { DISCARD_GRACE_MS } from "../../../src/lib/ingest/draft-index";
+import { runSourcesMaintenance } from "../src/routes/admin-sources";
 import { seedCorpus, seedPersonas, seedPrincipals, CORPUS_DOCUMENT_IDS, type PersonaId } from "./seed";
 
 const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
@@ -24,12 +26,14 @@ let sent: Sent[] = [];
 let rowsAtSend: number[] = [];
 let deletedVectors: string[] = [];
 let failQueue = false;
+/** When set, sends of the jobs it matches fail (one job down, the others fine). */
+let failJob: ((jobId: string) => boolean) | null = null;
 /** When set, runs before the statement with matching SQL executes (once per call). */
 let beforeStatement: ((sql: string) => Promise<void>) | null = null;
 
 const fakeQueue = {
   async send(message: Sent) {
-    if (failQueue) {
+    if (failQueue || failJob?.(message.jobId)) {
       throw new Error("queue down");
     }
     const row = await env.CORPUS_DB.prepare("SELECT COUNT(*) AS n FROM upload_files").first<{ n: number }>();
@@ -139,6 +143,7 @@ async function resetPipeline() {
   rowsAtSend = [];
   deletedVectors = [];
   failQueue = false;
+  failJob = null;
   beforeStatement = null;
 }
 
@@ -419,6 +424,60 @@ describe("POST /admin/uploads", () => {
     expect(sent).toHaveLength(3);
   });
 
+  it("refuses a second upload of a document the open draft already has, with a reason the admin can read", async () => {
+    await createBatch({ files: [{ name: "Leave Policy.md", size: 20 }] });
+    sent = [];
+    const response = await call("/admin/uploads", admin(), {
+      json: baseBody({ files: [{ name: "other.md", size: 5 }, { name: "leave policy.MD", size: 30 }] }),
+    });
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { code: string; reason: string; message: string };
+    expect(body).toMatchObject({ code: "VALIDATION_FAILED", reason: "DOCUMENT_IN_DRAFT" });
+    expect(body.message).toContain("leave policy.MD");
+    // Nothing of the refused batch was written or queued.
+    const counts = await env.CORPUS_DB.prepare(
+      "SELECT (SELECT COUNT(*) FROM upload_batches) AS batches, (SELECT COUNT(*) FROM upload_files) AS files",
+    ).first<{ batches: number; files: number }>();
+    expect(counts).toEqual({ batches: 1, files: 1 });
+    expect(sent).toEqual([]);
+  });
+
+  it("accepts the document again once its earlier upload failed", async () => {
+    const first = await createBatch({ files: [{ name: "Leave Policy.md", size: 20 }] });
+    await env.CORPUS_DB.prepare("UPDATE upload_files SET stage = 'failed', error_code = 'CORRUPT_FILE' WHERE id = ?")
+      .bind(first.files[0].id)
+      .run();
+    const again = await createBatch({ files: [{ name: "Leave Policy.md", size: 25 }] });
+    expect(again.batchId).not.toBe(first.batchId);
+  });
+
+  it("lets only one of two racing uploads of the same document into the draft", async () => {
+    await createBatch({ files: [{ name: "warmup.md", size: 5 }] });
+    const draft = await env.CORPUS_DB.prepare("SELECT generation_id FROM drafts").first<{ generation_id: string }>();
+    let raced = false;
+    // Another admin's batch for the same file commits between this request's checks and its insert.
+    beforeStatement = async (sql) => {
+      if (!raced && /INSERT INTO upload_batches/.test(sql)) {
+        raced = true;
+        await createUploadBatch(env.CORPUS_DB as never, {
+          generationId: draft!.generation_id,
+          createdBy: "member-jordan",
+          acl: readersToAcl({ kind: "everyone" }),
+          idempotencyKey: "idem-race-winner",
+          files: [{ name: "Handbook.md", size: 9 }],
+        });
+      }
+    };
+    const response = await call("/admin/uploads", admin(), { json: baseBody({ files: [{ name: "handbook.md", size: 7 }] }) });
+    beforeStatement = null;
+    expect(raced).toBe(true);
+    expect(response.status).toBe(400);
+    const holders = await env.CORPUS_DB.prepare(
+      "SELECT COUNT(*) AS n FROM upload_files WHERE lower(file_name) = 'handbook.md'",
+    ).first<{ n: number }>();
+    expect(holders?.n).toBe(1);
+  });
+
   it("refuses new files once the draft started its checks", async () => {
     await createBatch();
     await env.CORPUS_DB.prepare("UPDATE corpus_generations SET state = 'reconciling' WHERE id IN (SELECT generation_id FROM drafts)").run();
@@ -507,6 +566,50 @@ describe("PUT /admin/uploads/:batchId/files/:fileId", () => {
     expect(discard.status).toBe(200);
     const response = await call(`/admin/uploads/${created.batchId}/files/${created.files[0].id}`, admin(), { method: "PUT", body: bytes(10) });
     expect(response.status).toBe(400);
+  });
+
+  async function putThatLosesTo(close: (generationId: string) => Promise<unknown>) {
+    const created = await createBatch({ files: [{ name: "doc.md", size: 10 }] });
+    const draft = await env.CORPUS_DB.prepare("SELECT generation_id FROM drafts").first<{ generation_id: string }>();
+    sent = [];
+    let closed = false;
+    // The bytes are already in R2 when the draft closes, right before the object is attached.
+    beforeStatement = async (sql) => {
+      if (!closed && /SET r2_key/.test(sql)) {
+        closed = true;
+        await close(draft!.generation_id);
+      }
+    };
+    const fileId = created.files[0].id;
+    const response = await call(`/admin/uploads/${created.batchId}/files/${fileId}`, admin(), { method: "PUT", body: bytes(10) });
+    beforeStatement = null;
+    expect(closed).toBe(true);
+    return { response, fileId, batchId: created.batchId };
+  }
+
+  it("rejects a body whose transfer finishes after a discard, removes the object and queues nothing", async () => {
+    const { response, fileId, batchId } = await putThatLosesTo((id) => claimDiscard(env.CORPUS_DB as never, id));
+    expect(response.status).toBe(400);
+    const row = await env.CORPUS_DB.prepare("SELECT r2_key, stage, error_code FROM upload_files WHERE id = ?")
+      .bind(fileId)
+      .first<{ r2_key: string | null; stage: string; error_code: string | null }>();
+    expect(row).toEqual({ r2_key: null, stage: "failed", error_code: "DRAFT_CLOSED" });
+    const listed = await env.SOURCES.list({ prefix: "uploads/" });
+    expect(listed.objects.filter((object) => object.key.endsWith(fileId))).toEqual([]);
+    expect(sent).toEqual([]);
+    // The status the dialog polls says why instead of parsing for ever.
+    const status = (await (await call(`/admin/uploads/${batchId}`, admin())).json()) as UploadStatus;
+    expect(status.files[0]).toMatchObject({ stage: "failed", errorMessage: "The draft was discarded before this file finished." });
+  });
+
+  it("rejects a body whose transfer finishes after the draft failed for another reason", async () => {
+    const { response, fileId } = await putThatLosesTo((id) => failDraft(env.CORPUS_DB as never, id, "INDEX_UNAVAILABLE"));
+    expect(response.status).toBe(400);
+    const row = await env.CORPUS_DB.prepare("SELECT r2_key FROM upload_files WHERE id = ?").bind(fileId).first<{ r2_key: string | null }>();
+    expect(row?.r2_key).toBeNull();
+    const listed = await env.SOURCES.list({ prefix: "uploads/" });
+    expect(listed.objects.filter((object) => object.key.endsWith(fileId))).toEqual([]);
+    expect(sent).toEqual([]);
   });
 });
 
@@ -816,5 +919,104 @@ describe("POST /admin/reindex", () => {
     expect(response.status).toBeGreaterThanOrEqual(500);
     const open = await env.CORPUS_DB.prepare("SELECT COUNT(*) AS n FROM drafts WHERE closed_at IS NULL").first<{ n: number }>();
     expect(open?.n).toBe(0);
+  });
+});
+
+describe("sources maintenance (scheduled)", () => {
+  const scheduled = () =>
+    (worker as unknown as { scheduled(controller: unknown, env: unknown): Promise<void> }).scheduled({}, sessionEnv);
+
+  it("republishes a batch expiry job that failed to publish, with no further client request", async () => {
+    failJob = (jobId) => jobId.startsWith("ub-");
+    const created = await createBatch();
+    const draft = await env.CORPUS_DB.prepare("SELECT generation_id FROM drafts").first<{ generation_id: string }>();
+    expect(sent.map((message) => message.jobId)).toEqual([draft!.generation_id]);
+    const before = await env.CORPUS_DB.prepare("SELECT job_enqueued_at FROM upload_batches WHERE id = ?")
+      .bind(created.batchId)
+      .first<{ job_enqueued_at: number | null }>();
+    expect(before?.job_enqueued_at).toBeNull();
+    failJob = null;
+    // The client never sends a byte. The scheduled handler finishes the publish on its own.
+    await scheduled();
+    expect(sent.map((message) => message.jobId)).toEqual([draft!.generation_id, created.batchId]);
+    const after = await env.CORPUS_DB.prepare("SELECT job_enqueued_at FROM upload_batches WHERE id = ?")
+      .bind(created.batchId)
+      .first<{ job_enqueued_at: number | null }>();
+    expect(after?.job_enqueued_at).not.toBeNull();
+    await scheduled();
+    expect(sent).toHaveLength(2);
+  });
+
+  it("keeps an unpublished draft job for the next run instead of failing the draft while the queue is down", async () => {
+    const { draft } = await ensureOpenDraft(env.CORPUS_DB as never, { kind: "upload", createdBy: "member-jordan" });
+    const lost = await createUploadBatch(env.CORPUS_DB as never, {
+      generationId: draft.generationId,
+      createdBy: "member-jordan",
+      acl: readersToAcl({ kind: "everyone" }),
+      idempotencyKey: "idem-maint-1",
+      files: [{ name: "lost.md", size: 5 }],
+    });
+    failQueue = true;
+    await scheduled();
+    const state = await env.CORPUS_DB.prepare(
+      "SELECT d.closed_at, g.state FROM drafts d JOIN corpus_generations g ON g.id = d.generation_id WHERE d.generation_id = ?",
+    ).bind(draft.generationId).first<{ closed_at: number | null; state: string }>();
+    expect(state).toEqual({ closed_at: null, state: "draft" });
+    failQueue = false;
+    await scheduled();
+    expect(sent.map((message) => message.jobId)).toEqual([draft.generationId, lost.batchId]);
+  });
+
+  it("purges a discarded draft for good once writers that were in flight can no longer run", async () => {
+    await createBatch();
+    const draft = await env.CORPUS_DB.prepare("SELECT generation_id FROM drafts").first<{ generation_id: string }>();
+    const id = draft!.generation_id;
+    // Two staged chunks under the draft.
+    await env.CORPUS_DB.prepare(
+      `INSERT INTO document_versions (id, document_id, generation_id, r2_key, content_digest, byte_size, created_at)
+       SELECT id || '-p', document_id, ?, r2_key, content_digest, byte_size, created_at
+       FROM document_versions WHERE generation_id = ? LIMIT 1`,
+    ).bind(id, activeId).run();
+    await env.CORPUS_DB.prepare(
+      `INSERT INTO chunks (chunk_id, document_id, document_version_id, generation_id, heading, chunk_index, content,
+         start_offset, end_offset, content_digest, vector_id, acl_group, access_scope, allowed_roles, allowed_departments, metadata, created_at)
+       SELECT chunk_id || '-p', document_id, (SELECT id FROM document_versions WHERE generation_id = ? LIMIT 1), ?, heading, chunk_index, content,
+         start_offset, end_offset, content_digest, vector_id || '-p', acl_group, access_scope, allowed_roles, allowed_departments, metadata, created_at
+       FROM chunks WHERE generation_id = ? LIMIT 2`,
+    ).bind(id, id, activeId).run();
+    const staged = await env.CORPUS_DB.prepare("SELECT vector_id FROM chunks WHERE generation_id = ? ORDER BY vector_id")
+      .bind(id)
+      .all<{ vector_id: string }>();
+    expect(staged.results).toHaveLength(2);
+    const discard = await call(`/admin/drafts/${id}/discard`, admin(), { method: "POST", json: {} });
+    expect(discard.status).toBe(200);
+    expect([...deletedVectors].sort()).toEqual(staged.results.map((row) => row.vector_id));
+    // A writer already in flight cannot put rows back.
+    await expect(
+      env.CORPUS_DB.prepare(
+        `INSERT INTO document_versions (id, document_id, generation_id, r2_key, content_digest, byte_size, created_at)
+         SELECT id || '-late', document_id, ?, r2_key, content_digest, byte_size, created_at
+         FROM document_versions WHERE generation_id = ? LIMIT 1`,
+      ).bind(id, activeId).run(),
+    ).rejects.toThrow(/DRAFT_CLOSED/);
+    const closedAt = (await env.CORPUS_DB.prepare("SELECT closed_at FROM drafts WHERE generation_id = ?").bind(id).first<{ closed_at: number }>())!.closed_at;
+    // Inside the grace window a pass keeps the vector ids: a late upsert may still land.
+    deletedVectors = [];
+    await runSourcesMaintenance(sessionEnv as never, closedAt + 1000);
+    expect(deletedVectors).toEqual([]);
+    const purged = () =>
+      env.CORPUS_DB.prepare("SELECT purged_at FROM drafts WHERE generation_id = ?").bind(id).first<{ purged_at: number | null }>();
+    expect((await purged())?.purged_at).toBeNull();
+    // After it, the ids are deleted once more and the draft is marked purged.
+    await runSourcesMaintenance(sessionEnv as never, closedAt + DISCARD_GRACE_MS + 1);
+    expect([...deletedVectors].sort()).toEqual(staged.results.map((row) => row.vector_id));
+    expect((await purged())?.purged_at).not.toBeNull();
+    deletedVectors = [];
+    await runSourcesMaintenance(sessionEnv as never, closedAt + DISCARD_GRACE_MS + 2);
+    expect(deletedVectors).toEqual([]);
+    for (const table of ["chunks", "document_catalog", "document_bodies", "document_versions"]) {
+      const row = await env.CORPUS_DB.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE generation_id = ?`).bind(id).first<{ n: number }>();
+      expect(row?.n, table).toBe(0);
+    }
   });
 });

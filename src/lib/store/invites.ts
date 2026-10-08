@@ -130,8 +130,8 @@ export async function acceptInvite(
     throw new InviteInvalidError();
   }
   // No failure counter: a miss writes nothing, so an unauthenticated caller cannot
-  // grow the database. Tokens are 256-bit random, so guessing is not the defence;
-  // volume is limited at the edge (WAF rate limit on /api/auth/invite).
+  // grow the database. Token entropy (256-bit random) is the defence. Edge rate
+  // limiting on /api/auth/invite is a deployment TODO, not configured in this repo.
   const tokenDigest = await sha256Hex(input.token);
   const invite = await db
     .prepare(

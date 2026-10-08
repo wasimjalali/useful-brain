@@ -16,14 +16,16 @@ import {
 import {
   copyBaseChunkPage,
   copyBaseDocuments,
+  DISCARD_GRACE_MS,
   embedChunkRange,
   finalizeDocument,
+  purgeDiscardedDraft,
   writeDocumentChunks,
   type DocumentToIndex,
 } from "../../../src/lib/ingest/draft-index";
 import { generationNamespace, vectorIdForChunk } from "../../../src/lib/ingest/digests";
 import { ensureDraftGeneration } from "../../../src/lib/store/corpus-d1";
-import { closeDraft, ensureOpenDraft, failDraft, getOpenDraft, markBaseCopied } from "../../../src/lib/store/drafts";
+import { claimDiscard, closeDraft, ensureOpenDraft, failDraft, getOpenDraft, markBaseCopied } from "../../../src/lib/store/drafts";
 import { claimFinalize, startIndexing } from "../../../src/lib/store/draft-state";
 import { createUploadBatch, expireUndeliveredFiles, failUploadFile, recordUploadedObject } from "../../../src/lib/store/uploads";
 import { readersToAcl } from "../../../src/lib/ingest/upload-validation";
@@ -374,6 +376,122 @@ describe("document write, replace and embedding reuse", () => {
     const result = await embedChunkRange(ctx, { generationId: draft.generationId, documentId: doc.documentId, from: 0, to: written.chunkCount, reuseFromGenerationId: null });
     expect(result).toEqual({ embedded: 0, reused: 0, skipped: written.chunkCount });
     await finalizeDocument(ctx, { generationId: draft.generationId, doc, body: "# K\n\nwords", department: null });
+  });
+});
+
+describe("discard fences writers that were already in flight", () => {
+  async function projectionCounts(generationId: string) {
+    const out: Record<string, number> = {};
+    for (const table of ["chunks", "document_catalog", "document_bodies", "document_versions"]) {
+      const row = await env.CORPUS_DB.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE generation_id = ?`)
+        .bind(generationId)
+        .first<{ n: number }>();
+      out[table] = row?.n ?? 0;
+    }
+    return out;
+  }
+  const empty = { chunks: 0, document_catalog: 0, document_bodies: 0, document_versions: 0 };
+
+  it("refuses every projection write a step makes after the discard, so nothing is recreated", async () => {
+    const vectors = fakeVectors();
+    const ai = fakeAi();
+    const active = await seedActive({ ai, vectors });
+    const draft = await newDraft();
+    const ctx = { db: db(), ai, vectors: vectors.port };
+    const doc = deptDoc("upl-late", ["hr"]);
+    await writeDocumentChunks(ctx, { generationId: draft.generationId, doc, body: "# Late\n\nEarly words.", ensureDocumentRow: true });
+    // The step passed its open check, then the admin discarded the draft.
+    expect(await claimDiscard(db(), draft.generationId)).toBe(true);
+    await purgeDiscardedDraft(ctx, draft.generationId, { deleteVectorsNow: true });
+    expect(await projectionCounts(draft.generationId)).toEqual(empty);
+    // The step resumes. Every write it attempts is refused by the database.
+    await expect(
+      writeDocumentChunks(ctx, { generationId: draft.generationId, doc, body: "# Late\n\nLate words.", ensureDocumentRow: true }),
+    ).rejects.toThrow(/DRAFT_CLOSED/);
+    await expect(
+      finalizeDocument(ctx, { generationId: draft.generationId, doc, body: "# Late\n\nLate words.", department: null }),
+    ).rejects.toThrow(/DRAFT_CLOSED/);
+    await expect(
+      copyBaseDocuments(db(), { draftGenerationId: draft.generationId, baseGenerationId: active.generationId }),
+    ).rejects.toThrow(/DRAFT_CLOSED/);
+    const upsertsBefore = vectors.store.size;
+    await expect(
+      copyBaseChunkPage(ctx, { draftGenerationId: draft.generationId, baseGenerationId: active.generationId, afterId: 0 }),
+    ).rejects.toThrow(/DRAFT_CLOSED/);
+    expect(vectors.store.size).toBe(upsertsBefore);
+    expect(await projectionCounts(draft.generationId)).toEqual(empty);
+  });
+
+  it("deletes a vector upsert that lands after the discard once in-flight writers can no longer run", async () => {
+    const vectors = fakeVectors();
+    const ai = fakeAi();
+    const draft = await newDraft();
+    const doc = deptDoc("upl-straggler", ["hr"]);
+    const plain = { db: db(), ai, vectors: vectors.port };
+    const written = await writeDocumentChunks(plain, {
+      generationId: draft.generationId,
+      doc,
+      body: "# Straggler\n\nWords embedded while the draft is discarded.",
+      ensureDocumentRow: true,
+    });
+    const namespace = await generationNamespace(draft.generationId);
+    const inDraft = () => [...vectors.store.values()].filter((vector) => vector.namespace === namespace).length;
+    // The embedding step read its chunk rows before the discard; its upsert reaches the index after it.
+    let discarded = false;
+    const racing = {
+      ...vectors.port,
+      async upsert(records: Parameters<typeof vectors.port.upsert>[0]) {
+        if (!discarded) {
+          discarded = true;
+          expect(await claimDiscard(db(), draft.generationId)).toBe(true);
+          await purgeDiscardedDraft(plain, draft.generationId, { deleteVectorsNow: true });
+        }
+        return vectors.port.upsert(records);
+      },
+    };
+    await embedChunkRange(
+      { db: db(), ai, vectors: racing },
+      { generationId: draft.generationId, documentId: doc.documentId, from: 0, to: written.chunkCount, reuseFromGenerationId: null },
+    );
+    expect(discarded).toBe(true);
+    expect(inDraft()).toBe(written.chunkCount);
+    const closedAt = (await env.CORPUS_DB.prepare("SELECT closed_at FROM drafts WHERE generation_id = ?")
+      .bind(draft.generationId)
+      .first<{ closed_at: number }>())!.closed_at;
+    const purgedAt = async () =>
+      (await env.CORPUS_DB.prepare("SELECT purged_at FROM drafts WHERE generation_id = ?")
+        .bind(draft.generationId)
+        .first<{ purged_at: number | null }>())?.purged_at ?? null;
+    // Still inside the grace window: nothing is forgotten yet.
+    expect(await purgeDiscardedDraft(plain, draft.generationId, { now: closedAt + 60_000 })).toEqual({ purged: false });
+    expect(await purgedAt()).toBeNull();
+    // Afterwards the straggler is deleted and the draft converges to empty.
+    expect(await purgeDiscardedDraft(plain, draft.generationId, { now: closedAt + DISCARD_GRACE_MS + 1 })).toEqual({ purged: true });
+    expect(inDraft()).toBe(0);
+    expect(await purgedAt()).not.toBeNull();
+    expect(await projectionCounts(draft.generationId)).toEqual(empty);
+    const tombstones = await env.CORPUS_DB.prepare("SELECT COUNT(*) AS n FROM discarded_vectors WHERE generation_id = ?")
+      .bind(draft.generationId)
+      .first<{ n: number }>();
+    expect(tombstones?.n).toBe(0);
+  });
+
+  it("never touches a generation that was not discarded", async () => {
+    const vectors = fakeVectors();
+    const ai = fakeAi();
+    const active = await seedActive({ ai, vectors });
+    const draft = await newDraft();
+    const ctx = { db: db(), ai, vectors: vectors.port };
+    await writeDocumentChunks(ctx, { generationId: draft.generationId, doc: deptDoc("upl-keep", ["hr"]), body: "# Keep\n\nwords", ensureDocumentRow: true });
+    const before = { draft: await projectionCounts(draft.generationId), active: await projectionCounts(active.generationId) };
+    const far = Date.now() + DISCARD_GRACE_MS * 10;
+    expect(await purgeDiscardedDraft(ctx, draft.generationId, { now: far, deleteVectorsNow: true })).toEqual({ purged: false });
+    expect(await purgeDiscardedDraft(ctx, active.generationId, { now: far, deleteVectorsNow: true })).toEqual({ purged: false });
+    // A draft that failed for another reason is not a discard either.
+    await failDraft(db(), draft.generationId, "INDEX_UNAVAILABLE");
+    expect(await purgeDiscardedDraft(ctx, draft.generationId, { now: far, deleteVectorsNow: true })).toEqual({ purged: false });
+    expect({ draft: await projectionCounts(draft.generationId), active: await projectionCounts(active.generationId) }).toEqual(before);
+    expect(vectors.deleted).toEqual([]);
   });
 });
 

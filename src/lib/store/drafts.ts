@@ -143,11 +143,13 @@ export async function failDraft(
 
 /**
  * Claims a discard. One atomic batch moves every non-live generation to
- * failed/DISCARDED and closes its draft row; a live generation (active or
- * archived) matches nothing. Only a caller that gets true may delete what the
- * draft holds: if a promotion won the race the claim changes nothing and the
- * caller must leave the generation alone. Failed drafts are claimable again, so
- * a discard that died half way can be repeated.
+ * failed/DISCARDED, closes its draft row and fails every file of it that had
+ * not finished (DRAFT_CLOSED), so a transfer still streaming can no longer
+ * attach its object and the upload status says why. A live generation (active
+ * or archived) matches nothing. Only a caller that gets true may delete what
+ * the draft holds: if a promotion won the race the claim changes nothing and
+ * the caller must leave the generation alone. Failed drafts are claimable
+ * again, so a discard that died half way can be repeated.
  */
 export async function claimDiscard(db: SqlExecutor, generationId: string, now = Date.now()): Promise<boolean> {
   const results = await db.batch([
@@ -164,8 +166,30 @@ export async function claimDiscard(db: SqlExecutor, generationId: string, now = 
            AND EXISTS (SELECT 1 FROM corpus_generations WHERE id = ? AND state = 'failed' AND error_code = 'DISCARDED')`,
       )
       .bind(now, generationId, generationId),
+    db
+      .prepare(
+        `UPDATE upload_files SET stage = 'failed', error_code = 'DRAFT_CLOSED', updated_at = ?
+         WHERE stage NOT IN ('ready', 'failed')
+           AND batch_id IN (SELECT id FROM upload_batches WHERE generation_id = ?)
+           AND EXISTS (SELECT 1 FROM corpus_generations WHERE id = ? AND state = 'failed' AND error_code = 'DISCARDED')`,
+      )
+      .bind(now, generationId, generationId),
   ]);
   return (results[0]?.meta?.changes ?? 0) > 0;
+}
+
+/** Discarded drafts not yet emptied for good, oldest first. */
+export async function discardedDraftsToPurge(db: SqlExecutor, limit = 10): Promise<string[]> {
+  const rows = await db
+    .prepare(
+      `SELECT d.generation_id FROM drafts d JOIN corpus_generations g ON g.id = d.generation_id
+       WHERE d.purged_at IS NULL AND d.closed_at IS NOT NULL
+         AND g.state = 'failed' AND g.error_code = 'DISCARDED'
+       ORDER BY d.closed_at LIMIT ?`,
+    )
+    .bind(limit)
+    .all<{ generation_id: string }>();
+  return rows.results.map((row) => row.generation_id);
 }
 
 /**

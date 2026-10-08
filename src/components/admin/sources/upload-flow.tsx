@@ -59,11 +59,22 @@ type Entry = {
   fileId?: string;
   stage: UploadStage;
   error?: string;
+  /** The server itself reported this file failed, so it holds nothing in the draft. */
+  serverFailed?: boolean;
 };
 
 const STILL_PROCESSING = "Still processing, check Sources";
+const STATUS_UNAVAILABLE = "Status unavailable, check Sources";
 
 const isTerminal = (entry: Entry) => entry.stage === "ready" || entry.stage === "failed";
+
+/**
+ * A started file keeps the readers fixed unless it failed before reaching the
+ * server, or the server said it failed. A failure seen only here (a refused
+ * transfer whose bytes may still have landed) does not prove it left the draft.
+ */
+const holdsReaders = (entry: Entry) =>
+  entry.started && (entry.stage !== "failed" || (entry.fileId !== undefined && !entry.serverFailed));
 
 export function UploadFlow({
   actions,
@@ -150,9 +161,11 @@ export function UploadFlow({
         }
         const keys = open.filter((entry) => entry.batchId === batchId).map((entry) => entry.key);
         if (!result.ok) {
+          // A lost status read says nothing about the file: it keeps its stage
+          // (and the readers stay locked) while polling goes on.
           failures.current += 1;
           if (failures.current >= MAX_STATUS_FAILURES) {
-            patch(keys, (entry) => (isTerminal(entry) ? {} : { stage: "failed", error: result.error.message }));
+            patch(keys, (entry) => (isTerminal(entry) ? {} : { note: STATUS_UNAVAILABLE }));
           }
           continue;
         }
@@ -161,7 +174,7 @@ export function UploadFlow({
         patch(keys, (entry) => {
           const status = byFile.get(entry.fileId as string);
           return status && !isTerminal(entry)
-            ? { stage: status.stage, error: status.errorMessage, note: undefined }
+            ? { stage: status.stage, error: status.errorMessage, note: undefined, serverFailed: status.stage === "failed" }
             : {};
         });
       }
@@ -261,8 +274,7 @@ export function UploadFlow({
     readers: entry.readers,
     note: entry.note,
   }));
-  // Failed files never reach a draft, so they don't hold the choice.
-  const locked = entries.some((entry) => entry.started && entry.stage !== "failed");
+  const locked = entries.some(holdsReaders);
 
   return (
     <UploadDialog

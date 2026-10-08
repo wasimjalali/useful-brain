@@ -202,6 +202,31 @@ describe("scopeDocumentId", () => {
     expect(replay.assistantMessageId).toBe(first.assistantMessageId);
   });
 
+  it("does not let an unscoped question with an embedded scope suffix collide with a scoped one", async () => {
+    const searchOnly = () =>
+      scriptedRuntime([
+        fauxAssistantMessage([fauxToolCall("search_knowledge", { query: "security password" })], {
+          stopReason: "toolUse",
+        }),
+        fauxAssistantMessage([fauxText("x")], { stopReason: "stop" }),
+      ]);
+    const requestId = `req-nul-${Math.random().toString(36).slice(2, 8)}`;
+    const q = "What is the password policy?";
+    await executeTurn(deps({ requestId, runtime: searchOnly(), question: `${q}\u0000scope:doc-public-security` }));
+    await expect(
+      executeTurn(deps({ requestId, runtime: searchOnly(), question: q, scopeDocumentId: "doc-public-security" })),
+    ).rejects.toBeInstanceOf(WorkerValidationError);
+  });
+
+  it("rejects a question with NUL or other control characters at /turns", async () => {
+    for (const bad of ["a\u0000b", "a\u0001b", "a\u001fb", "a\u007fb"]) {
+      const response = await call("/turns", cookies["member-maya"], {
+        json: { question: bad, requestId: `req-ctl-${Math.random().toString(36).slice(2, 8)}` },
+      });
+      expect(response.status).toBe(400);
+    }
+  });
+
   it("restricts both retrieval channels to the document, after the ACL", async () => {
     const runtime = () =>
       scriptedRuntime([

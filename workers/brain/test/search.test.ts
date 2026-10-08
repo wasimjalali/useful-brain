@@ -211,6 +211,18 @@ describe("document ranking does not depend on documents the caller cannot read",
     expect(await order()).toEqual(baseline);
   });
 
+  it("ranks before the candidate cap, so a late-alphabet exact title is not dropped", async () => {
+    for (let i = 0; i < 520; i += 1) {
+      await insertCatalogDoc(`doc-cap-${i}`, `aaa zcap ${i}`, { scope: "public" }, true);
+    }
+    await env.CORPUS_DB.prepare(
+      `UPDATE document_catalog SET headings_json = '["exact"]' WHERE document_id LIKE 'doc-cap-%'`,
+    ).run();
+    await insertCatalogDoc("doc-cap-target", "zzz zcap exact", { scope: "public" }, true);
+    const ids = (await search("member-maya", "zcap exact")).documents.map((d) => d.id);
+    expect(ids[0]).toBe("doc-cap-target");
+  });
+
   it("lists a catalog row with no body in neither search nor the document route", async () => {
     await insertCatalogDoc("doc-nobody-body", "qgamma notes", { scope: "public" }, true);
     await env.CORPUS_DB.prepare(`DELETE FROM document_bodies WHERE document_id = 'doc-nobody-body'`).run();

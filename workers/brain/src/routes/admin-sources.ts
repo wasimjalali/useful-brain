@@ -9,7 +9,7 @@ import type {
   ReindexResponse,
   UploadFileAccepted,
 } from "../../../../src/lib/contracts/sources";
-import { deleteVectors, type VectorPort } from "../../../../src/lib/ingest/draft-index";
+import { purgeDiscardedDraft, type IndexContext, type VectorPort } from "../../../../src/lib/ingest/draft-index";
 import {
   parseUploadRequest,
   readersToAcl,
@@ -20,10 +20,12 @@ import {
   assertAcceptsUploads,
   claimDiscard,
   closeDraft,
+  discardedDraftsToPurge,
   draftAcceptsWrites,
   ensureOpenDraft,
   failDraft,
   getDraft,
+  getOpenDraft,
   markJobPublished,
   unpublishedJobIds,
 } from "../../../../src/lib/store/drafts";
@@ -36,6 +38,7 @@ import {
   getUploadStatus,
   recordUploadedObject,
   resolveUploadReplay,
+  UploadDocumentInDraftError,
 } from "../../../../src/lib/store/uploads";
 
 type QueueLike = { send(message: { jobId: string; idempotencyKey: string }): Promise<void> };
@@ -108,10 +111,12 @@ async function enqueueJob(queue: QueueLike, id: string): Promise<void> {
 /**
  * Publishes the jobs of a draft that never reached the queue. The rows exist
  * before anything is published and a job is marked only after the queue took it,
- * so a crash between the two leaves the intent for the next request to finish.
- * The draft job is mandatory: if it cannot be queued the draft is failed so it
- * does not sit forever. A batch's expiry job is only a safety net for files that
- * never arrive, so a failure there is logged and retried on the next request.
+ * so a crash between the two leaves the intent for the next request, or the
+ * scheduled maintenance, to finish. On a request the draft job is mandatory: if
+ * it cannot be queued the draft is failed so the admin sees it at once. A
+ * batch's expiry job is only a safety net for files that never arrive, so a
+ * failure there is logged and left for the scheduled maintenance, which
+ * republishes every outstanding intent and never fails a draft for a queue blip.
  * Publishing twice is harmless: the workflow instance id is the job id.
  */
 async function publishPendingJobs(
@@ -119,18 +124,19 @@ async function publishPendingJobs(
   queue: QueueLike,
   generationId: string,
   log: { requestId: string; started: number },
+  mode: "request" | "maintenance" = "request",
 ): Promise<void> {
   for (const jobId of await unpublishedJobIds(corpus, generationId)) {
     try {
       await enqueueJob(queue, jobId);
     } catch (error) {
-      if (jobId === generationId) {
+      if (jobId === generationId && mode === "request") {
         await failDraft(corpus, generationId, "ENQUEUE_FAILED");
         throw error;
       }
       writeOperationalLog({
         requestId: log.requestId,
-        operation: "admin-uploads-expiry-enqueue",
+        operation: jobId === generationId ? "admin-uploads-draft-enqueue" : "admin-uploads-expiry-enqueue",
         status: "error",
         durationMs: Date.now() - log.started,
         errorCode: "ENQUEUE_FAILED",
@@ -138,6 +144,42 @@ async function publishPendingJobs(
       continue;
     }
     await markJobPublished(corpus, generationId, jobId);
+  }
+}
+
+function vectorContext(corpus: SqlExecutor, env: SourcesEnv): IndexContext {
+  return { db: corpus, ai: null, vectors: (env.VECTORIZE as VectorPort | undefined) ?? null };
+}
+
+/**
+ * Scheduled upkeep that must not wait for a client request: republishes every
+ * job intent of the open draft that never reached the queue (a batch expiry
+ * job above all, or a never-PUT batch would hold the draft open for ever), and
+ * empties discarded drafts, including what a writer that was in flight at the
+ * discard added afterwards. Idempotent; each run does a bounded amount of work.
+ */
+export async function runSourcesMaintenance(env: SourcesEnv, now = Date.now()): Promise<void> {
+  const corpus = requireCorpus(env);
+  const requestId = crypto.randomUUID();
+  if (env.INGEST_QUEUE) {
+    const open = await getOpenDraft(corpus);
+    if (open) {
+      await publishPendingJobs(corpus, env.INGEST_QUEUE, open.generationId, { requestId, started: now }, "maintenance");
+    }
+  }
+  for (const generationId of await discardedDraftsToPurge(corpus)) {
+    try {
+      await purgeDiscardedDraft(vectorContext(corpus, env), generationId, { now });
+    } catch {
+      // One stuck draft must not starve the others; the next run tries again.
+      writeOperationalLog({
+        requestId,
+        operation: "admin-draft-purge",
+        status: "error",
+        durationMs: Date.now() - now,
+        errorCode: "PURGE_FAILED",
+      });
+    }
   }
 }
 
@@ -206,7 +248,20 @@ export async function handleAdminSourcesRoute(input: {
     const { draft } = await ensureOpenDraft(corpus, { kind: "upload", createdBy: principal.id });
     assertAcceptsUploads(draft);
     // Rows first, queue second: a job must never start before the files it waits for exist.
-    const batch = await createUploadBatch(corpus, { generationId: draft.generationId, ...request_ });
+    let batch: Awaited<ReturnType<typeof createUploadBatch>>;
+    try {
+      batch = await createUploadBatch(corpus, { generationId: draft.generationId, ...request_ });
+    } catch (error) {
+      if (error instanceof UploadDocumentInDraftError) {
+        // The one validation failure the admin can act on, so its message is shown.
+        return json(
+          { code: "VALIDATION_FAILED", reason: error.reason, message: error.message, retryable: false, requestId },
+          requestId,
+          400,
+        );
+      }
+      throw error;
+    }
     await publishPendingJobs(corpus, queue, draft.generationId, { requestId, started });
     done("admin-uploads-create");
     return json(batch, requestId);
@@ -336,22 +391,10 @@ export async function handleAdminSourcesRoute(input: {
   if (!(await claimDiscard(corpus, generationId))) {
     throw new WorkerValidationError();
   }
-  const vectorIds = await corpus
-    .prepare(`SELECT vector_id FROM chunks WHERE generation_id = ?`)
-    .bind(generationId)
-    .all<{ vector_id: string }>();
-  await deleteVectors(
-    { db: corpus, ai: null, vectors: (env.VECTORIZE as VectorPort | undefined) ?? null },
-    generationId,
-    vectorIds.results.map((row) => row.vector_id),
-    Date.now(),
-  );
-  await corpus.batch([
-    corpus.prepare(`DELETE FROM chunks WHERE generation_id = ?`).bind(generationId),
-    corpus.prepare(`DELETE FROM document_catalog WHERE generation_id = ?`).bind(generationId),
-    corpus.prepare(`DELETE FROM document_bodies WHERE generation_id = ?`).bind(generationId),
-    corpus.prepare(`DELETE FROM document_versions WHERE generation_id = ?`).bind(generationId),
-  ]);
+  // Rows and vectors go now. The vector ids stay as tombstones until the
+  // scheduled maintenance deletes them once more, after any writer that was in
+  // flight at the claim can no longer upsert one.
+  await purgeDiscardedDraft(vectorContext(corpus, env), generationId, { deleteVectorsNow: true });
   done("admin-draft-discard");
   return json({ ok: true, generationId } satisfies DraftActionResponse, requestId);
 }

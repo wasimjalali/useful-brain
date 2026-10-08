@@ -4,7 +4,10 @@ import { recordServiceHealth } from "../store/service-health";
 
 export const WORKERS_AI_SERVICE = "workers_ai";
 
-function failureCode(error: unknown): HealthDetailCode {
+function failureCode(error: unknown, signal?: AbortSignal): HealthDetailCode {
+  if (signal?.aborted && signal.reason instanceof Error && signal.reason.name === "TimeoutError") {
+    return "timeout";
+  }
   const message = error instanceof Error ? error.message : "";
   if ((error instanceof Error && error.name === "TimeoutError") || /timeout|timed out/i.test(message)) {
     return "timeout";
@@ -43,14 +46,11 @@ export type RecordedAiRunOptions = {
 
 /** True when the caller, not the service, ended the call. */
 function isCallerAbort(error: unknown, signal: AbortSignal | undefined): boolean {
-  if (error instanceof Error && error.name === "AbortError") {
-    return true;
+  if (signal?.aborted) {
+    const reason: unknown = signal.reason;
+    return !(reason instanceof Error && reason.name === "TimeoutError");
   }
-  if (!signal?.aborted) {
-    return false;
-  }
-  const reason: unknown = signal.reason;
-  return !(reason instanceof Error && reason.name === "TimeoutError");
+  return error instanceof Error && error.name === "AbortError";
 }
 
 /**
@@ -85,7 +85,7 @@ export async function recordedAiRun<T>(
     if (isCallerAbort(error, options.signal)) {
       throw error;
     }
-    outcome = { status: "error", code: failureCode(error) };
+    outcome = { status: "error", code: failureCode(error, options.signal) };
     lastWrite.set(WORKERS_AI_SERVICE, { at: now(), status: "error" });
     await record(db, outcome, now);
     throw error;

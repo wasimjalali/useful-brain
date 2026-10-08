@@ -48,6 +48,19 @@ export function batchAcl(batch: Pick<UploadBatchRow, "access_scope" | "allowed_r
   };
 }
 
+/**
+ * A file names a document that an unfinished or ready upload already holds in
+ * the open draft. Two uploads of one document in one draft would share its
+ * projection, so cleaning up a failed one could erase the other's content.
+ */
+export class UploadDocumentInDraftError extends WorkerValidationError {
+  readonly reason = "DOCUMENT_IN_DRAFT";
+  constructor(readonly fileName: string) {
+    super(`${fileName} is already in the open draft. Promote or discard the draft before uploading it again.`);
+    this.name = "UploadDocumentInDraftError";
+  }
+}
+
 type CreateBatchInput = {
   generationId: string;
   createdBy: string;
@@ -100,10 +113,16 @@ export async function resolveUploadReplay(
   };
 }
 
+/** Files of the draft that still hold their document: anything but a failed upload, whose content was already removed. */
+const LIVE_DOCUMENT_HOLDERS = `SELECT f.document_id, f.file_name FROM upload_files f
+  JOIN upload_batches b ON b.id = f.batch_id
+  WHERE b.generation_id = ? AND f.stage <> 'failed'`;
+
 /**
  * Creates a batch and its file rows in one atomic batch. The same
  * idempotency key with the same request returns the original ids; with a
- * different request it is rejected.
+ * different request it is rejected. A file whose document another live upload
+ * of the draft already holds rejects the whole batch.
  */
 export async function createUploadBatch(db: SqlExecutor, input: CreateBatchInput): Promise<UploadCreated> {
   const now = input.now ?? Date.now();
@@ -113,17 +132,27 @@ export async function createUploadBatch(db: SqlExecutor, input: CreateBatchInput
   }
   const batchId = newBoundedId("ub");
   const files: UploadCreated["files"] = [];
+  const documentIds: string[] = [];
+  for (const file of input.files) {
+    documentIds.push(await uploadDocumentId(file.name));
+  }
+  const documentList = documentIds.map(() => "?").join(", ");
   const statements = [
     db
       .prepare(
         // Conditional on the draft still being built, so a batch can never land
-        // in a draft that already started its checks.
+        // in a draft that already started its checks, and on none of its
+        // documents being held by another live upload of the draft. The check
+        // and the insert are one statement, so a racing batch cannot slip in.
         `INSERT INTO upload_batches (
            id, generation_id, created_by, access_scope, allowed_roles, allowed_departments,
            idempotency_key, created_at
          ) SELECT ?, ?, ?, ?, ?, ?, ?, ?
          WHERE EXISTS (
            SELECT 1 FROM corpus_generations WHERE id = ? AND state IN ('draft', 'indexing')
+         )
+         AND NOT EXISTS (
+           SELECT 1 FROM (${LIVE_DOCUMENT_HOLDERS}) held WHERE held.document_id IN (${documentList})
          )`,
       )
       .bind(
@@ -136,9 +165,11 @@ export async function createUploadBatch(db: SqlExecutor, input: CreateBatchInput
         input.idempotencyKey,
         now,
         input.generationId,
+        input.generationId,
+        ...documentIds,
       ),
   ];
-  for (const file of input.files) {
+  for (const [index, file] of input.files.entries()) {
     const fileId = newBoundedId("uf");
     files.push({ id: fileId, name: file.name });
     statements.push(
@@ -149,7 +180,7 @@ export async function createUploadBatch(db: SqlExecutor, input: CreateBatchInput
            ) SELECT ?, ?, ?, ?, ?, 'parsing', ?, ?
            WHERE EXISTS (SELECT 1 FROM upload_batches WHERE id = ?)`,
         )
-        .bind(fileId, batchId, file.name, file.size, await uploadDocumentId(file.name), now, now, batchId),
+        .bind(fileId, batchId, file.name, file.size, documentIds[index], now, now, batchId),
     );
   }
   let results: Awaited<ReturnType<SqlExecutor["batch"]>>;
@@ -165,6 +196,13 @@ export async function createUploadBatch(db: SqlExecutor, input: CreateBatchInput
     throw error;
   }
   if ((results[0]?.meta?.changes ?? 0) !== 1) {
+    const held = await db
+      .prepare(`SELECT document_id FROM (${LIVE_DOCUMENT_HOLDERS}) held WHERE held.document_id IN (${documentList}) LIMIT 1`)
+      .bind(input.generationId, ...documentIds)
+      .first<{ document_id: string }>();
+    if (held) {
+      throw new UploadDocumentInDraftError(input.files[documentIds.indexOf(held.document_id)].name);
+    }
     throw new WorkerValidationError("Promote or discard the current draft first.");
   }
   return { batchId, files };
@@ -191,7 +229,13 @@ export async function getUploadBatch(db: SqlExecutor, batchId: string): Promise<
     .first<UploadBatchRow>();
 }
 
-/** False when the file already left the parsing stage (it expired or its draft closed): the object is then unwanted. */
+/**
+ * Attaches the stored object to its file. False when the file already left the
+ * parsing stage (it expired or was failed) or its draft is no longer open and
+ * being built: the object is then unwanted and the caller deletes it. The draft
+ * check is part of the same UPDATE, so a discard that lands while the bytes
+ * stream always wins.
+ */
 export async function recordUploadedObject(
   db: SqlExecutor,
   fileId: string,
@@ -201,7 +245,13 @@ export async function recordUploadedObject(
   const result = await db
     .prepare(
       `UPDATE upload_files SET r2_key = ?, updated_at = ?
-       WHERE id = ? AND stage = 'parsing'`,
+       WHERE id = ? AND stage = 'parsing'
+         AND EXISTS (
+           SELECT 1 FROM upload_batches b
+           JOIN drafts d ON d.generation_id = b.generation_id
+           JOIN corpus_generations g ON g.id = d.generation_id
+           WHERE b.id = upload_files.batch_id AND d.closed_at IS NULL AND g.state IN ('draft', 'indexing')
+         )`,
     )
     .bind(r2Key, now, fileId)
     .run();

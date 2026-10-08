@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { PageBody } from "@/components/shell/page-body";
 import { PageHeader } from "@/components/ui/page-header";
@@ -29,6 +29,9 @@ export default async function TicketPage({ params }: { params: Promise<{ id: str
     ticket = await brainJson<TicketView>(`/tickets/${id}`);
   } catch (cause) {
     const failure = toPublicAppError(cause);
+    if (failure.code === "AUTH_REQUIRED") {
+      redirect("/login");
+    }
     if (failure.code === "NOT_FOUND") {
       notFound();
     }

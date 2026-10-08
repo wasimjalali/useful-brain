@@ -340,7 +340,12 @@ type RequestIdClaim = {
  * scoping existed hold.
  */
 async function requestPayloadDigest(question: string, scopeDocumentId?: string): Promise<string> {
-  return sha256Hex(scopeDocumentId === undefined ? question : `${question}\u0000scope:${scopeDocumentId}`);
+  if (scopeDocumentId === undefined) {
+    return sha256Hex(question);
+  }
+  // Length-prefixed fields behind a leading NUL, which /turns rejects in a
+  // question, so no unscoped question can produce the same preimage.
+  return sha256Hex(`\u0000scope1\u0000${question.length}:${question}\u0000${scopeDocumentId.length}:${scopeDocumentId}`);
 }
 
 async function loadRequestIdClaim(

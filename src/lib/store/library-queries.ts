@@ -343,7 +343,7 @@ function documentSnippet(body: string, title: string, tokens: string[]): string 
   return section ? `${section.heading} · ${excerpt(section.text, tokens)}` : null;
 }
 
-/** Upper bound on readable matches ranked locally; ordered by title, so independent of hidden rows. */
+/** Upper bound on readable matches ranked locally; ordered by the readable-only rank, so independent of hidden rows. */
 const SEARCH_CANDIDATE_CAP = 500;
 
 function coverage(text: string, tokens: string[]): number {
@@ -369,16 +369,19 @@ export async function searchDocuments(
     return [];
   }
   const readable = readableDocumentPredicate(generationId, principal);
+  // Same coverage terms as the local ranker, so the cap keeps the best readable matches.
+  const titleRank = tokens.map(() => "(instr(lower(c.title), ?) > 0)").join(" + ");
+  const headingRank = tokens.map(() => "(instr(lower(c.headings_json), ?) > 0)").join(" + ");
   const found = await db
     .prepare(
       `SELECT c.document_id, c.title, c.department, c.headings_json
        FROM document_catalog_fts f
        JOIN document_catalog c ON c.id = f.rowid
        WHERE document_catalog_fts MATCH ? AND ${readable.sql}
-       ORDER BY c.title COLLATE NOCASE, c.document_id
+       ORDER BY (${titleRank}) DESC, (${headingRank}) DESC, c.title COLLATE NOCASE, c.document_id
        LIMIT ?`,
     )
-    .bind(match, ...readable.params, SEARCH_CANDIDATE_CAP)
+    .bind(match, ...readable.params, ...tokens, ...tokens, SEARCH_CANDIDATE_CAP)
     .all<SearchCandidate>();
   const ranked = found.results
     .map((row) => ({

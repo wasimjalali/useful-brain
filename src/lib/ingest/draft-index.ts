@@ -491,6 +491,108 @@ export async function removeDocumentFromDraft(
   ]);
 }
 
+/**
+ * How long after a draft closed a workflow step that started before the close
+ * may still be running. Ingestion steps time out after 10 minutes; this is
+ * three times that. Until it has passed, a discarded draft's vector ids are
+ * kept, because such a step may still upsert one of them.
+ */
+export const DISCARD_GRACE_MS = 30 * 60 * 1000;
+/** Pages of VECTOR_DELETE_LIMIT ids one purge pass deletes after the grace window. */
+const PURGE_VECTOR_PAGES = 50;
+
+const DISCARDED_DRAFT = `SELECT 1 FROM drafts d JOIN corpus_generations g ON g.id = d.generation_id
+  WHERE d.generation_id = ? AND d.closed_at IS NOT NULL AND g.state = 'failed' AND g.error_code = 'DISCARDED'`;
+
+/**
+ * Empties a discarded draft. Idempotent and safe to repeat from any caller (the
+ * discard route, then the scheduled purge). A generation that is not a
+ * discarded draft is never touched.
+ *
+ * 1. In one atomic batch, every vector id the draft's chunks name is kept as a
+ *    tombstone and its chunks, catalog, bodies and versions are deleted. The
+ *    write fence in the corpus schema refuses any row a late step tries to add.
+ * 2. With `deleteVectorsNow` (the discard route) the tombstoned vectors are
+ *    deleted at once, so the index does not hold them for the grace window.
+ * 3. Once DISCARD_GRACE_MS has passed since the draft closed, no step that
+ *    read rows before the discard can still upsert: every tombstoned vector is
+ *    deleted again, the tombstones go, and the draft is marked purged. This
+ *    pass is bounded; `purged: false` means call again.
+ */
+export async function purgeDiscardedDraft(
+  ctx: IndexContext,
+  generationId: string,
+  options: { now?: number; deleteVectorsNow?: boolean } = {},
+): Promise<{ purged: boolean }> {
+  const now = options.now ?? Date.now();
+  const { db } = ctx;
+  const draft = await db
+    .prepare(`SELECT d.closed_at, d.purged_at FROM drafts d JOIN corpus_generations g ON g.id = d.generation_id
+       WHERE d.generation_id = ? AND d.closed_at IS NOT NULL AND g.state = 'failed' AND g.error_code = 'DISCARDED'`)
+    .bind(generationId)
+    .first<{ closed_at: number; purged_at: number | null }>();
+  if (!draft) {
+    return { purged: false };
+  }
+  if (draft.purged_at !== null) {
+    return { purged: true };
+  }
+  const discarded = `AND EXISTS (${DISCARDED_DRAFT})`;
+  await db.batch([
+    db
+      .prepare(
+        `INSERT INTO discarded_vectors (generation_id, vector_id)
+         SELECT generation_id, vector_id FROM chunks WHERE generation_id = ? ${discarded}
+         ON CONFLICT (generation_id, vector_id) DO NOTHING`,
+      )
+      .bind(generationId, generationId),
+    db.prepare(`DELETE FROM chunks WHERE generation_id = ? ${discarded}`).bind(generationId, generationId),
+    db.prepare(`DELETE FROM document_catalog WHERE generation_id = ? ${discarded}`).bind(generationId, generationId),
+    db.prepare(`DELETE FROM document_bodies WHERE generation_id = ? ${discarded}`).bind(generationId, generationId),
+    db.prepare(`DELETE FROM document_versions WHERE generation_id = ? ${discarded}`).bind(generationId, generationId),
+  ]);
+  const tombstones = (afterId: string) =>
+    db
+      .prepare(
+        `SELECT vector_id FROM discarded_vectors WHERE generation_id = ? AND vector_id > ?
+         ORDER BY vector_id LIMIT ?`,
+      )
+      .bind(generationId, afterId, VECTOR_DELETE_LIMIT)
+      .all<{ vector_id: string }>();
+  if (now < draft.closed_at + DISCARD_GRACE_MS) {
+    if (options.deleteVectorsNow) {
+      let after = "";
+      for (;;) {
+        const ids = (await tombstones(after)).results.map((row) => row.vector_id);
+        if (ids.length === 0) {
+          break;
+        }
+        await deleteVectors(ctx, generationId, ids, now);
+        after = ids[ids.length - 1];
+      }
+    }
+    return { purged: false };
+  }
+  for (let page = 0; page < PURGE_VECTOR_PAGES; page += 1) {
+    const ids = (await tombstones("")).results.map((row) => row.vector_id);
+    if (ids.length === 0) {
+      await db
+        .prepare(`UPDATE drafts SET purged_at = ? WHERE generation_id = ? AND purged_at IS NULL`)
+        .bind(now, generationId)
+        .run();
+      return { purged: true };
+    }
+    await deleteVectors(ctx, generationId, ids, now);
+    await db
+      .prepare(
+        `DELETE FROM discarded_vectors WHERE generation_id = ? AND vector_id IN (${ids.map(() => "?").join(", ")})`,
+      )
+      .bind(generationId, ...ids)
+      .run();
+  }
+  return { purged: false };
+}
+
 type BaseChunkRow = {
   id: number;
   chunk_id: string;

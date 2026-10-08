@@ -418,6 +418,56 @@ describe("SourcesWorkspace upload", () => {
     expect(within(screen.getByRole("list", { name: "Files" })).getByText(/HR/)).toBeInTheDocument();
   });
 
+  it("keeps the readers locked and the file working when status polls fail", async () => {
+    const uploadStatus = vi.fn(async () => fail("Couldn't read the upload status."));
+    mount(sources(), actions({ uploadStatus }), { initialUploadOpen: true });
+    addFiles([md("a.md")]);
+    await tick(5000);
+    expect(uploadStatus.mock.calls.length).toBeGreaterThanOrEqual(3);
+    // The server may still be indexing the file with these readers.
+    expect(screen.getByRole("radio", { name: "Departments" })).toBeDisabled();
+    expect(screen.getByText("Status unavailable, check Sources")).toBeInTheDocument();
+    expect(screen.queryByText("Couldn't read the upload status.")).not.toBeInTheDocument();
+    expect(within(screen.getByRole("list", { name: "Files" })).queryByText("Failed")).not.toBeInTheDocument();
+  });
+
+  it("clears the status note once a poll succeeds again", async () => {
+    let calls = 0;
+    const uploadStatus = vi.fn(async () => {
+      calls += 1;
+      return calls <= 3
+        ? fail("Couldn't read the upload status.")
+        : ok<UploadStatus>({ batchId: "b1", files: [{ id: "f0", name: "a.md", stage: "embedding" }] });
+    });
+    mount(sources(), actions({ uploadStatus }), { initialUploadOpen: true });
+    addFiles([md("a.md")]);
+    await tick(3000);
+    expect(screen.getByText("Status unavailable, check Sources")).toBeInTheDocument();
+    await tick(1000);
+    expect(screen.queryByText("Status unavailable, check Sources")).not.toBeInTheDocument();
+    expect(screen.getByText("Embedding")).toBeInTheDocument();
+  });
+
+  it("keeps the readers locked when a refused transfer may still have reached the draft", async () => {
+    const putFile = vi.fn(async () => ({ ok: false as const, message: "The file couldn't be uploaded. Check your connection." }));
+    mount(sources(), actions({ putFile }), { initialUploadOpen: true });
+    addFiles([md("a.md")]);
+    await tick(1000);
+    expect(screen.getByText("The file couldn't be uploaded. Check your connection.")).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Departments" })).toBeDisabled();
+  });
+
+  it("releases the readers once the server reports the only file failed", async () => {
+    const uploadStatus = vi.fn(async () =>
+      ok<UploadStatus>({ batchId: "b1", files: [{ id: "f0", name: "a.md", stage: "failed", errorMessage: "This file is empty." }] }),
+    );
+    mount(sources(), actions({ uploadStatus }), { initialUploadOpen: true });
+    addFiles([md("a.md")]);
+    await tick(1000);
+    expect(screen.getByText("This file is empty.")).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Departments" })).toBeEnabled();
+  });
+
   it("keeps sending the remaining files after the dialog is closed, then reloads", async () => {
     let releaseFirst: () => void = () => undefined;
     const putFile = vi.fn((_b: string, fileId: string) =>

@@ -331,7 +331,8 @@ function ChatView({
       if (!current.open) return { open: true, tab: "cited", turnId };
       return current.turnId === turnId ? current : { ...current, turnId };
     });
-    if (turnId !== panelTurn?.id) setReader(null);
+    // A reader opened from search (no turn) belongs to no turn, so it stays.
+    setReader((current) => (current && current.turnId !== null && current.turnId !== turnId ? null : current));
   }
 
   function togglePanel() {

@@ -40,7 +40,8 @@ function same(a: CitationKey | null, b: CitationKey): boolean {
 /**
  * Holds the hovered and pinned citation so chips, sources and passages darken
  * together. The pin is dropped when `resetKey` moves from one value to another
- * (the open panel switched turn or document). Null means no panel is open, and
+ * (the open panel switched to another turn, or to a document of a turn the pin
+ * is not in). Null means no panel is open, and
  * opening or closing it keeps the pin.
  */
 export function CitationLinkProvider({
@@ -57,7 +58,9 @@ export function CitationLinkProvider({
     const previous = previousKey.current;
     previousKey.current = resetKey ?? null;
     if (previous && resetKey && previous !== resetKey) {
-      setPinned(null);
+      // A chip click that retargets the panel to its own turn keeps its pin.
+      const turn = resetKey.split("|")[0];
+      setPinned((current) => (current && current.turnId === turn ? current : null));
     }
   }, [resetKey]);
   const togglePin = useCallback(

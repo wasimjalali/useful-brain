@@ -907,6 +907,25 @@ describe("review fixes", () => {
     expect(chips()[0]).not.toHaveAttribute("data-active");
   });
 
+  it("keeps a pinned citation when a chip click retargets the open panel to its own turn", () => {
+    renderChat({ initialTurns: [turnOf("msg-1", "one"), turnOf("msg-2", "two")] });
+    const chips = () => screen.getAllByRole("button", { name: "Citation 1" });
+    fireEvent.click(screen.getByRole("button", { name: "Evidence" }));
+    // The panel opened on the latest turn; a chip in turn 1 retargets it.
+    fireEvent.click(chips()[0]);
+    fireEvent.mouseLeave(chips()[0]);
+    expect(chips()[0]).toHaveAttribute("data-active", "true");
+  });
+
+  it("keeps a reader opened from search when another turn is clicked", async () => {
+    nav.search = "doc=nw_hr_parental_leave";
+    window.history.replaceState(null, "", "/chat?doc=nw_hr_parental_leave");
+    renderChat({ initialTurns: [turnOf("msg-1", "one"), turnOf("msg-2", "two")] });
+    expect(await within(panel()).findByRole("heading", { name: "Parental Leave Policy" })).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("button", { name: "Good" })[0]);
+    expect(within(panel()).getByRole("heading", { name: "Parental Leave Policy" })).toBeInTheDocument();
+  });
+
   describe("failed turns", () => {
     const failWith = (error: { code: string; message: string; retryable: boolean }) =>
       renderChat({ askAction: async () => ({ ok: false, error } as never) });

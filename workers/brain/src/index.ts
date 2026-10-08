@@ -75,7 +75,7 @@ import { handleAdminPeopleRoute } from "./routes/admin-people";
 import { handleAdminMetricsRoute, campaignView } from "./routes/admin-metrics";
 import { handleLibraryRoute } from "./routes/documents";
 import { handleTicketRoute } from "./routes/tickets";
-import { handleAdminSourcesRoute } from "./routes/admin-sources";
+import { handleAdminSourcesRoute, runSourcesMaintenance, type SourcesEnv } from "./routes/admin-sources";
 import { ApprovalWorkflow } from "./approval-workflow";
 import {
   DURABLE_RESUME_TOOLS,
@@ -685,7 +685,8 @@ const brainWorker = {
           : typeof body.question === "string"
             ? body.question.trim()
             : "";
-        if (!question || question.length > 2000) {
+        // eslint-disable-next-line no-control-regex
+        if (!question || question.length > 2000 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(question)) {
           throw new WorkerValidationError();
         }
         let scopeDocumentId: string | undefined;
@@ -1218,6 +1219,12 @@ const brainWorker = {
         }
       } catch {
         console.error("catalog_backfill_failed");
+      }
+      // Republish lost upload job intents and empty discarded drafts without waiting for a request.
+      try {
+        await runSourcesMaintenance(env as unknown as SourcesEnv);
+      } catch {
+        console.error("sources_maintenance_failed");
       }
     }
     if (!env.APPROVAL_RESUME_QUEUE) {

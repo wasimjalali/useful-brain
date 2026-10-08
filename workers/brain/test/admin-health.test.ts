@@ -131,6 +131,16 @@ describe("recordedAiRun", () => {
     expect(row(await health(), "workers_ai")).toMatchObject({ status: "error", detail: "timeout", at: 6000 });
   });
 
+  it("records a timeout when the call rejects with AbortError after a TimeoutError signal fired", async () => {
+    const signal = AbortSignal.timeout(1);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const aborted = new DOMException("aborted", "AbortError");
+    await expect(
+      recordedAiRun(env.OPERATIONS_DB, async () => Promise.reject(aborted), () => 7000, { signal }),
+    ).rejects.toBe(aborted);
+    expect(row(await health(), "workers_ai")).toMatchObject({ status: "error", detail: "timeout", at: 7000 });
+  });
+
   it("does not hide the model result when the health write fails", async () => {
     const broken = { prepare: () => { throw new Error("db down"); } } as never;
     await expect(recordedAiRun(broken, async () => "fine")).resolves.toBe("fine");
