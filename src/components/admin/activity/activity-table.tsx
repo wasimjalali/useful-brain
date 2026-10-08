@@ -11,6 +11,8 @@ import type {
   TraceStepView,
 } from "@/lib/contracts/admin-insights-view";
 
+import { TraceTimeline } from "./trace-timeline";
+
 const OUTCOME: Record<ActivityOutcome, { label: string; tone: StatusTone }> = {
   answered: { label: "Answered", tone: "success" },
   no_evidence: { label: "No evidence", tone: "faint" },
@@ -127,25 +129,23 @@ export function ActivityTable({
               {isOpen ? (
                 <div
                   aria-label={`Trace for ${r.question}`}
-                  className="mb-3 ml-[46px] mr-3 mt-1 grid grid-cols-[96px_minmax(0,1fr)_64px] gap-x-4 gap-y-[9px] rounded-[14px] bg-sunken px-4 py-3.5 font-mono text-xs leading-[18px]"
+                  className="mb-3 ml-[46px] mr-3 mt-1 grid grid-cols-1 gap-y-3 rounded-[14px] bg-sunken px-4 py-3.5"
                   id={`trace-${r.id}`}
                   role="group"
                 >
                   {traceFailed[r.id] ? (
-                    <span className="col-span-3 flex items-center gap-3 text-ink">
+                    <span className="flex items-center gap-3 text-ink">
                       Could not load this trace
                       <Button onClick={() => loadTrace(r.id)} size={32} variant="secondary">
                         Retry trace
                       </Button>
                     </span>
                   ) : trace === undefined ? (
-                    <span className="col-span-3 text-ink-faint-text">Loading trace</span>
+                    <span className="text-ink-faint-text">Loading trace</span>
                   ) : trace.length === 0 ? (
-                    <span className="col-span-3 text-ink-faint-text">No trace recorded</span>
+                    <span className="text-ink-faint-text">No trace recorded</span>
                   ) : (
-                    trace.map((t, i) => (
-                      <TraceLine key={`${t.step}-${i}`} step={t} />
-                    ))
+                    <TraceTimeline steps={trace} />
                   )}
                 </div>
               ) : null}
@@ -166,15 +166,5 @@ export function ActivityTable({
         </div>
       ) : null}
     </div>
-  );
-}
-
-function TraceLine({ step }: { step: TraceStepView }) {
-  return (
-    <>
-      <span className="text-ink-faint-text">{step.step}</span>
-      <span className="whitespace-pre-wrap break-words text-ink">{step.detail}</span>
-      <span className="text-right text-ink-muted">{step.duration}</span>
-    </>
   );
 }
