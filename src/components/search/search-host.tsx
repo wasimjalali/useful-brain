@@ -30,8 +30,8 @@ const normalizeTitle = (title: string) => title.trim().replace(/\s+/g, " ").toLo
 
 /**
  * One row per distinct normalized title, at the position of its first hit. The row opens the
- * most recently updated chat of the group (hits without a known date lose to dated ones, then
- * the earlier hit wins).
+ * most recently updated chat of the group (the server's order breaks ties and covers hits whose
+ * date the sidebar cache lacks).
  */
 export function groupChatsByTitle(
   hits: SearchResponse["chats"],
@@ -46,9 +46,13 @@ export function groupChatsByTitle(
     else groups.set(key, [hit]);
   }
   return [...groups.values()].map((group) => {
-    const best = group.reduce((a, b) =>
-      (updatedAt.get(b.id) ?? -Infinity) > (updatedAt.get(a.id) ?? -Infinity) ? b : a,
-    );
+    // Server order is by updated_at, so the first hit wins unless both timestamps are known
+    // and a later one is strictly newer. A missing timestamp (stale sidebar cache) never loses.
+    const best = group.reduce((a, b) => {
+      const ta = updatedAt.get(a.id);
+      const tb = updatedAt.get(b.id);
+      return ta !== undefined && tb !== undefined && tb > ta ? b : a;
+    });
     return {
       id: best.id,
       title: best.title,

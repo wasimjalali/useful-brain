@@ -182,4 +182,14 @@ describe("groupChatsByTitle", () => {
     const rows = groupChatsByTitle([hit("a", "Same"), hit("b", "same")], new Map(), now);
     expect(rows.map((r) => r.id)).toEqual(["a"]);
   });
+
+  it("keeps the server's first hit when its timestamp is missing from a stale cache", () => {
+    const rows = groupChatsByTitle(
+      [hit("new", "Same"), hit("old", "same")],
+      new Map([["old", 1]]),
+      now,
+    );
+    expect(rows.map((r) => r.id)).toEqual(["new"]);
+    expect(rows[0].count).toBe(2);
+  });
 });
