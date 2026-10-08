@@ -500,6 +500,8 @@ export async function removeDocumentFromDraft(
 export const DISCARD_GRACE_MS = 30 * 60 * 1000;
 /** Pages of VECTOR_DELETE_LIMIT ids one purge pass deletes after the grace window. */
 const PURGE_VECTOR_PAGES = 50;
+/** Vector ids per tombstone DELETE, leaving one D1 parameter for the generation id. */
+const TOMBSTONE_DELETE_BATCH = 99;
 
 const DISCARDED_DRAFT = `SELECT 1 FROM drafts d JOIN corpus_generations g ON g.id = d.generation_id
   WHERE d.generation_id = ? AND d.closed_at IS NOT NULL AND g.state = 'failed' AND g.error_code = 'DISCARDED'`;
@@ -583,12 +585,16 @@ export async function purgeDiscardedDraft(
       return { purged: true };
     }
     await deleteVectors(ctx, generationId, ids, now);
-    await db
-      .prepare(
-        `DELETE FROM discarded_vectors WHERE generation_id = ? AND vector_id IN (${ids.map(() => "?").join(", ")})`,
-      )
-      .bind(generationId, ...ids)
-      .run();
+    // D1 binds at most 100 parameters per statement: the generation id plus 99 vector ids.
+    for (let start = 0; start < ids.length; start += TOMBSTONE_DELETE_BATCH) {
+      const slice = ids.slice(start, start + TOMBSTONE_DELETE_BATCH);
+      await db
+        .prepare(
+          `DELETE FROM discarded_vectors WHERE generation_id = ? AND vector_id IN (${slice.map(() => "?").join(", ")})`,
+        )
+        .bind(generationId, ...slice)
+        .run();
+    }
   }
   return { purged: false };
 }

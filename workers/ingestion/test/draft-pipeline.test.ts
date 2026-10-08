@@ -422,6 +422,56 @@ describe("discard fences writers that were already in flight", () => {
     expect(await projectionCounts(draft.generationId)).toEqual(empty);
   });
 
+  it("purges more than 100 tombstones without exceeding the D1 parameter limit", async () => {
+    const vectors = fakeVectors();
+    const draft = await newDraft();
+    expect(await claimDiscard(db(), draft.generationId)).toBe(true);
+    const ids = Array.from({ length: 150 }, (_, i) => `vec-${String(i).padStart(3, "0")}`);
+    await env.CORPUS_DB.batch(
+      ids.map((id) =>
+        env.CORPUS_DB.prepare("INSERT INTO discarded_vectors (generation_id, vector_id) VALUES (?, ?)").bind(draft.generationId, id),
+      ),
+    );
+    // D1 rejects statements binding more than 100 parameters; enforce that here.
+    const raw = db();
+    const limited = new Proxy(raw, {
+      get(target, key, receiver) {
+        if (key !== "prepare") {
+          const value = Reflect.get(target, key, receiver);
+          return typeof value === "function" ? value.bind(target) : value;
+        }
+        return (sql: string) => {
+          const statement = target.prepare(sql);
+          return new Proxy(statement, {
+            get(st, k, r) {
+              if (k === "bind") {
+                return (...values: unknown[]) => {
+                  if (values.length > 100) throw new Error(`too many SQL variables: ${values.length}`);
+                  return st.bind(...values);
+                };
+              }
+              const v = Reflect.get(st, k, r);
+              return typeof v === "function" ? v.bind(st) : v;
+            },
+          });
+        };
+      },
+    });
+    const closedAt = (await env.CORPUS_DB.prepare("SELECT closed_at FROM drafts WHERE generation_id = ?")
+      .bind(draft.generationId)
+      .first<{ closed_at: number }>())!.closed_at;
+    const result = await purgeDiscardedDraft(
+      { db: limited, ai: fakeAi(), vectors: vectors.port },
+      draft.generationId,
+      { now: closedAt + DISCARD_GRACE_MS + 1 },
+    );
+    expect(result).toEqual({ purged: true });
+    const left = await env.CORPUS_DB.prepare("SELECT COUNT(*) AS n FROM discarded_vectors WHERE generation_id = ?")
+      .bind(draft.generationId)
+      .first<{ n: number }>();
+    expect(left?.n).toBe(0);
+  });
+
   it("deletes a vector upsert that lands after the discard once in-flight writers can no longer run", async () => {
     const vectors = fakeVectors();
     const ai = fakeAi();

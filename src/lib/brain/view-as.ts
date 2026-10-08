@@ -130,7 +130,7 @@ export async function beginViewAsAudit(
        ON CONFLICT(request_id) DO NOTHING`,
     )
     .bind(
-      `view-as-${requestId}`.slice(0, 120),
+      await viewAsAuditId(requestId),
       requestId,
       input.adminPrincipalId,
       input.assumedPrincipalId,
@@ -225,4 +225,11 @@ export async function adminTitleMatch(
 
 export function citedDocumentIds(response: Pick<GroundedAnswerResponse, "retrieval">): string[] {
   return response.retrieval.results.flatMap((item) => (item.documentId ? [item.documentId] : []));
+}
+
+/** Audit primary key derived from the full request id, so distinct ids never collide. */
+async function viewAsAuditId(requestId: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(requestId));
+  const hex = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `view-as-${hex}`;
 }
