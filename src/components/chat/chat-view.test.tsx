@@ -965,10 +965,35 @@ describe("review fixes", () => {
     });
 
     it("keeps the saved-question copy and Retry for a retryable failure", async () => {
-      failWith({ code: "PROVIDER_TEMPORARY", message: "down", retryable: true });
+      failWith({ code: "RATE_LIMITED", message: "busy", retryable: true });
       askQuestion("one");
       const alert = await screen.findByRole("alert");
       expect(alert).toHaveTextContent("The answer stopped before it finished. Your question is saved.");
+      expect(within(alert).getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    });
+
+    it("says the knowledge base is unavailable, with Retry, when the backend failed", async () => {
+      failWith({ code: "PROVIDER_TEMPORARY", message: "down", retryable: true });
+      askQuestion("one");
+      const alert = await screen.findByRole("alert");
+      expect(alert).toHaveTextContent("The knowledge base is unavailable right now. Your question is saved.");
+      expect(alert).not.toHaveTextContent("stopped");
+      expect(within(alert).getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    });
+
+    it("says the knowledge base was unavailable for a reloaded failed turn", () => {
+      renderChat({
+        initialTurns: [
+          stored("msg-failed", "How much parental leave do I get?", null, {
+            error: "The previous answer could not be completed.",
+            errorRetryable: true,
+            errorCode: "PROVIDER_TEMPORARY",
+            answerType: null,
+          }),
+        ],
+      });
+      const alert = screen.getByRole("alert");
+      expect(alert).toHaveTextContent("The knowledge base is unavailable right now. Your question is saved.");
       expect(within(alert).getByRole("button", { name: "Retry" })).toBeInTheDocument();
     });
   });

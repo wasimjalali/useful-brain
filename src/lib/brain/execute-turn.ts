@@ -27,6 +27,7 @@ import {
 import type { TurnStage } from "../cf/turn-progress";
 import { countReadableDocuments } from "../acl/access";
 import {
+  markFailedTurn,
   WorkerBusyError,
   WorkerCancelledError,
   WorkerForbiddenError,
@@ -441,7 +442,13 @@ async function executeTurnFull(
       now: Date.now(),
     }).catch(() => undefined);
     await lock.release(pending.assistantMessageId).catch(() => undefined);
-    throw mapStoreError(failure);
+    // The turn is stored (possibly in a conversation this request created),
+    // so the failure names it: the client retries in place instead of
+    // starting a second conversation.
+    throw markFailedTurn(mapStoreError(failure), {
+      conversationId: pending.conversationId,
+      assistantMessageId: pending.assistantMessageId,
+    });
   } finally {
     cancellationWatchStop.abort();
     await cancellationWatch;

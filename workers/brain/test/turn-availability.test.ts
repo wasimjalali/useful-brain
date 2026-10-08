@@ -6,9 +6,11 @@ import { BRAIN_KNOWLEDGE_UNAVAILABLE, BRAIN_NOT_ENOUGH_EVIDENCE } from "../../..
 import { executeTurn } from "../../../src/lib/brain/execute-turn";
 import { TICKET_DESK } from "../../../src/lib/contracts/approvals";
 import {
+  WorkerCancelledError,
   WorkerUnavailableError,
   workerErrorResponse,
 } from "../../../src/lib/cf/worker-errors";
+import { loadConversationForUi } from "../../../src/lib/store/conversation-queries";
 import type { CorpusSql, VectorizeIndex } from "../../../src/lib/retrieve/cloudflare-pipeline";
 import { seedPrincipals } from "./seed";
 
@@ -349,6 +351,95 @@ describe("persisted turns that hit a backend failure", () => {
     });
     expect(retried.structuredAnswer.answerType).toBe("grounded");
     expect(await assistantRow("req-avail-persisted-retry")).toMatchObject({ status: "completed" });
+  });
+
+  it("keeps the member's stop a cancellation even when the search also failed", async () => {
+    await seedPrincipals();
+    // turn-cancellation.test.ts cancels around a search that succeeds; this
+    // pins the ordering when the run also ended unavailable.
+    let cancelled = false;
+    const failingThenCancelled: CorpusSql = {
+      prepare(sql) {
+        if (sql.includes("chunks_fts MATCH")) {
+          cancelled = true;
+        }
+        return corpusDatabase({ ftsFails: true }).prepare(sql);
+      },
+    };
+    await expect(
+      executeTurn({
+        operations: env.OPERATIONS_DB,
+        corpus: failingThenCancelled,
+        vectorize: workingVectorize,
+        principal,
+        question: "What is the refund window?",
+        requestId: "req-avail-cancel-order",
+        lockFor: () => ({
+          acquire: async (runId: string) => ({ ok: true as const, runId }),
+          cancelled: async () => cancelled,
+          release: async () => ({ ok: true as const }),
+        }),
+        ai: { run: aiStub({ finalReply: BRAIN_NOT_ENOUGH_EVIDENCE }) },
+      }),
+    ).rejects.toBeInstanceOf(WorkerCancelledError);
+    expect(await assistantRow("req-avail-cancel-order")).toMatchObject({
+      status: "failed",
+      error_code: "CANCELLED",
+    });
+  });
+
+  it("names the stored conversation and message in the failure so the client can retry in place", async () => {
+    await seedPrincipals();
+    let caught: unknown;
+    try {
+      await persistedTurn({
+        requestId: "req-avail-turn-ref",
+        corpus: corpusDatabase({ ftsFails: true }),
+        run: aiStub({ finalReply: BRAIN_NOT_ENOUGH_EVIDENCE }),
+      });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(WorkerUnavailableError);
+    const failed = await assistantRow("req-avail-turn-ref");
+    const response = workerErrorResponse(caught, "req-ref");
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({
+      code: "UNAVAILABLE",
+      message: BRAIN_KNOWLEDGE_UNAVAILABLE,
+      retryable: true,
+      requestId: "req-ref",
+      turn: { conversationId: failed!.conversation_id, assistantMessageId: failed!.id },
+    });
+
+    // Reloaded history says why the stored turn failed.
+    const conversation = await loadConversationForUi(
+      env.OPERATIONS_DB,
+      failed!.conversation_id,
+      principal.id,
+    );
+    expect(conversation.turns[0]).toMatchObject({
+      answer: null,
+      errorRetryable: true,
+      errorCode: "PROVIDER_TEMPORARY",
+    });
+  });
+
+  it("names no stored turn for an ephemeral failure", async () => {
+    await seedPrincipals();
+    let caught: unknown;
+    try {
+      await ephemeralTurn({
+        requestId: "req-avail-ephemeral-ref",
+        corpus: corpusDatabase({ ftsFails: true }),
+        vectorize: workingVectorize,
+        run: aiStub({ finalReply: BRAIN_NOT_ENOUGH_EVIDENCE }),
+      });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(WorkerUnavailableError);
+    expect(await workerErrorResponse(caught, "req-eph").json()).not.toHaveProperty("turn");
   });
 
   it("records no approval when a search failed before a ticket proposal", async () => {

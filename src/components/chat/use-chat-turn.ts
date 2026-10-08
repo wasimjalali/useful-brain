@@ -284,6 +284,9 @@ export function useChatTurn({
 
         if (!result.ok) {
           const cancelled = result.error.code === "CANCELLED";
+          // Brain stored the failed turn (in a conversation it may have just
+          // created): keep both ids so Retry and the next question stay in it.
+          const storedTurn = result.error.turn;
           setTurns(
             place({
               id: `turn_${turnSeq.current}`,
@@ -292,9 +295,13 @@ export function useChatTurn({
               error: cancelled ? null : result.error.message,
               errorRetryable: result.error.retryable,
               ...(cancelled ? {} : { errorCode: result.error.code }),
+              ...(storedTurn ? { messageId: storedTurn.assistantMessageId } : {}),
               cancelled,
             }),
           );
+          if (storedTurn && conversationId === null) {
+            setConversationId(storedTurn.conversationId);
+          }
           return;
         }
 

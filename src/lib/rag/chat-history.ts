@@ -1,3 +1,4 @@
+import type { AppErrorCode } from "./app-errors";
 import type { GroundedAnswerResponse } from "./grounded-answer";
 
 // A single question and its grounded answer (or the error that replaced it).
@@ -7,6 +8,8 @@ export type ChatTurn = {
   answer: GroundedAnswerResponse | null;
   error: string | null;
   errorRetryable?: boolean;
+  /** Why a failed turn failed, when the copy depends on it. */
+  errorCode?: AppErrorCode;
   cancelled?: boolean;
 };
 

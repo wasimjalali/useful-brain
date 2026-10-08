@@ -10,10 +10,14 @@ export type AppErrorCode =
   | "INTERNAL_ERROR"
   | "CANCELLED";
 
+/** The stored turn a failed persisted turn belongs to, so Retry stays in its conversation. */
+export type FailedTurnRef = { conversationId: string; assistantMessageId: string };
+
 export type PublicAppError = {
   code: AppErrorCode;
   message: string;
   retryable: boolean;
+  turn?: FailedTurnRef;
 };
 
 export type ActionResult<T> =
@@ -23,12 +27,16 @@ export type ActionResult<T> =
 export class AppError extends Error implements PublicAppError {
   readonly code: AppErrorCode;
   readonly retryable: boolean;
+  readonly turn?: FailedTurnRef;
 
-  constructor(code: AppErrorCode, message: string, retryable: boolean) {
+  constructor(code: AppErrorCode, message: string, retryable: boolean, turn?: FailedTurnRef) {
     super(message);
     this.name = "AppError";
     this.code = code;
     this.retryable = retryable;
+    if (turn) {
+      this.turn = turn;
+    }
   }
 }
 
@@ -85,6 +93,7 @@ export function toPublicAppError(
       code: error.code,
       message: error.message,
       retryable: error.retryable,
+      ...(error.turn ? { turn: error.turn } : {}),
     };
   }
 
