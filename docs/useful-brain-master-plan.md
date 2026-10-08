@@ -412,7 +412,7 @@ Two quality ratchets are required: deterministic fake-provider CI floors and rea
 
 Architecture approval is complete. Phase 0 is merged. Phase 1 code is merged ([PR #11](https://github.com/wasimjalali/useful-brain/pull/11)). Staging resources are provisioned. Product boundary (Wasim 2026-08-27): local portfolio agent, no billing or public signup, Access not required. Independent review is the single consolidated PR after Phase 7A.
 
-Standing authorization (2026-08-26): Grok 4.6 xhigh may execute Phase 1 through Phase 6 and Phase 7A without ordinary phase-by-phase approval. That includes approved packages, master-plan schema and auth changes, staging-only resources, synthetic Workers AI/evals inside the safety limits, PRs, merging green PRs, continuing to the next phase, planning-document updates, evidence-based Cloudflare-hosted model selection, and eligible credits for staging infrastructure and Workers AI. It does not include real company data, production cutover, destructive retirement, uncovered external spend or unlimited usage.
+Standing authorization (2026-08-26): the Claude Opus orchestrator (with Sonnet workers) may execute Phase 1 through Phase 6 and Phase 7A without ordinary phase-by-phase approval. That includes approved packages, master-plan schema and auth changes, staging-only resources, synthetic Workers AI/evals inside the safety limits, PRs, merging green PRs, continuing to the next phase, planning-document updates, evidence-based Cloudflare-hosted model selection, and eligible credits for staging infrastructure and Workers AI. It does not include real company data, production cutover, destructive retirement, uncovered external spend or unlimited usage.
 
 ### First-pilot planning profile
 
@@ -582,11 +582,11 @@ Do not delete Burooj until all of the following are true:
 
 Implementation uses one bounded phase at a time with explicit acceptance evidence.
 
-- `Grok 4.6 xhigh`: primary implementation, tests, documentation and phase reports.
-- `GPT-5.6 Sol xhigh`: architecture changes, critic adjudication, security-boundary review and final integration review.
+- Implementation is orchestrated by Claude Opus, with Sonnet workers writing the code, tests, documentation and phase reports.
+- Reviews scale with the PR: Sonnet alone for small changes, plus GPT Sol via Codex for features, plus Opus for sensitive ones. Medium or high effort, never xhigh. At most 3 review rounds.
 - The enabled security and code-review checks remain independent merge gates for critical work.
 
-Grok works from `docs/useful-brain-execution-tracker.md` and the checked-in execution prompt. Standing authorization covers Phase 1 through Phase 6 and Phase 7A. Every phase lands through a branch and PR. Independent review is `codex review --base main`; a self-review is not independent. Merge only when GitHub checks and independent review are green. Stop on architecture drift, a failed phase exit, a remaining stop condition in `AGENTS.md`, or a newly discovered high-severity risk with no in-plan fix. Phase 7B and destructive retirement remain closed.
+The orchestrator works from `docs/useful-brain-execution-tracker.md` and the checked-in execution prompt. Standing authorization covers Phase 1 through Phase 6 and Phase 7A. Every phase lands through a branch and PR. Independent review follows the size-scaled reviewer rule above; a self-review is not independent. Merge only when GitHub checks and independent review are green. Stop on architecture drift, a failed phase exit, a remaining stop condition in `AGENTS.md`, or a newly discovered high-severity risk with no in-plan fix. Phase 7B and destructive retirement remain closed.
 
 ## 14. Finalized choices and open validation gates
 

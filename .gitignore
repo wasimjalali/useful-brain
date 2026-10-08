@@ -42,3 +42,6 @@ spikes/**/.npmrc
 .archives/
 
 eval-output/
+
+/verify/
+/.claude/worktrees/
