@@ -10,7 +10,7 @@ The redesign shipped a new shell, chat, library, admin pages, uploads with draft
 - Removing the redesign's only answer-path change (a ticket instruction in the prompt plus the `create_ticket` tool) did not help: 18/24 versus 17/24 on the eight unstable questions, three repeats each.
 - The pre-redesign `main` code (prompt `grounded-answer.v9`) fails the same questions today. q088 passed in no turn of any variant (0/3, 0/3 and 0/2 clean).
 
-Conclusion: there's no evidence the redesign caused the gap, and the ticket additions are ruled out as the cause. It isn't proven either way: the pre-redesign control is small (15 usable turns), and no valid full run of the old code exists from today. The likeliest reading is that 118 was a good draw on a battery whose multi-hop slice is unstable on this model. q028 and q088 were already on the 2026-08-31 failure list. Retrieval is unchanged to the third decimal.
+Conclusion: there's no evidence the redesign caused the gap, and removing the ticket additions shows no measurable effect. It isn't proven either way: the pre-redesign control is small (15 usable turns), and no valid full run of the old code exists from today. The likeliest reading is that 118 was a good draw on a battery whose multi-hop slice is unstable on this model. q028 and q088 were already on the 2026-08-31 failure list. Retrieval is unchanged to the third decimal.
 
 | Category | Baseline 2026-09-06 | Redesign run 1 | Redesign run 2 |
 | --- | --- | --- | --- |
