@@ -28,6 +28,9 @@ export type WorkspaceIdentity = {
   id: string;
   kind: "user" | "service_token";
   subject?: string;
+  /** Session accounts only; null for loopback and service tokens. */
+  name?: string | null;
+  email?: string | null;
   roles: string[];
   departments: string[];
   isAdmin: boolean;
@@ -97,8 +100,31 @@ export async function askGroundedQuestion(input: {
   conversationId: string | null;
   requestId: string;
   assumePrincipal?: { userId: string; roles: string[]; departments: string[] } | null;
+  /** Library "Ask about this": limits the first turn to one document. */
+  scopeDocumentId?: string;
+  /** Admin View as: a principals.id. Brain resolves the grants server-side. */
+  assumePrincipalId?: string;
+  /** Re-runs the saved question of this failed assistant message. */
+  retryOfMessageId?: string;
 }): Promise<ActionResult<GroundedAnswerResponse>> {
   const question = input.question.trim();
+
+  if (input.retryOfMessageId) {
+    try {
+      return actionSuccess(
+        await brainJson<GroundedAnswerResponse>("/turns", {
+          method: "POST",
+          json: { retryOfMessageId: input.retryOfMessageId, requestId: input.requestId },
+        }),
+      );
+    } catch (error) {
+      return actionFailure(error, {
+        code: "INTERNAL_ERROR",
+        message: "The answer could not be generated.",
+        retryable: false,
+      });
+    }
+  }
 
   if (!question) {
     return actionFailure(
@@ -125,6 +151,8 @@ export async function askGroundedQuestion(input: {
           conversationId: input.conversationId ?? undefined,
           requestId: input.requestId,
           assumePrincipal: input.assumePrincipal ?? undefined,
+          scopeDocumentId: input.scopeDocumentId,
+          assumePrincipalId: input.assumePrincipalId,
         },
       }),
     );
@@ -151,20 +179,6 @@ export async function cancelGroundedQuestionAction(
     return actionFailure(error, {
       code: "INTERNAL_ERROR",
       message: "The answer could not be stopped.",
-      retryable: true,
-    });
-  }
-}
-
-export async function loadConversationAction(conversationId: string) {
-  try {
-    return actionSuccess(
-      await brainJson<Conversation>(`/conversations/${conversationId}`),
-    );
-  } catch (error) {
-    return actionFailure(error, {
-      code: "INTERNAL_ERROR",
-      message: "The conversation could not be loaded.",
       retryable: true,
     });
   }

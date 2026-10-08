@@ -1,4 +1,5 @@
 import { Type, type Static } from "typebox";
+import Value from "typebox/value";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 
@@ -6,6 +7,7 @@ import { IdempotentExecutor, mutatingIdempotencyKey } from "../agent/approvals";
 import { AGENT_BUDGETS } from "../agent/budgets";
 import { awaitWithDeadline, toolDeadlineSignal } from "../agent/deadlines";
 import { normalizeToolArguments, policyGateway, type ApprovalBinding, type PolicyPrincipal } from "../agent/policy";
+import { CreateTicketParams } from "../contracts/approvals";
 import { fetchAllowlistedSource } from "./http-allowlist";
 import { ConnectorRegistry, ConnectorRegistryError } from "./registry";
 import { frameMcpResult, toolText } from "./mcp-session";
@@ -261,6 +263,66 @@ export function createMcpCreateTicketTool(input: {
             ? error.message
             : toolErrorMessage(error, "mcp write failed");
         return { ...untrusted({ error: message }), details: {}, terminate: true };
+      }
+    },
+  };
+}
+
+export function createCreateTicketTool(input: {
+  principal: PolicyPrincipal;
+  conversationId: string;
+  executor: IdempotentExecutor;
+  /** Runs only after an approval that matches the exact arguments and key. */
+  createTicket: (args: Static<typeof CreateTicketParams>, idempotencyKey: string) => Promise<{ id: string }>;
+  approval?: ApprovalBinding | null;
+  now?: number;
+}): AgentTool<typeof CreateTicketParams, { pendingApproval?: boolean; ticketId?: string }> {
+  return {
+    name: "create_ticket",
+    label: "Create ticket",
+    description: "Create a Support ticket. Requires approval. Sequential.",
+    parameters: CreateTicketParams,
+    executionMode: "sequential",
+    execute: async (toolCallId, params: Static<typeof CreateTicketParams>, signal) => {
+      signal?.throwIfAborted();
+      if (!Value.Check(CreateTicketParams, params)) {
+        return { ...untrusted({ error: "invalid create_ticket arguments" }), details: {}, terminate: true };
+      }
+      const idempotencyKey = await mutatingIdempotencyKey(
+        "create_ticket",
+        params,
+        `${input.principal.id}-${input.conversationId}-${toolCallId}`,
+      );
+      const decision = policyGateway({
+        tool: "create_ticket",
+        principal: input.principal,
+        conversationId: input.conversationId,
+        args: params,
+        idempotencyKey,
+        now: input.now ?? Date.now(),
+        approval: input.approval,
+      });
+      if (decision.action === "pending_approval") {
+        return {
+          ...untrusted({ pending_approval: true, preview: params }),
+          details: { pendingApproval: true },
+          terminate: true,
+        };
+      }
+      if (decision.action === "deny") {
+        return { ...untrusted({ error: decision.reason }), details: {}, terminate: true };
+      }
+      try {
+        const created = await input.executor.run(idempotencyKey, () =>
+          input.createTicket(params, idempotencyKey),
+        );
+        return { ...untrusted({ created: true, ticketId: created.id }), details: { ticketId: created.id } };
+      } catch (error) {
+        return {
+          ...untrusted({ error: toolErrorMessage(error, "create ticket failed") }),
+          details: {},
+          terminate: true,
+        };
       }
     },
   };

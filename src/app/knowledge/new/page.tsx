@@ -1,7 +1,7 @@
-import { WorkspacePage } from "@/components/workspace/workspace-page";
+import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
+import { LEGACY_REDIRECTS } from "@/app/redirects";
 
-export default function NewKnowledgeDocumentPage() {
-  return <WorkspacePage addDocument view="knowledge" />;
+export default function LegacyRedirect() {
+  redirect(LEGACY_REDIRECTS["/knowledge/new"]);
 }

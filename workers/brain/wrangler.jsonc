@@ -34,6 +34,13 @@
       "migrations_dir": "../../migrations/operations"
     }
   ],
+  "r2_buckets": [
+    {
+      "binding": "SOURCES",
+      "bucket_name": "useful-brain-sources-development",
+      "jurisdiction": "eu"
+    }
+  ],
   "vectorize": [
     {
       "binding": "VECTORIZE",
@@ -122,6 +129,13 @@
           "migrations_dir": "../../migrations/operations"
         }
       ],
+      "r2_buckets": [
+        {
+          "binding": "SOURCES",
+          "bucket_name": "useful-brain-sources-development",
+          "jurisdiction": "eu"
+        }
+      ],
       "vectorize": [
         {
           "binding": "VECTORIZE",
@@ -197,6 +211,13 @@
           "migrations_dir": "../../migrations/operations"
         }
       ],
+      "r2_buckets": [
+        {
+          "binding": "SOURCES",
+          "bucket_name": "useful-brain-sources-staging",
+          "jurisdiction": "eu"
+        }
+      ],
       "vectorize": [{ "binding": "VECTORIZE", "index_name": "useful-brain-staging" }],
       "ai": { "binding": "AI" },
       "queues": {
@@ -260,6 +281,13 @@
           "database_name": "useful-brain-operations-production",
           "database_id": "00000000-0000-4000-8000-000000000022",
           "migrations_dir": "../../migrations/operations"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "SOURCES",
+          "bucket_name": "useful-brain-sources-production",
+          "jurisdiction": "eu"
         }
       ],
       "vectorize": [{ "binding": "VECTORIZE", "index_name": "useful-brain-production" }],

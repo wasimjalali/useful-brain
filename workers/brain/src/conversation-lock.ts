@@ -8,7 +8,8 @@ import {
 import { acquireRunLock, releaseRunLock } from "../../../src/lib/cf/run-lock";
 import {
   canAdvanceTurnStage,
-  isTurnStage,
+  normalizeTurnStage,
+  turnStageCount,
   type TurnStage,
 } from "../../../src/lib/cf/turn-progress";
 
@@ -45,6 +46,11 @@ export class ConversationRunLock extends DurableObject {
           "ALTER TABLE run_lock ADD COLUMN stage TEXT",
         );
       }
+      if (!columns.includes("stage_n")) {
+        this.ctx.storage.sql.exec(
+          "ALTER TABLE run_lock ADD COLUMN stage_n INTEGER",
+        );
+      }
     });
     this.ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
   }
@@ -72,8 +78,8 @@ export class ConversationRunLock extends DurableObject {
         return result;
       }
       this.ctx.storage.sql.exec(
-        `INSERT INTO run_lock (id, run_id, acquired_at, cancelled, stage) VALUES (1, ?, ?, 0, NULL)
-         ON CONFLICT(id) DO UPDATE SET run_id = excluded.run_id, acquired_at = excluded.acquired_at, cancelled = 0, stage = NULL`,
+        `INSERT INTO run_lock (id, run_id, acquired_at, cancelled, stage, stage_n) VALUES (1, ?, ?, 0, NULL, NULL)
+         ON CONFLICT(id) DO UPDATE SET run_id = excluded.run_id, acquired_at = excluded.acquired_at, cancelled = 0, stage = NULL, stage_n = NULL`,
         result.runId,
         Date.now(),
       );
@@ -136,12 +142,13 @@ export class ConversationRunLock extends DurableObject {
 
   /**
    * Record the owning run's progress stage. Only the run holding the lock may
-   * write; the stage must be a known value and may only advance or repeat.
-   * Storage is written only when the stage actually changes, so repeat marks
-   * stay read-only. The payload is the stage enum alone: no model text, tool
-   * arguments or evidence ever reaches this method.
+   * write; the stage must be a known value (old names map to "writing") and
+   * may only advance or repeat. "searching" and "reading" require an integer
+   * count in 0..100000 and "writing" carries none, so the stored payload is a
+   * stage enum plus an integer: no model text, tool arguments or evidence ever
+   * reaches this method. Storage is written only when the stage changes.
    */
-  async setStage(runId: string, stage: string): Promise<TurnStageWriteResult> {
+  async setStage(runId: string, stage: string, count?: number): Promise<TurnStageWriteResult> {
     let requested: string;
     try {
       requested = parseBoundedId(runId, "run id");
@@ -151,7 +158,12 @@ export class ConversationRunLock extends DurableObject {
       }
       throw error;
     }
-    if (!isTurnStage(stage)) {
+    const normalized = normalizeTurnStage(stage);
+    if (!normalized) {
+      return { ok: false, status: 400 };
+    }
+    const storedCount = turnStageCount(normalized, count);
+    if (storedCount === undefined) {
       return { ok: false, status: 400 };
     }
     return this.ctx.storage.transactionSync(() => {
@@ -163,30 +175,34 @@ export class ConversationRunLock extends DurableObject {
       if (!row || row.run_id !== requested) {
         return { ok: false as const, status: 409 as const };
       }
-      const current = isTurnStage(row.stage) ? row.stage : null;
-      if (!canAdvanceTurnStage(current, stage)) {
+      const current = normalizeTurnStage(row.stage);
+      if (!canAdvanceTurnStage(current, normalized)) {
         return { ok: false as const, status: 409 as const };
       }
-      if (current === stage) {
+      if (current === normalized) {
         return { ok: true as const, runId: requested, changed: false };
       }
       this.ctx.storage.sql.exec(
-        "UPDATE run_lock SET stage = ? WHERE id = 1",
-        stage,
+        "UPDATE run_lock SET stage = ?, stage_n = ? WHERE id = 1",
+        normalized,
+        storedCount,
       );
       return { ok: true as const, runId: requested, changed: true };
     });
   }
 
-  async progress(): Promise<{ runId: string | null; stage: TurnStage | null }> {
+  async progress(): Promise<{ runId: string | null; stage: TurnStage | null; count: number | null }> {
     const row = this.ctx.storage.sql
-      .exec<{ run_id: string; stage: string | null }>(
-        "SELECT run_id, stage FROM run_lock WHERE id = 1",
+      .exec<{ run_id: string; stage: string | null; stage_n: number | null }>(
+        "SELECT run_id, stage, stage_n FROM run_lock WHERE id = 1",
       )
       .toArray()[0];
+    const stage = normalizeTurnStage(row?.stage);
+    const count = stage && stage !== "writing" ? turnStageCount(stage, row?.stage_n) : null;
     return {
       runId: row?.run_id ?? null,
-      stage: isTurnStage(row?.stage) ? (row?.stage as TurnStage) : null,
+      stage,
+      count: count ?? null,
     };
   }
 

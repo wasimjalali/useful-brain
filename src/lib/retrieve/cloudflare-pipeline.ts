@@ -18,7 +18,7 @@ import { fuseCandidates, selectRerankHead, simpleRerank } from "./fusion";
 import { queryLooksLiteral, rescoreLocally } from "./keyword-score";
 import { applyRelevanceFloor, rerankWithHeading, type Reranker } from "./rerank";
 import { expandParent } from "./parent-off";
-import type { ChunkRecord, SearchHit, SearchResponse, ScoredChunk } from "./types";
+import type { BestBelowFloor, ChunkRecord, SearchHit, SearchResponse, ScoredChunk } from "./types";
 import { VECTORIZE_METADATA_INDEX } from "../store/vectorize-projection";
 
 export type CorpusSql = {
@@ -109,6 +109,13 @@ export class CloudflareKnowledgePipeline {
     topK?: number;
     candidateLimit?: number;
     signal?: AbortSignal;
+    /**
+     * Restrict retrieval to one document. Applied after the ACL: the keyword
+     * channel adds it to the same SQL as the ACL predicate, the vector channel
+     * (no document metadata index) drops other documents after the post-load
+     * authorization. The caller must already have resolved readability.
+     */
+    documentId?: string;
   }): Promise<SearchResponse> {
     input.signal?.throwIfAborted();
     const fingerprint: RetrievalFingerprint = this.input.fingerprint ?? REAL_STACK_FINGERPRINT;
@@ -136,7 +143,10 @@ export class CloudflareKnowledgePipeline {
     // always propagate.
     let vectorChannelError = false;
     const vectorMatches: Array<{ vectorId: string; score: number }> = [];
-    const { sql, params } = aclSqlAndParams(acl);
+    const aclSqlParts = aclSqlAndParams(acl);
+    const scoped = input.documentId !== undefined;
+    const sql = scoped ? `${aclSqlParts.sql} AND c.document_id = ?` : aclSqlParts.sql;
+    const params = scoped ? [...aclSqlParts.params, input.documentId as string] : aclSqlParts.params;
     // The keyword promise is always settled exactly once, even when the
     // vector path throws first: the catch swallows the expected error and
     // the await below re-raises the real keyword failure. Without this, an
@@ -211,7 +221,10 @@ export class CloudflareKnowledgePipeline {
     const keywordHits = rows.results.map((row) => ({ chunkId: row.chunk_id, score: 0 }));
     const candidateIds = [...new Set([...vectorHits, ...keywordHits].map((hit) => hit.chunkId))].sort();
     const loaded = await loadChunks(this.input.db, candidateIds);
-    const { allowed } = filterChunks(input.principal, loaded);
+    const { allowed: aclAllowed } = filterChunks(input.principal, loaded);
+    const allowed = scoped
+      ? aclAllowed.filter((chunk) => chunk.documentId === input.documentId)
+      : aclAllowed;
     const allowedIds = new Set(allowed.map((chunk) => chunk.chunkId));
     const chunksById = Object.fromEntries(allowed.map((chunk) => [chunk.chunkId, chunk]));
     const allowedVectorHits = vectorHits.filter((hit) => allowedIds.has(hit.chunkId));
@@ -234,7 +247,7 @@ export class CloudflareKnowledgePipeline {
         : fingerprint.keywordWeight,
       keywordRescue: fingerprint.keywordRescue ?? 0,
     });
-    const reranked = await rerankMerged(
+    const { kept: reranked, bestBelowFloor } = await rerankMerged(
       query,
       merged,
       this.input.reranker,
@@ -279,6 +292,8 @@ export class CloudflareKnowledgePipeline {
           final.flatMap((item) => (item.rerankScore === null ? [] : [[item.chunk.chunkId, item.rerankScore]])),
         ),
         fingerprint: fingerprintId(fingerprint),
+        candidateCount: merged.length,
+        ...(bestBelowFloor ? { bestBelowFloor } : {}),
         ...(vectorChannelError ? { vectorChannelError: true } : {}),
       },
     };
@@ -372,7 +387,7 @@ async function rerankMerged(
   reranker: Reranker,
   fingerprint: RetrievalFingerprint,
   signal?: AbortSignal,
-): Promise<ScoredChunk[]> {
+): Promise<{ kept: ScoredChunk[]; bestBelowFloor: BestBelowFloor | null }> {
   const ordered = simpleRerank(merged, merged.length, fingerprint.channelOverlapBonus);
   const head = selectRerankHead({
     ordered,
@@ -389,7 +404,21 @@ async function rerankMerged(
   }
   const scored = head.map((item, index) => ({ ...item, rerankScore: scores[index] }));
   scored.sort((left, right) => (right.rerankScore ?? 0) - (left.rerankScore ?? 0));
-  return applyRelevanceFloor(scored, fingerprint.relevanceFloor);
+  const kept = applyRelevanceFloor(scored, fingerprint.relevanceFloor);
+  // `scored` is sorted by rerank score, so the first dropped item is the
+  // best candidate the relevance floor removed. Items are already ACL-allowed.
+  const keptIds = new Set(kept.map((item) => item.chunk.chunkId));
+  const dropped = scored.find((item) => !keptIds.has(item.chunk.chunkId));
+  return {
+    kept,
+    bestBelowFloor: dropped
+      ? {
+          chunkId: dropped.chunk.chunkId,
+          documentId: dropped.chunk.documentId,
+          score: dropped.rerankScore ?? 0,
+        }
+      : null,
+  };
 }
 
 function isAbortError(error: unknown): boolean {

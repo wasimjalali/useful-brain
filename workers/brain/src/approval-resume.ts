@@ -1,4 +1,8 @@
+import { Type, type Static, type TSchema } from "typebox";
+import Value from "typebox/value";
+
 import { parseBoundedId, parseMutatingIdempotencyKey } from "../../../src/lib/cf/bounded-id";
+import { CreateTicketParams } from "../../../src/lib/contracts/approvals";
 import { argumentFingerprint, policyGateway } from "../../../src/lib/agent/policy";
 import { expireApproval, loadAgentReplay } from "../../../src/lib/store/agent-runs";
 import type { OperationsDatabase } from "../../../src/lib/store/conversations";
@@ -26,22 +30,27 @@ export function parseApprovalResumeMessage(value: unknown): ApprovalResumeMessag
   };
 }
 
-export const DURABLE_RESUME_TOOLS = new Set(["create_draft", "action_sink_write", "mcp_create_ticket"]);
+const TitleParams = Type.Object({ title: Type.String({ minLength: 1 }) }, { additionalProperties: false });
+
+/** Per-tool argument schema the durable resume dispatcher accepts. */
+const DURABLE_RESUME_SCHEMAS: Record<string, TSchema> = {
+  create_draft: TitleParams,
+  action_sink_write: TitleParams,
+  mcp_create_ticket: TitleParams,
+  create_ticket: CreateTicketParams,
+};
+
+export const DURABLE_RESUME_TOOLS = new Set(Object.keys(DURABLE_RESUME_SCHEMAS));
 
 function assertSupportedArguments(tool: string, value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("approved tool arguments are invalid");
   }
-  const args = value as Record<string, unknown>;
-  if (
-    !DURABLE_RESUME_TOOLS.has(tool) ||
-    Object.keys(args).length !== 1 ||
-    typeof args.title !== "string" ||
-    args.title.length === 0
-  ) {
+  const schema = Object.hasOwn(DURABLE_RESUME_SCHEMAS, tool) ? DURABLE_RESUME_SCHEMAS[tool] : undefined;
+  if (!schema || !Value.Check(schema, value)) {
     throw new Error("approved tool is not supported by the durable resume dispatcher");
   }
-  return args;
+  return value as Record<string, unknown>;
 }
 
 export async function resumeApprovedAgentRun(
@@ -139,23 +148,55 @@ export async function commitApprovedResumeWrites(
   },
 ): Promise<{ resumed: boolean; duplicate?: boolean; expired?: boolean }> {
   const { runId, idempotencyKey, tool, toolCallId, args, now } = input;
-  const resultJson = JSON.stringify({ resumed: true, tool });
   const argsJson = JSON.stringify(args);
+  const isTicket = tool === "create_ticket";
+  const ticketArgs = isTicket ? (assertSupportedArguments(tool, args) as Static<typeof CreateTicketParams>) : null;
+  // The ticket number is assigned by the insert, so its result is built in SQL.
+  const resultSql = isTicket
+    ? `json_object('resumed', json('true'), 'tool', ?, 'ticketId', 'SUP-' || (SELECT seq FROM tickets WHERE idempotency_key = ?))`
+    : `?`;
+  const resultBinds: unknown[] = isTicket
+    ? [tool, idempotencyKey]
+    : [JSON.stringify({ resumed: true, tool })];
+  const effectStatement = ticketArgs
+    ? db
+        .prepare(
+          `INSERT INTO tickets (
+             idempotency_key, run_id, principal_id, desk, priority, customer, subject, created_at
+           ) SELECT ?, ?, r.principal_id, ?, ?, ?, ?, ?
+           FROM agent_runs r
+           WHERE r.id = ? AND ${STILL_APPROVED_RESUME}
+           ON CONFLICT(idempotency_key) DO NOTHING`,
+        )
+        .bind(
+          idempotencyKey,
+          runId,
+          ticketArgs.desk,
+          ticketArgs.priority,
+          ticketArgs.customer,
+          ticketArgs.subject,
+          now,
+          runId,
+          runId,
+          idempotencyKey,
+          now,
+        )
+    : db
+        .prepare(
+          `INSERT INTO synthetic_mutating_effects (
+             idempotency_key, tool, normalized_arguments_json, created_at
+           ) SELECT ?, ?, ?, ?
+           WHERE ${STILL_APPROVED_RESUME}
+           ON CONFLICT(idempotency_key) DO NOTHING`,
+        )
+        .bind(idempotencyKey, tool, argsJson, now, runId, idempotencyKey, now);
   await db.batch([
-    db
-      .prepare(
-        `INSERT INTO synthetic_mutating_effects (
-           idempotency_key, tool, normalized_arguments_json, created_at
-         ) SELECT ?, ?, ?, ?
-         WHERE ${STILL_APPROVED_RESUME}
-         ON CONFLICT(idempotency_key) DO NOTHING`,
-      )
-      .bind(idempotencyKey, tool, argsJson, now, runId, idempotencyKey, now),
+    effectStatement,
     db
       .prepare(
         `INSERT INTO idempotent_effects (
            idempotency_key, status, result_json, created_at, updated_at
-         ) SELECT ?, 'completed', ?, ?, ?
+         ) SELECT ?, 'completed', ${resultSql}, ?, ?
          WHERE ${STILL_APPROVED_RESUME}
          ON CONFLICT(idempotency_key) DO UPDATE SET
            status = 'completed', result_json = excluded.result_json,
@@ -164,7 +205,7 @@ export async function commitApprovedResumeWrites(
       )
       .bind(
         idempotencyKey,
-        resultJson,
+        ...resultBinds,
         now,
         now,
         runId,
@@ -176,11 +217,11 @@ export async function commitApprovedResumeWrites(
       ),
     db
       .prepare(
-        `UPDATE tool_calls SET status = 'ok', redacted_result = ?
+        `UPDATE tool_calls SET status = 'ok', redacted_result = ${resultSql}
          WHERE id = ? AND run_id = ? AND status = 'pending_approval'
            AND ${STILL_APPROVED_RESUME}`,
       )
-      .bind(resultJson, toolCallId, runId, runId, idempotencyKey, now),
+      .bind(...resultBinds, toolCallId, runId, runId, idempotencyKey, now),
     db
       .prepare(
         `UPDATE agent_runs SET status = 'completed', updated_at = ?

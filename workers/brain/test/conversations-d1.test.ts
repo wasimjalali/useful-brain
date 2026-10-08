@@ -175,6 +175,8 @@ describe("operations conversation snapshots", () => {
       env.OPERATIONS_DB,
       pending.conversationId,
       "principal-alice",
+      undefined,
+      { diagnostics: true },
     );
     expect(conversation.turns[0]?.answer?.retrieval.results[0]).toMatchObject({
       vectorScore: 0.84,

@@ -38,6 +38,7 @@ This file records the decisions, the amendments to the recon contracts and the d
 | D16 | Turn progress | Additive closed union: `searching{readableDocuments}`, `reading{passages}`, `writing`, `done`, `failed{errorCode}`. Old stages map onto it. The UI holds each label at least 260 ms so `reading` doesn't flash. Validated text is revealed after the turn returns; no token streaming. This records a deviation from master plan §11 Phase 4 ("streaming through the conversation Durable Object"): the spec forbids streaming unvalidated tokens, and validated text is complete when it exists. | README 03 and audit correction 8. |
 | D17 | Retry of a failed turn | `POST /turns {retryOfMessageId}` reuses the saved user message (`parent_user_message_id`). | README 06. |
 | D18 | Document-scoped chat | `POST /turns {scopeDocumentId}` restricts retrieval to that document after ACL. Unreadable id returns 404. | Library "Ask about this". |
+| D20 | Draft reconciliation without a vector listing | The Vectorize Worker binding has no list operation (list-vectors is Wrangler and REST only, per Cloudflare docs). Draft reconciliation waits for exact mutation equality, fetches every ledger vector with `getByIds`, checks namespace and `acl_group`, and marks the audit partial if `describe()` moves during the scan (`reconcile_mode = ledger_getbyids`). It cannot find orphan vectors. Keyword-only environments (no Vectorize binding, as in local preview) record `reconcile_mode = keyword_only`. **Open for Wasim:** a full paginated inventory needs a Cloudflare API token as a Worker secret. | Master plan §5 asks for a full ID snapshot; this is the strongest binding-only check. |
 | D19 | Readable-document count | One SQL helper `countReadableDocuments` uses the same `aclSqlAndParams` predicate as the FTS channel, tested against the `canAccessChunk` oracle. | Same ACL code as retrieval. |
 
 D8, D8a and D16 amend the master plan's upload and streaming details in the direction the spec sets, without weakening a safety contract. None of the decisions contradicts AGENTS.md safety rules, so Phase 0 does not stop.
@@ -55,7 +56,7 @@ Use recon-backend §8 with these changes:
 - `GET /config` and `GET /evaluations` (extended) are admin only.
 - Health detail strings are closed codes mapped to copy in the UI.
 
-Migrations, all additive: operations `0012_turn_metrics_feedback`, `0013_admin_invites_viewas`, `0014_tickets_approval_display`, `0015_turn_steps_health`; corpus `0004_document_catalog` (catalog, bodies, title and heading FTS with triggers, no `INSERT OR REPLACE`), `0005_uploads_draft_progress`. Existing generations get catalog and body rows through an idempotent backfill.
+Migrations, all additive: operations `0012_turn_metrics_feedback`, `0013_tickets_approval_display`, `0014_admin_metrics`, `0015_invites_view_as_audits`; corpus `0004_document_catalog` (catalog, bodies, title and heading FTS with triggers, no `INSERT OR REPLACE`), `0005_uploads_draft_pipeline`. Existing generations get catalog and body rows through an idempotent backfill run at promote and by the admin-only `POST /admin/catalog/backfill`.
 
 ## 4. Phases and work packages
 

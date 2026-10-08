@@ -104,30 +104,30 @@ describe("conversation lock turn stages", () => {
     const stub = env.CONVERSATION.getByName("conv-stage-owner");
     expect(await stub.acquire("run-progress")).toEqual({ ok: true, runId: "run-progress" });
 
-    expect(await stub.setStage("run-progress", "searching")).toEqual({
+    expect(await stub.setStage("run-progress", "searching", 7)).toEqual({
       ok: true,
       runId: "run-progress",
       changed: true,
     });
-    expect(await stub.progress()).toEqual({ runId: "run-progress", stage: "searching" });
+    expect(await stub.progress()).toEqual({ runId: "run-progress", stage: "searching", count: 7 });
 
     // A repeated mark is accepted without a storage write.
-    expect(await stub.setStage("run-progress", "searching")).toEqual({
+    expect(await stub.setStage("run-progress", "searching", 7)).toEqual({
       ok: true,
       runId: "run-progress",
       changed: false,
     });
 
-    expect(await stub.setStage("run-progress", "drafting")).toEqual({
+    expect(await stub.setStage("run-progress", "reading", 3)).toEqual({
       ok: true,
       runId: "run-progress",
       changed: true,
     });
 
     // Backward movement and writes from a stale run are rejected.
-    expect(await stub.setStage("run-progress", "searching")).toEqual({ ok: false, status: 409 });
-    expect(await stub.setStage("run-other", "saving")).toEqual({ ok: false, status: 409 });
-    expect(await stub.progress()).toEqual({ runId: "run-progress", stage: "drafting" });
+    expect(await stub.setStage("run-progress", "searching", 7)).toEqual({ ok: false, status: 409 });
+    expect(await stub.setStage("run-other", "writing")).toEqual({ ok: false, status: 409 });
+    expect(await stub.progress()).toEqual({ runId: "run-progress", stage: "reading", count: 3 });
   });
 
   it("rejects unknown stages and unbounded run ids", async () => {
@@ -135,8 +135,8 @@ describe("conversation lock turn stages", () => {
     expect(await stub.acquire("run-progress")).toEqual({ ok: true, runId: "run-progress" });
     expect(await stub.setStage("run-progress", "done")).toEqual({ ok: false, status: 400 });
     expect(await stub.setStage("run-progress", "summarizing")).toEqual({ ok: false, status: 400 });
-    expect(await stub.setStage("../run", "searching")).toEqual({ ok: false, status: 400 });
-    expect(await stub.progress()).toEqual({ runId: "run-progress", stage: null });
+    expect(await stub.setStage("../run", "searching", 1)).toEqual({ ok: false, status: 400 });
+    expect(await stub.progress()).toEqual({ runId: "run-progress", stage: null, count: null });
   });
 
   it("rejects stage writes after release and rehydrates across eviction", async () => {
@@ -145,24 +145,21 @@ describe("conversation lock turn stages", () => {
     await stub.setStage("run-progress", "checking_citations");
 
     await evictDurableObject(stub);
-    expect(await stub.progress()).toEqual({
-      runId: "run-progress",
-      stage: "checking_citations",
-    });
+    expect(await stub.progress()).toEqual({ runId: "run-progress", stage: "writing", count: null });
 
     expect(await stub.release("run-progress")).toEqual({ ok: true, runId: "run-progress" });
-    expect(await stub.progress()).toEqual({ runId: null, stage: null });
+    expect(await stub.progress()).toEqual({ runId: null, stage: null, count: null });
     expect(await stub.setStage("run-progress", "saving")).toEqual({ ok: false, status: 409 });
   });
 
   it("resets the stage when a new run takes the lock", async () => {
     const stub = env.CONVERSATION.getByName("conv-stage-reset");
     await stub.acquire("run-first");
-    await stub.setStage("run-first", "drafting");
+    await stub.setStage("run-first", "reading", 2);
     await stub.release("run-first");
 
     await stub.acquire("run-second");
-    expect(await stub.progress()).toEqual({ runId: "run-second", stage: null });
+    expect(await stub.progress()).toEqual({ runId: "run-second", stage: null, count: null });
   });
 });
 
@@ -226,13 +223,13 @@ describe("turn progress route", () => {
     });
     const stub = env.CONVERSATION.getByName(pending.conversationId);
     await stub.acquire(pending.assistantMessageId);
-    await stub.setStage(pending.assistantMessageId, "searching");
-    await stub.setStage(pending.assistantMessageId, "drafting");
+    await stub.setStage(pending.assistantMessageId, "searching", 5);
+    await stub.setStage(pending.assistantMessageId, "reading", 3);
 
     const response = await authed("/turns/req-live-stage/progress");
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
-    expect(await response.json()).toEqual({ stage: "drafting" });
+    expect(await response.json()).toEqual({ stage: "reading", passages: 3 });
   });
 
   it("reports the earliest stage when no lock row exists yet", async () => {
@@ -245,7 +242,7 @@ describe("turn progress route", () => {
 
     const response = await authed("/turns/req-not-started/progress");
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ stage: "searching" });
+    expect(await response.json()).toEqual({ stage: "searching", readableDocuments: 0 });
   });
 
   it("reports the earliest stage when the lock belongs to another run", async () => {
@@ -257,11 +254,11 @@ describe("turn progress route", () => {
     });
     const stub = env.CONVERSATION.getByName(pending.conversationId);
     await stub.acquire("m-stale-run");
-    await stub.setStage("m-stale-run", "saving");
+    await stub.setStage("m-stale-run", "writing");
 
     const response = await authed("/turns/req-stale-lock/progress");
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ stage: "searching" });
+    expect(await response.json()).toEqual({ stage: "searching", readableDocuments: 0 });
   });
 
   it("reports the D1 terminal snapshot for a completed turn", async () => {
