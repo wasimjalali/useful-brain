@@ -68,11 +68,19 @@ describe("FailuresList", () => {
     expect(screen.queryByText("Asked as")).toBeNull();
     fireEvent.click(btn);
     expect(btn).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByText("support_agent")).toHaveClass("font-mono");
+    expect(screen.getByText("Support agent")).toBeInTheDocument();
+    expect(screen.queryByText("support_agent")).toBeNull();
+    expect(screen.getByText("Factual", { selector: "span.rounded-md" })).toBeInTheDocument();
+    expect(screen.getByText("Looks for")).toBeInTheDocument();
     expect(screen.getByText("Exact token.")).toBeInTheDocument();
     expect(screen.getByTestId("failure-chevron")).toHaveStyle({ transform: "rotate(90deg)" });
     fireEvent.click(btn);
     expect(screen.queryByText("Asked as")).toBeNull();
+  });
+  it("reads the role as a singular label", () => {
+    render(<FailuresList failures={[{ ...failure("q001"), askedAs: "manager" }]} initiallyOpenId="q001" />);
+    expect(screen.getByText("Manager")).toBeInTheDocument();
+    expect(screen.queryByText("Managers")).toBeNull();
   });
   it("can start open and keeps rows independent", () => {
     render(<FailuresList failures={[failure("q093"), failure("q120")]} initiallyOpenId="q093" />);
@@ -83,7 +91,9 @@ describe("FailuresList", () => {
 describe("footer and chip", () => {
   it("shows the read-only note and command", () => {
     render(<><ModelChip model="@cf/zai-org/glm-5.3-flash" /><EvalsFooter /></>);
-    expect(screen.getByText("@cf/zai-org/glm-5.3-flash")).toBeInTheDocument();
+    expect(screen.getByText("GLM 5.3 Flash")).toBeInTheDocument();
+    expect(screen.queryByText("@cf/zai-org/glm-5.3-flash")).toBeNull();
+    expect(screen.getByTitle("@cf/zai-org/glm-5.3-flash")).toBeInTheDocument();
     expect(screen.getByText("Read-only here. Run the suite from the repo:")).toBeInTheDocument();
     expect(screen.getByText("npm run eval:northwind")).toHaveClass("font-mono");
   });

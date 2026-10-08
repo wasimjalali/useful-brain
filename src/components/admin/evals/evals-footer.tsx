@@ -1,4 +1,5 @@
 import { CpuIcon, LockIcon } from "@/components/icons";
+import { modelDisplayName } from "@/lib/labels";
 
 export function EvalsFooter() {
   return (
@@ -12,9 +13,9 @@ export function EvalsFooter() {
 
 export function ModelChip({ model }: { model: string }) {
   return (
-    <span className="inline-flex h-[30px] items-center gap-2 rounded-[10px] bg-sunken px-2.5 font-mono text-xs text-ink">
+    <span className="inline-flex h-[30px] items-center gap-2 rounded-[10px] bg-sunken px-2.5 text-xs font-medium text-ink" title={model}>
       <CpuIcon className="size-3.5 text-ink-muted" />
-      {model}
+      {modelDisplayName(model)}
     </span>
   );
 }
