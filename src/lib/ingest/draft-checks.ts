@@ -133,7 +133,8 @@ async function removeKnownVectorIds(db: SqlExecutor, listed: Set<string>, pageSi
  * and `acl_group`. While pending, an orphan in the draft's namespace (an
  * unprocessed delete) or an unknown id that does not resolve (the listing and
  * the binding lag each other) is retried against a fresh listing. More than
- * ORPHAN_RESOLVE_CAP unknown ids fails closed at once.
+ * ORPHAN_RESOLVE_CAP unknown ids is retried while pending (purge deletes may still
+ * be landing) and fails closed on the final attempt.
  * With no binding (keyword-only) there are no vectors, so the audit is
  * recorded as empty and clean with mode "keyword_only".
  *
@@ -262,6 +263,11 @@ export async function reconcileDraft(
       await removeKnownVectorIds(db, unknown, input.knownPageSize ?? KNOWN_ID_PAGE);
       inventoried = { orphans: 0, inDraft: [], unresolved: 0, tooMany: 0 };
       if (unknown.size > (input.orphanResolveCap ?? ORPHAN_RESOLVE_CAP)) {
+        // Unprocessed purge deletes can inflate the count for a while, so it is
+        // retried against a fresh listing. Only the final attempt fails closed.
+        if (input.missingIsPending) {
+          throw new MutationPendingError();
+        }
         inventoried.tooMany = unknown.size;
       } else {
         let resolved = 0;
@@ -304,7 +310,7 @@ export async function reconcileDraft(
   report.endWatermark = processedAfter || null;
   const tooMany = inventoried?.tooMany ?? 0;
   if (tooMany > 0) {
-    // Not retried: more unknown ids will not become fewer. Unresolved ones could hide an in-draft orphan.
+    // Final attempt only. Unresolved ids could hide an in-draft orphan, so none are skipped.
     report.status = "partial";
     report.clean = false;
     report.reason = `${tooMany} unknown vectors exceed the check limit of ${input.orphanResolveCap ?? ORPHAN_RESOLVE_CAP}`;

@@ -4,6 +4,7 @@ import {
   createRestVectorInventory,
   inventoryFromSettings,
   VECTOR_LIST_PAGE_SIZE,
+  VectorInventoryDeadline,
   VectorInventoryError,
   VectorInventoryRateLimited,
 } from "./vector-inventory";
@@ -71,7 +72,7 @@ function fakeFetch(responses: Array<Response | Error | ((call: Call) => Response
 
 function inventory(
   responses: Parameters<typeof fakeFetch>[0],
-  options: { now?: () => number; maxPages?: number } = {},
+  options: { now?: () => number; maxPages?: number; deadlineMs?: number; clock?: { t: number } } = {},
 ) {
   const sleeps: number[] = [];
   const fake = fakeFetch(responses);
@@ -83,9 +84,12 @@ function inventory(
     delayMs: 40,
     sleep: async (ms) => {
       sleeps.push(ms);
+      // A clock test lets sleeping move time forward.
+      if (options.clock) options.clock.t += ms;
     },
-    ...(options.now ? { now: options.now } : {}),
+    ...(options.clock ? { now: () => options.clock!.t } : options.now ? { now: options.now } : {}),
     ...(options.maxPages ? { maxPages: options.maxPages } : {}),
+    ...(options.deadlineMs ? { deadlineMs: options.deadlineMs } : {}),
   });
   return { port, sleeps, calls: fake.calls };
 }
@@ -249,6 +253,16 @@ describe("REST vector inventory", () => {
     expect(await failure(inventory([missing]).port.listAll())).toBeInstanceOf(VectorInventoryError);
   });
 
+  it("each malformed fixture fails at its own guard, not at the count check", async () => {
+    const run = (result: Record<string, unknown>) =>
+      failure(inventory([new Response(JSON.stringify({ success: true, result }), { status: 200 })]).port.listAll());
+    expect((await run({ count: 1, vectors: [{ id: "a" }], totalCount: 5, isTruncated: true })).message).toMatch(/without a cursor/);
+    // These only reach their own guard because count is valid; a bad one is rejected on its own.
+    expect(await run({ count: 1, vectors: [{ id: 7 }], totalCount: 1, isTruncated: false })).toBeInstanceOf(VectorInventoryError);
+    expect(await run({ count: 1, vectors: [{ id: "a" }], totalCount: -1, isTruncated: false })).toBeInstanceOf(VectorInventoryError);
+    expect(await run({ count: 1, vectors: [{ id: "a" }], totalCount: 1, isTruncated: "no" })).toBeInstanceOf(VectorInventoryError);
+  });
+
   it("honours Retry-After on a 429 within a bounded budget, then continues", async () => {
     const limited = (seconds: string) => new Response("slow down", { status: 429, headers: { "retry-after": seconds } });
     const { port, sleeps, calls } = inventory([limited("2"), limited("3"), body({ ids: ids("v", 0, 3), totalCount: 3 })]);
@@ -270,11 +284,12 @@ describe("REST vector inventory", () => {
     expect(await failure(tooLong.port.listAll())).toBeInstanceOf(VectorInventoryRateLimited);
     expect(tooLong.sleeps).toEqual([]);
 
-    const spent = inventory([limited({ "retry-after": "50" }), limited({ "retry-after": "50" }), limited({ "retry-after": "50" })]);
+    const spent = inventory([limited({ "retry-after": "40" }), limited({ "retry-after": "40" }), limited({ "retry-after": "40" })]);
     const error = await failure(spent.port.listAll());
     expect(error).toBeInstanceOf(VectorInventoryRateLimited);
     expect(error.name).toBe("VectorInventoryRateLimited");
-    expect(spent.sleeps).toEqual([50_000, 50_000]);
+    // 40s fits the 60s total budget, a second 40s does not.
+    expect(spent.sleeps).toEqual([40_000]);
     expectNoSecrets(error);
   });
 
@@ -309,10 +324,10 @@ describe("REST vector inventory", () => {
     const bodies: unknown[] = [
       "not json at all",
       { success: true },
-      { success: true, result: { vectors: "nope", totalCount: 1, isTruncated: false } },
-      { success: true, result: { vectors: [{ id: 1 }], totalCount: 1, isTruncated: false } },
-      { success: true, result: { vectors: [{ id: "a" }], totalCount: "1", isTruncated: false } },
-      { success: true, result: { vectors: [{ id: "a" }], totalCount: 5, isTruncated: true } },
+      { success: true, result: { count: 0, vectors: "nope", totalCount: 1, isTruncated: false } },
+      { success: true, result: { count: 1, vectors: [{ id: 1 }], totalCount: 1, isTruncated: false } },
+      { success: true, result: { count: 1, vectors: [{ id: "a" }], totalCount: "1", isTruncated: false } },
+      { success: true, result: { count: 1, vectors: [{ id: "a" }], totalCount: 5, isTruncated: true } },
     ];
     for (const raw of bodies) {
       const text = typeof raw === "string" ? raw : JSON.stringify(raw);
@@ -350,6 +365,92 @@ describe("REST vector inventory", () => {
   });
 });
 
+describe("REST vector inventory limits", () => {
+  const limited = (retryAfter?: string) =>
+    new Response("slow down", { status: 429, headers: retryAfter === undefined ? {} : { "retry-after": retryAfter } });
+
+  it("stops after five 429 retries even when Retry-After is 0", async () => {
+    const { port, calls, sleeps } = inventory(Array.from({ length: 8 }, () => limited("0")));
+    const error = await failure(port.listAll());
+    expect(error).toBeInstanceOf(VectorInventoryRateLimited);
+    expect(calls).toHaveLength(6);
+    expect(sleeps).toEqual([0, 0, 0, 0, 0]);
+  });
+
+  it("stops after five retries when Retry-After is an HTTP date in the past", async () => {
+    const { port, calls } = inventory(Array.from({ length: 8 }, () => limited("Wed, 21 Oct 2015 07:28:00 GMT")));
+    const error = await failure(port.listAll());
+    expect(error).toBeInstanceOf(VectorInventoryRateLimited);
+    expect(calls).toHaveLength(6);
+  });
+
+  it("waits for a future HTTP date within the limit", async () => {
+    const clock = { t: Date.parse("2026-10-08T12:00:00Z") };
+    const { port, sleeps } = inventory(
+      [limited("Thu, 08 Oct 2026 12:00:07 GMT"), body({ ids: ids("v", 0, 2), totalCount: 2 })],
+      { clock },
+    );
+    expect((await port.listAll()).ids).toHaveLength(2);
+    expect(sleeps).toEqual([7000]);
+  });
+
+  it("rejects malformed Retry-After values without waiting or retrying", async () => {
+    for (const bad of ["-1", "abc", "1.5", "1e3", "", " ", "1 2", "99999999", "2015-10-21"]) {
+      const { port, calls, sleeps } = inventory([limited(bad), limited(bad)]);
+      const error = await failure(port.listAll());
+      expect(error, bad).toBeInstanceOf(VectorInventoryRateLimited);
+      expect(calls, bad).toHaveLength(1);
+      expect(sleeps, bad).toEqual([]);
+    }
+  });
+
+  it("fails with a typed, name-safe error when the wall-clock deadline passes between pages", async () => {
+    const clock = { t: 1_000_000 };
+    const page = (n: number, last = false) =>
+      body({ ids: ids(`p${n}`, 0, 10), totalCount: 30, ...(last ? {} : { nextCursor: `c${n}` }) });
+    const { port, calls, sleeps } = inventory([page(1), page(2), page(3, true)], { clock, deadlineMs: 70 });
+    const error = await failure(port.listAll());
+    expect(error).toBeInstanceOf(VectorInventoryDeadline);
+    expect(error.name).toBe("VectorInventoryDeadline");
+    expect(calls).toHaveLength(2);
+    expect(sleeps).toEqual([40]); // the second gap would have crossed the deadline, so it is not slept
+    expectNoSecrets(error);
+  });
+
+  it("does not sleep through a Retry-After that would cross the deadline", async () => {
+    const clock = { t: 5_000 };
+    const { port, sleeps } = inventory([limited("50"), body({ ids: [], totalCount: 0 })], { clock, deadlineMs: 40_000 });
+    expect(await failure(port.listAll())).toBeInstanceOf(VectorInventoryDeadline);
+    expect(sleeps).toEqual([]);
+  });
+
+  it("a healthy scan of 100 full pages finishes inside the deadline at the default gap", async () => {
+    const clock = { t: 0 };
+    const responses = Array.from({ length: 100 }, (_, n) =>
+      body({ ids: ids(`p${n}`, 0, 1000), totalCount: 100_000, ...(n < 99 ? { nextCursor: `c${n}` } : {}) }),
+    );
+    const sleeps: number[] = [];
+    const fake = fakeFetch(responses);
+    const port = createRestVectorInventory({
+      accountId: ACCOUNT,
+      indexName: INDEX,
+      apiToken: TOKEN,
+      fetch: async (...args) => {
+        clock.t += 500; // request latency
+        return fake.fetch(...args);
+      },
+      sleep: async (ms) => {
+        sleeps.push(ms);
+        clock.t += ms;
+      },
+      now: () => clock.t,
+    });
+    expect((await port.listAll()).ids).toHaveLength(100_000);
+    expect(sleeps.every((ms) => ms === 100)).toBe(true);
+    expect(clock.t).toBeLessThan(240_000);
+  });
+});
+
 describe("inventory settings", () => {
   const all = { VECTORIZE_API_TOKEN: TOKEN, CLOUDFLARE_ACCOUNT_ID: ACCOUNT, VECTORIZE_INDEX_NAME: INDEX };
 
@@ -359,23 +460,30 @@ describe("inventory settings", () => {
     expect(full).toMatchObject({ partlyConfigured: false, missing: [] });
   });
 
-  it("none set is binding-only, not a misconfiguration; empty strings count as unset", () => {
-    expect(inventoryFromSettings({})).toEqual({
+  it("the deployed shape, with only the plain index var, is binding-only", () => {
+    expect(inventoryFromSettings({ VECTORIZE_INDEX_NAME: "useful-brain-staging" })).toEqual({
       inventory: null,
       partlyConfigured: false,
-      missing: ["VECTORIZE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID", "VECTORIZE_INDEX_NAME"],
+      missing: [],
     });
-    expect(inventoryFromSettings({ VECTORIZE_API_TOKEN: "", CLOUDFLARE_ACCOUNT_ID: "" }).partlyConfigured).toBe(false);
+    expect(inventoryFromSettings({})).toEqual({ inventory: null, partlyConfigured: false, missing: [] });
+    expect(
+      inventoryFromSettings({ VECTORIZE_API_TOKEN: "", CLOUDFLARE_ACCOUNT_ID: "", VECTORIZE_INDEX_NAME: INDEX }).partlyConfigured,
+    ).toBe(false);
   });
 
-  it("some but not all set is partly configured and names only the missing settings", () => {
-    for (const absent of Object.keys(all) as Array<keyof typeof all>) {
-      const { [absent]: _removed, ...rest } = all;
-      void _removed;
-      const result = inventoryFromSettings(rest);
+  it("exactly one secret, or both secrets without an index name, is partly configured and names only what is missing", () => {
+    const cases: Array<[Record<string, string>, string[]]> = [
+      [{ VECTORIZE_API_TOKEN: TOKEN, VECTORIZE_INDEX_NAME: INDEX }, ["CLOUDFLARE_ACCOUNT_ID"]],
+      [{ CLOUDFLARE_ACCOUNT_ID: ACCOUNT, VECTORIZE_INDEX_NAME: INDEX }, ["VECTORIZE_API_TOKEN"]],
+      [{ VECTORIZE_API_TOKEN: TOKEN }, ["CLOUDFLARE_ACCOUNT_ID", "VECTORIZE_INDEX_NAME"]],
+      [{ VECTORIZE_API_TOKEN: TOKEN, CLOUDFLARE_ACCOUNT_ID: ACCOUNT }, ["VECTORIZE_INDEX_NAME"]],
+    ];
+    for (const [settings, missing] of cases) {
+      const result = inventoryFromSettings(settings);
       expect(result.inventory).toBeNull();
       expect(result.partlyConfigured).toBe(true);
-      expect(result.missing).toEqual([absent]);
+      expect(result.missing).toEqual(missing);
       expect(JSON.stringify(result)).not.toContain(TOKEN);
     }
   });

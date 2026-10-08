@@ -44,10 +44,11 @@ Local dev: put `VECTORIZE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` in `workers/ing
 
 Behavior to know:
 
-- Set both secrets or neither. With only some of the three settings present, reconciliation fails closed (not reconciled, reason "inventory partly configured") and the worker logs the missing setting names.
+- The two secrets switch the feature on. With neither set, reconciliation is binding-only, whatever `VECTORIZE_INDEX_NAME` says (it is a plain var in every environment). With both set it lists the index. With only one secret, or both and no index name, reconciliation fails closed (not reconciled, reason "inventory partly configured") and the worker logs the missing setting names.
 - An orphan in the draft's own namespace (a vector in the index with no D1 row) fails the draft after the retries run out. Orphans in other namespaces are counted only.
-- More than 2,000 unknown vectors (ids in the index with no D1 row) fails closed at once with a reason naming the count, because the rest could hide an in-draft orphan. Clean up the index first, then run the check again.
-- A 429 from the API is waited out when `Retry-After` is 60 seconds or less, up to 120 seconds in total. Anything longer fails the attempt and the step retries.
+- More than 2,000 unknown vectors (ids in the index with no D1 row) is retried while the check is pending, since purge deletes may still be landing. If it persists, the final attempt fails closed with a reason naming the count, because the rest could hide an in-draft orphan. Clean up the index first, then run the check again.
+- A 429 from the API is waited out when `Retry-After` is a whole number of seconds or an HTTP date up to 60 seconds away, at most 5 retries per page and 60 seconds of waiting in total. Anything else fails the attempt and the step retries.
+- One listing has a 240 second deadline, waits included, with a 100 millisecond gap between pages of up to 1,000 ids. At roughly half a second per request, that fits an index of about 100,000 vectors (the planned envelope, about 100 pages, around one minute) with wide margin. Short pages or a slow API shrink that. On the deadline the attempt fails and the step retries; on the final attempt the draft fails closed.
 - Orphan counts are written to `draft_checks` (`inventory_checked`, `orphan_vectors`, `orphan_vectors_in_draft`) and are not shown in the admin UI. Read them with `wrangler d1 execute` against the corpus database. `inventory_checked = 0` means the check ran binding-only.
 
 Verify after setting the secrets: upload one file on staging, let the draft finish, and confirm its `draft_checks` row has `inventory_checked = 1`. The live API's all-namespace listing and `totalCount` semantics are unverified until this runs once. If it fails closed with a "list is incomplete" or "more ids than totalCount" error, the count semantics differ from the docs and the check needs adjusting.

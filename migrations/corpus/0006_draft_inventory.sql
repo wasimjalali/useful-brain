@@ -12,3 +12,7 @@
 ALTER TABLE draft_checks ADD COLUMN inventory_checked INTEGER CHECK (inventory_checked IN (0, 1));
 ALTER TABLE draft_checks ADD COLUMN orphan_vectors INTEGER;
 ALTER TABLE draft_checks ADD COLUMN orphan_vectors_in_draft INTEGER;
+
+-- The orphan check reads discarded_vectors in vector_id order. Its primary key
+-- starts with generation_id, so without this the keyset pages would sort the table.
+CREATE INDEX IF NOT EXISTS idx_discarded_vectors_vector ON discarded_vectors (vector_id);

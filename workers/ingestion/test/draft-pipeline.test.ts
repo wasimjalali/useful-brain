@@ -26,7 +26,7 @@ import {
   type DocumentToIndex,
 } from "../../../src/lib/ingest/draft-index";
 import { generationNamespace, vectorIdForChunk } from "../../../src/lib/ingest/digests";
-import { VectorInventoryError, type VectorInventory } from "../../../src/lib/ingest/vector-inventory";
+import { inventoryFromSettings, VectorInventoryError, type VectorInventory } from "../../../src/lib/ingest/vector-inventory";
 import { ensureDraftGeneration } from "../../../src/lib/store/corpus-d1";
 import { claimDiscard, closeDraft, ensureOpenDraft, failDraft, getOpenDraft, markBaseCopied } from "../../../src/lib/store/drafts";
 import { claimFinalize, startIndexing } from "../../../src/lib/store/draft-state";
@@ -833,21 +833,41 @@ describe("reconciliation", () => {
       expect(await run(true)).toMatchObject({ reconciled: true, orphanVectors: 0, orphanVectorsInDraft: 0 });
     });
 
-    it("more unknown ids than the cap fails closed at once, even while pending, without resolving any", async () => {
+    it("more unknown ids than the cap is retried while pending, and fails closed on the final attempt without resolving any", async () => {
       const { vectors, draft } = await draftWithVectors();
       for (let index = 0; index < 5; index += 1) addOrphan(vectors, `junk-${index}`, "some-other-namespace");
       const calls: string[][] = [];
       const counting = { ...vectors.port, getByIds: async (ids: string[]) => { calls.push(ids); return vectors.port.getByIds(ids); } };
       const run = (missingIsPending: boolean) =>
         reconcileDraft({ db: db(), vectors: counting, inventory: listing(vectors.store), generationId: draft.generationId, orphanResolveCap: 4, missingIsPending });
-      const pending = await run(true);
-      expect(pending).toMatchObject({ reconciled: false, status: "partial", inventoryChecked: true, orphanVectors: 5, orphanVectorsInDraft: null });
-      expect(pending.reason).toBe("5 unknown vectors exceed the check limit of 4");
-      expect(calls).toHaveLength(1); // the ledger fetch only
+      // Pending: purge deletes may still be landing, so nothing is decided or recorded.
+      await expect(run(true)).rejects.toBeInstanceOf(MutationPendingError);
+      expect(await auditRow(draft.generationId)).toBeNull();
+      const final = await run(false);
+      expect(final).toMatchObject({ reconciled: false, status: "partial", inventoryChecked: true, orphanVectors: 5, orphanVectorsInDraft: null });
+      expect(final.reason).toBe("5 unknown vectors exceed the check limit of 4");
+      expect(calls).toHaveLength(2); // the ledger fetch of each run only; no unknown id was resolved
       expect(await auditRow(draft.generationId)).toMatchObject({ status: "partial" });
-      // At the cap exactly it still resolves.
+      // Once the surplus clears (deletes processed) the pending run reconciles; at the cap exactly it resolves.
       vectors.store.delete("junk-0");
-      expect(await run(false)).toMatchObject({ reconciled: true, orphanVectors: 4 });
+      expect(await run(true)).toMatchObject({ reconciled: true, orphanVectors: 4 });
+    });
+
+    it("the deployed settings shape (index name var only, no secrets) reconciles binding-only", async () => {
+      const { vectors, draft } = await draftWithVectors();
+      addOrphan(vectors, "ignored-without-a-listing", await generationNamespace(draft.generationId));
+      const settings = inventoryFromSettings({ VECTORIZE_INDEX_NAME: "useful-brain-staging" });
+      for (const missingIsPending of [true, false]) {
+        const outcome = await reconcileDraft({
+          db: db(),
+          vectors: vectors.port,
+          inventory: settings.inventory,
+          inventoryPartlyConfigured: settings.partlyConfigured,
+          generationId: draft.generationId,
+          missingIsPending,
+        });
+        expect(outcome).toMatchObject({ mode: "ledger_getbyids", reconciled: true, status: "complete", inventoryChecked: false, orphanVectors: null });
+      }
     });
 
     it("resolves more than 20 unknown ids in batches of 20", async () => {

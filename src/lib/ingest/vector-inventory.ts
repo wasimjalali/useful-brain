@@ -21,11 +21,15 @@ export class VectorInventoryError extends Error {
 export const VECTOR_LIST_PAGE_SIZE = 1000;
 /** Generous safety cap on pages in one sequence. Termination itself comes from the progress checks. */
 export const MAX_LIST_PAGES = 1000;
-const DEFAULT_PAGE_GAP_MS = 250;
+const DEFAULT_PAGE_GAP_MS = 100;
+/** Retries of one page after a 429, however short the Retry-After. */
+const MAX_RATE_LIMIT_RETRIES = 5;
+/** Wall-clock limit for one listAll, waits included. Inside the 5-minute reconcile step. */
+const LIST_DEADLINE_MS = 240_000;
 /** A 429 with a Retry-After above this is thrown, not waited out. */
 const MAX_RETRY_AFTER_MS = 60_000;
-/** Total time one listAll may spend waiting on 429s. Fits the 5-minute reconcile step. */
-const RATE_LIMIT_WAIT_BUDGET_MS = 120_000;
+/** Total time one listAll may spend waiting on 429s. */
+const RATE_LIMIT_WAIT_BUDGET_MS = 60_000;
 const ACCOUNT_ID = /^[0-9a-f]{32}$/;
 const INDEX_NAME = /^[A-Za-z0-9_-]{1,64}$/;
 /** Statuses where a cursor request cannot be told apart from an expired cursor. */
@@ -41,6 +45,7 @@ export type RestVectorInventoryConfig = {
   sleep?: (ms: number) => Promise<void>;
   now?: () => number;
   maxPages?: number;
+  deadlineMs?: number;
 };
 
 type Page = {
@@ -55,6 +60,14 @@ export class VectorInventoryRateLimited extends VectorInventoryError {
   constructor(message: string) {
     super(message);
     this.name = "VectorInventoryRateLimited";
+  }
+}
+
+/** The listing ran past its wall-clock limit. Typed so a caller can tell it from a fault. */
+export class VectorInventoryDeadline extends VectorInventoryError {
+  constructor() {
+    super("list exceeded its time limit");
+    this.name = "VectorInventoryDeadline";
   }
 }
 
@@ -102,19 +115,26 @@ function parsePage(raw: unknown): Page {
   };
 }
 
-/** Retry-After as milliseconds, from delta-seconds or an HTTP date. Null when absent or unusable. */
+/**
+ * Retry-After as milliseconds. Only a non-negative integer of seconds or an
+ * HTTP-date (it starts with a weekday name) is accepted; anything else is null.
+ */
 function retryAfterMs(response: Response, now: number): number | null {
-  const header = response.headers.get("retry-after");
-  if (header === null || header.trim() === "") {
+  const header = response.headers.get("retry-after")?.trim();
+  if (!header) {
     return null;
   }
-  const seconds = Number(header);
-  if (Number.isFinite(seconds) && seconds >= 0) {
-    return seconds * 1000;
+  if (/^\d{1,6}$/.test(header)) {
+    return Number(header) * 1000;
   }
-  const date = Date.parse(header);
-  return Number.isFinite(date) ? Math.max(0, date - now) : null;
+  if (/^[A-Za-z]{3},\s/.test(header)) {
+    const date = Date.parse(header);
+    return Number.isFinite(date) ? Math.max(0, date - now) : null;
+  }
+  return null;
 }
+
+type Budget = { waitedMs: number; startedAt: number };
 
 export function createRestVectorInventory(config: RestVectorInventoryConfig): VectorInventory {
   const doFetch = config.fetch ?? globalThis.fetch.bind(globalThis);
@@ -122,7 +142,13 @@ export function createRestVectorInventory(config: RestVectorInventoryConfig): Ve
   const sleep = config.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const now = config.now ?? Date.now;
 
-  async function requestPage(cursor: string | null, budget: { waitedMs: number }): Promise<Page> {
+  function assertWithinDeadline(budget: Budget, upcomingWaitMs = 0): void {
+    if (now() - budget.startedAt + upcomingWaitMs > (config.deadlineMs ?? LIST_DEADLINE_MS)) {
+      throw new VectorInventoryDeadline();
+    }
+  }
+
+  async function requestPage(cursor: string | null, budget: Budget): Promise<Page> {
     const url = new URL(
       `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/vectorize/v2/indexes/${config.indexName}/list`,
     );
@@ -131,7 +157,8 @@ export function createRestVectorInventory(config: RestVectorInventoryConfig): Ve
       url.searchParams.set("cursor", cursor);
     }
     let response: Response;
-    for (;;) {
+    for (let retries = 0; ; retries += 1) {
+      assertWithinDeadline(budget);
       try {
         response = await doFetch(url.toString(), {
           method: "GET",
@@ -145,9 +172,15 @@ export function createRestVectorInventory(config: RestVectorInventoryConfig): Ve
         break;
       }
       const wait = retryAfterMs(response, now());
-      if (wait === null || wait > MAX_RETRY_AFTER_MS || budget.waitedMs + wait > RATE_LIMIT_WAIT_BUDGET_MS) {
+      if (
+        wait === null ||
+        retries >= MAX_RATE_LIMIT_RETRIES ||
+        wait > MAX_RETRY_AFTER_MS ||
+        budget.waitedMs + wait > RATE_LIMIT_WAIT_BUDGET_MS
+      ) {
         throw new VectorInventoryRateLimited("list request failed: HTTP 429");
       }
+      assertWithinDeadline(budget, wait);
       budget.waitedMs += wait;
       await sleep(wait);
     }
@@ -169,7 +202,7 @@ export function createRestVectorInventory(config: RestVectorInventoryConfig): Ve
     return parsePage(raw);
   }
 
-  async function sequence(budget: { waitedMs: number }): Promise<VectorListing> {
+  async function sequence(budget: Budget): Promise<VectorListing> {
     const ids = new Set<string>();
     const cursors = new Set<string>();
     const first = await requestPage(null, budget);
@@ -201,6 +234,7 @@ export function createRestVectorInventory(config: RestVectorInventoryConfig): Ve
       if (page.cursorExpiresAt !== null && now() >= page.cursorExpiresAt) {
         throw new CursorExpired();
       }
+      assertWithinDeadline(budget, delayMs);
       await sleep(delayMs);
       page = await requestPage(page.nextCursor, budget);
     }
@@ -215,7 +249,7 @@ export function createRestVectorInventory(config: RestVectorInventoryConfig): Ve
       if (!ACCOUNT_ID.test(config.accountId) || !INDEX_NAME.test(config.indexName) || config.apiToken.length === 0) {
         throw new VectorInventoryError("inventory configuration is invalid");
       }
-      const budget = { waitedMs: 0 };
+      const budget: Budget = { waitedMs: 0, startedAt: now() };
       try {
         return await sequence(budget);
       } catch (error) {
@@ -242,25 +276,32 @@ export type InventorySettings = {
   VECTORIZE_INDEX_NAME?: string;
 };
 
-const SETTING_NAMES = ["VECTORIZE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID", "VECTORIZE_INDEX_NAME"] as const;
-
 /**
- * Builds the REST inventory from the worker's settings. None set means
- * binding-only. All three set means a listing. Anything in between is a
- * configuration mistake the caller must fail closed on; `missing` holds the
- * setting names (never values) that are absent.
+ * Builds the REST inventory from the worker's settings. The two secrets decide
+ * whether the feature is on: neither set means binding-only, whatever the
+ * index name (a plain var present in every environment). Both secrets plus the
+ * index name means a listing. Anything else (one secret, or both without an
+ * index name) is a configuration mistake the caller must fail closed on.
+ * `missing` holds setting names (never values) for the warning log.
  */
 export function inventoryFromSettings(settings: InventorySettings): {
   inventory: VectorInventory | null;
   partlyConfigured: boolean;
   missing: string[];
 } {
-  const missing = SETTING_NAMES.filter((name) => !settings[name]);
-  if (missing.length === SETTING_NAMES.length) {
-    return { inventory: null, partlyConfigured: false, missing: [...missing] };
+  const hasToken = Boolean(settings.VECTORIZE_API_TOKEN);
+  const hasAccount = Boolean(settings.CLOUDFLARE_ACCOUNT_ID);
+  const hasIndex = Boolean(settings.VECTORIZE_INDEX_NAME);
+  if (!hasToken && !hasAccount) {
+    return { inventory: null, partlyConfigured: false, missing: [] };
   }
-  if (missing.length > 0) {
-    return { inventory: null, partlyConfigured: true, missing: [...missing] };
+  if (!hasToken || !hasAccount || !hasIndex) {
+    const missing = [
+      ...(hasToken ? [] : ["VECTORIZE_API_TOKEN"]),
+      ...(hasAccount ? [] : ["CLOUDFLARE_ACCOUNT_ID"]),
+      ...(hasIndex ? [] : ["VECTORIZE_INDEX_NAME"]),
+    ];
+    return { inventory: null, partlyConfigured: true, missing };
   }
   return {
     inventory: createRestVectorInventory({
