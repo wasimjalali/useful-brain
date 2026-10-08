@@ -54,117 +54,148 @@ export function ActivityTable({
   };
 
   return (
-    <div aria-label="Activity" role="table">
-      <div className="px-0" role="rowgroup">
-        <div
-          className={`grid ${COLS} h-8 items-center border-b border-border px-3 text-xs font-medium text-ink-faint-text`}
-          role="row"
-        >
-          <span role="columnheader">
-            <span className="sr-only">Details</span>
-          </span>
-          <span role="columnheader">Time (UTC)</span>
-          <span role="columnheader">Person</span>
-          <span role="columnheader">Question</span>
-          <span role="columnheader">Outcome</span>
-          <span className="text-right" role="columnheader">
-            Sources
-          </span>
-          <span className="text-right" role="columnheader">
-            Latency
-          </span>
+    // Seven fixed columns don't fit a phone: the table keeps its width and scrolls sideways in its own container.
+    <div className="overflow-x-auto">
+      <div aria-label="Activity" className="min-w-[720px]" role="table">
+        <div className="px-0" role="rowgroup">
+          <div
+            className={`grid ${COLS} h-8 items-center border-b border-border px-3 text-xs font-medium text-ink-faint-text`}
+            role="row"
+          >
+            <span role="columnheader">
+              <span className="sr-only">Details</span>
+            </span>
+            <span role="columnheader">Time (UTC)</span>
+            <span role="columnheader">Person</span>
+            <span role="columnheader">Question</span>
+            <span role="columnheader">Outcome</span>
+            <span className="text-right" role="columnheader">
+              Sources
+            </span>
+            <span className="text-right" role="columnheader">
+              Latency
+            </span>
+          </div>
         </div>
-      </div>
-      <div role="rowgroup">
-        {rows.map((r) => {
-          const isOpen = openId === r.id;
-          const o = OUTCOME[r.outcome];
-          const trace = traces[r.id];
-          return (
-            <div key={r.id}>
-              <div
-                className={`grid ${COLS} h-12 w-full cursor-pointer items-center rounded-[10px] px-3 text-left text-ink transition-colors duration-[120ms] hover:bg-sunken ${
-                  isOpen ? "bg-sunken" : "bg-transparent"
-                }`}
-                onClick={() => toggle(r.id)}
-                role="row"
-              >
-                <span role="cell">
-                  <button
-                    aria-controls={`trace-${r.id}`}
-                    aria-expanded={isOpen}
-                    aria-label={`Details for ${r.question}`}
-                    className="ub-ring inline-flex rounded text-ink-muted"
-                    type="button"
-                  >
-                    <span
-                      className="inline-flex transition-transform duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
-                      data-testid="row-chevron"
-                      style={{ transform: isOpen ? "rotate(90deg)" : "rotate(0deg)" }}
-                    >
-                      <ChevronRightIcon className="size-[15px]" />
-                    </span>
-                  </button>
-                </span>
-                <span className="font-mono text-xs text-ink-muted" role="cell">
-                  {r.time}
-                </span>
-                <span className="truncate text-[13px]" role="cell">
-                  {r.person}
-                </span>
-                <span className="truncate text-[13px]" role="cell" title={r.question}>
-                  {r.question}
-                </span>
-                <span className="inline-flex items-center gap-[7px] text-[13px]" role="cell">
-                  <StatusDot tone={o.tone} />
-                  {o.label}
-                </span>
-                <span className="text-right text-[13px] text-ink-muted" role="cell">
-                  {r.sources ?? "-"}
-                </span>
-                <span className="text-right font-mono text-xs text-ink-muted" role="cell">
-                  {r.latency}
-                </span>
-              </div>
-              {isOpen ? (
+        <div role="rowgroup">
+          {rows.map((r) => {
+            const isOpen = openId === r.id;
+            const o = OUTCOME[r.outcome];
+            const trace = traces[r.id];
+            return (
+              <div key={r.id}>
                 <div
-                  aria-label={`Trace for ${r.question}`}
-                  className="mb-3 ml-[46px] mr-3 mt-1 grid grid-cols-1 gap-y-3 rounded-[14px] bg-sunken px-4 py-3.5"
-                  id={`trace-${r.id}`}
-                  role="group"
+                  className={`grid ${COLS} h-12 w-full cursor-pointer items-center rounded-[10px] px-3 text-left text-ink transition-colors duration-[120ms] hover:bg-sunken ${
+                    isOpen ? "bg-sunken" : "bg-transparent"
+                  }`}
+                  onClick={() => toggle(r.id)}
+                  role="row"
                 >
-                  {traceFailed[r.id] ? (
-                    <span className="flex items-center gap-3 text-ink">
-                      Could not load this trace
-                      <Button onClick={() => loadTrace(r.id)} size={32} variant="secondary">
-                        Retry trace
-                      </Button>
-                    </span>
-                  ) : trace === undefined ? (
-                    <span className="text-ink-faint-text">Loading trace</span>
-                  ) : trace.length === 0 ? (
-                    <span className="text-ink-faint-text">No trace recorded</span>
-                  ) : (
-                    <TraceTimeline steps={trace} total={r.latency} />
-                  )}
+                  <span role="cell">
+                    <button
+                      aria-controls={`trace-${r.id}`}
+                      aria-expanded={isOpen}
+                      aria-label={`Details for ${r.question}`}
+                      className="ub-ring inline-flex rounded text-ink-muted"
+                      type="button"
+                    >
+                      <span
+                        className="inline-flex transition-transform duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
+                        data-testid="row-chevron"
+                        style={{
+                          transform: isOpen ? "rotate(90deg)" : "rotate(0deg)",
+                        }}
+                      >
+                        <ChevronRightIcon className="size-[15px]" />
+                      </span>
+                    </button>
+                  </span>
+                  <span
+                    className="font-mono text-xs text-ink-muted"
+                    role="cell"
+                  >
+                    {r.time}
+                  </span>
+                  <span className="truncate text-[13px]" role="cell">
+                    {r.person}
+                  </span>
+                  <span
+                    className="truncate text-[13px]"
+                    role="cell"
+                    title={r.question}
+                  >
+                    {r.question}
+                  </span>
+                  <span
+                    className="inline-flex items-center gap-[7px] text-[13px]"
+                    role="cell"
+                  >
+                    <StatusDot tone={o.tone} />
+                    {o.label}
+                  </span>
+                  <span
+                    className="text-right text-[13px] text-ink-muted"
+                    role="cell"
+                  >
+                    {r.sources ?? "-"}
+                  </span>
+                  <span
+                    className="text-right font-mono text-xs text-ink-muted"
+                    role="cell"
+                  >
+                    {r.latency}
+                  </span>
                 </div>
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
-      {hasMore ? (
-        <div className="flex flex-col items-center gap-2 pt-4">
-          {loadMoreFailed ? (
-            <p className="text-[13px] text-danger" role="alert">
-              Couldn&apos;t load more activity. Try again.
-            </p>
-          ) : null}
-          <Button disabled={loadingMore} onClick={onLoadMore} variant="secondary">
-            Load more
-          </Button>
+                {isOpen ? (
+                  <div
+                    aria-label={`Trace for ${r.question}`}
+                    className="mb-3 ml-[46px] mr-3 mt-1 grid grid-cols-1 gap-y-3 rounded-[14px] bg-sunken px-4 py-3.5"
+                    id={`trace-${r.id}`}
+                    role="group"
+                  >
+                    {traceFailed[r.id] ? (
+                      <span className="flex items-center gap-3 text-ink">
+                        Could not load this trace
+                        <Button
+                          onClick={() => loadTrace(r.id)}
+                          size={32}
+                          variant="secondary"
+                        >
+                          Retry trace
+                        </Button>
+                      </span>
+                    ) : trace === undefined ? (
+                      <span className="text-ink-faint-text">Loading trace</span>
+                    ) : trace.length === 0 ? (
+                      <span className="text-ink-faint-text">
+                        No trace recorded
+                      </span>
+                    ) : (
+                      <TraceTimeline steps={trace} total={r.latency} />
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
-      ) : null}
+        {hasMore ? (
+          <div className="flex flex-col items-center gap-2 pt-4">
+            {loadMoreFailed ? (
+              <p className="text-[13px] text-danger" role="alert">
+                Couldn&apos;t load more activity. Try again.
+              </p>
+            ) : null}
+            <Button
+              disabled={loadingMore}
+              onClick={onLoadMore}
+              variant="secondary"
+            >
+              Load more
+            </Button>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
