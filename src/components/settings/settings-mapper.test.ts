@@ -67,7 +67,7 @@ describe("mapAdminSettings", () => {
       activeGeneration: "g-c305cf57",
     });
     expect(connectors.map((c) => [c.name, c.status, c.description])).toEqual([
-      ["Uploads", "active", "Built in, 65 documents"],
+      ["Uploads", "active", "Built in · 65 documents"],
       ["Support desk", "connected", "Creates tickets, each one needs your approval"],
       ["GitHub", "not_connected", "Sync a repository folder into a draft"],
     ]);

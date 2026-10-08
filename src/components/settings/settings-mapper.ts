@@ -47,7 +47,7 @@ export function mapAdminSettings(
     {
       id: "uploads",
       name: "Uploads",
-      description: `Built in, ${activeDocuments} documents`,
+      description: `Built in · ${activeDocuments} documents`,
       status: "active",
     },
   ];

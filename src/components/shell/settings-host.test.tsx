@@ -22,7 +22,7 @@ const adminData = {
     rerankFloor: 0.05,
     activeGeneration: "g-c305cf57",
   },
-  connectors: [{ id: "uploads", name: "Uploads", description: "Built in, 62 documents", status: "active" }],
+  connectors: [{ id: "uploads", name: "Uploads", description: "Built in · 62 documents", status: "active" }],
   totalDocuments: 62,
 };
 
