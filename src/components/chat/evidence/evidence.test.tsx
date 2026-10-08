@@ -193,6 +193,49 @@ describe("EvidencePanel", () => {
     window.localStorage.clear();
   });
 
+  it("shows Copy failed, never Copied, when the clipboard rejects", async () => {
+    window.localStorage.clear();
+    const writeText = vi.fn().mockRejectedValue(new Error("denied"));
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    render(<Harness isAdmin />);
+    fireEvent.click(screen.getAllByRole("button", { name: "Retrieval details" })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: "Copy chunk ID" })[0]);
+    expect(await screen.findByText("Copy failed")).toBeInTheDocument();
+    expect(screen.queryByText("Copied")).toBeNull();
+    window.localStorage.clear();
+  });
+
+  it("shows Copy failed when the clipboard API is missing or throws synchronously", () => {
+    window.localStorage.clear();
+    render(<Harness isAdmin />);
+    fireEvent.click(screen.getAllByRole("button", { name: "Retrieval details" })[0]);
+    Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
+    fireEvent.click(screen.getAllByRole("button", { name: "Copy chunk ID" })[0]);
+    expect(screen.getByText("Copy failed")).toBeInTheDocument();
+    Object.defineProperty(navigator, "clipboard", {
+      value: {
+        writeText: () => {
+          throw new Error("sync");
+        },
+      },
+      configurable: true,
+    });
+    fireEvent.click(screen.getAllByRole("button", { name: "Copy chunk ID" })[0]);
+    expect(screen.getByText("Copy failed")).toBeInTheDocument();
+    expect(screen.queryByText("Copied")).toBeNull();
+    window.localStorage.clear();
+  });
+
+  it("gives the copy button a hit area of at least 32px", () => {
+    window.localStorage.clear();
+    render(<Harness isAdmin />);
+    fireEvent.click(screen.getAllByRole("button", { name: "Retrieval details" })[0]);
+    expect(screen.getAllByRole("button", { name: "Copy chunk ID" })[0].className).toContain(
+      "before:-inset-2",
+    );
+    window.localStorage.clear();
+  });
+
   it("shows the retrieved footer to admins", () => {
     render(<Harness isAdmin />);
     fireEvent.click(screen.getByRole("tab", { name: /Retrieved/ }));

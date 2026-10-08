@@ -56,28 +56,39 @@ function PassageText({ text, highlights, active }: { text: string; highlights?: 
 const DETAILS_KEY = "ub:retrieval-details-open";
 
 function CopyChunkButton({ value }: { value: string }) {
-  const [copied, setCopied] = useState(false);
+  const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
   useEffect(() => {
-    if (!copied) {
+    if (state === "idle") {
       return;
     }
-    const timer = window.setTimeout(() => setCopied(false), 1500);
+    const timer = window.setTimeout(() => setState("idle"), 1500);
     return () => window.clearTimeout(timer);
-  }, [copied]);
+  }, [state]);
+  function copy() {
+    try {
+      const write = navigator.clipboard?.writeText(value);
+      if (!write) {
+        setState("failed");
+        return;
+      }
+      write.then(
+        () => setState("copied"),
+        () => setState("failed"),
+      );
+    } catch {
+      setState("failed");
+    }
+  }
   return (
     <button
       aria-label="Copy chunk ID"
-      className="ub-ring inline-flex items-center gap-1 rounded p-0.5 text-ink-faint-text transition-colors duration-[120ms] hover:bg-hover hover:text-ink"
-      onClick={() => {
-        navigator.clipboard.writeText(value).then(
-          () => setCopied(true),
-          () => undefined,
-        );
-      }}
+      className="ub-ring relative inline-flex items-center gap-1 rounded p-0.5 text-ink-faint-text transition-colors duration-[120ms] before:absolute before:-inset-2 before:content-[''] hover:bg-hover hover:text-ink"
+      onClick={copy}
       type="button"
     >
-      {copied ? <span className="text-[11px]">Copied</span> : null}
-      {copied ? <CheckIcon className="size-3.5" /> : <CopyIcon className="size-3.5" />}
+      {state === "copied" ? <span className="text-[11px]">Copied</span> : null}
+      {state === "failed" ? <span className="text-[11px]">Copy failed</span> : null}
+      {state === "copied" ? <CheckIcon className="size-3.5" /> : <CopyIcon className="size-3.5" />}
     </button>
   );
 }
