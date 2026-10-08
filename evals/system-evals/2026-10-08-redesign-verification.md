@@ -1,4 +1,4 @@
-# Redesign verification: 115/120, no leak, and why it isn't a redesign regression
+# Redesign verification: 115/120, no leak, and no sign the redesign caused the gap
 
 Date: 2026-10-08. Repo: Useful Brain. Eval: 120-question Northwind live battery, GLM 5.3 Flash (`@cf/zai-org/glm-5.3-flash`), plus the real-stack UI verification of the redesign.
 
@@ -8,9 +8,9 @@ The redesign shipped a new shell, chat, library, admin pages, uploads with draft
 
 - The misses move between runs. Only q088 fails in every run.
 - Removing the redesign's only answer-path change (a ticket instruction in the prompt plus the `create_ticket` tool) did not help: 18/24 versus 17/24 on the eight unstable questions, three repeats each.
-- The pre-redesign `main` code (prompt `grounded-answer.v9`) fails the same questions today. q088 failed 0 of 3 in every variant.
+- The pre-redesign `main` code (prompt `grounded-answer.v9`) fails the same questions today. q088 passed in no turn of any variant (0/3, 0/3 and 0/2 clean).
 
-Conclusion: the 118 was a good draw on a battery whose multi-hop slice is unstable on this model, not a floor the redesign broke. q028 and q088 were already on the 2026-08-31 failure list. Retrieval is unchanged to the third decimal.
+Conclusion: there's no evidence the redesign caused the gap, and the ticket additions are ruled out as the cause. It isn't proven either way: the pre-redesign control is small (15 usable turns), and no valid full run of the old code exists from today. The likeliest reading is that 118 was a good draw on a battery whose multi-hop slice is unstable on this model. q028 and q088 were already on the 2026-08-31 failure list. Retrieval is unchanged to the third decimal.
 
 | Category | Baseline 2026-09-06 | Redesign run 1 | Redesign run 2 |
 | --- | --- | --- | --- |
@@ -31,7 +31,7 @@ Conclusion: the 118 was a good draw on a battery whose multi-hop slice is unstab
 - **Model and decoding:** GLM 5.3 Flash, `temperature: 0`, `seed: 7`, unchanged since 2026-08-31.
 - **Retrieval layer:** recall@3 0.912, MRR 0.825, nDCG 0.837, 0 ACL leaks. Identical to the locked baseline.
 - **Run 1** (full): 115/120. Misses: q028, q074, q088, q090, q119.
-- **Re-ask of run 1's misses:** q074, q090 and q119 passed, q028 and q088 failed again. That re-ask is *not* reported as a score, because only re-asking failures biases the count upward.
+- **Re-ask of run 1's misses:** q074, q090 and q119 passed, q028 and q088 failed again. That re-ask is *not* reported as a score, because only re-asking failures biases the count upward. Its raw file, `run1-reask-findings.json`, merges the re-asked rows into run 1 and so reads 118/120. That figure is not a run.
 - **Run 2** (full, fresh): 115/120. Misses: q074, q088, q089, q116, q120. q028 passed this time.
 - **A/B on the unstable slice:** q028, q074, q088, q089, q090, q116, q119, q120, three repeats each, scored with the same scorer as the battery (`scripts/ab-repeat.ts`).
 
@@ -39,9 +39,9 @@ Conclusion: the 118 was a good draw on a battery whose multi-hop slice is unstab
 | --- | --- | --- | --- | --- |
 | A: redesign as shipped (v10) | 17/24 | 1/3 | 0/3 | q090 1, q120 1 |
 | B: v10 without the ticket instruction and tool | 18/24 | 1/3 | 0/3 | q116 1 |
-| C: `main` before the redesign (v9) | 12/17 clean turns | 2/3 | 0/3 | q116 3 |
+| C: `main` before the redesign (v9) | 10/15 clean turns | 2/3 | 0/2 | q116 2 |
 
-Variant C ran on a fresh worker (port 8790, its own seeded generation `g-6a2aa51f`). Seven of its 24 turns hit the local `wrangler dev` brownout described below and are excluded. A full 120-question run of `main` on that worker was invalidated the same way. It scored 105/120 only because q001 to q042 returned empty retrieval at up to 1,017 s per turn. Its files are kept, named `main-v9-full-brownout-*`, and are not used as a number.
+Variant C ran on a fresh worker (port 8790, its own seeded generation `g-6a2aa51f`). Nine of its 24 turns hit the local `wrangler dev` brownout described below (400 s to 1,017 s each) and are excluded. Counting them, C scores 11/24. A full 120-question run of `main` on that worker was invalidated the same way. It scored 105/120 only because q001 to q042 returned empty retrieval at up to 1,017 s per turn. Its files are kept, named `main-v9-full-brownout-*`, and are not used as a number.
 
 ## The two questions that keep failing
 
@@ -71,7 +71,7 @@ About 440 live turns across the two full runs, the re-ask, the A/B and the brown
 ## What changed because of this
 
 - Nothing in the answer path. The ticket instruction stays: removing it doesn't move the score, and approvals need it.
-- The redesign's eval gate is recorded as "115/120 twice, 0 leaks, regression not attributable to the redesign" instead of "118 or better". The band on this battery is wider than the 2026-09-06 report's 116 to 120.
+- The redesign's eval gate is recorded as "115/120 twice, 0 leaks, gap not shown to be caused by the redesign" instead of "118 or better". That's a judgment call on a small control, flagged for Wasim. The band on this battery is wider than the 2026-09-06 report's 116 to 120.
 - Worth doing next (not done here): repeat full runs on a fresh worker per run, and fix q088 and q028 with corpus-agnostic changes measured over several runs rather than one.
 
 ## Reproduce
