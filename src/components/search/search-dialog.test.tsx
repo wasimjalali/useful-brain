@@ -84,4 +84,34 @@ describe("SearchDialog", () => {
     fireEvent.keyDown(document, { key: "Escape" });
     expect(p.onClose).toHaveBeenCalled();
   });
+
+  it("shows a faint count after a grouped chat title and none for a single chat", () => {
+    setup({ chats: [{ ...chats[0], count: 5 }] });
+    expect(screen.getByText("5 chats")).toBeTruthy();
+    cleanup();
+    setup({ chats: [{ ...chats[0], count: 1 }] });
+    expect(screen.queryByText(/\d chats/)).toBeNull();
+    cleanup();
+    setup();
+    expect(screen.queryByText(/\d chats/)).toBeNull();
+  });
+
+  it("counts grouped rows in the footer and keeps keyboard order and actions on them", () => {
+    const grouped = [
+      { id: "c9", title: "Refund window", titleMatches: [] as [number, number][], dateLabel: "1d", count: 5 },
+      { id: "c2", title: "Other", titleMatches: [] as [number, number][], dateLabel: "3d" },
+    ];
+    const p = setup({ chats: grouped });
+    expect(screen.getByText("2 chats · 2 documents")).toBeTruthy();
+    const input = screen.getByRole("combobox");
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(p.onOpenChat).toHaveBeenLastCalledWith("c9");
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(p.onOpenChat).toHaveBeenLastCalledWith("c2");
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    fireEvent.keyDown(input, { key: "Enter", metaKey: true });
+    expect(p.onAskDocument).toHaveBeenCalledWith("d1");
+    expect(screen.getAllByRole("option").length).toBe(4);
+  });
 });
