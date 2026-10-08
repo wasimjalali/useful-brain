@@ -99,8 +99,8 @@ describe("GET /evaluations?view=campaign", () => {
     const response = await call("/evaluations?view=campaign", cookies["member-jordan"]);
     expect(response.status).toBe(200);
     const body = (await response.json()) as EvalsAdminView;
-    expect(body.runs.map((run) => run.key)).toEqual(["baseline", "pass1", "final", "coverage"]);
-    expect(body.latestKey).toBe("coverage");
+    expect(body.runs.map((run) => run.key)).toEqual(["baseline", "pass1", "final", "coverage", "redesign", "latest"]);
+    expect(body.latestKey).toBe("latest");
     expect(body.categories.map((category) => category.id)).toEqual([
       "factual",
       "trap",
@@ -109,29 +109,27 @@ describe("GET /evaluations?view=campaign", () => {
       "multi_hop",
     ]);
     expect(body.retrieval.aclLeaks).toBe(0);
-    expect(body.failures.map((failure) => failure.id)).toEqual(["q093", "q120"]);
-    const [first, second] = body.failures;
-    expect(first.askedAs).toBe("support_agent");
-    expect(first.question).toBe("What is ERR-7702 and who do I hand it to?");
-    expect(first.expected).toEqual([
-      {
-        documentId: "nw_engineering_error_code_reference",
-        title: "Northwind Core Error Code Reference",
-        section: "Billing and Entitlement Errors (ERR-7xxx)",
-      },
-    ]);
-    expect(first.note).toContain("exact token");
-    expect(second.expected.map((item) => item.title)).toEqual([
-      "Support SLA Policy",
-      "Customer Complaint Escalation Path",
-    ]);
+    expect(body.failures.map((failure) => failure.id)).toEqual(["q073", "q086", "q090"]);
+    const [first, second, third] = body.failures;
+    expect(first.askedAs).toBe("eng_ic");
+    expect(first.expected).toEqual([]);
+    expect(second.askedAs).toBe("eng_lead");
     expect(second.expected.map((item) => item.documentId)).toEqual([
-      "nw_support_sla_policy",
-      "nw_support_complaint_escalation",
+      "nw_engineering_change_management",
+      "nw_engineering_deployment",
     ]);
-    expect(second.expected.map((item) => item.section)).toEqual([
-      "SLA Credits",
-      "Goodwill and Compensation Rules",
+    expect(second.expected.map((item) => item.title)).toEqual([
+      "Change Management Policy",
+      "Code Deployment Policy",
+    ]);
+    expect(third.askedAs).toBe("support_agent");
+    expect(third.expected.map((item) => item.title)).toEqual([
+      "Refund Policy",
+      "Customer Data Access Requests",
+    ]);
+    expect(third.expected.map((item) => item.section)).toEqual([
+      "Refund and Data",
+      "Response Windows",
     ]);
   });
 
@@ -139,29 +137,29 @@ describe("GET /evaluations?view=campaign", () => {
     const { generationId } = await seedCorpus();
     await env.CORPUS_DB.prepare(
       `INSERT INTO document_catalog (document_id, generation_id, title, access_scope, chunk_count, file_name, updated_at)
-       VALUES ('nw_support_sla_policy', ?, 'Catalog SLA Title', 'public', 1, 'sla.md', 1)`,
+       VALUES ('nw_support_dsar_process', ?, 'Catalog DSAR Title', 'public', 1, 'sla.md', 1)`,
     )
       .bind(generationId)
       .run();
     const response = await call("/evaluations?view=campaign", cookies["member-jordan"]);
     const body = (await response.json()) as EvalsAdminView;
-    expect(body.failures[1].expected.map((item) => item.title)).toEqual([
-      "Catalog SLA Title",
-      "Customer Complaint Escalation Path",
+    expect(body.failures[2].expected.map((item) => item.title)).toEqual([
+      "Refund Policy",
+      "Catalog DSAR Title",
     ]);
   });
 
   it("shows a private-owner document as 'Private document', never its catalog title", async () => {
     await env.CORPUS_DB.prepare(
-      `UPDATE document_catalog SET access_scope = 'private', title = 'SECRET OWNER TITLE' WHERE document_id = 'nw_support_sla_policy'`,
+      `UPDATE document_catalog SET access_scope = 'private', title = 'SECRET OWNER TITLE' WHERE document_id = 'nw_support_dsar_process'`,
     ).run();
     const response = await call("/evaluations?view=campaign", cookies["member-jordan"]);
     const raw = await response.text();
     expect(raw).not.toContain("SECRET OWNER TITLE");
     const body = JSON.parse(raw) as EvalsAdminView;
-    expect(body.failures[1].expected.map((item) => item.title)).toEqual([
+    expect(body.failures[2].expected.map((item) => item.title)).toEqual([
+      "Refund Policy",
       "Private document",
-      "Customer Complaint Escalation Path",
     ]);
   });
 });

@@ -4,7 +4,11 @@ import { useState } from "react";
 
 import { ChevronRightIcon } from "@/components/icons";
 import type { EvalFailureView } from "@/lib/contracts/admin-insights-view";
-import { roleLabel } from "@/lib/labels";
+
+function askedAsLabel(role: string): string {
+  const spaced = role.replace(/_/g, " ");
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
 
 export function FailuresList({
   failures,
@@ -54,7 +58,7 @@ export function FailuresList({
                 id={panelId}
               >
                 <dt className="text-ink-faint-text">Asked as</dt>
-                <dd className="m-0 text-ink">{roleLabel(f.askedAs)}</dd>
+                <dd className="m-0 text-ink">{askedAsLabel(f.askedAs)}</dd>
                 <dt className="text-ink-faint-text">Expected</dt>
                 <dd className="m-0 flex flex-col gap-0.5 text-ink">
                   {f.expected.map((e) => (

@@ -1,4 +1,4 @@
-export type CampaignKey = "baseline" | "pass1" | "final" | "coverage";
+export type CampaignKey = "baseline" | "pass1" | "final" | "coverage" | "redesign" | "latest";
 
 export type CampaignCategoryId =
   | "factual"
@@ -131,7 +131,7 @@ export const NORTHWIND_CAMPAIGN_RUNS: CampaignRun[] = [
   },
   {
     key: "coverage",
-    label: "Latest",
+    label: "Coverage",
     date: "2026-09-06",
     passed: 118,
     scored: 120,
@@ -159,6 +159,53 @@ export const NORTHWIND_CAMPAIGN_RUNS: CampaignRun[] = [
       },
     ],
   },
+  {
+    key: "redesign",
+    label: "Redesign",
+    date: "2026-10-08",
+    passed: 115,
+    scored: 120,
+    passRate: 115 / 120,
+    note: "Redesign build, GLM 5.3 Flash. Two full runs, both 115.",
+    categories: [],
+    failures: [],
+  },
+  {
+    key: "latest",
+    label: "Latest",
+    date: "2026-10-08",
+    passed: 117,
+    scored: 120,
+    passRate: 117 / 120,
+    note: "Redesign build, GLM 5.3 Flash. Three remaining failures.",
+    categories: [
+      category("factual", 70, 70),
+      category("trap", 17, 17),
+      category("permission", 12, 13),
+      category("unanswerable", 10, 10),
+      category("multi_hop", 8, 10),
+    ],
+    failures: [
+      {
+        id: "q073",
+        category: "permission",
+        detail:
+          "Expected insufficient_evidence. Answered from an allowed neighbor document.",
+      },
+      {
+        id: "q086",
+        category: "multi_hop",
+        detail:
+          "Missing the second-hop citation for nw_engineering_deployment.",
+      },
+      {
+        id: "q090",
+        category: "multi_hop",
+        detail:
+          "Missing the second-hop citation for nw_support_dsar_process.",
+      },
+    ],
+  },
 ];
 
 export const NORTHWIND_CAMPAIGN = {
@@ -166,7 +213,7 @@ export const NORTHWIND_CAMPAIGN = {
   model: "@cf/zai-org/glm-5.3-flash",
   questions: 120,
   documents: 65,
-  latestKey: "coverage" as const,
+  latestKey: "latest" as const,
   retrieval: {
     recallAt3: 0.912,
     mrr: 0.825,
