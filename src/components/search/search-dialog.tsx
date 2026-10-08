@@ -30,8 +30,11 @@ function Matched({ text, ranges }: { text: string; ranges: MatchRange[] }) {
   return <>{parts}</>;
 }
 
+/** A chat row; `count` is how many chats share its title (set when more than one). */
+export type SearchChatRow = SearchChatRowView & { count?: number };
+
 type Item =
-  | { kind: "chat"; row: SearchChatRowView }
+  | { kind: "chat"; row: SearchChatRow }
   | { kind: "document"; row: SearchDocumentRowView };
 
 export function SearchDialog({
@@ -47,7 +50,7 @@ export function SearchDialog({
   onClose,
 }: {
   query: string;
-  chats: SearchChatRowView[];
+  chats: SearchChatRow[];
   documents: SearchDocumentRowView[];
   loading: boolean;
   /** Set when the search itself failed; shown instead of an empty result. */
@@ -119,6 +122,9 @@ export function SearchDialog({
               <MessageSquareIcon aria-hidden="true" className="size-4 shrink-0 text-ink-muted" />
               <span className="min-w-0 flex-1 truncate">
                 <Matched ranges={row.titleMatches} text={row.title} />
+                {row.count && row.count > 1 ? (
+                  <span className="ml-2 text-xs text-ink-faint-text">{`${row.count} chats`}</span>
+                ) : null}
               </span>
               {i === active ? ret(i) : (
                 <span className="text-xs text-ink-faint-text tabular-nums">{row.dateLabel}</span>

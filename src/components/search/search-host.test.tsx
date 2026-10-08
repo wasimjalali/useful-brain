@@ -11,7 +11,7 @@ vi.mock("@/components/shell/shell-context", () => ({
   useShell: () => ({ newChat, conversations: [{ id: "c1", title: "Leave", createdAt: 0, updatedAt: Date.now() - 2 * 86_400_000 }] }),
 }));
 
-import { SearchHost } from "./search-host";
+import { groupChatsByTitle, SearchHost } from "./search-host";
 
 const result = {
   ok: true,
@@ -134,5 +134,52 @@ describe("SearchHost", () => {
     await settle();
     await act(async () => first(result));
     expect(screen.queryByText("Leave Policy", { exact: false })).toBeNull();
+  });
+
+  it("groups chats that share a title and opens the most recent one", async () => {
+    searchAll.mockResolvedValue({
+      ok: true,
+      data: {
+        chats: [
+          { id: "a", title: "Refund window", titleMatches: [[0, 6]], snippet: null },
+          { id: "b", title: "  refund   WINDOW ", titleMatches: [[2, 8]], snippet: null },
+          { id: "c", title: "Leave", titleMatches: [], snippet: null },
+        ],
+        documents: [],
+      },
+    });
+    render(<SearchHost onClose={vi.fn()} />);
+    await type("re");
+    await settle();
+    expect(screen.getAllByRole("option").length).toBe(2);
+    expect(screen.getByText("2 chats")).toBeInTheDocument();
+    expect(screen.getByText("2 chats · 0 documents")).toBeInTheDocument();
+  });
+});
+
+describe("groupChatsByTitle", () => {
+  const hit = (id: string, title: string) => ({ id, title, titleMatches: [] as [number, number][], snippet: null });
+  const now = 10 * 86_400_000;
+
+  it("merges normalized titles, targets the most recently updated chat and counts them", () => {
+    const rows = groupChatsByTitle(
+      [hit("a", "Refund?"), hit("b", " refund?  "), hit("c", "REFUND?"), hit("d", "Other")],
+      new Map([["a", 1], ["b", 9 * 86_400_000], ["c", 5], ["d", 2]]),
+      now,
+    );
+    expect(rows.map((r) => r.id)).toEqual(["b", "d"]);
+    expect(rows[0].count).toBe(3);
+    expect(rows[1].count).toBeUndefined();
+  });
+
+  it("leaves distinct titles untouched and in order", () => {
+    const rows = groupChatsByTitle([hit("a", "One"), hit("b", "Two")], new Map(), now);
+    expect(rows.map((r) => r.id)).toEqual(["a", "b"]);
+    expect(rows.every((r) => r.count === undefined)).toBe(true);
+  });
+
+  it("keeps the first hit when no dates are known", () => {
+    const rows = groupChatsByTitle([hit("a", "Same"), hit("b", "same")], new Map(), now);
+    expect(rows.map((r) => r.id)).toEqual(["a"]);
   });
 });
