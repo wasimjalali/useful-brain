@@ -3580,4 +3580,4 @@ env.LOOPBACK_SUBJECT ("dev@localhost")                                    Enviro
 [31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mError: internal error; reference = 9plo6k8h4cij15abjh4l3oe4[0m
 
 
-🪵  Logs were written to "/Users/wasimjalali/.wrangler/logs/wrangler-2026-10-08_13-24-14_248.log"
+🪵  Logs were written to "~/.wrangler/logs/wrangler-2026-10-08_13-24-14_248.log"
