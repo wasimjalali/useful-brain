@@ -27,6 +27,7 @@ async function search(persona: PersonaId, q: string): Promise<SearchResponse> {
 }
 
 let cookies: Record<PersonaId, string>;
+let generationId: string;
 
 async function seedChat(id: string, owner: string, title: string, message: string, updatedAt: number) {
   await env.OPERATIONS_DB.batch([
@@ -43,7 +44,7 @@ async function seedChat(id: string, owner: string, title: string, message: strin
 beforeAll(async () => {
   await seedPrincipals();
   cookies = await seedPersonas();
-  await seedCorpus();
+  generationId = (await seedCorpus()).generationId;
   await seedChat("c-maya-1", "member-maya", "Quarterly roadmap", "What is in the roadmap?", 10);
   await seedChat("c-priya-1", "member-priya", "Quarterly roadmap", "roadmap secrets of priya", 11);
   await seedChat("c-maya-pct", "member-maya", "Discounts", "We offered 100% off today", 12);
@@ -163,5 +164,56 @@ describe("chat search", () => {
   it("caps chats and documents at five each", async () => {
     const result = await search("member-maya", "alpha");
     expect(result.chats).toHaveLength(5);
+  });
+});
+
+async function insertCatalogDoc(
+  id: string,
+  title: string,
+  access: { scope: string; roles?: string[] },
+  readable: boolean,
+) {
+  const statements = [
+    env.CORPUS_DB.prepare(
+      `INSERT INTO document_catalog (document_id, generation_id, title, access_scope, allowed_roles, chunk_count, file_name, updated_at)
+       VALUES (?, ?, ?, ?, ?, 1, 'x.md', 1)`,
+    ).bind(id, generationId, title, access.scope, JSON.stringify(access.roles ?? [])),
+  ];
+  if (readable) {
+    statements.push(
+      env.CORPUS_DB.prepare(
+        `INSERT INTO chunks (chunk_id, document_id, document_version_id, generation_id, heading, chunk_index, content,
+           start_offset, end_offset, content_digest, vector_id, acl_group, access_scope, allowed_roles, allowed_departments, metadata, created_at)
+         VALUES (?, ?, 'v', ?, 'H', 0, 'text', 0, 4, 'd', ?, ?, ?, ?, '[]', '{}', 1)`,
+      ).bind(`chunk-${id}`, id, generationId, `vec-${id}`, "a".repeat(32), access.scope, JSON.stringify(access.roles ?? [])),
+      env.CORPUS_DB.prepare(
+        `INSERT INTO document_bodies (document_id, generation_id, body, reconstructed) VALUES (?, ?, ?, 0)`,
+      ).bind(id, generationId, `# ${title}\n\n## Section\n\nBody text.`),
+    );
+  }
+  await env.CORPUS_DB.batch(statements);
+}
+
+describe("document ranking does not depend on documents the caller cannot read", () => {
+  it("keeps a member's result order when hidden documents change the term statistics", async () => {
+    await insertCatalogDoc("doc-rank-1", "qalpha qalpha qbeta", { scope: "public" }, true);
+    await insertCatalogDoc("doc-rank-2", "qalpha qbeta qbeta", { scope: "public" }, true);
+    const order = async () => (await search("member-maya", "qalpha qbeta")).documents.map((d) => d.id);
+    const baseline = await order();
+    expect(baseline).toEqual(["doc-rank-1", "doc-rank-2"]);
+    for (let i = 0; i < 8; i += 1) {
+      await insertCatalogDoc(`doc-hidden-a-${i}`, "qalpha qalpha qalpha", { scope: "role", roles: ["nobody"] }, false);
+    }
+    expect(await order()).toEqual(baseline);
+    for (let i = 0; i < 16; i += 1) {
+      await insertCatalogDoc(`doc-hidden-b-${i}`, "qbeta qbeta qbeta", { scope: "role", roles: ["nobody"] }, false);
+    }
+    expect(await order()).toEqual(baseline);
+  });
+
+  it("lists a catalog row with no body in neither search nor the document route", async () => {
+    await insertCatalogDoc("doc-nobody-body", "qgamma notes", { scope: "public" }, true);
+    await env.CORPUS_DB.prepare(`DELETE FROM document_bodies WHERE document_id = 'doc-nobody-body'`).run();
+    expect((await search("member-maya", "qgamma")).documents).toEqual([]);
   });
 });

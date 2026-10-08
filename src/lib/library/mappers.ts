@@ -3,19 +3,41 @@ import type { LibraryChipView, LibraryRowView } from "@/lib/contracts/library-vi
 
 const NO_DEPARTMENT = "General";
 
+const ROLE_LABELS: Record<string, string> = {
+  manager: "Managers",
+  director: "Directors",
+  executive: "Executives",
+  hr_manager: "HR managers",
+  finance_manager: "Finance managers",
+  support_manager: "Support managers",
+  sales_manager: "Sales managers",
+};
+
+function capitalize(value: string): string {
+  const spaced = value.replace(/_/g, " ");
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+/** Wire department ids ("hr", "sales") as people read them ("HR", "Sales"). */
+export function departmentLabel(name: string): string {
+  return name === "hr" ? "HR" : capitalize(name);
+}
+
 export function readersLabel(readers: DocumentReaders): string {
   switch (readers.kind) {
     case "everyone":
       return "Everyone";
     case "private":
       return "Only you";
+    case "roles":
+      return readers.names.map((name) => ROLE_LABELS[name] ?? capitalize(name)).join(", ");
     default:
-      return readers.names.join(", ");
+      return readers.names.map(departmentLabel).join(", ");
   }
 }
 
 function departmentOf(document: LibraryDocument): string {
-  return document.department ?? NO_DEPARTMENT;
+  return document.department ? departmentLabel(document.department) : NO_DEPARTMENT;
 }
 
 export function filterDocuments(documents: LibraryDocument[], query: string): LibraryDocument[] {

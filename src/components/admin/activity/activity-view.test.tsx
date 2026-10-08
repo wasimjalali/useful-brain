@@ -75,4 +75,29 @@ describe("ActivityView", () => {
     await waitFor(() => expect(screen.getByText("Question a")).toBeInTheDocument());
     expect(loadActivity).toHaveBeenLastCalledWith({ outcome: "all", cursor: null });
   });
+
+  it("retries a failed trace instead of caching the failure", async () => {
+    loadTrace.mockResolvedValueOnce({ ok: false, error: { code: "INTERNAL_ERROR", message: "x", retryable: true } });
+    loadTrace.mockResolvedValueOnce({ ok: true, data: [{ step: "retrieve", detail: "chunks: 6", duration: "420 ms" }] });
+    render(<ActivityView initial={page()} />);
+    fireEvent.click(screen.getByRole("button", { name: /Question a/ }));
+    await waitFor(() => expect(screen.getByText("Could not load this trace")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Retry trace" }));
+    await waitFor(() => expect(screen.getByText("chunks: 6")).toBeInTheDocument());
+    expect(loadTrace).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps loaded rows when Load more fails", async () => {
+    loadActivity.mockResolvedValue({ ok: false, error: { code: "INTERNAL_ERROR", message: "x", retryable: true } });
+    render(<ActivityView initial={page()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Load more" }));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Couldn't load more activity"));
+    expect(screen.getByText("Question a")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Load more" })).toBeInTheDocument();
+  });
+
+  it("says so when the week has no activity at all", () => {
+    render(<ActivityView initial={page({ rows: [], nextCursor: null })} />);
+    expect(screen.getByText("No activity this week")).toBeInTheDocument();
+  });
 });

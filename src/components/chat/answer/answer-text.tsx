@@ -9,7 +9,9 @@ import { useCitationBinding } from "../evidence/citation-link";
 
 function LinkedChip({ n }: { n: number }) {
   const { active, onHover, onClick } = useCitationBinding(n);
-  return <CitationChip active={active} n={n} onClick={onClick} onHover={onHover} />;
+  return (
+    <CitationChip active={active} data-opens-evidence="true" n={n} onClick={onClick} onHover={onHover} />
+  );
 }
 
 const MARKER = /\[(\d+)\]/g;

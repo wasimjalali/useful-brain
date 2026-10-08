@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import type { InviteInput, InviteState, PeopleTab, PersonRowView } from "@/lib/contracts/admin-manage-view";
 import {
@@ -42,17 +42,22 @@ export function PeopleWorkspace({
   const [query, setQuery] = useState("");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [invite, setInvite] = useState<InviteState>({ status: "form" });
+  const inviteRequest = useRef(0);
 
   const peopleRows = useMemo(() => mapPeople(people.people), [people.people]);
   const groupRows = useMemo(() => mapGroups(groups.groups), [groups.groups]);
 
   async function submit(input: InviteInput) {
+    const request = ++inviteRequest.current;
     setInvite({ status: "submitting" });
     const result = await createInvite({
       email: input.email,
       role: "standard",
       department: input.department.toLowerCase(),
     });
+    if (request !== inviteRequest.current) {
+      return;
+    }
     if (result.ok) {
       setInvite({
         status: "done",
@@ -65,6 +70,7 @@ export function PeopleWorkspace({
   }
 
   function close() {
+    inviteRequest.current += 1;
     setInviteOpen(false);
     setInvite({ status: "form" });
   }

@@ -2,7 +2,10 @@
  * Seeds synthetic Northwind people into the LOCAL dev operations database.
  *   npm run seed:demo -- --dry-run     print counts only
  *   DEMO_PASSWORD=... npm run seed:demo
- * --remote targets the remote database and must be passed explicitly.
+ *   DEMO_PASSWORD=... npm run seed:demo -- --remote --env staging
+ * --remote needs an explicit --env <name> (development or staging). It is passed
+ * to wrangler, so the environment's own database is used. production is refused.
+ * DEMO_PASSWORD must meet the signup rules (8 to 128 characters).
  * DEMO_PASSWORD is read from the environment, never printed, never written to disk.
  * Only Maya Chen, Priya Shah and Jordan Ellis can sign in; the rest get an unusable hash.
  */
@@ -12,6 +15,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { hashPassword } from "../src/lib/auth/password";
+import { normalizePassword } from "../src/lib/auth/session-account";
 
 const TOTAL_PEOPLE = 148;
 const DEPARTMENT_HEADCOUNT: Array<[string, number]> = [
@@ -32,7 +36,8 @@ const DEPARTMENT_MANAGER_ROLE: Record<string, string> = {
   executive: "executive",
 };
 const UNUSABLE_HASH = "disabled";
-const OPERATIONS_DATABASE = "useful-brain-operations-development";
+const OPERATIONS_BINDING = "OPERATIONS_DB";
+const REMOTE_ENVIRONMENTS = new Set(["development", "staging"]);
 
 const FIRST = [
   "Aisha", "Ben", "Carla", "Dev", "Elena", "Farid", "Grace", "Hugo", "Ines", "Jamal",
@@ -138,41 +143,63 @@ function countsOf(people: Person[]): string {
   ].join("\n");
 }
 
-async function main(): Promise<void> {
-  const args = new Set(process.argv.slice(2));
-  const known = new Set(["--dry-run", "--remote"]);
-  for (const arg of args) {
-    if (!known.has(arg)) {
+function parseArgs(argv: string[]): { dryRun: boolean; remote: boolean; env: string | null } {
+  let dryRun = false;
+  let remote = false;
+  let env: string | null = null;
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === "--dry-run") {
+      dryRun = true;
+    } else if (arg === "--remote") {
+      remote = true;
+    } else if (arg === "--env") {
+      env = argv[i + 1] ?? "";
+      i += 1;
+    } else {
       throw new Error(`unknown argument ${arg}`);
     }
   }
-  const remote = args.has("--remote");
+  if (remote) {
+    if (!env || !REMOTE_ENVIRONMENTS.has(env)) {
+      throw new Error(`--remote needs --env <${[...REMOTE_ENVIRONMENTS].join("|")}>. production is refused.`);
+    }
+  } else if (env !== null) {
+    throw new Error("--env only applies with --remote");
+  }
+  return { dryRun, remote, env };
+}
+
+async function main(): Promise<void> {
+  const { dryRun, remote, env } = parseArgs(process.argv.slice(2));
   const people = buildPeople();
-  if (args.has("--dry-run")) {
-    console.log(`${countsOf(people)}\ntarget: ${remote ? "remote" : "local"} (dry run, nothing written)`);
+  const targetName = remote ? `remote (${env})` : "local";
+  if (dryRun) {
+    console.log(`${countsOf(people)}\ntarget: ${targetName} (dry run, nothing written)`);
     return;
   }
   const password = process.env.DEMO_PASSWORD;
   if (!password) {
     throw new Error("DEMO_PASSWORD is not set. Refusing to run.");
   }
+  normalizePassword(password);
   const sql = await buildSql(people, password);
   const dir = mkdtempSync(path.join(tmpdir(), "seed-demo-"));
   try {
     const file = path.join(dir, "seed.sql");
     writeFileSync(file, sql, { mode: 0o600 });
-    const target = remote ? ["--remote"] : ["--local", "--persist-to", ".wrangler/state"];
+    const target = remote ? ["--remote", "--env", env as string] : ["--local", "--persist-to", ".wrangler/state"];
     const childEnv: NodeJS.ProcessEnv = { ...process.env, CI: "true" };
     delete childEnv.DEMO_PASSWORD;
     execFileSync(
       "npx",
-      ["wrangler", "d1", "execute", OPERATIONS_DATABASE, ...target, "-c", "workers/brain/wrangler.jsonc", "--file", file],
+      ["wrangler", "d1", "execute", OPERATIONS_BINDING, ...target, "-c", "workers/brain/wrangler.jsonc", "--file", file],
       { stdio: "inherit", env: childEnv },
     );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
-  console.log(`${countsOf(people)}\nseeded ${remote ? "remote" : "local"} operations database`);
+  console.log(`${countsOf(people)}\nseeded ${targetName} operations database`);
 }
 
 main().catch((error: unknown) => {

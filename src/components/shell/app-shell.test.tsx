@@ -20,6 +20,8 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/app/library-actions", () => ({ searchAll: vi.fn() }));
 
+import { ChatComposer } from "@/components/chat/chat-composer";
+
 import { AppShell } from "./app-shell";
 import { ShellPanel } from "./shell-context";
 import { admin, clearViewport, member, setViewport } from "./test-support";
@@ -106,8 +108,13 @@ describe("global shortcuts", () => {
   });
 
   it("still works inside the composer", () => {
-    renderShell({ children: <textarea aria-label="Question" data-composer="true" /> });
-    press("k", { ctrlKey: true }, screen.getByLabelText("Question"));
+    renderShell({
+      children: (
+        <ChatComposer onChange={() => {}} onSend={() => {}} pending={false} placeholder="Ask" value="" />
+      ),
+    });
+    const event = press("k", { ctrlKey: true }, screen.getByLabelText("Question"));
+    expect(event.defaultPrevented).toBe(true);
     expect(screen.getByRole("dialog", { name: "Search" })).toBeInTheDocument();
   });
 
@@ -272,14 +279,21 @@ describe("settings and chats", () => {
     nav.search = "settings=1";
     renderShell();
     expect(screen.getByRole("dialog", { name: "Settings" })).toBeInTheDocument();
+    const replaceState = vi.spyOn(window.history, "replaceState");
     fireEvent.click(screen.getByRole("button", { name: "Close settings" }));
-    expect(nav.replace).toHaveBeenCalledWith("/chat");
+    expect(replaceState).toHaveBeenCalledWith(null, "", "/chat");
+    expect(nav.replace).not.toHaveBeenCalled();
+    replaceState.mockRestore();
   });
 
   it("opens settings from the gear by adding ?settings=1", () => {
+    const pushState = vi.spyOn(window.history, "pushState");
     renderShell();
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-    expect(nav.push).toHaveBeenCalledWith("/chat?settings=1");
+    // No router navigation: it would remount the chat and drop an in-flight answer.
+    expect(pushState).toHaveBeenCalledWith(null, "", "/chat?settings=1");
+    expect(nav.push).not.toHaveBeenCalled();
+    pushState.mockRestore();
   });
 
   it("deletes a chat, drops it from the rail and leaves the deleted chat's page", async () => {

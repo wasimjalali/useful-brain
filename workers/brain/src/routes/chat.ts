@@ -89,7 +89,12 @@ export async function pendingTurnProgress(
   if (stage === "searching" && lock.count !== null) {
     return { stage: "searching", readableDocuments: lock.count };
   }
-  return { stage: "searching", readableDocuments: await readableDocumentsFor(env, principal) };
+  // The turn itself treats a failed count as unknown; a poll must not fail on it either.
+  try {
+    return { stage: "searching", readableDocuments: await readableDocumentsFor(env, principal) };
+  } catch {
+    return { stage: "searching", readableDocuments: 0 };
+  }
 }
 
 /**
@@ -102,6 +107,8 @@ export async function resolveTurnRetry(
   env: ChatRouteEnv,
   principal: DirectoryRecord,
   retryOfMessageId: unknown,
+  /** The retry's own request id: its replay is not a duplicate of itself. */
+  requestId?: unknown,
 ): Promise<{ question: string; conversationId: string; userMessageId: string }> {
   if (typeof retryOfMessageId !== "string") {
     throw new WorkerValidationError();
@@ -109,24 +116,34 @@ export async function resolveTurnRetry(
   const messageId = parseBoundedId(retryOfMessageId, "message id");
   const row = await operations(env)
     .prepare(
-      `SELECT a.status, a.conversation_id, a.parent_user_message_id, u.content
+      `SELECT a.status, a.conversation_id, a.parent_user_message_id, u.content,
+              EXISTS (
+                SELECT 1 FROM messages n
+                WHERE n.parent_user_message_id = a.parent_user_message_id AND n.role = 'assistant'
+                  AND n.id <> a.id AND (n.request_id IS NULL OR n.request_id <> ?)
+                  AND (n.status = 'completed'
+                       OR (n.status = 'failed'
+                           AND (n.created_at > a.created_at OR (n.created_at = a.created_at AND n.id > a.id))))
+              ) AS superseded
        FROM messages a
        JOIN conversations c ON c.id = a.conversation_id AND c.owner_principal_id = ?
        LEFT JOIN messages u
          ON u.id = a.parent_user_message_id AND u.role = 'user' AND u.conversation_id = a.conversation_id
        WHERE a.id = ? AND a.role = 'assistant'`,
     )
-    .bind(principal.id, messageId)
+    .bind(typeof requestId === "string" ? requestId : "", principal.id, messageId)
     .first<{
       status: string;
       conversation_id: string;
       parent_user_message_id: string | null;
       content: string | null;
+      superseded: number;
     }>();
   if (!row) {
     throw new WorkerNotFoundError();
   }
-  if (row.status !== "failed" || !row.parent_user_message_id || !row.content) {
+  // A later completed or failed attempt already replaced this one; retrying it would answer the question twice.
+  if (row.status !== "failed" || !row.parent_user_message_id || !row.content || row.superseded) {
     throw new WorkerValidationError();
   }
   return {
@@ -161,6 +178,9 @@ function parseFeedbackValue(body: unknown): FeedbackValue {
   }
   return value as FeedbackValue;
 }
+
+/** Free-text document requests one principal may hold. A repeat of a stored one is not new. */
+const MAX_FREE_TEXT_DOCUMENT_REQUESTS = 50;
 
 /** The question of a free-text document request: a string of 3 to 300 characters once whitespace is collapsed. */
 function parseDocumentRequestQuestion(body: unknown): string {
@@ -242,10 +262,22 @@ export async function handleChatRoute(context: ChatRouteContext): Promise<Respon
     } catch {
       throw new WorkerValidationError();
     }
+    const questionNormalized = parseDocumentRequestQuestion(body);
+    const held = await operations(env)
+      .prepare(
+        `SELECT
+           (SELECT COUNT(*) FROM document_requests WHERE principal_id = ? AND message_id IS NULL) AS free_text,
+           EXISTS (SELECT 1 FROM document_requests WHERE principal_id = ? AND question_normalized = ?) AS stored`,
+      )
+      .bind(principal.id, principal.id, questionNormalized)
+      .first<{ free_text: number; stored: number }>();
+    if (held && !held.stored && held.free_text >= MAX_FREE_TEXT_DOCUMENT_REQUESTS) {
+      throw new WorkerValidationError("You have too many open document requests.");
+    }
     await recordDocumentRequest(operations(env), {
       principalId: principal.id,
       messageId: null,
-      questionNormalized: parseDocumentRequestQuestion(body),
+      questionNormalized,
       now: Date.now(),
     });
     log("document-request");

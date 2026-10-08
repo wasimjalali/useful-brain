@@ -4,10 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const push = vi.fn();
 const searchAll = vi.fn();
+const newChat = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 vi.mock("@/app/library-actions", () => ({ searchAll: (q: string) => searchAll(q) }));
 vi.mock("@/components/shell/shell-context", () => ({
-  useShell: () => ({ conversations: [{ id: "c1", title: "Leave", createdAt: 0, updatedAt: Date.now() - 2 * 86_400_000 }] }),
+  useShell: () => ({ newChat, conversations: [{ id: "c1", title: "Leave", createdAt: 0, updatedAt: Date.now() - 2 * 86_400_000 }] }),
 }));
 
 import { SearchHost } from "./search-host";
@@ -16,7 +17,7 @@ const result = {
   ok: true,
   data: {
     chats: [{ id: "c1", title: "Leave question", titleMatches: [[0, 5]], snippet: null }],
-    documents: [{ id: "d1", title: "Leave Policy", department: "HR", titleMatches: [[0, 5]], snippet: "Eligibility · text" }],
+    documents: [{ id: "d1", title: "Leave Policy", department: "hr", titleMatches: [[0, 5]], snippet: "Eligibility · text" }],
   },
 };
 
@@ -29,6 +30,7 @@ afterEach(() => {
   vi.useRealTimers();
   push.mockReset();
   searchAll.mockReset();
+  newChat.mockReset();
 });
 
 async function type(value: string) {
@@ -62,6 +64,7 @@ describe("SearchHost", () => {
     expect(searchAll).toHaveBeenCalledWith("lea");
     expect(screen.getAllByText("Leave", { exact: false }).length).toBeGreaterThan(0);
     expect(screen.getByRole("option", { name: /Leave Policy/ })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /Leave Policy/ })).toHaveTextContent("HR");
   });
 
   it("Enter opens a chat, then a document in the reader", async () => {
@@ -86,6 +89,29 @@ describe("SearchHost", () => {
     fireEvent.keyDown(input, { key: "ArrowDown" });
     fireEvent.keyDown(input, { key: "Enter", metaKey: true });
     expect(push).toHaveBeenLastCalledWith("/chat?scope=d1");
+    // A fresh chat, so the scope applies to the first turn and not to an old conversation.
+    expect(newChat).toHaveBeenCalledOnce();
+    expect(newChat.mock.invocationCallOrder[0]).toBeLessThan(push.mock.invocationCallOrder[0]);
+  });
+
+  it("does not start a new chat when opening a chat or a document", async () => {
+    render(<SearchHost onClose={vi.fn()} />);
+    const input = await type("lea");
+    await settle();
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(newChat).not.toHaveBeenCalled();
+  });
+
+  it("shows a failed search as an alert, not as no results", async () => {
+    searchAll.mockResolvedValue({
+      ok: false,
+      error: { code: "INTERNAL_ERROR", message: "Search is unavailable.", retryable: true },
+    });
+    render(<SearchHost onClose={vi.fn()} />);
+    await type("lea");
+    await settle();
+    expect(screen.getByRole("alert")).toHaveTextContent("Search is unavailable.");
+    expect(screen.queryByText(/No results/)).toBeNull();
   });
 
   it("closes on Escape", async () => {

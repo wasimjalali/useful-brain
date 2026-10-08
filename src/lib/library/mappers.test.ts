@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { LibraryDocument } from "@/lib/contracts/library";
 
-import { buildChips, filterDocuments, readersLabel, toRows } from "./mappers";
+import { buildChips, departmentLabel, filterDocuments, readersLabel, toRows } from "./mappers";
 
 const doc = (over: Partial<LibraryDocument>): LibraryDocument => ({
   id: "d",
@@ -67,5 +67,15 @@ describe("toRows", () => {
     expect(rows.map((r) => r.id)).toEqual(["d1", "d3"]);
     expect(rows[0]).toEqual({ id: "d1", title: "Employee Handbook", department: "HR", readers: "Everyone" });
     expect(toRows(docs, "All")).toHaveLength(4);
+  });
+});
+
+describe("wire value labels", () => {
+  it("formats departments and roles like the Sources page", () => {
+    expect(departmentLabel("hr")).toBe("HR");
+    expect(departmentLabel("sales")).toBe("Sales");
+    expect(readersLabel({ kind: "roles", names: ["hr_manager", "support_manager"] })).toBe("HR managers, Support managers");
+    expect(readersLabel({ kind: "departments", names: ["hr", "legal"] })).toBe("HR, Legal");
+    expect(toRows([doc({ department: "hr" })], "All")[0].department).toBe("HR");
   });
 });

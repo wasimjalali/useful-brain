@@ -28,6 +28,7 @@ import {
   embedChunkRange,
   EMBED_RANGE,
   finalizeDocument,
+  removeDocumentFromDraft,
   writeDocumentChunks,
   type DocumentToIndex,
   type IndexContext,
@@ -43,12 +44,14 @@ import { claimFinalize, markDraftReady, startIndexing } from "../../../src/lib/s
 import {
   advanceStage,
   batchAcl,
+  expireUndeliveredFiles,
   failUploadFile,
   getUploadBatch,
   getUploadFile,
   markFileReady,
   setChunksEmbedded,
   setChunksTotal,
+  UPLOAD_DELIVERY_TTL_MS,
 } from "../../../src/lib/store/uploads";
 
 export type IngestionWorkflowParams = {
@@ -67,6 +70,9 @@ const RECONCILE_CONFIG = {
   timeout: "5 minutes",
 } as const;
 const WAIT_BASE_ITERATIONS = 60;
+/** A paused draft waits at most this many UTC days for budget before it stays paused for an operator. */
+const MAX_BUDGET_WINDOWS = 7;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 type Failure = { failure: UploadErrorCode };
 type FileJob = {
@@ -80,7 +86,9 @@ type FileJob = {
   title: string;
 };
 type DraftJob = { kind: "draft"; generationId: string; draftKind: "upload" | "reindex"; baseGenerationId: string | null };
-type Job = FileJob | DraftJob | { kind: "unknown" } | { kind: "closed" };
+/** Expires the files of one batch that never arrived, then lets the draft finish. */
+type SweepJob = { kind: "sweep"; batchId: string; generationId: string; createdAt: number };
+type Job = FileJob | DraftJob | SweepJob | { kind: "unknown" } | { kind: "closed" };
 
 export class IngestionWorkflow extends WorkflowEntrypoint<Env, IngestionWorkflowParams> {
   private db(): SqlExecutor {
@@ -109,9 +117,11 @@ export class IngestionWorkflow extends WorkflowEntrypoint<Env, IngestionWorkflow
     );
     const job = await step.do("load-job", STEP_CONFIG, async (): Promise<Job> => this.loadJob(jobId));
     if (job.kind === "file") {
-      await this.runFileJob(step, job);
+      await this.runFileJob(step, job, event.instanceId);
     } else if (job.kind === "draft") {
-      await this.runDraftJob(step, job);
+      await this.runDraftJob(step, job, event.instanceId);
+    } else if (job.kind === "sweep") {
+      await this.runSweepJob(step, job, event.instanceId);
     }
     return { ...accepted, outcome: job.kind };
   }
@@ -136,6 +146,14 @@ export class IngestionWorkflow extends WorkflowEntrypoint<Env, IngestionWorkflow
         title: file.file_name,
       };
     }
+    const batch = await getUploadBatch(db, jobId);
+    if (batch) {
+      const owner = await getDraft(db, batch.generation_id);
+      if (!owner || owner.closedAt !== null) {
+        return { kind: "closed" };
+      }
+      return { kind: "sweep", batchId: batch.id, generationId: batch.generation_id, createdAt: batch.created_at };
+    }
     const draft = await getDraft(db, jobId);
     if (draft && draft.closedAt === null) {
       return {
@@ -150,8 +168,11 @@ export class IngestionWorkflow extends WorkflowEntrypoint<Env, IngestionWorkflow
 
   // ---- one uploaded file -------------------------------------------------
 
-  private async runFileJob(step: WorkflowStep, job: FileJob): Promise<void> {
+  private async runFileJob(step: WorkflowStep, job: FileJob, owner: string): Promise<void> {
     const failFile = async (code: UploadErrorCode) => {
+      // Content the file already put into the draft must go before the file
+      // is reported failed, or the draft could promote what the UI called failed.
+      await this.dropFailedProjection(step, job);
       await step.do("mark-file-failed", STEP_CONFIG, async () => {
         await failUploadFile(this.db(), job.fileId, code);
         return { failed: code };
@@ -197,7 +218,69 @@ export class IngestionWorkflow extends WorkflowEntrypoint<Env, IngestionWorkflow
     } catch (error) {
       await failFile(this.failureCode(error));
     }
-    await this.finalizeDraft(step, job.generationId);
+    await this.finalizeDraft(step, job.generationId, owner);
+  }
+
+  /**
+   * Removes a failing file's content from the draft once indexing began, and
+   * puts the previous version of a document it was replacing back. If that
+   * cannot be done the whole draft fails: a draft is never left holding content
+   * of a file that failed. A file that is already ready, or never got as far as
+   * writing, is left alone.
+   */
+  private async dropFailedProjection(step: WorkflowStep, job: FileJob): Promise<void> {
+    try {
+      const removed = await step.do("remove-file-projection", STEP_CONFIG, async () => {
+        const row = await getUploadFile(this.db(), job.fileId);
+        if (row?.stage !== "chunking" && row?.stage !== "embedding") {
+          return { removed: false, restore: false };
+        }
+        // A closed draft is being (or was) cleared by whoever closed it; writing here would only leave strays.
+        if (!(await draftAcceptsWrites(this.db(), job.generationId))) {
+          return { removed: false, restore: false };
+        }
+        await removeDocumentFromDraft(this.context(), { generationId: job.generationId, documentId: job.documentId });
+        if (!job.baseGenerationId) {
+          return { removed: true, restore: false };
+        }
+        const base = await this.db()
+          .prepare(`SELECT 1 AS found FROM document_catalog WHERE generation_id = ? AND document_id = ?`)
+          .bind(job.baseGenerationId, job.documentId)
+          .first<{ found: number }>();
+        if (!base) {
+          return { removed: true, restore: false };
+        }
+        await copyBaseDocuments(this.db(), {
+          draftGenerationId: job.generationId,
+          baseGenerationId: job.baseGenerationId,
+          documentId: job.documentId,
+        });
+        return { removed: true, restore: true };
+      });
+      if (removed.restore && job.baseGenerationId) {
+        let after = 0;
+        for (let page = 0; ; page += 1) {
+          const result = await step.do(`restore-base-${page}`, STEP_CONFIG, async () => {
+            await this.assertOpen(job.generationId);
+            return copyBaseChunkPage(this.context(), {
+              draftGenerationId: job.generationId,
+              baseGenerationId: job.baseGenerationId!,
+              afterId: after,
+              documentId: job.documentId,
+            });
+          });
+          if (result.nextAfterId === null) {
+            break;
+          }
+          after = result.nextAfterId;
+        }
+      }
+    } catch {
+      await step.do("fail-draft-on-cleanup", STEP_CONFIG, async () => {
+        await failDraft(this.db(), job.generationId, "INDEX_UNAVAILABLE");
+        return { failed: true };
+      });
+    }
   }
 
   private failureCode(error: unknown): UploadErrorCode {
@@ -288,7 +371,7 @@ export class IngestionWorkflow extends WorkflowEntrypoint<Env, IngestionWorkflow
 
   // ---- the draft itself --------------------------------------------------
 
-  private async runDraftJob(step: WorkflowStep, job: DraftJob): Promise<void> {
+  private async runDraftJob(step: WorkflowStep, job: DraftJob, owner: string): Promise<void> {
     await step.do("start-indexing", STEP_CONFIG, async () => {
       await startIndexing(this.db(), job.generationId);
       return { started: true };
@@ -310,7 +393,33 @@ export class IngestionWorkflow extends WorkflowEntrypoint<Env, IngestionWorkflow
       await markBaseCopied(this.db(), job.generationId);
       return { copied: true };
     });
-    await this.finalizeDraft(step, job.generationId);
+    await this.finalizeDraft(step, job.generationId, owner);
+  }
+
+  // ---- files that never arrived ------------------------------------------
+
+  /**
+   * Waits out the delivery window of one batch, fails the files whose bytes
+   * never came, and lets the draft finish if nothing else holds it. Without
+   * this a half-uploaded batch would keep the draft building for ever.
+   */
+  private async runSweepJob(step: WorkflowStep, job: SweepJob, owner: string): Promise<void> {
+    const wait = await step.do("sweep-deadline", STEP_CONFIG, async () => ({
+      ms: Math.max(0, job.createdAt + UPLOAD_DELIVERY_TTL_MS - Date.now()),
+    }));
+    if (wait.ms > 0) {
+      await step.sleep("wait-for-uploads", wait.ms);
+    }
+    const open = await step.do("expire-undelivered", STEP_CONFIG, async () => {
+      if (!(await draftAcceptsWrites(this.db(), job.generationId))) {
+        return { open: false };
+      }
+      await expireUndeliveredFiles(this.db(), job.batchId);
+      return { open: true };
+    });
+    if (open.open) {
+      await this.finalizeDraft(step, job.generationId, owner);
+    }
   }
 
   private async copyBase(step: WorkflowStep, job: DraftJob): Promise<void> {
@@ -421,18 +530,19 @@ export class IngestionWorkflow extends WorkflowEntrypoint<Env, IngestionWorkflow
 
   // ---- reconcile and checks ----------------------------------------------
 
-  /** Runs exactly once per draft: the caller that wins the claim does the reconcile and the checks. */
-  private async finalizeDraft(step: WorkflowStep, generationId: string): Promise<void> {
+  /**
+   * Runs exactly once per draft: the instance that wins the claim does the
+   * reconcile and the checks. The claim belongs to this workflow instance, so a
+   * retried claim step resumes it instead of abandoning the draft.
+   */
+  private async finalizeDraft(step: WorkflowStep, generationId: string, owner: string): Promise<void> {
     const claimed = await step.do("claim-finalize", STEP_CONFIG, async () => ({
-      claimed: await claimFinalize(this.db(), generationId),
+      claimed: await claimFinalize(this.db(), generationId, owner),
     }));
     if (!claimed.claimed) {
       return;
     }
-    const reserved = await step.do("reserve-checks", STEP_CONFIG, async () => ({
-      outcome: await reserveCheckRun(this.db(), generationId),
-    }));
-    if (reserved.outcome === "paused") {
+    if (!(await this.reserveWithinBudget(step, generationId))) {
       return;
     }
     const context = this.context();
@@ -502,6 +612,40 @@ export class IngestionWorkflow extends WorkflowEntrypoint<Env, IngestionWorkflow
       }
       return { status };
     });
+  }
+
+  /**
+   * Reserves a check run. When the daily budget is spent the owner keeps
+   * waiting: it sleeps to the start of the next UTC day and tries again in a new
+   * durable step, so a paused draft resumes by itself. Gives up (draft stays
+   * paused for an operator) after MAX_BUDGET_WINDOWS days, or as soon as the
+   * draft is no longer open.
+   */
+  private async reserveWithinBudget(step: WorkflowStep, generationId: string): Promise<boolean> {
+    const first = await step.do("reserve-checks", STEP_CONFIG, async () => ({
+      outcome: await reserveCheckRun(this.db(), generationId),
+    }));
+    let outcome: "started" | "paused" | "existing" | "closed" = first.outcome;
+    for (let window = 0; outcome === "paused"; window += 1) {
+      if (window >= MAX_BUDGET_WINDOWS) {
+        return false;
+      }
+      const next = await step.do(`budget-window-${window}`, STEP_CONFIG, async () => {
+        const now = Date.now();
+        const at = (Math.floor(now / DAY_MS) + 1) * DAY_MS;
+        return { at, ms: at - now };
+      });
+      await step.sleep(`wait-for-budget-${window}`, next.ms);
+      const retry = await step.do(`reserve-checks-${window + 1}`, STEP_CONFIG, async () => {
+        if (!(await draftAcceptsWrites(this.db(), generationId))) {
+          return { outcome: "closed" as const };
+        }
+        // The window opened at `next.at`; count the day from there even if the wake-up was early.
+        return { outcome: await reserveCheckRun(this.db(), generationId, Math.max(Date.now(), next.at)) };
+      });
+      outcome = retry.outcome;
+    }
+    return outcome !== "closed";
   }
 
   private async uploadedAclDocuments(generationId: string): Promise<AclProbeDocument[]> {

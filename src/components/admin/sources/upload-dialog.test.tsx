@@ -20,6 +20,7 @@ function setup(over: Partial<Parameters<typeof UploadDialog>[0]> = {}) {
     onToggleGroup: vi.fn(),
     onFilesAdded: vi.fn<(files: File[]) => void>(),
     onCancel: vi.fn(),
+    onRemoveFile: vi.fn(),
     onSubmit: vi.fn(),
     ...over,
   };

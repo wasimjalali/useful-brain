@@ -4,8 +4,9 @@ ALTER TABLE messages ADD COLUMN latency_ms INTEGER;
 ALTER TABLE messages ADD COLUMN passages_retrieved INTEGER;
 ALTER TABLE messages ADD COLUMN best_candidate_department TEXT;
 
+-- Overview, Activity and Unanswered all filter role, status and a created_at range.
 CREATE INDEX messages_by_type_created
-  ON messages (role, status, answer_type, created_at);
+  ON messages (role, status, created_at);
 
 CREATE TABLE message_feedback (
   message_id TEXT NOT NULL REFERENCES messages (id),

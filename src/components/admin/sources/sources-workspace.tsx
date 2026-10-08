@@ -202,6 +202,7 @@ export function SourcesWorkspace({
         <UploadFlow
           actions={actions}
           onAdded={() => void uploadClosed(true)}
+          onBatchSent={() => void reload()}
           onClose={(started) => void uploadClosed(started)}
           peopleCount={peopleTotal}
         />

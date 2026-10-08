@@ -50,6 +50,10 @@ export type UploadFileView = {
   sizeLabel: string;
   stage: UploadStage;
   error?: string;
+  /** Who can read this file, fixed when its upload started. */
+  readers?: string;
+  /** Replaces the stage text, for example when polling stopped. */
+  note?: string;
 };
 
 export type UploadScope = "everyone" | "departments" | "roles";

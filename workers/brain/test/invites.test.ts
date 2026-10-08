@@ -101,6 +101,10 @@ describe("POST /admin/invites typed reasons", () => {
     expect(await reasonOf({ ...valid, email: "r1@northwind.example", role: "admin" })).toBe("invalid_role");
     expect(await reasonOf({ ...valid, email: "r2@northwind.example", department: "marketing" })).toBe("invalid_department");
     expect(await reasonOf({ ...valid, email: "maya.chen@northwind.example" })).toBe("account_exists");
+    await env.OPERATIONS_DB.prepare(
+      `INSERT INTO principals (id, kind, subject, created_at) VALUES ('p-no-auth', 'user', 'loopback.like@northwind.example', 1)`,
+    ).run();
+    expect(await reasonOf({ ...valid, email: "loopback.like@northwind.example" })).toBe("account_exists");
     await issue("reason.open@northwind.example");
     expect(await reasonOf({ ...valid, email: "reason.open@northwind.example" })).toBe("invite_open");
   });
@@ -173,16 +177,17 @@ describe("POST /auth/invite/accept", () => {
     expect((await post("/auth/invite/accept", { token: invite.token, name: "Weak", password: "correct horse battery" })).status).toBe(201);
   });
 
-  it("rejects malformed bodies and rate-limits repeated bad tries on one token", async () => {
+  it("rejects malformed bodies, and failed guesses write nothing from an unauthenticated caller", async () => {
     expect((await post("/auth/invite/accept", { name: "x", password: "correct horse battery" })).status).toBe(400);
     expect((await post("/auth/invite/accept", { token: 5, name: "x", password: "correct horse battery" })).status).toBe(400);
-    const token = "f".repeat(64);
-    const statuses: number[] = [];
+    const count = async () =>
+      (await env.OPERATIONS_DB.prepare(`SELECT COUNT(*) AS n FROM auth_login_attempts`).first<{ n: number }>())!.n;
+    const before = await count();
     for (let i = 0; i < 7; i += 1) {
-      statuses.push((await post("/auth/invite/accept", { token, name: "Brute", password: "correct horse battery" })).status);
+      const token = `${i}`.repeat(64);
+      expect((await post("/auth/invite/accept", { token, name: "Brute", password: "correct horse battery" })).status).toBe(400);
     }
-    expect(statuses.slice(0, 5).every((s) => s === 400)).toBe(true);
-    expect(statuses[6]).toBe(429);
+    expect(await count()).toBe(before);
   });
 
   it("is reachable without a session", async () => {

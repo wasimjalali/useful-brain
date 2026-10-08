@@ -184,20 +184,6 @@ export async function cancelGroundedQuestionAction(
   }
 }
 
-export async function loadConversationAction(conversationId: string) {
-  try {
-    return actionSuccess(
-      await brainJson<Conversation>(`/conversations/${conversationId}`),
-    );
-  } catch (error) {
-    return actionFailure(error, {
-      code: "INTERNAL_ERROR",
-      message: "The conversation could not be loaded.",
-      retryable: true,
-    });
-  }
-}
-
 export async function deleteConversationAction(conversationId: string) {
   try {
     await brainJson(`/conversations/${conversationId}`, { method: "DELETE" });

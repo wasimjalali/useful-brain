@@ -67,5 +67,8 @@ export function titleForPath(
   if (pathname === "/chat") {
     return "New chat";
   }
+  if (pathname.startsWith("/tickets/")) {
+    return "Ticket";
+  }
   return TITLES[pathname] ?? "Useful Brain";
 }

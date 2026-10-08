@@ -97,10 +97,12 @@ export async function reconcileDraft(
   const present: string[] = [];
   for (const batch of chunksOf(Object.keys(expected), VECTOR_GET_LIMIT)) {
     for (const vector of await vectors.getByIds(batch)) {
-      const wrongNamespace = vector.namespace !== undefined && vector.namespace !== namespace;
-      const wrongAcl =
-        vector.metadata !== undefined && vector.metadata.acl_group !== aclByVector.get(vector.id);
-      if (!wrongNamespace && !wrongAcl && expected[vector.id] !== undefined) {
+      // Both fields must be present and equal. An absent namespace or ACL
+      // metadata cannot be verified, so it counts as missing, never as valid.
+      const ledgerAcl = aclByVector.get(vector.id);
+      const namespaceOk = vector.namespace === namespace;
+      const aclOk = typeof ledgerAcl === "string" && vector.metadata?.acl_group === ledgerAcl;
+      if (namespaceOk && aclOk && expected[vector.id] !== undefined) {
         present.push(vector.id);
       }
     }

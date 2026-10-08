@@ -34,7 +34,11 @@ export type UploadBatchRow = {
   access_scope: "public" | "department" | "role";
   allowed_roles: string;
   allowed_departments: string;
+  created_at: number;
 };
+
+/** A declared file must arrive within this long of its batch being created. */
+export const UPLOAD_DELIVERY_TTL_MS = 30 * 60 * 1000;
 
 export function batchAcl(batch: Pick<UploadBatchRow, "access_scope" | "allowed_roles" | "allowed_departments">): UploadAcl {
   return {
@@ -44,47 +48,68 @@ export function batchAcl(batch: Pick<UploadBatchRow, "access_scope" | "allowed_r
   };
 }
 
+type CreateBatchInput = {
+  generationId: string;
+  createdBy: string;
+  acl: UploadAcl;
+  idempotencyKey: string;
+  files: { name: string; size: number }[];
+  now?: number;
+};
+
+/**
+ * The batch an idempotency key already created, or null for a new key. A key
+ * is bound to the whole normalized request: creator, readers and the exact set
+ * of files with their sizes. Replaying it with anything different is rejected,
+ * so a retry can never hand back a batch with other readers than were asked for.
+ * File order does not matter; the answer follows the order of the request.
+ */
+export async function resolveUploadReplay(
+  db: SqlExecutor,
+  input: Pick<CreateBatchInput, "createdBy" | "acl" | "idempotencyKey" | "files">,
+): Promise<(UploadCreated & { generationId: string }) | null> {
+  const existing = await db
+    .prepare(
+      `SELECT id, generation_id, created_by, access_scope, allowed_roles, allowed_departments
+       FROM upload_batches WHERE idempotency_key = ?`,
+    )
+    .bind(input.idempotencyKey)
+    .first<Pick<UploadBatchRow, "id" | "generation_id" | "created_by" | "access_scope" | "allowed_roles" | "allowed_departments">>();
+  if (!existing) {
+    return null;
+  }
+  const rows = await db
+    .prepare(`SELECT id, file_name, byte_size FROM upload_files WHERE batch_id = ?`)
+    .bind(existing.id)
+    .all<{ id: string; file_name: string; byte_size: number }>();
+  const stored = new Map(rows.results.map((row) => [row.file_name, row]));
+  const same =
+    existing.created_by === input.createdBy &&
+    existing.access_scope === input.acl.accessScope &&
+    existing.allowed_roles === JSON.stringify(input.acl.allowedRoles) &&
+    existing.allowed_departments === JSON.stringify(input.acl.allowedDepartments) &&
+    stored.size === input.files.length &&
+    input.files.every((file) => stored.get(file.name)?.byte_size === file.size);
+  if (!same) {
+    throw new WorkerValidationError();
+  }
+  return {
+    batchId: existing.id,
+    generationId: existing.generation_id,
+    files: input.files.map((file) => ({ id: stored.get(file.name)!.id, name: file.name })),
+  };
+}
+
 /**
  * Creates a batch and its file rows in one atomic batch. The same
- * idempotency key with the same files returns the original ids; with
- * different files it is rejected.
+ * idempotency key with the same request returns the original ids; with a
+ * different request it is rejected.
  */
-export async function createUploadBatch(
-  db: SqlExecutor,
-  input: {
-    generationId: string;
-    createdBy: string;
-    acl: UploadAcl;
-    idempotencyKey: string;
-    files: { name: string; size: number }[];
-    now?: number;
-  },
-): Promise<UploadCreated> {
+export async function createUploadBatch(db: SqlExecutor, input: CreateBatchInput): Promise<UploadCreated> {
   const now = input.now ?? Date.now();
-  const existing = await db
-    .prepare(`SELECT id FROM upload_batches WHERE idempotency_key = ?`)
-    .bind(input.idempotencyKey)
-    .first<{ id: string }>();
-  if (existing) {
-    const rows = await db
-      .prepare(
-        `SELECT id, file_name, byte_size FROM upload_files WHERE batch_id = ? ORDER BY created_at, rowid`,
-      )
-      .bind(existing.id)
-      .all<{ id: string; file_name: string; byte_size: number }>();
-    const same =
-      rows.results.length === input.files.length &&
-      input.files.every((file) =>
-        rows.results.some((row) => row.file_name === file.name && row.byte_size === file.size),
-      );
-    if (!same) {
-      throw new WorkerValidationError();
-    }
-    const byName = new Map(rows.results.map((row) => [row.file_name, row.id]));
-    return {
-      batchId: existing.id,
-      files: input.files.map((file) => ({ id: byName.get(file.name)!, name: file.name })),
-    };
+  const replay = await resolveUploadReplay(db, input);
+  if (replay) {
+    return { batchId: replay.batchId, files: replay.files };
   }
   const batchId = newBoundedId("ub");
   const files: UploadCreated["files"] = [];
@@ -127,19 +152,22 @@ export async function createUploadBatch(
         .bind(fileId, batchId, file.name, file.size, await uploadDocumentId(file.name), now, now, batchId),
     );
   }
-  const results = await db.batch(statements);
+  let results: Awaited<ReturnType<SqlExecutor["batch"]>>;
+  try {
+    results = await db.batch(statements);
+  } catch (error) {
+    // Two requests with one key raced and this one hit the unique key: answer
+    // it as the replay it is. Anything else is a real failure.
+    const winner = await resolveUploadReplay(db, input);
+    if (winner) {
+      return { batchId: winner.batchId, files: winner.files };
+    }
+    throw error;
+  }
   if ((results[0]?.meta?.changes ?? 0) !== 1) {
     throw new WorkerValidationError("Promote or discard the current draft first.");
   }
   return { batchId, files };
-}
-
-export async function uploadBatchKeyExists(db: SqlExecutor, idempotencyKey: string): Promise<boolean> {
-  const row = await db
-    .prepare(`SELECT 1 AS found FROM upload_batches WHERE idempotency_key = ?`)
-    .bind(idempotencyKey)
-    .first<{ found: number }>();
-  return row !== null;
 }
 
 export async function getUploadFile(db: SqlExecutor, fileId: string): Promise<UploadFileRow | null> {
@@ -156,26 +184,43 @@ export async function getUploadFile(db: SqlExecutor, fileId: string): Promise<Up
 export async function getUploadBatch(db: SqlExecutor, batchId: string): Promise<UploadBatchRow | null> {
   return db
     .prepare(
-      `SELECT id, generation_id, created_by, access_scope, allowed_roles, allowed_departments
+      `SELECT id, generation_id, created_by, access_scope, allowed_roles, allowed_departments, created_at
        FROM upload_batches WHERE id = ?`,
     )
     .bind(batchId)
     .first<UploadBatchRow>();
 }
 
+/** False when the file already left the parsing stage (it expired or its draft closed): the object is then unwanted. */
 export async function recordUploadedObject(
   db: SqlExecutor,
   fileId: string,
   r2Key: string,
   now = Date.now(),
-): Promise<void> {
-  await db
+): Promise<boolean> {
+  const result = await db
     .prepare(
       `UPDATE upload_files SET r2_key = ?, updated_at = ?
        WHERE id = ? AND stage = 'parsing'`,
     )
     .bind(r2Key, now, fileId)
     .run();
+  return (result.meta?.changes ?? 0) > 0;
+}
+
+/**
+ * Fails every file of the batch whose bytes never arrived, so a half-uploaded
+ * batch cannot hold the draft open for ever. Files that arrived are untouched.
+ */
+export async function expireUndeliveredFiles(db: SqlExecutor, batchId: string, now = Date.now()): Promise<number> {
+  const result = await db
+    .prepare(
+      `UPDATE upload_files SET stage = 'failed', error_code = 'NOT_RECEIVED', updated_at = ?
+       WHERE batch_id = ? AND stage = 'parsing' AND r2_key IS NULL`,
+    )
+    .bind(now, batchId)
+    .run();
+  return result.meta?.changes ?? 0;
 }
 
 /** Stages only move forward; failed and ready are terminal. Returns true when the row moved. */

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 
+import { uploadHref } from "@/app/(app)/admin/overview/mappers";
 import type {
   EvalsSummaryView,
   KpiView,
@@ -32,9 +33,7 @@ export function OverviewView({
       <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_380px]">
         <UnansweredList
           items={unanswered}
-          onAddDocument={(item) =>
-            router.push(`/admin/sources?upload=1&q=${encodeURIComponent(item.question)}`)
-          }
+          onAddDocument={() => router.push(uploadHref())}
         />
         <div className="flex flex-col gap-10">
           <SystemHealth rows={system} />

@@ -60,6 +60,31 @@ describe("GET /admin/people", () => {
     }
   });
 
+  it("People count equals the Library list length per persona, also for a mixed document", async () => {
+    const damage = (scope: string, departments: string) =>
+      env.CORPUS_DB.prepare(
+        `UPDATE chunks SET access_scope = ?, allowed_departments = ?
+         WHERE generation_id = ? AND document_id = 'doc-public-handbook' AND chunk_index = 1`,
+      ).bind(scope, departments, generationId).run();
+    const check = async () => {
+      const body = (await (await get("/admin/people", cookies["member-jordan"])).json()) as PeopleResponse;
+      for (const persona of ["member-maya", "member-priya", "member-jordan"] as const) {
+        const library = (await (await get("/library", cookies[persona])).json()) as { documents: unknown[] };
+        const whoami = (await (await get("/whoami", cookies[persona])).json()) as { readableDocumentCount: number };
+        const count = body.people.find((p) => p.id === persona)!.readableDocuments;
+        expect(count, persona).toBe(library.documents.length);
+        expect(whoami.readableDocumentCount, persona).toBe(library.documents.length);
+      }
+    };
+    await check();
+    await damage("department", '["hr"]');
+    try {
+      await check();
+    } finally {
+      await damage("public", "[]");
+    }
+  });
+
   it("admin grants no read rights in the count, and a private owner counts their own document", async () => {
     const body = (await (await get("/admin/people", cookies["member-jordan"])).json()) as PeopleResponse;
     const jordan = body.people.find((p) => p.id === "member-jordan")!;

@@ -22,8 +22,10 @@ export type ViewAsTurnInput = Pick<
 
 /**
  * One ephemeral turn as another person. Nothing is stored in conversations,
- * messages or metrics. An audit row is written before the run and completed after
- * it, even when the run fails.
+ * messages or metrics. An audit row is claimed before the run and completed
+ * after it, even when the run fails. The response (and any restricted-title
+ * diagnostic in it) is released only once the audit row records it: if the
+ * completion cannot be written, the turn fails with a safe error instead.
  */
 export async function runViewAsTurn(
   input: ViewAsTurnInput,
@@ -34,11 +36,15 @@ export async function runViewAsTurn(
     adminPrincipalId: input.admin.id,
     assumedPrincipalId: person.record.id,
     question: input.question,
+    scopeDocumentId: input.scopeDocumentId,
     now: Date.now(),
   });
   let answerType = "error";
   let cited: string[] = [];
   let diagnosticShown = false;
+  let result: (GroundedAnswerResponse & TurnResponseExtras) | undefined;
+  let failure: unknown;
+  let failed = false;
   try {
     const assumedPerson = await echoAssumedPerson(person, input.corpus);
     const answer = await executeTurn({
@@ -76,15 +82,33 @@ export async function runViewAsTurn(
         console.error("admin_diagnostic_failed");
       }
     }
-    return { ...publicAnswer, assumedPerson, ...(adminDiagnostic ? { adminDiagnostic } : {}) };
-  } finally {
-    await finishViewAsAudit(input.operations, {
-      requestId: input.requestId,
-      answerType,
-      citedDocumentIds: cited,
-      diagnosticShown,
-    }).catch(() => {
-      console.error("view_as_audit_finish_failed");
-    });
+    result = { ...publicAnswer, assumedPerson, ...(adminDiagnostic ? { adminDiagnostic } : {}) };
+  } catch (error) {
+    failed = true;
+    failure = error;
   }
+  const completion = {
+    requestId: input.requestId,
+    answerType,
+    citedDocumentIds: cited,
+    diagnosticShown,
+  };
+  let audited = false;
+  // One retry: completion is a single idempotent UPDATE of an owned row.
+  for (let attempt = 0; attempt < 2 && !audited; attempt += 1) {
+    try {
+      await finishViewAsAudit(input.operations, completion);
+      audited = true;
+    } catch {
+      console.error("view_as_audit_finish_failed");
+    }
+  }
+  if (failed) {
+    // The original failure outranks a failed audit completion.
+    throw failure;
+  }
+  if (!audited || !result) {
+    throw new Error("view_as_audit_incomplete");
+  }
+  return result;
 }

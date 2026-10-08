@@ -289,6 +289,7 @@ export function useChatTurn({
               answer: null,
               error: cancelled ? null : result.error.message,
               errorRetryable: result.error.retryable,
+              ...(cancelled ? {} : { errorCode: result.error.code }),
               cancelled,
             }),
           );

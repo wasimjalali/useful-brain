@@ -14,6 +14,7 @@ export function withAiHealth(operations: OperationsDatabase, ai: WorkersAiRunner
     run: (model, input, options) =>
       recordedAiRun(operations, () => ai.run(model, input, options), Date.now, {
         successMinIntervalMs: AI_HEALTH_SUCCESS_INTERVAL_MS,
+        signal: options?.signal,
       }),
   };
 }

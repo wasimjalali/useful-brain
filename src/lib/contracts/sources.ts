@@ -33,6 +33,7 @@ export const UPLOAD_ERROR_CODES = [
   "TIMED_OUT",
   "INDEX_UNAVAILABLE",
   "DRAFT_CLOSED",
+  "NOT_RECEIVED",
   "INTERNAL",
 ] as const;
 export type UploadErrorCode = (typeof UPLOAD_ERROR_CODES)[number];

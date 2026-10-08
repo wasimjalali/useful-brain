@@ -10,24 +10,72 @@ import type {
   UploadCreated,
   UploadStatus,
 } from "../../../src/lib/contracts/sources";
-import { activeGenerationId } from "../../../src/lib/store/corpus-d1";
+import { readersToAcl } from "../../../src/lib/ingest/upload-validation";
+import { activeGenerationId, promoteGeneration } from "../../../src/lib/store/corpus-d1";
+import { ensureOpenDraft } from "../../../src/lib/store/drafts";
+import { createUploadBatch } from "../../../src/lib/store/uploads";
 import { seedCorpus, seedPersonas, seedPrincipals, CORPUS_DOCUMENT_IDS, type PersonaId } from "./seed";
 
 const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
 
 type Sent = { jobId: string; idempotencyKey: string };
 let sent: Sent[] = [];
+/** Upload file rows that already existed in D1 when each message reached the queue. */
+let rowsAtSend: number[] = [];
 let deletedVectors: string[] = [];
 let failQueue = false;
+/** When set, runs before the statement with matching SQL executes (once per call). */
+let beforeStatement: ((sql: string) => Promise<void>) | null = null;
 
 const fakeQueue = {
   async send(message: Sent) {
     if (failQueue) {
       throw new Error("queue down");
     }
+    const row = await env.CORPUS_DB.prepare("SELECT COUNT(*) AS n FROM upload_files").first<{ n: number }>();
+    rowsAtSend.push(row?.n ?? 0);
     sent.push(message);
   },
 };
+
+type Statement = ReturnType<typeof env.CORPUS_DB.prepare>;
+
+/** Wraps the corpus binding so a test can interleave another writer right before a statement runs. */
+function racingDb() {
+  const meta = new WeakMap<object, { real: Statement; sql: string }>();
+  const wrap = (statement: Statement, sql: string): Statement => {
+    const hook = async () => {
+      await beforeStatement?.(sql);
+    };
+    const wrapped = {
+      bind: (...values: unknown[]) => wrap(statement.bind(...(values as never[])), sql),
+      run: async () => {
+        await hook();
+        return statement.run();
+      },
+      first: async (...args: unknown[]) => {
+        await hook();
+        return (statement.first as (...a: unknown[]) => Promise<unknown>)(...args);
+      },
+      all: async () => {
+        await hook();
+        return statement.all();
+      },
+    } as unknown as Statement;
+    meta.set(wrapped as object, { real: statement, sql });
+    return wrapped;
+  };
+  return {
+    prepare: (sql: string) => wrap(env.CORPUS_DB.prepare(sql), sql),
+    batch: async (statements: Statement[]) => {
+      for (const statement of statements) {
+        await beforeStatement?.(meta.get(statement as object)?.sql ?? "");
+      }
+      return env.CORPUS_DB.batch(statements.map((statement) => meta.get(statement as object)?.real ?? statement));
+    },
+  };
+}
+
 const fakeVectorize = {
   async deleteByIds(ids: string[]) {
     deletedVectors.push(...ids);
@@ -66,7 +114,7 @@ async function call(
       headers,
       body,
     }),
-    sessionEnv,
+    beforeStatement ? ({ ...sessionEnv, CORPUS_DB: racingDb() } as unknown as typeof env) : sessionEnv,
     ctx,
   );
   await waitOnExecutionContext(ctx);
@@ -82,10 +130,16 @@ async function resetPipeline() {
     env.CORPUS_DB.prepare("DELETE FROM upload_batches"),
     env.CORPUS_DB.prepare("DELETE FROM draft_checks"),
     env.CORPUS_DB.prepare("DELETE FROM drafts"),
+    // A test that promotes a draft must not leak the new pointer into the next one.
+    env.CORPUS_DB.prepare("UPDATE corpus_state SET active_generation_id = ? WHERE singleton = 1").bind(activeId),
+    env.CORPUS_DB.prepare("UPDATE corpus_generations SET state = 'active' WHERE id = ?").bind(activeId),
+    env.CORPUS_DB.prepare("UPDATE corpus_generations SET state = 'archived' WHERE state = 'active' AND id <> ?").bind(activeId),
   ]);
   sent = [];
+  rowsAtSend = [];
   deletedVectors = [];
   failQueue = false;
+  beforeStatement = null;
 }
 
 beforeAll(async () => {
@@ -206,8 +260,11 @@ describe("POST /admin/uploads", () => {
       .bind(batch!.generation_id)
       .first<Record<string, unknown>>();
     expect(draft).toEqual({ kind: "upload", base_generation_id: activeId, closed_at: null });
-    // The draft job is enqueued once, with identifiers only.
-    expect(sent).toEqual([{ jobId: batch!.generation_id, idempotencyKey: batch!.generation_id }]);
+    // The draft job and the batch's delivery-expiry job are enqueued once, with identifiers only.
+    expect(sent).toEqual([
+      { jobId: batch!.generation_id, idempotencyKey: batch!.generation_id },
+      { jobId: created.batchId, idempotencyKey: created.batchId },
+    ]);
     // The ACL group a worker will compute from this row matches the selection.
     const key = await aclGroupKey({
       accessScope: "department",
@@ -249,15 +306,117 @@ describe("POST /admin/uploads", () => {
       "SELECT (SELECT COUNT(*) FROM upload_batches) AS batches, (SELECT COUNT(*) FROM drafts) AS drafts",
     ).first<{ batches: number; drafts: number }>();
     expect(counts).toEqual({ batches: 1, drafts: 1 });
-    expect(sent).toHaveLength(1);
+    expect(sent).toHaveLength(2);
   });
 
-  it("puts a second batch into the same single draft without a second job", async () => {
+  it("binds a key to the whole request: readers, sizes and creator cannot change on replay", async () => {
+    const body = baseBody({
+      idempotencyKey: "idem-bound-1",
+      readers: { kind: "everyone" },
+      files: [{ name: "a.md", size: 10 }],
+    });
+    const first = (await (await call("/admin/uploads", admin(), { json: body })).json()) as UploadCreated;
+    // Same key, narrower readers: the original (public) batch must not be handed back.
+    for (const changed of [
+      { ...body, readers: { kind: "departments", names: ["hr"] } },
+      { ...body, readers: { kind: "roles", names: ["manager"] } },
+      { ...body, files: [{ name: "a.md", size: 11 }] },
+    ]) {
+      expect((await call("/admin/uploads", admin(), { json: changed })).status).toBe(400);
+    }
+    expect((await (await call("/admin/uploads", admin(), { json: body })).json()) as UploadCreated).toEqual(first);
+    // Another creator replaying the key is refused at the store, too.
+    const batch = await env.CORPUS_DB.prepare("SELECT generation_id FROM upload_batches WHERE id = ?")
+      .bind(first.batchId)
+      .first<{ generation_id: string }>();
+    await expect(
+      createUploadBatch(env.CORPUS_DB as never, {
+        generationId: batch!.generation_id,
+        createdBy: "someone-else",
+        acl: readersToAcl({ kind: "everyone" }),
+        idempotencyKey: "idem-bound-1",
+        files: [{ name: "a.md", size: 10 }],
+      }),
+    ).rejects.toThrow();
+    // Order of files does not matter for the same request.
+    const two = baseBody({
+      idempotencyKey: "idem-bound-2",
+      files: [
+        { name: "x.md", size: 1 },
+        { name: "y.md", size: 2 },
+      ],
+    });
+    const created = (await (await call("/admin/uploads", admin(), { json: two })).json()) as UploadCreated;
+    const reordered = (await (
+      await call("/admin/uploads", admin(), { json: { ...two, files: [...(two.files as object[])].reverse() } })
+    ).json()) as UploadCreated;
+    expect(reordered.batchId).toBe(created.batchId);
+    expect(reordered.files.map((file) => file.name)).toEqual(["y.md", "x.md"]);
+  });
+
+  it("replaying a batch whose draft is gone returns the original result and creates nothing", async () => {
+    const body = baseBody({ idempotencyKey: "idem-done-1" });
+    const first = (await (await call("/admin/uploads", admin(), { json: body })).json()) as UploadCreated;
+    const draft = await env.CORPUS_DB.prepare("SELECT generation_id FROM drafts").first<{ generation_id: string }>();
+    expect((await call(`/admin/drafts/${draft!.generation_id}/discard`, admin(), { method: "POST", json: {} })).status).toBe(200);
+    const sentBefore = sent.length;
+    const replay = await call("/admin/uploads", admin(), { json: body });
+    expect(replay.status).toBe(200);
+    expect((await replay.json()) as UploadCreated).toEqual(first);
+    const counts = await env.CORPUS_DB.prepare(
+      "SELECT (SELECT COUNT(*) FROM drafts) AS drafts, (SELECT COUNT(*) FROM corpus_generations) AS generations, (SELECT COUNT(*) FROM drafts WHERE closed_at IS NULL) AS open",
+    ).first<{ drafts: number; generations: number; open: number }>();
+    expect(counts?.drafts).toBe(1);
+    expect(counts?.open).toBe(0);
+    expect(sent).toHaveLength(sentBefore);
+  });
+
+  it("persists the batch and its files before the draft job reaches the queue", async () => {
+    await createBatch({ files: [{ name: "a.md", size: 5 }, { name: "b.md", size: 6 }] });
+    expect(sent).toHaveLength(2);
+    expect(rowsAtSend).toEqual([2, 2]);
+    const draft = await env.CORPUS_DB.prepare("SELECT job_enqueued_at FROM drafts").first<{ job_enqueued_at: number | null }>();
+    expect(draft?.job_enqueued_at).not.toBeNull();
+  });
+
+  it("recovers a draft whose job was never published (crash after the database write)", async () => {
+    // The request died after the rows committed and before the queue send.
+    const generation = await ensureOpenDraft(env.CORPUS_DB as never, { kind: "upload", createdBy: "member-jordan" });
+    const lost = await createUploadBatch(env.CORPUS_DB as never, {
+      generationId: generation.draft.generationId,
+      createdBy: "member-jordan",
+      acl: readersToAcl({ kind: "departments", names: ["hr"] }),
+      idempotencyKey: "idem-crash-1",
+      files: [{ name: "lost.md", size: 5 }],
+    });
+    expect(sent).toEqual([]);
+    const pending = await env.CORPUS_DB.prepare("SELECT job_enqueued_at FROM drafts").first<{ job_enqueued_at: number | null }>();
+    expect(pending?.job_enqueued_at).toBeNull();
+    // The admin retries with the same key.
+    const retry = await call("/admin/uploads", admin(), {
+      json: { readers: { kind: "departments", names: ["hr"] }, idempotencyKey: "idem-crash-1", files: [{ name: "lost.md", size: 5 }] },
+    });
+    expect(retry.status).toBe(200);
+    expect((await retry.json()) as UploadCreated).toEqual(lost);
+    expect(sent).toEqual([
+      { jobId: generation.draft.generationId, idempotencyKey: generation.draft.generationId },
+      { jobId: lost.batchId, idempotencyKey: lost.batchId },
+    ]);
+    // Nothing is published twice.
+    await call("/admin/uploads", admin(), {
+      json: { readers: { kind: "departments", names: ["hr"] }, idempotencyKey: "idem-crash-1", files: [{ name: "lost.md", size: 5 }] },
+    });
+    expect(sent).toHaveLength(2);
+  });
+
+  it("puts a second batch into the same single draft without a second draft job", async () => {
     await createBatch();
     await createBatch({ files: [{ name: "second.md", size: 5 }] });
     const drafts = await env.CORPUS_DB.prepare("SELECT COUNT(*) AS n FROM drafts").first<{ n: number }>();
     expect(drafts?.n).toBe(1);
-    expect(sent).toHaveLength(1);
+    const draft = await env.CORPUS_DB.prepare("SELECT generation_id FROM drafts").first<{ generation_id: string }>();
+    expect(sent.filter((message) => message.jobId === draft!.generation_id)).toHaveLength(1);
+    expect(sent).toHaveLength(3);
   });
 
   it("refuses new files once the draft started its checks", async () => {
@@ -535,6 +694,96 @@ describe("draft promote and discard", () => {
     const open = await env.CORPUS_DB.prepare("SELECT generation_id FROM drafts WHERE closed_at IS NULL").first<{ generation_id: string }>();
     expect(open?.generation_id).not.toBe(id);
   });
+
+  /** A ready, check-passed draft that holds one staged chunk, so a wrongful discard is visible. */
+  async function promotableDraft(): Promise<string> {
+    const id = await draftId();
+    const tag = `-race-${crypto.randomUUID().slice(0, 8)}`;
+    await env.CORPUS_DB.prepare(
+      `INSERT INTO document_versions (id, document_id, generation_id, r2_key, content_digest, byte_size, created_at)
+       SELECT id || ?, document_id, ?, r2_key, content_digest, byte_size, created_at
+       FROM document_versions WHERE generation_id = ? LIMIT 1`,
+    ).bind(tag, id, activeId).run();
+    await env.CORPUS_DB.prepare(
+      `INSERT INTO chunks (chunk_id, document_id, document_version_id, generation_id, heading, chunk_index, content,
+         start_offset, end_offset, content_digest, vector_id, acl_group, access_scope, allowed_roles, allowed_departments, metadata, created_at)
+       SELECT chunk_id || ?, document_id, (SELECT id FROM document_versions WHERE generation_id = ? LIMIT 1), ?, heading, chunk_index, content,
+         start_offset, end_offset, content_digest, vector_id || ?, acl_group, access_scope, allowed_roles, allowed_departments, metadata, created_at
+       FROM chunks WHERE generation_id = ? LIMIT 1`,
+    ).bind(tag, id, id, tag, activeId).run();
+    await env.CORPUS_DB.prepare("UPDATE corpus_generations SET state = 'ready' WHERE id = ?").bind(id).run();
+    await env.CORPUS_DB.prepare("INSERT INTO draft_checks (generation_id, status, reconciled, acl_leaks, started_at) VALUES (?, 'passed', 1, 0, 1)").bind(id).run();
+    return id;
+  }
+
+  async function restoreActive(id: string) {
+    await env.CORPUS_DB.prepare("UPDATE corpus_generations SET state = 'archived' WHERE id = ?").bind(id).run();
+    await env.CORPUS_DB.prepare("UPDATE corpus_generations SET state = 'active' WHERE id = ?").bind(activeId).run();
+    await env.CORPUS_DB.prepare("UPDATE corpus_state SET active_generation_id = ? WHERE singleton = 1").bind(activeId).run();
+  }
+
+  it("a discard that loses the race to a promotion deletes nothing from the new active generation", async () => {
+    const id = await promotableDraft();
+    const staged = (await env.CORPUS_DB.prepare("SELECT COUNT(*) AS n FROM chunks WHERE generation_id = ?").bind(id).first<{ n: number }>())?.n;
+    expect(staged).toBe(1);
+    let promoted = false;
+    // The promotion lands after the discard read the draft and before it changes anything.
+    beforeStatement = async (sql) => {
+      if (!promoted && /UPDATE corpus_generations SET state = 'failed'/.test(sql)) {
+        promoted = true;
+        await promoteGeneration(env.CORPUS_DB as never, id);
+      }
+    };
+    const response = await discard(id);
+    beforeStatement = null;
+    expect(promoted).toBe(true);
+    expect(response.status).toBe(400);
+    expect(await activeGenerationId(env.CORPUS_DB as never)).toBe(id);
+    expect((await env.CORPUS_DB.prepare("SELECT state FROM corpus_generations WHERE id = ?").bind(id).first<{ state: string }>())?.state).toBe("active");
+    expect((await env.CORPUS_DB.prepare("SELECT COUNT(*) AS n FROM chunks WHERE generation_id = ?").bind(id).first<{ n: number }>())?.n).toBe(1);
+    expect((await env.CORPUS_DB.prepare("SELECT COUNT(*) AS n FROM document_versions WHERE generation_id = ?").bind(id).first<{ n: number }>())?.n).toBe(1);
+    expect(deletedVectors).toEqual([]);
+    await restoreActive(id);
+  });
+
+  it("a promotion that loses the race to a discard reports failure and never moves the pointer", async () => {
+    const id = await promotableDraft();
+    let discarded = false;
+    // The discard claims the draft after promote read it as ready, right before the promote writes.
+    beforeStatement = async (sql) => {
+      if (!discarded && /SET state = 'active'/.test(sql)) {
+        discarded = true;
+        await env.CORPUS_DB.batch([
+          env.CORPUS_DB.prepare("UPDATE corpus_generations SET state = 'failed', error_code = 'DISCARDED' WHERE id = ?").bind(id),
+          env.CORPUS_DB.prepare("UPDATE drafts SET closed_at = 1 WHERE generation_id = ?").bind(id),
+        ]);
+      }
+    };
+    const response = await promote(id);
+    beforeStatement = null;
+    expect(discarded).toBe(true);
+    expect(response.status).toBe(400);
+    expect(await activeGenerationId(env.CORPUS_DB as never)).toBe(activeId);
+    expect((await env.CORPUS_DB.prepare("SELECT state FROM corpus_generations WHERE id = ?").bind(id).first<{ state: string }>())?.state).toBe("failed");
+  });
+
+  it.each(["draft", "indexing", "reconciling", "ready", "failed"])(
+    "discards a %s draft, so a stuck build can always be cleared",
+    async (state) => {
+      const id = await draftId();
+      await env.CORPUS_DB.prepare("UPDATE corpus_generations SET state = ? WHERE id = ?").bind(state, id).run();
+      const response = await discard(id);
+      expect(response.status).toBe(200);
+      const row = await env.CORPUS_DB.prepare(
+        "SELECT g.state, g.error_code, d.closed_at FROM corpus_generations g JOIN drafts d ON d.generation_id = g.id WHERE g.id = ?",
+      ).bind(id).first<{ state: string; error_code: string; closed_at: number | null }>();
+      expect(row).toMatchObject({ state: "failed", error_code: "DISCARDED" });
+      expect(row?.closed_at).not.toBeNull();
+      expect(await activeGenerationId(env.CORPUS_DB as never)).toBe(activeId);
+      // The slot is free again.
+      await createBatch();
+    },
+  );
 
   it("discard twice is harmless and cannot discard a live generation", async () => {
     const id = await draftId();

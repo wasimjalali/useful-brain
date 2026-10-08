@@ -33,6 +33,8 @@ export type AssistantTurnProps = {
   onOpenEvidence: () => void;
   onApprove: () => void;
   onDeny: () => void;
+  onOpenTicket: (ticketId: string) => void;
+  onSignIn: () => void;
 };
 
 /** The assistant side of one turn. The working state is the status line in the workspace. */
@@ -51,10 +53,20 @@ export function AssistantTurn({
   onOpenEvidence,
   onApprove,
   onDeny,
+  onOpenTicket,
+  onSignIn,
 }: AssistantTurnProps) {
   const answer = turn.answer;
   if (!answer) {
-    return <ErrorAlert onRetry={onRetry} />;
+    return (
+      <ErrorAlert
+        message={turn.error}
+        onRetry={onRetry}
+        onSignIn={onSignIn}
+        retryable={turn.errorRetryable !== false}
+        signedOut={turn.errorCode === "AUTH_REQUIRED"}
+      />
+    );
   }
 
   if (answer.structuredAnswer.answerType === "insufficient_evidence") {
@@ -86,6 +98,7 @@ export function AssistantTurn({
           busy={approvalBusy}
           onApprove={onApprove}
           onDeny={onDeny}
+          onOpenTicket={card.status === "done" ? () => onOpenTicket(card.ticketId) : undefined}
         />
       ) : null}
       {sources.length > 0 ? (

@@ -81,4 +81,41 @@ describe("LibraryClient", () => {
     render(<LibraryClient documents={[]} loading />);
     expect(screen.getByText("Loading documents")).toBeInTheDocument();
   });
+
+  it("formats lowercase wire values for department and readers", () => {
+    render(
+      <LibraryClient
+        documents={[
+          { id: "w1", title: "Payroll", department: "hr", readers: { kind: "roles", names: ["hr_manager", "manager"] }, headings: [] },
+        ]}
+      />,
+    );
+    expect(screen.getByRole("button", { name: /^HR/ })).toBeInTheDocument();
+    expect(screen.getByText("HR managers, Managers")).toBeInTheDocument();
+  });
+
+  it("falls back to All when the selected department chip disappears", () => {
+    render(<LibraryClient documents={documents} />);
+    fireEvent.click(screen.getByRole("button", { name: /^HR/ }));
+    fireEvent.change(screen.getByLabelText("Search titles and sections"), { target: { value: "paging" } });
+    expect(screen.getByText("On-Call Rotation")).toBeInTheDocument();
+    expect(screen.queryByText(/Nothing you can read matches/)).toBeNull();
+  });
+
+  it("shows a request failure only under the query that failed", async () => {
+    requestDocumentAction.mockResolvedValue({ ok: false, error: { code: "INTERNAL_ERROR", message: "x", retryable: true } });
+    render(<LibraryClient documents={documents} />);
+    const search = screen.getByLabelText("Search titles and sections");
+    fireEvent.change(search, { target: { value: "zzz" } });
+    fireEvent.click(screen.getByRole("button", { name: "Request this document" }));
+    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+    fireEvent.change(search, { target: { value: "yyy" } });
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("offers no request for an empty library", () => {
+    render(<LibraryClient documents={[]} />);
+    expect(screen.queryByRole("button", { name: "Request this document" })).toBeNull();
+    expect(screen.queryByText(/matches/)).toBeNull();
+  });
 });

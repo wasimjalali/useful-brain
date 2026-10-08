@@ -97,8 +97,8 @@ function lastAsked(at: number, now: number): string {
   return `${days} days ago`;
 }
 
-export function uploadHref(question: string): string {
-  return `/admin/sources?upload=1&q=${encodeURIComponent(question)}`;
+export function uploadHref(): string {
+  return "/admin/sources?upload=1";
 }
 
 export function mapUnanswered(items: UnansweredQuestion[], now: number): UnansweredView[] {

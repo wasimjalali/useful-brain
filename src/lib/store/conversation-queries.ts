@@ -139,7 +139,10 @@ export async function loadConversationForUi(
   conversationId: string,
   ownerPrincipalId: string,
   corpus?: SqlExecutor,
+  /** Scores, generation id and chunk ids reach only an admin viewer; the default hides them. */
+  options: { diagnostics?: boolean } = {},
 ): Promise<ConversationView> {
+  const diagnostics = options.diagnostics === true;
   await assertConversationOwner(db, conversationId, ownerPrincipalId);
   const header = await db
     .prepare(
@@ -259,20 +262,33 @@ export async function loadConversationForUi(
       requestedQuestions.add(row.question_normalized);
     }
   }
-  // A failed attempt that was retried is replaced by the retry: the retry
-  // answers the same saved user message, so only the latest attempt shows.
-  const retriedUserIds = new Set(
+  // Attempts at one saved user message collapse to one: the newest completed
+  // answer, else the newest failed one. A pending attempt (in flight, or stuck)
+  // never hides a failed attempt, so its Retry stays reachable.
+  const bestAttempt = new Map<string, AssistantRow>();
+  for (const assistant of assistants.results) {
+    const parentId = assistant.parent_user_message_id;
+    if (!parentId || (assistant.status !== "completed" && assistant.status !== "failed")) {
+      continue;
+    }
+    const best = bestAttempt.get(parentId);
+    const better =
+      !best ||
+      (assistant.status === "completed" && best.status === "failed") ||
+      (assistant.status === best.status &&
+        (assistant.created_at > best.created_at ||
+          (assistant.created_at === best.created_at && assistant.id > best.id)));
+    if (better) {
+      bestAttempt.set(parentId, assistant);
+    }
+  }
+  const supersededIds = new Set(
     assistants.results
       .filter(
         (assistant) =>
           assistant.parent_user_message_id &&
-          assistants.results.some(
-            (later) =>
-              later.id !== assistant.id &&
-              later.parent_user_message_id === assistant.parent_user_message_id &&
-              (later.created_at > assistant.created_at ||
-                (later.created_at === assistant.created_at && later.id > assistant.id)),
-          ),
+          (assistant.status === "completed" || assistant.status === "failed") &&
+          bestAttempt.get(assistant.parent_user_message_id)?.id !== assistant.id,
       )
       .map((assistant) => assistant.id),
   );
@@ -285,10 +301,10 @@ export async function loadConversationForUi(
     if (!question) {
       continue;
     }
+    if (supersededIds.has(assistant.id)) {
+      continue;
+    }
     if (assistant.status === "failed") {
-      if (retriedUserIds.has(assistant.id)) {
-        continue;
-      }
       const cancelled = assistant.error_code === "CANCELLED";
       turns.push({
         id: assistant.id,
@@ -348,8 +364,8 @@ export async function loadConversationForUi(
           embeddingDimensions: assistant.embedding_dimensions ?? 0,
           results: evidence.results.map((item) => ({
             rank: item.rank,
-            score: item.score,
-            chunkId: item.chunk_id,
+            score: diagnostics ? item.score : 0,
+            chunkId: diagnostics ? item.chunk_id : `${assistant.id}:${item.rank}`,
             source: item.source,
             section: item.section,
             text: item.text,
@@ -360,15 +376,15 @@ export async function loadConversationForUi(
               item.document_id && item.generation_id
                 ? (documentTitles.get(`${item.generation_id}|${item.document_id}`) ?? null)
                 : null,
-            vectorScore: item.vector_score,
-            keywordScore: item.keyword_score,
-            fusedScore: item.fused_score,
-            rerankScore: item.rerank_score,
+            vectorScore: diagnostics ? item.vector_score : null,
+            keywordScore: diagnostics ? item.keyword_score : null,
+            fusedScore: diagnostics ? item.fused_score : null,
+            rerankScore: diagnostics ? item.rerank_score : null,
           })) satisfies ChatEvidenceRow[],
         },
         conversationId,
         assistantMessageId: assistant.id,
-        corpusGenerationId: assistant.corpus_generation_id,
+        corpusGenerationId: diagnostics ? assistant.corpus_generation_id : null,
         retrievalConfigVersion: assistant.retrieval_config_version,
       },
       error: null,
@@ -428,7 +444,7 @@ export async function deleteConversation(
       .bind(conversationId),
     db
       .prepare(
-        `DELETE FROM document_requests WHERE message_id IN (
+        `UPDATE document_requests SET message_id = NULL WHERE message_id IN (
            SELECT id FROM messages WHERE conversation_id = ?
          )`,
       )

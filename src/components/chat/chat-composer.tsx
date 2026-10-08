@@ -83,6 +83,7 @@ export function ChatComposer({
         className={`w-full min-w-0 flex-1 resize-none border-0 bg-transparent p-0 text-[15px] leading-6 text-ink outline-none placeholder:text-ink-faint-text focus:outline-none disabled:text-ink-faint-text ${
           height >= MAX_HEIGHT ? "overflow-y-auto" : "overflow-hidden"
         }`}
+        data-composer="true"
         disabled={disabled}
         id="chat-question"
         maxLength={2000}

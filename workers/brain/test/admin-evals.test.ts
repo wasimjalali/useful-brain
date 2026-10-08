@@ -150,4 +150,18 @@ describe("GET /evaluations?view=campaign", () => {
       "Customer Complaint Escalation Path",
     ]);
   });
+
+  it("shows a private-owner document as 'Private document', never its catalog title", async () => {
+    await env.CORPUS_DB.prepare(
+      `UPDATE document_catalog SET access_scope = 'private', title = 'SECRET OWNER TITLE' WHERE document_id = 'nw_support_sla_policy'`,
+    ).run();
+    const response = await call("/evaluations?view=campaign", cookies["member-jordan"]);
+    const raw = await response.text();
+    expect(raw).not.toContain("SECRET OWNER TITLE");
+    const body = JSON.parse(raw) as EvalsAdminView;
+    expect(body.failures[1].expected.map((item) => item.title)).toEqual([
+      "Private document",
+      "Customer Complaint Escalation Path",
+    ]);
+  });
 });

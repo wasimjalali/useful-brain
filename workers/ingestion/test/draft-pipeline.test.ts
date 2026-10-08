@@ -23,8 +23,11 @@ import {
 } from "../../../src/lib/ingest/draft-index";
 import { generationNamespace, vectorIdForChunk } from "../../../src/lib/ingest/digests";
 import { ensureDraftGeneration } from "../../../src/lib/store/corpus-d1";
-import { closeDraft, ensureOpenDraft, failDraft, getOpenDraft } from "../../../src/lib/store/drafts";
-import { ACTIVE_DOCUMENTS, db, fakeAi, fakeVectors, resetPipeline, seedActive } from "./helpers";
+import { closeDraft, ensureOpenDraft, failDraft, getOpenDraft, markBaseCopied } from "../../../src/lib/store/drafts";
+import { claimFinalize, startIndexing } from "../../../src/lib/store/draft-state";
+import { createUploadBatch, expireUndeliveredFiles, failUploadFile, recordUploadedObject } from "../../../src/lib/store/uploads";
+import { readersToAcl } from "../../../src/lib/ingest/upload-validation";
+import { ACTIVE_DOCUMENTS, db, fakeAi, fakeVectors, resetPipeline, seedActive, vectorFor } from "./helpers";
 
 beforeEach(resetPipeline);
 
@@ -154,6 +157,139 @@ describe("copy-on-write base copy", () => {
       { draftGenerationId: draft.generationId, baseGenerationId: active.generationId, afterId: 0 },
     );
     expect(page.baseVectorsMissing).toBe(1);
+  });
+});
+
+describe("base copy embedding compatibility", () => {
+  async function incompatibleBase() {
+    const vectors = fakeVectors();
+    const ai = fakeAi();
+    const active = await seedActive({ ai, vectors });
+    // The base was embedded by another model that also happens to be 1024 wide.
+    await env.CORPUS_DB.prepare("UPDATE corpus_generations SET embedding_model = ? WHERE id = ?")
+      .bind("@cf/other/embedding-1024", active.generationId)
+      .run();
+    const draft = await newDraft();
+    await copyBaseDocuments(db(), { draftGenerationId: draft.generationId, baseGenerationId: active.generationId });
+    return { vectors, ai, active, draft };
+  }
+
+  it("re-embeds base chunks instead of copying vectors from another embedding model", async () => {
+    const { vectors, ai, active, draft } = await incompatibleBase();
+    const before = ai.embedded.length;
+    const baseValues = new Map([...vectors.store].map(([id, record]) => [id, record.values]));
+    let after = 0;
+    for (;;) {
+      const page = await copyBaseChunkPage(
+        { db: db(), ai, vectors: vectors.port },
+        { draftGenerationId: draft.generationId, baseGenerationId: active.generationId, afterId: after },
+      );
+      if (page.nextAfterId === null) break;
+      after = page.nextAfterId;
+    }
+    expect(ai.embedded.length - before).toBe(active.chunkCount);
+    const copied = await env.CORPUS_DB.prepare("SELECT vector_id, content FROM chunks WHERE generation_id = ?")
+      .bind(draft.generationId)
+      .all<{ vector_id: string; content: string }>();
+    expect(copied.results).toHaveLength(active.chunkCount);
+    for (const row of copied.results) {
+      const stored = vectors.store.get(row.vector_id);
+      expect(stored).toBeDefined();
+      expect(Array.from(stored!.values)).toEqual(vectorFor(row.content));
+    }
+    expect(baseValues.size).toBe(active.chunkCount);
+  });
+
+  it("fails explicitly when the base is incompatible and nothing can re-embed", async () => {
+    const { vectors, active, draft } = await incompatibleBase();
+    await expect(
+      copyBaseChunkPage(
+        { db: db(), ai: null, vectors: vectors.port },
+        { draftGenerationId: draft.generationId, baseGenerationId: active.generationId, afterId: 0 },
+      ),
+    ).rejects.toThrow(/INDEX_UNAVAILABLE/);
+    expect([...vectors.store.keys()].filter((id) => id.length > 0).length).toBe(active.chunkCount);
+  });
+
+  it("still reuses a compatible base's vectors without calling the model", async () => {
+    const vectors = fakeVectors();
+    const ai = fakeAi();
+    const active = await seedActive({ ai, vectors });
+    const draft = await newDraft();
+    await copyBaseDocuments(db(), { draftGenerationId: draft.generationId, baseGenerationId: active.generationId });
+    const before = ai.embedded.length;
+    await copyBaseChunkPage(
+      { db: db(), ai, vectors: vectors.port },
+      { draftGenerationId: draft.generationId, baseGenerationId: active.generationId, afterId: 0 },
+    );
+    expect(ai.embedded.length).toBe(before);
+  });
+});
+
+describe("finalization claim", () => {
+  async function readyToFinalize() {
+    await seedActive();
+    const draft = await newDraft();
+    await startIndexing(db(), draft.generationId);
+    await markBaseCopied(db(), draft.generationId);
+    return draft;
+  }
+
+  it("lets the owner resume a claim it already committed and refuses any other instance", async () => {
+    const draft = await readyToFinalize();
+    expect(await claimFinalize(db(), draft.generationId, "instance-a")).toBe(true);
+    // The step result was lost and the step ran again.
+    expect(await claimFinalize(db(), draft.generationId, "instance-a")).toBe(true);
+    expect(await claimFinalize(db(), draft.generationId, "instance-b")).toBe(false);
+    const state = await env.CORPUS_DB.prepare("SELECT state FROM corpus_generations WHERE id = ?")
+      .bind(draft.generationId)
+      .first<{ state: string }>();
+    expect(state?.state).toBe("reconciling");
+  });
+
+  it("is refused while a file is still open, and again after the draft closed", async () => {
+    const draft = await readyToFinalize();
+    const batch = await createUploadBatch(db(), {
+      generationId: draft.generationId,
+      createdBy: "admin-test",
+      acl: readersToAcl({ kind: "everyone" }),
+      idempotencyKey: `claim-${crypto.randomUUID()}`,
+      files: [{ name: "open.md", size: 4 }],
+    });
+    expect(await claimFinalize(db(), draft.generationId, "instance-a")).toBe(false);
+    await failUploadFile(db(), batch.files[0].id, "INTERNAL");
+    expect(await claimFinalize(db(), draft.generationId, "instance-a")).toBe(true);
+    await failDraft(db(), draft.generationId, "TEST");
+    expect(await claimFinalize(db(), draft.generationId, "instance-a")).toBe(false);
+  });
+});
+
+describe("undelivered files", () => {
+  it("expires only files whose bytes never arrived, and refuses a late object record", async () => {
+    await seedActive();
+    const draft = await newDraft();
+    const batch = await createUploadBatch(db(), {
+      generationId: draft.generationId,
+      createdBy: "admin-test",
+      acl: readersToAcl({ kind: "everyone" }),
+      idempotencyKey: `expire-${crypto.randomUUID()}`,
+      files: [
+        { name: "arrived.md", size: 4 },
+        { name: "never.md", size: 4 },
+      ],
+    });
+    expect(await recordUploadedObject(db(), batch.files[0].id, "uploads/x/arrived")).toBe(true);
+    expect(await expireUndeliveredFiles(db(), batch.batchId)).toBe(1);
+    const rows = await env.CORPUS_DB.prepare("SELECT id, stage, error_code FROM upload_files WHERE batch_id = ? ORDER BY rowid")
+      .bind(batch.batchId)
+      .all<{ id: string; stage: string; error_code: string | null }>();
+    expect(rows.results).toEqual([
+      { id: batch.files[0].id, stage: "parsing", error_code: null },
+      { id: batch.files[1].id, stage: "failed", error_code: "NOT_RECEIVED" },
+    ]);
+    // A PUT that was still streaming when the file expired cannot attach its object.
+    expect(await recordUploadedObject(db(), batch.files[1].id, "uploads/x/never")).toBe(false);
+    expect(await expireUndeliveredFiles(db(), batch.batchId)).toBe(0);
   });
 });
 
@@ -297,6 +433,26 @@ describe("reconciliation", () => {
     expect((await reconcileDraft({ db: db(), vectors: vectors.port, generationId: draft.generationId })).reconciled).toBe(false);
     vectors.store.set(row!.vector_id, { ...stored, namespace: "someone-elses-namespace" });
     expect((await reconcileDraft({ db: db(), vectors: vectors.port, generationId: draft.generationId })).reconciled).toBe(false);
+  });
+
+  it("fails when the index returns a vector without its namespace or ACL metadata", async () => {
+    const { vectors, draft, doc } = await draftWithVectors();
+    const row = await env.CORPUS_DB.prepare("SELECT vector_id FROM chunks WHERE generation_id = ? AND document_id = ?")
+      .bind(draft.generationId, doc.documentId)
+      .first<{ vector_id: string }>();
+    const stored = vectors.store.get(row!.vector_id)!;
+    // Namespace absent: isolation between generations cannot be verified.
+    vectors.store.set(row!.vector_id, { ...stored, namespace: undefined } as never);
+    const noNamespace = await reconcileDraft({ db: db(), vectors: vectors.port, generationId: draft.generationId });
+    expect(noNamespace.reconciled).toBe(false);
+    expect(noNamespace.missing).toBe(1);
+    // ACL metadata absent: the filter field is unverifiable.
+    vectors.store.set(row!.vector_id, { ...stored, metadata: undefined } as never);
+    expect((await reconcileDraft({ db: db(), vectors: vectors.port, generationId: draft.generationId })).reconciled).toBe(false);
+    vectors.store.set(row!.vector_id, { ...stored, metadata: {} });
+    expect((await reconcileDraft({ db: db(), vectors: vectors.port, generationId: draft.generationId })).reconciled).toBe(false);
+    vectors.store.set(row!.vector_id, stored);
+    expect((await reconcileDraft({ db: db(), vectors: vectors.port, generationId: draft.generationId })).reconciled).toBe(true);
   });
 
   it("is partial when the index moves during the audit", async () => {

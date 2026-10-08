@@ -5,6 +5,7 @@ import type { SourcesResponse, UploadRequest, UploadStatus } from "@/lib/contrac
 import type { ActionResult } from "@/lib/rag/app-errors";
 
 import { SourcesWorkspace, SOURCES_MAX_POLLS, SOURCES_POLL_MS, type SourcesActions } from "./sources-workspace";
+import { UPLOAD_MAX_POLLS } from "./upload-flow";
 
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
@@ -395,5 +396,91 @@ describe("SourcesWorkspace upload", () => {
     await tick(5000);
     expect((a.uploadStatus as ReturnType<typeof vi.fn>).mock.calls.length).toBe(calls);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("locks the readers once a file has started and shows them on the row", async () => {
+    const a = actions();
+    mount(sources(), a, { initialUploadOpen: true });
+    addFiles([md("a.md")]);
+    await tick(0);
+    expect(screen.getByRole("radio", { name: "Departments" })).toBeDisabled();
+    expect(screen.getByRole("radio", { name: "Roles" })).toBeDisabled();
+    expect(within(screen.getByRole("list", { name: "Files" })).getByText(/Everyone/)).toBeInTheDocument();
+  });
+
+  it("locks department chips after the first batch starts", async () => {
+    mount(sources(), actions(), { initialUploadOpen: true });
+    fireEvent.click(screen.getByRole("radio", { name: "Departments" }));
+    fireEvent.click(screen.getByRole("button", { name: "HR" }));
+    addFiles([md("a.md")]);
+    await tick(0);
+    expect(screen.getByRole("button", { name: "Legal" })).toBeDisabled();
+    expect(within(screen.getByRole("list", { name: "Files" })).getByText(/HR/)).toBeInTheDocument();
+  });
+
+  it("keeps sending the remaining files after the dialog is closed, then reloads", async () => {
+    let releaseFirst: () => void = () => undefined;
+    const putFile = vi.fn((_b: string, fileId: string) =>
+      fileId === "f0"
+        ? new Promise<{ ok: true }>((resolve) => { releaseFirst = () => resolve({ ok: true }); })
+        : Promise.resolve({ ok: true as const }),
+    );
+    const a = actions({ putFile });
+    mount(sources(), a, { initialUploadOpen: true });
+    addFiles([md("a.md"), md("b.md")]);
+    await tick(0);
+    fireEvent.click(screen.getAllByRole("button", { name: "Cancel" })[0]);
+    const loads = (a.loadSources as ReturnType<typeof vi.fn>).mock.calls.length;
+    await act(async () => releaseFirst());
+    await tick(0);
+    expect(putFile).toHaveBeenCalledTimes(2);
+    expect((a.loadSources as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(loads);
+  });
+
+  it("rejects an empty file, a repeated name (any case) and the 26th file inline", async () => {
+    const a = actions();
+    mount(sources(), a, { initialUploadOpen: true });
+    addFiles([new File([], "empty.md"), md("Notes.md"), md("notes.MD")]);
+    await tick(0);
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("empty.md: the file is empty");
+    expect(alert).toHaveTextContent("notes.MD: a file with this name is already in the list");
+    expect((a.createUpload as ReturnType<typeof vi.fn>).mock.calls[0][0].files.map((f: { name: string }) => f.name)).toEqual(["Notes.md"]);
+    cleanup();
+    const b = actions();
+    mount(sources(), b, { initialUploadOpen: true });
+    addFiles(Array.from({ length: 26 }, (_, i) => md(`f${i}.md`)));
+    await tick(0);
+    expect(screen.getByRole("alert")).toHaveTextContent("f25.md: at most 25 files at a time");
+    expect((b.createUpload as ReturnType<typeof vi.fn>).mock.calls[0][0].files).toHaveLength(25);
+  });
+
+  it("lets a failed row be removed so the rest can be added", async () => {
+    const putFile = vi.fn(async (_b: string, fileId: string) =>
+      fileId === "f0" ? { ok: false as const, message: "Upload refused." } : { ok: true as const },
+    );
+    const a = actions({
+      putFile,
+      uploadStatus: vi.fn(async () => ok<UploadStatus>({ batchId: "b1", files: [{ id: "f1", name: "b.md", stage: "ready" }] })),
+    });
+    mount(sources(), a, { initialUploadOpen: true });
+    addFiles([md("a.md"), md("b.md")]);
+    await tick(1000);
+    expect(screen.getByRole("button", { name: "Add to draft" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Remove a.md" }));
+    expect(screen.queryByText("a.md")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add to draft" })).toBeEnabled();
+  });
+
+  it("stops polling a stuck file after a cap and says it is still processing", async () => {
+    const uploadStatus = vi.fn(async () => ok<UploadStatus>({ batchId: "b1", files: [{ id: "f0", name: "a.md", stage: "embedding" }] }));
+    mount(sources(), actions({ uploadStatus }), { initialUploadOpen: true });
+    addFiles([md("a.md")]);
+    await tick(UPLOAD_MAX_POLLS * 1000 + 5000);
+    const calls = uploadStatus.mock.calls.length;
+    expect(calls).toBeLessThanOrEqual(UPLOAD_MAX_POLLS);
+    expect(screen.getByText("Still processing, check Sources")).toBeInTheDocument();
+    await tick(10_000);
+    expect(uploadStatus.mock.calls.length).toBe(calls);
   });
 });

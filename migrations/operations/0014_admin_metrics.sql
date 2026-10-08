@@ -1,5 +1,8 @@
 -- Operations D1: per-turn trace steps and service health events.
 -- Additive only. Step details carry ids, counts, scores and model names, never evidence text.
+-- Activity and the conversation view look a run up by the message it answered.
+CREATE INDEX agent_runs_by_evidence_message ON agent_runs (evidence_message_id);
+
 CREATE TABLE turn_steps (
   message_id TEXT NOT NULL REFERENCES messages (id),
   seq INTEGER NOT NULL,

@@ -20,12 +20,14 @@ const OUTCOME: Record<ActivityOutcome, { label: string; tone: StatusTone }> = {
 };
 
 const COLS =
-  "grid-cols-[20px_52px_132px_minmax(0,1fr)_108px_64px_64px] gap-x-3.5";
+  "grid-cols-[20px_72px_132px_minmax(0,1fr)_108px_64px_64px] gap-x-3.5";
 
 export function ActivityTable({
   rows,
   loadTrace,
   traces,
+  traceFailed = {},
+  loadMoreFailed = false,
   onLoadMore,
   hasMore,
   loadingMore,
@@ -35,6 +37,9 @@ export function ActivityTable({
   loadTrace: (id: string) => void;
   /** Trace per row id. A missing entry means it is still loading. */
   traces: Record<string, TraceStepView[] | undefined>;
+  /** Row ids whose trace request failed, so the row can offer a retry. */
+  traceFailed?: Record<string, boolean | undefined>;
+  loadMoreFailed?: boolean;
   onLoadMore?: () => void;
   hasMore?: boolean;
   loadingMore?: boolean;
@@ -56,7 +61,7 @@ export function ActivityTable({
           <span role="columnheader">
             <span className="sr-only">Details</span>
           </span>
-          <span role="columnheader">Time</span>
+          <span role="columnheader">Time (UTC)</span>
           <span role="columnheader">Person</span>
           <span role="columnheader">Question</span>
           <span role="columnheader">Outcome</span>
@@ -75,43 +80,49 @@ export function ActivityTable({
           const trace = traces[r.id];
           return (
             <div key={r.id}>
-              <div role="row">
-                <button
-                  aria-controls={`trace-${r.id}`}
-                  aria-expanded={isOpen}
-                  className={`ub-ring grid ${COLS} h-12 w-full items-center rounded-[10px] px-3 text-left text-ink transition-colors duration-[120ms] hover:bg-sunken ${
-                    isOpen ? "bg-sunken" : "bg-transparent"
-                  }`}
-                  onClick={() => toggle(r.id)}
-                  type="button"
-                >
-                  <span
-                    className="inline-flex text-ink-muted transition-transform duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
-                    data-testid="row-chevron"
-                    style={{ transform: isOpen ? "rotate(90deg)" : "rotate(0deg)" }}
+              <div
+                className={`grid ${COLS} h-12 w-full cursor-pointer items-center rounded-[10px] px-3 text-left text-ink transition-colors duration-[120ms] hover:bg-sunken ${
+                  isOpen ? "bg-sunken" : "bg-transparent"
+                }`}
+                onClick={() => toggle(r.id)}
+                role="row"
+              >
+                <span role="cell">
+                  <button
+                    aria-controls={`trace-${r.id}`}
+                    aria-expanded={isOpen}
+                    aria-label={`Details for ${r.question}`}
+                    className="ub-ring inline-flex rounded text-ink-muted"
+                    type="button"
                   >
-                    <ChevronRightIcon className="size-[15px]" />
-                  </span>
-                  <span className="font-mono text-xs text-ink-muted" role="cell">
-                    {r.time}
-                  </span>
-                  <span className="truncate text-[13px]" role="cell">
-                    {r.person}
-                  </span>
-                  <span className="truncate text-[13px]" role="cell" title={r.question}>
-                    {r.question}
-                  </span>
-                  <span className="inline-flex items-center gap-[7px] text-[13px]" role="cell">
-                    <StatusDot tone={o.tone} />
-                    {o.label}
-                  </span>
-                  <span className="text-right text-[13px] text-ink-muted" role="cell">
-                    {r.sources ?? "-"}
-                  </span>
-                  <span className="text-right font-mono text-xs text-ink-muted" role="cell">
-                    {r.latency}
-                  </span>
-                </button>
+                    <span
+                      className="inline-flex transition-transform duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
+                      data-testid="row-chevron"
+                      style={{ transform: isOpen ? "rotate(90deg)" : "rotate(0deg)" }}
+                    >
+                      <ChevronRightIcon className="size-[15px]" />
+                    </span>
+                  </button>
+                </span>
+                <span className="font-mono text-xs text-ink-muted" role="cell">
+                  {r.time}
+                </span>
+                <span className="truncate text-[13px]" role="cell">
+                  {r.person}
+                </span>
+                <span className="truncate text-[13px]" role="cell" title={r.question}>
+                  {r.question}
+                </span>
+                <span className="inline-flex items-center gap-[7px] text-[13px]" role="cell">
+                  <StatusDot tone={o.tone} />
+                  {o.label}
+                </span>
+                <span className="text-right text-[13px] text-ink-muted" role="cell">
+                  {r.sources ?? "-"}
+                </span>
+                <span className="text-right font-mono text-xs text-ink-muted" role="cell">
+                  {r.latency}
+                </span>
               </div>
               {isOpen ? (
                 <div
@@ -120,7 +131,14 @@ export function ActivityTable({
                   id={`trace-${r.id}`}
                   role="group"
                 >
-                  {trace === undefined ? (
+                  {traceFailed[r.id] ? (
+                    <span className="col-span-3 flex items-center gap-3 text-ink">
+                      Could not load this trace
+                      <Button onClick={() => loadTrace(r.id)} size={32} variant="secondary">
+                        Retry trace
+                      </Button>
+                    </span>
+                  ) : trace === undefined ? (
                     <span className="col-span-3 text-ink-faint-text">Loading trace</span>
                   ) : trace.length === 0 ? (
                     <span className="col-span-3 text-ink-faint-text">No trace recorded</span>
@@ -136,7 +154,12 @@ export function ActivityTable({
         })}
       </div>
       {hasMore ? (
-        <div className="flex justify-center pt-4">
+        <div className="flex flex-col items-center gap-2 pt-4">
+          {loadMoreFailed ? (
+            <p className="text-[13px] text-danger" role="alert">
+              Couldn&apos;t load more activity. Try again.
+            </p>
+          ) : null}
           <Button disabled={loadingMore} onClick={onLoadMore} variant="secondary">
             Load more
           </Button>

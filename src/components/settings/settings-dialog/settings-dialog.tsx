@@ -55,6 +55,7 @@ export function SettingsDialog({
   account,
   config,
   connectors,
+  adminError,
   initialSection = "appearance",
   isAdmin,
   onClose,
@@ -64,6 +65,8 @@ export function SettingsDialog({
   /** Required for admins. Read from live config, never hard-coded. */
   config?: SettingsModelConfig;
   connectors?: SettingsConnector[];
+  /** Set when loading the admin data failed. Shown in the admin sections only. */
+  adminError?: string;
   initialSection?: SettingsSection;
   isAdmin: boolean;
   onClose: () => void;
@@ -159,6 +162,11 @@ export function SettingsDialog({
                 </div>
               </section>
             ) : null}
+            {(section === "model" || section === "connectors") && isAdmin && adminError ? (
+              <p className="text-sm text-ink" role="alert">
+                {adminError}
+              </p>
+            ) : null}
             {section === "model" && isAdmin && config ? (
               <section className="flex flex-col gap-3.5">
                 <div className="flex items-center gap-2.5 pr-10">
@@ -186,7 +194,7 @@ export function SettingsDialog({
                 </dl>
               </section>
             ) : null}
-            {section === "connectors" && isAdmin ? (
+            {section === "connectors" && isAdmin && !adminError ? (
               <section className="flex flex-col gap-3.5">
                 <h3 className="text-sm font-semibold">Connectors</h3>
                 <ul className="flex flex-col">

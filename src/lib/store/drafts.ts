@@ -141,6 +141,73 @@ export async function failDraft(
   await closeDraft(db, generationId, now);
 }
 
+/**
+ * Claims a discard. One atomic batch moves every non-live generation to
+ * failed/DISCARDED and closes its draft row; a live generation (active or
+ * archived) matches nothing. Only a caller that gets true may delete what the
+ * draft holds: if a promotion won the race the claim changes nothing and the
+ * caller must leave the generation alone. Failed drafts are claimable again, so
+ * a discard that died half way can be repeated.
+ */
+export async function claimDiscard(db: SqlExecutor, generationId: string, now = Date.now()): Promise<boolean> {
+  const results = await db.batch([
+    db
+      .prepare(
+        `UPDATE corpus_generations SET state = 'failed', error_code = 'DISCARDED', updated_at = ?
+         WHERE id = ? AND state IN ('draft', 'indexing', 'reconciling', 'ready', 'failed')`,
+      )
+      .bind(now, generationId),
+    db
+      .prepare(
+        `UPDATE drafts SET closed_at = COALESCE(closed_at, ?)
+         WHERE generation_id = ?
+           AND EXISTS (SELECT 1 FROM corpus_generations WHERE id = ? AND state = 'failed' AND error_code = 'DISCARDED')`,
+      )
+      .bind(now, generationId, generationId),
+  ]);
+  return (results[0]?.meta?.changes ?? 0) > 0;
+}
+
+/**
+ * Jobs of this draft that were never published to the queue: the draft job
+ * first (its id is the generation id), then the expiry job of each batch (its id
+ * is the batch id). The rows are written before anything is published, so a
+ * crash in between leaves the intent here for the next request to pick up.
+ */
+export async function unpublishedJobIds(db: SqlExecutor, generationId: string): Promise<string[]> {
+  const draft = await db
+    .prepare(`SELECT job_enqueued_at FROM drafts WHERE generation_id = ? AND closed_at IS NULL`)
+    .bind(generationId)
+    .first<{ job_enqueued_at: number | null }>();
+  if (!draft) {
+    return [];
+  }
+  const ids = draft.job_enqueued_at === null ? [generationId] : [];
+  const batches = await db
+    .prepare(
+      `SELECT id FROM upload_batches WHERE generation_id = ? AND job_enqueued_at IS NULL ORDER BY created_at, rowid`,
+    )
+    .bind(generationId)
+    .all<{ id: string }>();
+  return [...ids, ...batches.results.map((row) => row.id)];
+}
+
+export async function markJobPublished(
+  db: SqlExecutor,
+  generationId: string,
+  jobId: string,
+  now = Date.now(),
+): Promise<void> {
+  await db
+    .prepare(
+      jobId === generationId
+        ? `UPDATE drafts SET job_enqueued_at = COALESCE(job_enqueued_at, ?) WHERE generation_id = ?`
+        : `UPDATE upload_batches SET job_enqueued_at = COALESCE(job_enqueued_at, ?) WHERE id = ?`,
+    )
+    .bind(now, jobId)
+    .run();
+}
+
 /** True while the workflow may still write into this generation. */
 export async function draftAcceptsWrites(db: SqlExecutor, generationId: string): Promise<boolean> {
   const row = await db

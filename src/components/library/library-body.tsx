@@ -47,6 +47,7 @@ export function LibraryBody({
   requestError?: boolean;
 }) {
   const empty = !loading && rows.length === 0;
+  const hasQuery = query.trim() !== "";
   return (
     <div className="flex flex-col gap-4 px-12 pb-8 pt-5">
       <SearchField
@@ -73,13 +74,15 @@ export function LibraryBody({
       {empty ? (
         <div className="flex flex-col items-start gap-1 py-10">
           <p className="text-[15px] font-medium text-ink">
-            {`Nothing you can read matches “${query}”`}
+            {hasQuery ? `Nothing you can read matches “${query}”` : "No documents you can read yet"}
           </p>
-          <p className="text-[13px] text-ink-muted">
-            It may not exist yet, or it may be restricted to another team.
-          </p>
+          {hasQuery ? (
+            <p className="text-[13px] text-ink-muted">
+              It may not exist yet, or it may be restricted to another team.
+            </p>
+          ) : null}
           <div className="mt-3 flex gap-2">
-            {onRequest && requested ? (
+            {!hasQuery ? null : onRequest && requested ? (
               <span
                 aria-disabled="true"
                 className="inline-flex h-[34px] items-center gap-[7px] rounded-[10px] bg-sunken pl-3 pr-3.5 text-[13px] font-medium text-ink-muted"
@@ -92,15 +95,17 @@ export function LibraryBody({
                 Request this document
               </Button>
             ) : null}
-            <Button
-              onClick={() => {
-                onQueryChange("");
-                onDepartmentChange("All");
-              }}
-              variant="ghost"
-            >
-              Clear search
-            </Button>
+            {hasQuery ? (
+              <Button
+                onClick={() => {
+                  onQueryChange("");
+                  onDepartmentChange("All");
+                }}
+                variant="ghost"
+              >
+                Clear search
+              </Button>
+            ) : null}
           </div>
           {requestError ? (
             <p className="mt-2 text-[12px] text-danger" role="alert">

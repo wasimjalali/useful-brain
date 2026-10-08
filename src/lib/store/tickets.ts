@@ -84,3 +84,35 @@ export async function insertTicketOnce(
   }
   return stored;
 }
+
+/** Read one ticket by its SUP-#### id. Null when the id is malformed or unknown. */
+export async function loadTicketById(
+  db: OperationsDatabase,
+  ticketId: string,
+): Promise<StoredTicket | null> {
+  const match = /^SUP-([1-9][0-9]{0,9})$/.exec(ticketId);
+  if (!match) {
+    return null;
+  }
+  const row = await db
+    .prepare(
+      `SELECT seq, run_id, principal_id, desk, priority, customer, subject, created_at
+       FROM tickets WHERE seq = ?`,
+    )
+    .bind(Number(match[1]))
+    .first<TicketRow>();
+  if (!row) {
+    return null;
+  }
+  return {
+    id: formatTicketId(row.seq),
+    seq: row.seq,
+    runId: row.run_id,
+    principalId: row.principal_id,
+    desk: row.desk,
+    priority: row.priority,
+    customer: row.customer,
+    subject: row.subject,
+    createdAt: row.created_at,
+  };
+}

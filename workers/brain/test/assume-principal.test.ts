@@ -262,9 +262,13 @@ describe("view as another person (assumePrincipalId)", () => {
     });
   });
 
-  it("is idempotent by request id and refuses a request id owned by another turn", async () => {
-    await asPriya(cookies["member-jordan"], "va-idem");
-    await asPriya(cookies["member-jordan"], "va-idem");
+  it("refuses a request id owned by another turn and never re-executes a used one", async () => {
+    const first = await asPriya(cookies["member-jordan"], "va-idem");
+    expect(first.status).toBe(200);
+    const before = await audit("va-idem");
+    const repeated = await asPriya(cookies["member-jordan"], "va-idem");
+    expect(repeated.status).toBe(400);
+    expect(await audit("va-idem")).toEqual(before);
     expect(
       Number(
         (
@@ -278,6 +282,98 @@ describe("view as another person (assumePrincipalId)", () => {
       json: { question: "Hello there", requestId: "va-idem", assumePrincipalId: "member-maya" },
     });
     expect(other.status).toBe(400);
+  });
+
+  it("refuses a reused request id with a different question or scope before executing", async () => {
+    const first = await asPriya(cookies["member-jordan"], "va-reuse");
+    expect(first.status).toBe(200);
+    const before = await audit("va-reuse");
+    const otherQuestion = await call("/turns", cookies["member-jordan"], {
+      json: { question: "Who gives approval for spending?", requestId: "va-reuse", assumePrincipalId: "member-priya" },
+    });
+    expect(otherQuestion.status).toBe(400);
+    const otherScope = await asPriya(cookies["member-jordan"], "va-reuse", { scopeDocumentId: "doc-public-handbook" });
+    expect(otherScope.status).toBe(400);
+    expect(await audit("va-reuse")).toEqual(before);
+  });
+
+  it("lets only one of two concurrent duplicates execute, so outcomes never mix", async () => {
+    const [left, right] = await Promise.all([
+      asPriya(cookies["member-jordan"], "va-concurrent"),
+      call("/turns", cookies["member-jordan"], {
+        json: { question: "Who gives approval for spending?", requestId: "va-concurrent", assumePrincipalId: "member-priya" },
+      }),
+    ]);
+    expect([left.status, right.status].sort()).toEqual([200, 400]);
+    const row = await audit("va-concurrent");
+    const winnerQuestion = left.status === 200 ? "What are the final pay rules?" : "Who gives approval for spending?";
+    const { sha256Hex } = await import("../../../src/lib/ingest/digests");
+    expect(row?.question_sha256).toBe(await sha256Hex(winnerQuestion));
+    expect(row?.answer_type).not.toBeNull();
+  });
+
+  describe("audit completion", () => {
+    const admin = { id: "member-jordan", subject: "jordan.ellis@northwind.example", kind: "user" as const, roles: ["admin"], departments: ["operations"] };
+    const failingFinish = (failures: { count: number }, times = Infinity) =>
+      ({
+        prepare: (sql: string) => {
+          if (/UPDATE view_as_audits/.test(sql) && failures.count < times) {
+            failures.count += 1;
+            throw new Error("audit write failed");
+          }
+          return env.OPERATIONS_DB.prepare(sql);
+        },
+        batch: (statements: never) => env.OPERATIONS_DB.batch(statements),
+      }) as unknown as OperationsDatabase;
+
+    it("never releases a diagnostic when the final audit write fails", async () => {
+      const failures = { count: 0 };
+      await expect(
+        runViewAsTurn({
+          operations: failingFinish(failures),
+          corpus: env.CORPUS_DB as never,
+          lockFor: (id: string) => env.CONVERSATION.getByName(id),
+          admin,
+          assumePrincipalId: "member-maya",
+          question: "Who gives approval for spending?",
+          requestId: "va-audit-fails",
+        }),
+      ).rejects.toThrow("view_as_audit_incomplete");
+      expect(failures.count).toBeGreaterThan(0);
+      const row = await audit("va-audit-fails");
+      expect(row?.diagnostic_shown).toBe(0);
+    });
+
+    it("retries the final audit write once before giving up", async () => {
+      const failures = { count: 0 };
+      const answer = await runViewAsTurn({
+        operations: failingFinish(failures, 1),
+        corpus: env.CORPUS_DB as never,
+        lockFor: (id: string) => env.CONVERSATION.getByName(id),
+        admin,
+        assumePrincipalId: "member-maya",
+        question: "Who gives approval for spending?",
+        requestId: "va-audit-retry",
+      });
+      expect(answer.adminDiagnostic?.length).toBeGreaterThan(0);
+      expect((await audit("va-audit-retry"))?.diagnostic_shown).toBe(1);
+    });
+
+    it("keeps the original failure when the run failed and the audit write fails too", async () => {
+      const failures = { count: 0 };
+      await expect(
+        runViewAsTurn({
+          operations: failingFinish(failures),
+          corpus: env.CORPUS_DB as never,
+          lockFor: (id: string) => env.CONVERSATION.getByName(id),
+          admin,
+          assumePrincipalId: "member-priya",
+          question: "What are the final pay rules?",
+          scopeDocumentId: "doc-finance-policy",
+          requestId: "va-audit-both",
+        }),
+      ).rejects.not.toThrow("view_as_audit_incomplete");
+    });
   });
 
   it("ignores a client grant list in session mode and resolves grants from the directory", async () => {

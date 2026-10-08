@@ -163,6 +163,20 @@ describe("catalog backfill route", () => {
     expect((await call("/admin/catalog/backfill", cookies["member-maya"], sessionEnv, "POST")).status).toBe(403);
   });
 
+  it("the scheduled handler self-heals a missing catalog for the active generation", async () => {
+    await env.CORPUS_DB.batch([
+      env.CORPUS_DB.prepare(`DELETE FROM document_catalog WHERE generation_id = ?`).bind(generationId),
+      env.CORPUS_DB.prepare(`DELETE FROM document_bodies WHERE generation_id = ?`).bind(generationId),
+    ]);
+    expect(await catalogCount()).toBe(0);
+    const ctx = createExecutionContext();
+    await worker.scheduled({}, env);
+    await waitOnExecutionContext(ctx);
+    expect(await catalogCount()).toBe(CORPUS_DOCUMENT_IDS.length);
+    await worker.scheduled({}, env);
+    expect(await catalogCount()).toBe(CORPUS_DOCUMENT_IDS.length);
+  });
+
   it("whoami never writes; the admin repair fills the rows once and is idempotent", async () => {
     await env.CORPUS_DB.batch([
       env.CORPUS_DB.prepare(`DELETE FROM document_catalog WHERE generation_id = ?`).bind(generationId),
@@ -170,7 +184,8 @@ describe("catalog backfill route", () => {
     ]);
     expect(await catalogCount()).toBe(0);
     const whoami = (await (await call("/whoami", cookies["member-jordan"])).json()) as Whoami;
-    expect(whoami.readableDocumentCount).toBe(EXPECTED_READABLE["member-jordan"]);
+    // One predicate everywhere: without catalog rows nothing is readable (or listed) yet.
+    expect(whoami.readableDocumentCount).toBe(0);
     expect(await catalogCount()).toBe(0);
 
     const first = await call("/admin/catalog/backfill", cookies["member-jordan"], sessionEnv, "POST");
@@ -180,6 +195,8 @@ describe("catalog backfill route", () => {
     const second = await call("/admin/catalog/backfill", cookies["member-jordan"], sessionEnv, "POST");
     expect(await second.json()).toMatchObject({ added: 0 });
     expect(await catalogCount()).toBe(CORPUS_DOCUMENT_IDS.length);
+    const repaired = (await (await call("/whoami", cookies["member-jordan"])).json()) as Whoami;
+    expect(repaired.readableDocumentCount).toBe(EXPECTED_READABLE["member-jordan"]);
   });
 });
 

@@ -129,6 +129,9 @@ export const LIVE_KNOWLEDGE_SYSTEM_PROMPT = [
   `Prompt version ${PROMPT_VERSION}.`,
 ].join(" ");
 
+/** Write tools that may only be proposed after a successful current-turn search. */
+const SEARCH_FIRST_TOOLS: ReadonlySet<string> = new Set(["create_ticket"]);
+
 const MULTI_PART_CUE_RE = /\b(?:and|both|two|as well as)\b/iu;
 const MULTI_PART_PLURAL_RE =
   /\b(?:timelines|deadlines|windows|rules|processes|policies|numbers|dates|steps)\b/iu;
@@ -374,6 +377,15 @@ export async function runKnowledgeAgent(input: {
       }
       if (!allowed.has(context.toolCall.name)) {
         return { block: true, reason: "tool is not enabled for this run", terminate: true };
+      }
+      // A ticket proposal needs evidence from a search that already succeeded
+      // in this turn: an invented priority or subject must never reach an
+      // approval. The model may search and propose again.
+      if (SEARCH_FIRST_TOOLS.has(context.toolCall.name) && evidenceLedger.byLabel.size === 0) {
+        return {
+          block: true,
+          reason: `${context.toolCall.name} is blocked until search_knowledge has returned evidence in this turn`,
+        };
       }
       try {
         const registered = toolPolicy(context.toolCall.name);

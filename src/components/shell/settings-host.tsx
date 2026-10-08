@@ -45,12 +45,8 @@ export function SettingsHost({
     };
   }, [isAdmin]);
 
-  if (!identity || (isAdmin && admin.status !== "ready")) {
-    const message = !identity
-      ? "Couldn't load your account."
-      : admin.status === "error"
-        ? admin.message
-        : null;
+  if (!identity || (isAdmin && admin.status === "loading")) {
+    const message = !identity ? "Couldn't load your account." : null;
     return (
       <Dialog ariaLabel="Settings" onClose={onClose} width={780}>
         <div className="flex h-[580px] max-h-[calc(100dvh-32px)] flex-col items-center justify-center gap-3 rounded-2xl bg-bubble px-8 text-center">
@@ -77,6 +73,7 @@ export function SettingsHost({
   return (
     <SettingsDialog
       account={mapAccount(identity, data?.totalDocuments)}
+      adminError={admin.status === "error" ? admin.message : undefined}
       config={data?.config}
       connectors={data?.connectors}
       isAdmin={isAdmin}

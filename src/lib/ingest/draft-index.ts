@@ -11,6 +11,7 @@ import {
 } from "../store/document-catalog";
 import { UPSERT_CHUNK_SQL } from "../store/generations";
 import { chunkDocument } from "./chunker";
+import { UploadFailure } from "./error-codes";
 import { contentDigest, generationNamespace, sha256Hex, vectorIdForChunk } from "./digests";
 
 export const UPLOADS_SOURCE_ID = "src-uploads";
@@ -243,6 +244,23 @@ type StoredChunk = {
   acl_group: string;
 };
 
+/**
+ * True when vectors of this generation can be copied into a new one: same
+ * embedding model and dimensions as the current configuration. The document
+ * instruction is a constant, so it cannot differ. Every reuse path asks this.
+ */
+async function embeddingsReusableFrom(db: SqlExecutor, generationId: string): Promise<boolean> {
+  const source = await db
+    .prepare(`SELECT embedding_model, embedding_dimensions FROM corpus_generations WHERE id = ?`)
+    .bind(generationId)
+    .first<{ embedding_model: string; embedding_dimensions: number }>();
+  return (
+    source !== null &&
+    source.embedding_model === EMBEDDING_MODEL &&
+    source.embedding_dimensions === EMBEDDING_DIMENSIONS
+  );
+}
+
 async function reusableVectors(
   ctx: IndexContext,
   reuseFromGenerationId: string | null,
@@ -252,16 +270,7 @@ async function reusableVectors(
   if (!ctx.vectors || !reuseFromGenerationId || rows.length === 0) {
     return reusable;
   }
-  const source = await ctx.db
-    .prepare(`SELECT embedding_model, embedding_dimensions FROM corpus_generations WHERE id = ?`)
-    .bind(reuseFromGenerationId)
-    .first<{ embedding_model: string; embedding_dimensions: number }>();
-  // Reuse only when model and dimensions match; the document instruction is a constant.
-  if (
-    !source ||
-    source.embedding_model !== EMBEDDING_MODEL ||
-    source.embedding_dimensions !== EMBEDDING_DIMENSIONS
-  ) {
+  if (!(await embeddingsReusableFrom(ctx.db, reuseFromGenerationId))) {
     return reusable;
   }
   const digests = [...new Set(rows.map((row) => row.content_digest))];
@@ -414,12 +423,17 @@ export async function finalizeDocument(
   return { chunkCount: chunks.results.length };
 }
 
-/** Catalog, bodies and version rows of every base document, copied in one atomic batch. */
+/**
+ * Catalog, bodies and version rows of every base document (or just one, when
+ * `documentId` is given), copied in one atomic batch.
+ */
 export async function copyBaseDocuments(
   db: SqlExecutor,
-  input: { draftGenerationId: string; baseGenerationId: string },
+  input: { draftGenerationId: string; baseGenerationId: string; documentId?: string },
 ): Promise<void> {
   const tag = (await sha256Hex(input.draftGenerationId)).slice(0, 8);
+  const only = input.documentId === undefined ? "" : " AND document_id = ?";
+  const scope = input.documentId === undefined ? [] : [input.documentId];
   await db.batch([
     db
       .prepare(
@@ -429,27 +443,51 @@ export async function copyBaseDocuments(
          )
          SELECT document_id, ?, title, department, version, effective_date, headings_json,
            access_scope, allowed_roles, allowed_departments, metadata, chunk_count, file_name, updated_at
-         FROM document_catalog WHERE generation_id = ? AND true
+         FROM document_catalog WHERE generation_id = ?${only} AND true
          ON CONFLICT(document_id, generation_id) DO NOTHING`,
       )
-      .bind(input.draftGenerationId, input.baseGenerationId),
+      .bind(input.draftGenerationId, input.baseGenerationId, ...scope),
     db
       .prepare(
         `INSERT INTO document_bodies (document_id, generation_id, body, reconstructed)
-         SELECT document_id, ?, body, reconstructed FROM document_bodies WHERE generation_id = ? AND true
+         SELECT document_id, ?, body, reconstructed FROM document_bodies WHERE generation_id = ?${only} AND true
          ON CONFLICT(document_id, generation_id) DO NOTHING`,
       )
-      .bind(input.draftGenerationId, input.baseGenerationId),
+      .bind(input.draftGenerationId, input.baseGenerationId, ...scope),
     db
       .prepare(
         `INSERT INTO document_versions (
            id, document_id, generation_id, r2_key, content_digest, byte_size, created_at
          )
          SELECT id || '-' || ?, document_id, ?, r2_key, content_digest, byte_size, created_at
-         FROM document_versions WHERE generation_id = ? AND true
+         FROM document_versions WHERE generation_id = ?${only} AND true
          ON CONFLICT(document_id, generation_id) DO NOTHING`,
       )
-      .bind(tag, input.draftGenerationId, input.baseGenerationId),
+      .bind(tag, input.draftGenerationId, input.baseGenerationId, ...scope),
+  ]);
+}
+
+/**
+ * Removes everything the draft holds for one document: its vectors (recorded
+ * as index mutations so reconciliation waits for them), chunks, catalog, body
+ * and version rows. Idempotent.
+ */
+export async function removeDocumentFromDraft(
+  ctx: IndexContext,
+  input: { generationId: string; documentId: string; now?: number },
+): Promise<void> {
+  const now = input.now ?? Date.now();
+  const { db } = ctx;
+  const old = await db
+    .prepare(`SELECT vector_id FROM chunks WHERE generation_id = ? AND document_id = ?`)
+    .bind(input.generationId, input.documentId)
+    .all<{ vector_id: string }>();
+  await deleteVectors(ctx, input.generationId, old.results.map((row) => row.vector_id), now);
+  await db.batch([
+    db.prepare(`DELETE FROM chunks WHERE generation_id = ? AND document_id = ?`).bind(input.generationId, input.documentId),
+    db.prepare(`DELETE FROM document_catalog WHERE generation_id = ? AND document_id = ?`).bind(input.generationId, input.documentId),
+    db.prepare(`DELETE FROM document_bodies WHERE generation_id = ? AND document_id = ?`).bind(input.generationId, input.documentId),
+    db.prepare(`DELETE FROM document_versions WHERE generation_id = ? AND document_id = ?`).bind(input.generationId, input.documentId),
   ]);
 }
 
@@ -473,9 +511,12 @@ type BaseChunkRow = {
 };
 
 /**
- * Copies one page of base chunks into the draft: new chunk and vector ids, the
- * base embedding reused through getByIds. Returns the cursor for the next page,
- * or null when the base is exhausted.
+ * Copies one page of base chunks into the draft: new chunk and vector ids. When
+ * the base was embedded by the current model its vectors are reused through
+ * getByIds; when it was not, the chunks are embedded again (or, with no model
+ * to do that, the copy fails explicitly). Never mixes embedding spaces.
+ * Returns the cursor for the next page, or null when the base is exhausted.
+ * `documentId` limits the copy to one document.
  */
 export async function copyBaseChunkPage(
   ctx: IndexContext,
@@ -483,19 +524,27 @@ export async function copyBaseChunkPage(
     draftGenerationId: string;
     baseGenerationId: string;
     afterId: number;
+    documentId?: string;
     now?: number;
   },
 ): Promise<{ nextAfterId: number | null; copied: number; baseVectorsMissing: number }> {
   const now = input.now ?? Date.now();
   const { db } = ctx;
+  const only = input.documentId === undefined ? "" : " AND document_id = ?";
+  const scope = input.documentId === undefined ? [] : [input.documentId];
   const page = (
     await db
-      .prepare(`SELECT * FROM chunks WHERE generation_id = ? AND id > ? ORDER BY id LIMIT ?`)
-      .bind(input.baseGenerationId, input.afterId, COPY_PAGE)
+      .prepare(`SELECT * FROM chunks WHERE generation_id = ? AND id > ?${only} ORDER BY id LIMIT ?`)
+      .bind(input.baseGenerationId, input.afterId, ...scope, COPY_PAGE)
       .all<BaseChunkRow>()
   ).results;
   if (page.length === 0) {
     return { nextAfterId: null, copied: 0, baseVectorsMissing: 0 };
+  }
+  const reuse = ctx.vectors ? await embeddingsReusableFrom(db, input.baseGenerationId) : true;
+  if (ctx.vectors && !reuse && !ctx.ai) {
+    // Fail before any row is written: the draft cannot be built without a model.
+    throw new UploadFailure("INDEX_UNAVAILABLE");
   }
   const tag = (await sha256Hex(input.draftGenerationId)).slice(0, 8);
   const baseSuffix = `--${input.baseGenerationId}`;
@@ -533,13 +582,26 @@ export async function copyBaseChunkPage(
   if (ctx.vectors) {
     const namespace = await generationNamespace(input.draftGenerationId);
     const valuesById = new Map<string, number[]>();
-    for (const batch of chunksOf(
-      moved.map((entry) => entry.row.vector_id),
-      VECTOR_GET_LIMIT,
-    )) {
-      for (const vector of await ctx.vectors.getByIds(batch)) {
-        if (vector.values && vector.values.length === EMBEDDING_DIMENSIONS) {
-          valuesById.set(vector.id, Array.from(vector.values));
+    if (reuse) {
+      for (const batch of chunksOf(
+        moved.map((entry) => entry.row.vector_id),
+        VECTOR_GET_LIMIT,
+      )) {
+        for (const vector of await ctx.vectors.getByIds(batch)) {
+          if (vector.values && vector.values.length === EMBEDDING_DIMENSIONS) {
+            valuesById.set(vector.id, Array.from(vector.values));
+          }
+        }
+      }
+    } else {
+      for (let index = 0; index < moved.length; index += EMBED_BATCH) {
+        const slice = moved.slice(index, index + EMBED_BATCH);
+        const embeddings = await embedWithWorkersAi(ctx.ai!, EMBEDDING_MODEL, {
+          kind: "documents",
+          texts: slice.map((entry) => entry.row.content),
+        });
+        for (const [offset, embedding] of embeddings.entries()) {
+          valuesById.set(slice[offset].row.vector_id, embedding);
         }
       }
     }

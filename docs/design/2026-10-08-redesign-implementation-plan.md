@@ -56,7 +56,7 @@ Use recon-backend §8 with these changes:
 - `GET /config` and `GET /evaluations` (extended) are admin only.
 - Health detail strings are closed codes mapped to copy in the UI.
 
-Migrations, all additive: operations `0012_turn_metrics_feedback`, `0013_admin_invites_viewas`, `0014_tickets_approval_display`, `0015_turn_steps_health`; corpus `0004_document_catalog` (catalog, bodies, title and heading FTS with triggers, no `INSERT OR REPLACE`), `0005_uploads_draft_progress`. Existing generations get catalog and body rows through an idempotent backfill.
+Migrations, all additive: operations `0012_turn_metrics_feedback`, `0013_tickets_approval_display`, `0014_admin_metrics`, `0015_invites_view_as_audits`; corpus `0004_document_catalog` (catalog, bodies, title and heading FTS with triggers, no `INSERT OR REPLACE`), `0005_uploads_draft_pipeline`. Existing generations get catalog and body rows through an idempotent backfill run at promote and by the admin-only `POST /admin/catalog/backfill`.
 
 ## 4. Phases and work packages
 

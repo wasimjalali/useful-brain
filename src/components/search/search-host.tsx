@@ -7,6 +7,7 @@ import { searchAll } from "@/app/library-actions";
 import { useShell } from "@/components/shell/shell-context";
 import type { SearchResponse } from "@/lib/contracts/library";
 import type { SearchChatRowView, SearchDocumentRowView } from "@/lib/contracts/library-view";
+import { departmentLabel } from "@/lib/library/mappers";
 
 import { SearchDialog } from "./search-dialog";
 
@@ -27,16 +28,19 @@ function dateLabel(updatedAt: number | undefined, now: number): string {
 
 export function SearchHost({ onClose }: { onClose: () => void }) {
   const router = useRouter();
-  const { conversations } = useShell();
+  const { conversations, newChat } = useShell();
   const [query, setQuery] = useState("");
-  const [settled, setSettled] = useState<{ q: string; data: SearchResponse } | null>(null);
+  const [settled, setSettled] = useState<
+    { q: string; data: SearchResponse; error: string | null } | null
+  >(null);
   const [now] = useState(() => Date.now());
 
   const q = query.trim();
   const active = q.length >= MIN_QUERY;
-  const current = active && settled?.q === q ? settled.data : null;
+  const current = active && settled?.q === q ? settled : null;
   const loading = active && current === null;
-  const results = current ?? { chats: [], documents: [] };
+  const results = current?.data ?? { chats: [], documents: [] };
+  const error = current?.error ?? null;
 
   useEffect(() => {
     if (q.length < MIN_QUERY) {
@@ -46,7 +50,11 @@ export function SearchHost({ onClose }: { onClose: () => void }) {
     const timer = setTimeout(() => {
       void searchAll(q).then((result) => {
         if (!cancelled) {
-          setSettled({ q, data: result.ok ? result.data : { chats: [], documents: [] } });
+          setSettled(
+            result.ok
+              ? { q, data: result.data, error: null }
+              : { q, data: { chats: [], documents: [] }, error: result.error.message },
+          );
         }
       });
     }, DEBOUNCE_MS);
@@ -70,7 +78,7 @@ export function SearchHost({ onClose }: { onClose: () => void }) {
     id: hit.id,
     title: hit.title,
     titleMatches: hit.titleMatches,
-    department: hit.department ?? "General",
+    department: hit.department ? departmentLabel(hit.department) : "General",
     snippet: hit.snippet,
   }));
 
@@ -83,8 +91,12 @@ export function SearchHost({ onClose }: { onClose: () => void }) {
     <SearchDialog
       chats={chats}
       documents={documents}
+      error={error}
       loading={loading}
-      onAskDocument={(id) => go(`/chat?scope=${encodeURIComponent(id)}`)}
+      onAskDocument={(id) => {
+        newChat();
+        go(`/chat?scope=${encodeURIComponent(id)}`);
+      }}
       onClose={onClose}
       onOpenChat={(id) => go(`/chat/${encodeURIComponent(id)}`)}
       onOpenDocument={(id) => go(`/chat?doc=${encodeURIComponent(id)}`)}

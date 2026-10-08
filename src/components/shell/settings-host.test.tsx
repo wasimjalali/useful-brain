@@ -67,7 +67,25 @@ describe("SettingsHost", () => {
     await act(async () => {
       render(<SettingsHost identity={admin} onClose={vi.fn()} />);
     });
+    expect(screen.queryByRole("alert")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Model and retrieval" }));
     expect(screen.getByRole("alert")).toHaveTextContent("Couldn't load settings.");
+    fireEvent.click(screen.getByRole("button", { name: "Connectors" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Couldn't load settings.");
+  });
+
+  it("keeps Appearance, Account and Sign out working when the admin config fails", async () => {
+    loadAdminSettingsAction.mockResolvedValue({
+      ok: false,
+      error: { code: "INTERNAL_ERROR", message: "Couldn't load settings.", retryable: true },
+    });
+    await act(async () => {
+      render(<SettingsHost identity={admin} onClose={vi.fn()} />);
+    });
+    expect(screen.getByText("Appearance", { selector: "h3" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Account" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    expect(signOutAction).toHaveBeenCalledOnce();
   });
 
   it("signs out through the existing logout action", () => {

@@ -132,4 +132,54 @@ describe("POST /turns { retryOfMessageId }", () => {
     expect(conversation.turns).toHaveLength(1);
     expect(conversation.turns[0].answer).not.toBeNull();
   });
+
+  async function sibling(failed: Awaited<ReturnType<typeof failedTurn>>, id: string, status: string, at: number) {
+    const userMessage = (await messageRows(failed.conversationId)).find((m) => m.role === "user")!;
+    await env.OPERATIONS_DB.prepare(
+      `INSERT INTO messages (id, conversation_id, role, content, status, answer_type, error_code, parent_user_message_id, created_at, updated_at)
+       VALUES (?, ?, 'assistant', ?, ?, ?, ?, ?, ?, ?)`,
+    )
+      .bind(
+        id,
+        failed.conversationId,
+        status === "completed" ? "answer" : "",
+        status,
+        status === "completed" ? "grounded" : null,
+        status === "failed" ? "RATE_LIMITED" : null,
+        userMessage.id,
+        at,
+        at,
+      )
+      .run();
+  }
+  type View = { turns: Array<{ id: string; answer: unknown; error: string | null }> };
+  const viewOf = async (conversationId: string) =>
+    (await (await call(`/conversations/${conversationId}`, cookies["member-maya"])).json()) as View;
+
+  it("keeps a failed attempt, with its Retry, when the only later attempt is still pending", async () => {
+    const failed = await failedTurn("member-maya", "retry-src-pendsib", "PROVIDER_TEMPORARY");
+    await sibling(failed, "retry-pend-sib", "pending", 2_000);
+    const view = await viewOf(failed.conversationId);
+    expect(view.turns.map((t) => t.id)).toEqual([failed.assistantMessageId]);
+    expect(view.turns[0].error).not.toBeNull();
+  });
+
+  it("shows the completed answer, not a newer failed duplicate from a second tab", async () => {
+    const failed = await failedTurn("member-maya", "retry-src-twotabs");
+    await sibling(failed, "retry-tab-ok", "completed", 2_000);
+    await sibling(failed, "retry-tab-late-fail", "failed", 3_000);
+    const view = await viewOf(failed.conversationId);
+    expect(view.turns.map((t) => t.id)).toEqual(["retry-tab-ok"]);
+  });
+
+  it("refuses to retry a failed message that a later attempt already superseded", async () => {
+    const failed = await failedTurn("member-maya", "retry-src-superseded");
+    await sibling(failed, "retry-sup-ok", "completed", 2_000);
+    const before = await messageRows(failed.conversationId);
+    const res = await call("/turns", cookies["member-maya"], {
+      json: { retryOfMessageId: failed.assistantMessageId, requestId: "retry-sup-1" },
+    });
+    expect(res.status).toBe(400);
+    expect(await messageRows(failed.conversationId)).toEqual(before);
+  });
 });

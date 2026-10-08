@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import type { SuggestionView } from "@/lib/contracts/chat-view";
+import { DEFAULT_USEFUL_BRAIN_CONFIG } from "@/lib/useful-brain-config";
 
 export function EmptyState({
   composer,
@@ -13,7 +14,7 @@ export function EmptyState({
 }) {
   return (
     <div className="pt-12 min-[768px]:pt-44">
-      <h1 className="m-0 text-2xl font-semibold leading-8 text-ink">Ask about Northwind</h1>
+      <h1 className="m-0 text-2xl font-semibold leading-8 text-ink">Ask about {DEFAULT_USEFUL_BRAIN_CONFIG.companyName}</h1>
       <p className="m-0 mt-1.5 text-[15px] leading-6 text-ink-muted">
         Every answer cites the documents you can read.
       </p>

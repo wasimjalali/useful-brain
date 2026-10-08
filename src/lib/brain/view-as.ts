@@ -95,9 +95,19 @@ export async function echoAssumedPerson(
 }
 
 /**
- * Writes the audit row before the run. Idempotent by request id: a repeat for
- * the same admin and person changes nothing; a request id already used for a
- * different admin or person is refused so one audit row never describes two turns.
+ * Binds a request id to its question and, when scoped, its document scope.
+ * Stored in question_sha256; an unscoped request keeps the plain question hash.
+ */
+async function auditRequestDigest(question: string, scopeDocumentId?: string): Promise<string> {
+  return sha256Hex(scopeDocumentId === undefined ? question : `${question}\u0000scope:${scopeDocumentId}`);
+}
+
+/**
+ * Claims the request id and writes the audit row before the run. A view-as
+ * turn is ephemeral and cannot be replayed, so a request id executes at most
+ * once: any repeat (same or different admin, person, question or scope,
+ * concurrent or later) is refused before anything runs, and the first
+ * execution's audit row is never touched by it.
  */
 export async function beginViewAsAudit(
   db: OperationsDatabase,
@@ -106,12 +116,13 @@ export async function beginViewAsAudit(
     adminPrincipalId: string;
     assumedPrincipalId: string;
     question: string;
+    scopeDocumentId?: string;
     now: number;
   },
 ): Promise<void> {
   const requestId = parseBoundedId(input.requestId, "request id");
-  const questionSha = await sha256Hex(input.question);
-  await db
+  const questionSha = await auditRequestDigest(input.question, input.scopeDocumentId);
+  const claimed = await db
     .prepare(
       `INSERT INTO view_as_audits
          (id, request_id, admin_principal_id, assumed_principal_id, question_sha256, created_at)
@@ -127,20 +138,12 @@ export async function beginViewAsAudit(
       input.now,
     )
     .run();
-  const row = await db
-    .prepare(`SELECT admin_principal_id, assumed_principal_id FROM view_as_audits WHERE request_id = ?`)
-    .bind(requestId)
-    .first<{ admin_principal_id: string; assumed_principal_id: string }>();
-  if (
-    !row ||
-    row.admin_principal_id !== input.adminPrincipalId ||
-    row.assumed_principal_id !== input.assumedPrincipalId
-  ) {
+  if ((claimed.meta?.changes ?? 0) !== 1) {
     throw new WorkerValidationError();
   }
 }
 
-/** Idempotent by request id. `answerType` is "error" when the turn failed. */
+/** `answerType` is "error" when the turn failed. Throws when the audit row cannot be completed. */
 export async function finishViewAsAudit(
   db: OperationsDatabase,
   input: {
@@ -150,7 +153,7 @@ export async function finishViewAsAudit(
     diagnosticShown: boolean;
   },
 ): Promise<void> {
-  await db
+  const result = await db
     .prepare(
       `UPDATE view_as_audits
        SET answer_type = ?, cited_document_ids_json = ?, diagnostic_shown = ?
@@ -163,6 +166,9 @@ export async function finishViewAsAudit(
       parseBoundedId(input.requestId, "request id"),
     )
     .run();
+  if ((result.meta?.changes ?? 0) !== 1) {
+    throw new Error("view_as_audit_missing");
+  }
 }
 
 function titleQuery(question: string): string | null {

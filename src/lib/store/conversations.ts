@@ -332,8 +332,15 @@ type RequestIdClaim = {
   payload_digest: string | null;
 };
 
-async function requestPayloadDigest(question: string): Promise<string> {
-  return sha256Hex(question);
+/**
+ * Binds the request id to the question and, when the turn is scoped, to the
+ * document scope: replaying a request id with a different scope must not
+ * return the stored answer produced under the first one. An unscoped request
+ * keeps the plain question digest, which is also what claims written before
+ * scoping existed hold.
+ */
+async function requestPayloadDigest(question: string, scopeDocumentId?: string): Promise<string> {
+  return sha256Hex(scopeDocumentId === undefined ? question : `${question}\u0000scope:${scopeDocumentId}`);
 }
 
 async function loadRequestIdClaim(
@@ -459,6 +466,8 @@ export async function createPendingTurn(
     conversationId?: string;
     requestId: string;
     question: string;
+    /** Document scope of the turn; part of the replay binding of the request id. */
+    scopeDocumentId?: string;
     /** Retry: answer this existing user message again instead of inserting a new one. */
     reuseUserMessageId?: string;
     now: number;
@@ -466,7 +475,7 @@ export async function createPendingTurn(
 ): Promise<{ conversationId: string; assistantMessageId: string; duplicate: boolean }> {
   const ownerPrincipalId = parseBoundedId(input.ownerPrincipalId, "principal id");
   const requestId = parseBoundedId(input.requestId, "request id");
-  const payloadDigest = await requestPayloadDigest(input.question);
+  const payloadDigest = await requestPayloadDigest(input.question, input.scopeDocumentId);
   const duplicate = await db
     .prepare(
       `SELECT id, conversation_id, status FROM messages WHERE request_id = ? AND role = 'assistant'`,

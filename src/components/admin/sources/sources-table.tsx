@@ -60,7 +60,7 @@ export function SourcesTable({ rows }: { rows: SourceRowView[] }) {
           <TableCell>{row.department}</TableCell>
           <TableCell>{row.readers}</TableCell>
           <div className="text-right text-[13px]" role="cell">
-            {row.chunks ?? "—"}
+            {row.chunks ?? 0}
           </div>
           <TableCell>{row.updatedLabel}</TableCell>
           <div role="cell">

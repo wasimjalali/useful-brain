@@ -25,7 +25,7 @@ import {
 } from "./answer-view";
 import { ChatWorkspace } from "./chat-workspace";
 import { AssistantTurn } from "./conversation-turn";
-import { CitationLinkProvider, DocumentReader, EvidencePanel } from "./evidence";
+import { CitationLinkProvider, CitationScope, DocumentReader, EvidencePanel } from "./evidence";
 import { applyEvidenceUrl, parseEvidenceUrl } from "./evidence-url";
 import { messageIdOf, type ChatTurnState } from "./turn-model";
 import {
@@ -65,7 +65,10 @@ export type ChatViewProps = {
   suggestions?: SuggestionView[];
 };
 
-/** How long Approve and run waits for the run to finish: 15 checks, one second apart. */
+/**
+ * How long Approve and run waits for the run to finish: 15 checks, one second
+ * apart. It stops early on denied, expired, or approved with its ticket.
+ */
 export const APPROVAL_POLL_MS = 1000;
 export const APPROVAL_POLL_TRIES = 15;
 
@@ -178,7 +181,13 @@ function ChatView({
     getAssumedPrincipal: () => (viewAsId ? null : assumedPrincipalFor(loadAssumedPrincipalKey())),
     onConversationChange: (id, turns) =>
       shell.upsertConversation(id, deriveConversationTitle(turns[0]?.question ?? "")),
-    onNavigate: (id) => window.history.replaceState(null, "", `/chat/${id}`),
+    onNavigate: (id) => {
+      // Keep the query string: it carries the open evidence panel.
+      const path = `/chat/${id}`;
+      if (window.location.pathname !== path) {
+        window.history.replaceState(null, "", `${path}${window.location.search}`);
+      }
+    },
   });
   const { turns, patchTurn } = chat;
 
@@ -264,6 +273,31 @@ function ChatView({
     );
   }, [fetchReader, initialUrl, panelTurn]);
 
+  // A doc link that arrives while the chat is mounted (Cmd+K on /chat) changes
+  // the search params without remounting, so follow it here. Our own URL
+  // writes below land in the same params; the key and the open reader screen
+  // those out.
+  const urlDoc = searchParams?.get("doc") || null;
+  const urlC = searchParams?.get("c") || null;
+  const handledDoc = useRef<string | null>(initialUrl.doc ? `${initialUrl.doc}|${initialUrl.c ?? ""}` : null);
+  const readerDocumentId = reader?.documentId ?? null;
+  useEffect(() => {
+    const key = urlDoc ? `${urlDoc}|${urlC ?? ""}` : null;
+    if (key === handledDoc.current) return;
+    handledDoc.current = key;
+    if (!urlDoc || urlDoc === readerDocumentId) return;
+    const parsed = parseEvidenceUrl(new URLSearchParams({ doc: urlDoc, ...(urlC ? { c: urlC } : {}) }));
+    if (!parsed.doc) return;
+    const linkedTurn = parsed.c !== null ? panelTurn : null;
+    readerSeq.current += 1;
+    // Follows the URL, an external system, once per change of the doc link.
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setPanel((current) => ({ ...current, open: true }));
+    setReader(loadingReader(parsed.doc, parsed.c, linkedTurn?.id ?? null, ""));
+    /* eslint-enable react-hooks/set-state-in-effect */
+    void fetchReader(readerSeq.current, parsed.doc, parsed.c, linkedTurn);
+  }, [urlDoc, urlC, readerDocumentId, fetchReader, panelTurn]);
+
   // The panel state lives in the URL without navigating.
   useEffect(() => {
     const next = applyEvidenceUrl(window.location.search, {
@@ -293,9 +327,10 @@ function ChatView({
   }
 
   function openEvidenceFor(turnId: string) {
-    setPanel((current) =>
-      current.open && current.turnId === turnId ? current : { open: true, tab: "cited", turnId },
-    );
+    setPanel((current) => {
+      if (!current.open) return { open: true, tab: "cited", turnId };
+      return current.turnId === turnId ? current : { ...current, turnId };
+    });
     if (turnId !== panelTurn?.id) setReader(null);
   }
 
@@ -409,7 +444,13 @@ function ChatView({
           ? await actions.loadConversation(conversationId).catch(() => null)
           : null;
         const stored = loaded?.ok ? loaded.data.turns.find((candidate) => candidate.id === assistantId) : undefined;
-        if (stored?.approval && stored.approval.state !== "pending") {
+        // Approved is not the end: the ticket is made by the resume that
+        // follows. Stop on denied, expired, or approved with its ticket.
+        if (
+          stored?.approval &&
+          stored.approval.state !== "pending" &&
+          !(stored.approval.state === "approved" && !stored.approval.ticket)
+        ) {
           patchTurn(turn.id, { approval: stored.approval });
           return;
         }
@@ -446,7 +487,7 @@ function ChatView({
   const readerBody: ReaderDocumentView = reader?.view ?? { ...EMPTY_READER, title: reader?.title ?? "" };
 
   return (
-    <CitationLinkProvider>
+    <CitationLinkProvider resetKey={panel.open ? `${panelTurn?.id ?? ""}|${reader?.documentId ?? ""}` : null}>
       <ChatWorkspace
         banner={
           echo ? (
@@ -476,71 +517,86 @@ function ChatView({
           <div
             className="flex flex-col gap-4"
             key={turn.id}
-            onClickCapture={hasEvidence(turn) ? () => openEvidenceFor(turn.id) : undefined}
+            onClickCapture={
+              hasEvidence(turn)
+                ? (event) => {
+                    // Only citations open the panel. When it is already open,
+                    // any click in a turn points it at that turn.
+                    const opener = (event.target as HTMLElement).closest("[data-opens-evidence]");
+                    if (opener || panel.open) openEvidenceFor(turn.id);
+                  }
+                : undefined
+            }
           >
             <UserBubble>{turn.question}</UserBubble>
             <div className={turn.id.startsWith("turn_") && turn.answer ? "rise" : undefined}>
-              <AssistantTurn
-                actionError={actionErrors[turn.id] ?? null}
-                approvalBusy={busyApprovals.has(turn.id)}
-                documentsSearched={turn.assumedPerson?.readableDocuments ?? readable}
-                mobile={mobile}
-                now={now}
-                onApprove={() => void decide(turn, "approve")}
-                onCopy={() => void copy(turn)}
-                onDeny={() => void decide(turn, "reject")}
-                onFeedback={(value) => void sendFeedback(turn, value)}
-                onOpenEvidence={() => openEvidenceFor(turn.id)}
-                onRequestDocument={() => void requestDocument(turn)}
-                onRetry={() => void chat.retryTurn(turn.id)}
-                stored={messageIdOf(turn) !== null}
-                turn={turn}
-              />
+              <CitationScope turnId={turn.id}>
+                <AssistantTurn
+                  actionError={actionErrors[turn.id] ?? null}
+                  approvalBusy={busyApprovals.has(turn.id)}
+                  documentsSearched={turn.assumedPerson?.readableDocuments ?? readable}
+                  mobile={mobile}
+                  now={now}
+                  onApprove={() => void decide(turn, "approve")}
+                  onCopy={() => void copy(turn)}
+                  onDeny={() => void decide(turn, "reject")}
+                  onFeedback={(value) => void sendFeedback(turn, value)}
+                  onOpenEvidence={() => openEvidenceFor(turn.id)}
+                  onOpenTicket={(ticketId) => router.push(`/tickets/${encodeURIComponent(ticketId)}`)}
+                  onSignIn={() => router.push("/login")}
+                  onRequestDocument={() => void requestDocument(turn)}
+                  onRetry={() => void chat.retryTurn(turn.id)}
+                  stored={messageIdOf(turn) !== null}
+                  turn={turn}
+                />
+              </CitationScope>
             </div>
           </div>
         ))}
       </ChatWorkspace>
 
       <ShellPanel label="Evidence" onClose={closePanel} open={panel.open}>
-        {reader ? (
-          <DocumentReader
-            activeN={reader.activeN}
-            doc={readerBody}
-            loading={reader.status === "loading"}
-            onBack={panelTurn ? () => setReader(null) : undefined}
-            onClose={closePanel}
-            onOpenInLibrary={() => router.push("/library")}
-            unavailable={
-              reader.status === "missing"
-                ? "This document isn't available"
-                : reader.status === "failed"
-                  ? "The document could not be loaded"
-                  : undefined
-            }
-          />
-        ) : (
-          <EvidencePanel
-            cited={cited}
-            generation={panelAnswer?.corpusGenerationId ?? undefined}
-            isAdmin={isAdmin}
-            onClose={closePanel}
-            onOpenDocument={(n) => {
-              if (!panelAnswer || !panelTurn) return;
-              const documentId = documentIdForCitation(panelAnswer, n);
-              if (!documentId) return;
-              void openDocument(
-                documentId,
-                n,
-                panelTurn,
-                cited.find((passage) => passage.n === n)?.document ?? "",
-              );
-            }}
-            onTabChange={(tab) => setPanel((current) => ({ ...current, tab }))}
-            rerankFloor={RERANK_FLOOR}
-            retrieved={retrieved}
-            tab={panel.tab}
-          />
-        )}
+        <CitationScope turnId={reader ? reader.turnId : (panelTurn?.id ?? null)}>
+          {reader ? (
+            <DocumentReader
+              activeN={reader.activeN}
+              doc={readerBody}
+              loading={reader.status === "loading"}
+              onBack={panelTurn ? () => setReader(null) : undefined}
+              onClose={closePanel}
+              onOpenInLibrary={() => router.push("/library")}
+              unavailable={
+                reader.status === "missing"
+                  ? "This document isn't available"
+                  : reader.status === "failed"
+                    ? "The document could not be loaded"
+                    : undefined
+              }
+            />
+          ) : (
+            <EvidencePanel
+              cited={cited}
+              generation={panelAnswer?.corpusGenerationId ?? undefined}
+              isAdmin={isAdmin}
+              onClose={closePanel}
+              onOpenDocument={(n) => {
+                if (!panelAnswer || !panelTurn) return;
+                const documentId = documentIdForCitation(panelAnswer, n);
+                if (!documentId) return;
+                void openDocument(
+                  documentId,
+                  n,
+                  panelTurn,
+                  cited.find((passage) => passage.n === n)?.document ?? "",
+                );
+              }}
+              onTabChange={(tab) => setPanel((current) => ({ ...current, tab }))}
+              rerankFloor={RERANK_FLOOR}
+              retrieved={retrieved}
+              tab={panel.tab}
+            />
+          )}
+        </CitationScope>
       </ShellPanel>
     </CitationLinkProvider>
   );

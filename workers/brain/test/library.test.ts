@@ -136,6 +136,41 @@ describe("GET /library", () => {
   });
 });
 
+describe("missing ACL metadata fails closed", () => {
+  const damage = (sql: string) =>
+    env.CORPUS_DB.prepare(sql).bind(generationId).run();
+
+  it("denies a public catalog row whose chunk is private with no owner (metadata '{}')", async () => {
+    await damage(
+      `UPDATE chunks SET access_scope = 'private', metadata = '{}'
+       WHERE generation_id = ? AND document_id = 'doc-public-handbook' AND chunk_index = 1`,
+    );
+    try {
+      for (const persona of Object.keys(PRINCIPALS) as PersonaId[]) {
+        expect((await library(persona)).documents.map((d) => d.id), persona).not.toContain("doc-public-handbook");
+        const open = await call("/documents/doc-public-handbook", cookies[persona]);
+        expect(open.status, persona).toBe(404);
+        const found = await call(`/search?q=${encodeURIComponent("handbook")}`, cookies[persona]);
+        expect(JSON.stringify(await found.json()), persona).not.toContain("doc-public-handbook");
+      }
+    } finally {
+      await damage(
+        `UPDATE chunks SET access_scope = 'public', allowed_departments = '[]', metadata = '{}'
+         WHERE generation_id = ? AND document_id = 'doc-public-handbook' AND chunk_index = 1`,
+      );
+    }
+    expect((await library("member-maya")).documents.map((d) => d.id)).toContain("doc-public-handbook");
+  });
+
+  it("lists a catalog row only when it has a body, so list and open agree", async () => {
+    await env.CORPUS_DB.prepare(
+      `DELETE FROM document_bodies WHERE generation_id = ? AND document_id = 'doc-public-security'`,
+    ).bind(generationId).run();
+    expect((await library("member-maya")).documents.map((d) => d.id)).not.toContain("doc-public-security");
+    expect((await call("/documents/doc-public-security", cookies["member-maya"])).status).toBe(404);
+  });
+});
+
 describe("resolveScopedDocument", () => {
   const maya = PRINCIPALS["member-maya"];
 

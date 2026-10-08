@@ -1,4 +1,4 @@
-import { aclFilterFor, aclSqlAndParams, type Principal } from "../acl/access";
+import { readableDocumentPredicate, type Principal } from "../acl/access";
 import { WorkerNotFoundError } from "../cf/worker-errors";
 import { findRelianceSentences } from "../answer/sentence-match";
 import type {
@@ -32,25 +32,7 @@ type CatalogRow = {
 const CATALOG_COLUMNS = `c.document_id, c.title, c.department, c.version, c.effective_date,
   c.headings_json, c.access_scope, c.allowed_roles, c.allowed_departments`;
 
-/**
- * A document is readable when its catalog row passes the retrieval ACL
- * predicate AND it has chunks AND every one of its chunks passes it too, so a
- * mixed document is rejected whole. document_bodies and document_catalog_fts
- * carry no ACL, so every read goes through this predicate on `c`.
- */
-export function readableDocumentPredicate(
-  generationId: string,
-  principal: Principal,
-): { sql: string; params: string[] } {
-  const acl = aclSqlAndParams(aclFilterFor(principal));
-  const chunkAcl = acl.sql.replaceAll("c.", "k.");
-  return {
-    sql: `c.generation_id = ? AND ${acl.sql}
-      AND EXISTS (SELECT 1 FROM chunks k0 WHERE k0.generation_id = c.generation_id AND k0.document_id = c.document_id)
-      AND NOT EXISTS (SELECT 1 FROM chunks k WHERE k.generation_id = c.generation_id AND k.document_id = c.document_id AND NOT ${chunkAcl})`,
-    params: [generationId, ...acl.params, ...acl.params],
-  };
-}
+export { readableDocumentPredicate };
 
 function parseList(value: string): string[] {
   try {
@@ -361,6 +343,21 @@ function documentSnippet(body: string, title: string, tokens: string[]): string 
   return section ? `${section.heading} · ${excerpt(section.text, tokens)}` : null;
 }
 
+/** Upper bound on readable matches ranked locally; ordered by title, so independent of hidden rows. */
+const SEARCH_CANDIDATE_CAP = 500;
+
+function coverage(text: string, tokens: string[]): number {
+  const lower = text.toLowerCase();
+  return tokens.filter((token) => lower.includes(token)).length;
+}
+
+type SearchCandidate = { document_id: string; title: string; department: string | null; headings_json: string };
+
+/**
+ * FTS decides membership only. Its bm25 score uses corpus-wide statistics that
+ * include documents the caller cannot read, so ranking is computed here from
+ * the readable rows alone: title coverage, heading coverage, then title and id.
+ */
 export async function searchDocuments(
   db: SqlExecutor,
   generationId: string,
@@ -372,25 +369,54 @@ export async function searchDocuments(
     return [];
   }
   const readable = readableDocumentPredicate(generationId, principal);
-  const rows = await db
+  const found = await db
     .prepare(
-      `SELECT c.document_id, c.title, c.department, b.body AS body
+      `SELECT c.document_id, c.title, c.department, c.headings_json
        FROM document_catalog_fts f
        JOIN document_catalog c ON c.id = f.rowid
-       LEFT JOIN document_bodies b ON b.document_id = c.document_id AND b.generation_id = c.generation_id
        WHERE document_catalog_fts MATCH ? AND ${readable.sql}
-       ORDER BY bm25(document_catalog_fts), c.document_id
+       ORDER BY c.title COLLATE NOCASE, c.document_id
        LIMIT ?`,
     )
-    .bind(match, ...readable.params, SEARCH_RESULT_LIMIT)
-    .all<{ document_id: string; title: string; department: string | null; body: string | null }>();
-  return rows.results.map((row) => ({
-    id: row.document_id,
-    title: row.title,
-    department: row.department,
-    titleMatches: matchRanges(row.title, tokens),
-    snippet: row.body ? documentSnippet(row.body, row.title, tokens) : null,
-  }));
+    .bind(match, ...readable.params, SEARCH_CANDIDATE_CAP)
+    .all<SearchCandidate>();
+  const ranked = found.results
+    .map((row) => ({
+      row,
+      titleScore: coverage(row.title, tokens),
+      headingScore: coverage(parseList(row.headings_json).join(" "), tokens),
+    }))
+    .sort(
+      (a, b) =>
+        b.titleScore - a.titleScore ||
+        b.headingScore - a.headingScore ||
+        a.row.title.toLowerCase().localeCompare(b.row.title.toLowerCase()) ||
+        (a.row.document_id < b.row.document_id ? -1 : a.row.document_id > b.row.document_id ? 1 : 0),
+    )
+    .slice(0, SEARCH_RESULT_LIMIT)
+    .map((entry) => entry.row);
+  if (ranked.length === 0) {
+    return [];
+  }
+  // Bodies only for the hits that survived ranking; these ids already passed the predicate.
+  const bodies = await db
+    .prepare(
+      `SELECT document_id, body FROM document_bodies
+       WHERE generation_id = ? AND document_id IN (${ranked.map(() => "?").join(",")})`,
+    )
+    .bind(generationId, ...ranked.map((row) => row.document_id))
+    .all<{ document_id: string; body: string }>();
+  const bodyOf = new Map(bodies.results.map((row) => [row.document_id, row.body]));
+  return ranked.map((row) => {
+    const body = bodyOf.get(row.document_id);
+    return {
+      id: row.document_id,
+      title: row.title,
+      department: row.department,
+      titleMatches: matchRanges(row.title, tokens),
+      snippet: body ? documentSnippet(body, row.title, tokens) : null,
+    };
+  });
 }
 
 /** The caller's own conversations only: owner is part of the WHERE, never a post-filter. */

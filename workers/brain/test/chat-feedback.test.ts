@@ -119,7 +119,7 @@ describe("POST /messages/:id/request-document", () => {
         `SELECT question_normalized, message_id FROM document_requests WHERE principal_id = ? ORDER BY created_at`,
       )
         .bind(principal)
-        .all<{ question_normalized: string; message_id: string }>()
+        .all<{ question_normalized: string; message_id: string | null }>()
     ).results;
 
   it("requires a session", async () => {
@@ -173,5 +173,19 @@ describe("POST /messages/:id/request-document", () => {
     const other = await ask(cookies["member-priya"], question, "dr-derive-3");
     await call(`/messages/${other.assistantMessageId}/request-document`, cookies["member-priya"], { method: "POST" });
     expect(await rows("member-priya")).toHaveLength(1);
+  });
+
+  it("keeps the request, detached from the message, when its conversation is deleted", async () => {
+    const turn = await ask(cookies["member-maya"], "Qwxyz plimsoll vortex nonsense?", "dr-keep-1");
+    const res = await call(`/messages/${turn.assistantMessageId}/request-document`, cookies["member-maya"], { method: "POST" });
+    expect(res.status).toBe(200);
+    const before = await rows("member-maya");
+    expect(before.filter((r) => r.message_id === turn.assistantMessageId)).toHaveLength(1);
+    const del = await call(`/conversations/${turn.conversationId}`, cookies["member-maya"], { method: "DELETE" });
+    expect(del.status).toBe(200);
+    const after = await rows("member-maya");
+    expect(after).toHaveLength(before.length);
+    expect(after.some((r) => r.message_id === turn.assistantMessageId)).toBe(false);
+    expect(after.find((r) => r.question_normalized === "qwxyz plimsoll vortex nonsense?")).toMatchObject({ message_id: null });
   });
 });

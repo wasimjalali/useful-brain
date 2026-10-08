@@ -74,6 +74,7 @@ import { handleChatRoute, pendingTurnProgress, resolveTurnRetry } from "./routes
 import { handleAdminPeopleRoute } from "./routes/admin-people";
 import { handleAdminMetricsRoute, campaignView } from "./routes/admin-metrics";
 import { handleLibraryRoute } from "./routes/documents";
+import { handleTicketRoute } from "./routes/tickets";
 import { handleAdminSourcesRoute } from "./routes/admin-sources";
 import { ApprovalWorkflow } from "./approval-workflow";
 import {
@@ -320,6 +321,18 @@ const brainWorker = {
       });
       if (libraryResponse) {
         return libraryResponse;
+      }
+
+      const ticketResponse = await handleTicketRoute({
+        request,
+        path,
+        env,
+        principal,
+        requestId,
+        started,
+      });
+      if (ticketResponse) {
+        return ticketResponse;
       }
 
       if (path === "/config" && request.method === "GET") {
@@ -666,7 +679,7 @@ const brainWorker = {
         const retry =
           body.retryOfMessageId === undefined
             ? null
-            : await resolveTurnRetry(env, principal, body.retryOfMessageId);
+            : await resolveTurnRetry(env, principal, body.retryOfMessageId, body.requestId);
         const question = retry
           ? retry.question
           : typeof body.question === "string"
@@ -839,6 +852,7 @@ const brainWorker = {
           conversationId,
           principal.id,
           env.CORPUS_DB as SqlExecutor | undefined,
+          { diagnostics: isAdminPrincipal(principal) },
         );
         writeOperationalLog({
           requestId,
@@ -1192,6 +1206,19 @@ const brainWorker = {
         .run();
     } catch {
       console.error("service_health_prune_failed");
+    }
+    // Self-heal legacy active generations that predate the document catalog.
+    // Idempotent and paged; never on a request path (see plan D19).
+    if (env.CORPUS_DB) {
+      try {
+        const corpus = env.CORPUS_DB as SqlExecutor;
+        const activeId = await activeGenerationId(corpus);
+        if (activeId) {
+          await backfillDocumentCatalog(corpus, activeId);
+        }
+      } catch {
+        console.error("catalog_backfill_failed");
+      }
     }
     if (!env.APPROVAL_RESUME_QUEUE) {
       return;

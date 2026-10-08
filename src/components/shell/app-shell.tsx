@@ -117,13 +117,16 @@ export function AppShell({
     [pathname, searchParams],
   );
   const settingsOpen = searchParams?.get("settings") === "1";
+  // history.pushState/replaceState, not the router: Next folds them into
+  // useSearchParams without navigating, so a mounted chat and its in-flight
+  // answer survive opening Settings.
   const openSettings = useCallback(
-    () => router.push(withSettings(true)),
-    [router, withSettings],
+    () => window.history.pushState(null, "", withSettings(true)),
+    [withSettings],
   );
   const closeSettings = useCallback(
-    () => router.replace(withSettings(false)),
-    [router, withSettings],
+    () => window.history.replaceState(null, "", withSettings(false)),
+    [withSettings],
   );
 
   const upsertConversation = useCallback((id: string, title: string) => {

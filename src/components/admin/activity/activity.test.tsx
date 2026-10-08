@@ -36,7 +36,7 @@ describe("ActivityFilters", () => {
 describe("ActivityTable", () => {
   it("renders column headers and an outcome label per row, with a placeholder for missing sources", () => {
     render(<ActivityTable loadTrace={() => {}} rows={[row("a", "error", null), row("b", "no_evidence", 0)]} traces={{}} />);
-    ["Time", "Person", "Question", "Outcome", "Sources", "Latency"].forEach((h) =>
+    ["Time (UTC)", "Person", "Question", "Outcome", "Sources", "Latency"].forEach((h) =>
       expect(screen.getByRole("columnheader", { name: h })).toBeInTheDocument(),
     );
     expect(screen.getByText("Error")).toBeInTheDocument();
@@ -65,6 +65,14 @@ describe("ActivityTable", () => {
     expect(screen.getByText("38 ms")).toBeInTheDocument();
     fireEvent.click(btn);
     expect(screen.queryByText("rewrite")).toBeNull();
+  });
+
+  it("keeps every cell in a row with the toggle button inside the first cell", () => {
+    render(<ActivityTable loadTrace={() => {}} rows={[row("a", "answered")]} traces={{}} />);
+    const button = screen.getByRole("button", { name: /Question a/ });
+    expect(button.closest('[role="row"]')?.querySelectorAll('[role="cell"]').length).toBe(7);
+    expect(button.closest('[role="cell"]')).not.toBeNull();
+    expect(button.querySelector('[role="cell"]')).toBeNull();
   });
 
   it("opens one row at a time and shows an explicit empty trace", () => {

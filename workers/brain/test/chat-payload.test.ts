@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
 
+import { loadConversationForUi } from "../../../src/lib/store/conversation-queries";
 import { call, seedChatCorpus, seedGroundedAnswer } from "./chat-helpers";
 import { seedPersonas, seedPrincipals, type PersonaId } from "./seed";
 
@@ -65,13 +66,53 @@ describe("GET /conversations/:id additive fields", () => {
         .all<{ chunk_id: string; text: string; document_id: string | null }>()
     ).results;
     const results = shown.answer!.retrieval.results;
-    expect(results.map((r) => r.chunkId)).toEqual(stored.map((r) => r.chunk_id));
+    expect(results).toHaveLength(stored.length);
     for (const [index, row] of results.entries()) {
       expect(row.text).toBe(stored[index].text);
       expect(row.documentId).toBe(stored[index].document_id);
     }
     const handbook = results.find((r) => r.documentId === "doc-public-handbook");
     expect(handbook?.documentTitle).toBe("Employee Handbook");
+  });
+
+  it("hides scores, generation id and chunk ids from a member, and shows them to a diagnostics view", async () => {
+    const turn = await seedGroundedAnswer({ owner: "member-maya", requestId: "payload-diag", generationId });
+    await env.OPERATIONS_DB.prepare(
+      `UPDATE evidence_snapshots SET vector_score = 0.81, keyword_score = 0.62, fused_score = 0.7, rerank_score = 0.93 WHERE message_id = ?`,
+    )
+      .bind(turn.assistantMessageId)
+      .run();
+    const res = await call(`/conversations/${turn.conversationId}`, cookies["member-maya"]);
+    const raw = await res.text();
+    const view = JSON.parse(raw) as { turns: Array<{ answer: { corpusGenerationId?: string | null; retrieval: { results: Array<Record<string, unknown>> } } }> };
+    const answer = view.turns[0].answer;
+    expect(answer.corpusGenerationId ?? null).toBeNull();
+    for (const row of answer.retrieval.results) {
+      expect(row.vectorScore ?? null).toBeNull();
+      expect(row.keywordScore ?? null).toBeNull();
+      expect(row.fusedScore ?? null).toBeNull();
+      expect(row.rerankScore ?? null).toBeNull();
+      expect(row.score).toBe(0);
+      expect(row.chunkId).not.toBe("handbook__chunk_001");
+      expect(row.text).toBe("Leave accrues monthly.");
+    }
+    expect(new Set(answer.retrieval.results.map((r) => r.chunkId)).size).toBe(answer.retrieval.results.length);
+    expect(raw).not.toContain("handbook__chunk_001");
+    expect(raw).not.toContain(generationId);
+
+    const admin = await loadConversationForUi(env.OPERATIONS_DB, turn.conversationId, "member-maya", env.CORPUS_DB, {
+      diagnostics: true,
+    });
+    const shown = admin.turns[0].answer!;
+    expect(shown.corpusGenerationId).toBe(generationId);
+    expect(shown.retrieval.results[0]).toMatchObject({
+      chunkId: "handbook__chunk_001",
+      score: 0.8,
+      vectorScore: 0.81,
+      keywordScore: 0.62,
+      fusedScore: 0.7,
+      rerankScore: 0.93,
+    });
   });
 
   it("evidence text comes from the stored snapshot even after the live chunks change", async () => {

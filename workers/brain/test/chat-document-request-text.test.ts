@@ -66,4 +66,22 @@ describe("POST /document-requests", () => {
     expect(stored).toContain("travel booking rules");
     expect(stored).not.toContain("evil");
   });
+
+  it("caps free-text requests at 50 per principal; a repeat of a stored one still succeeds", async () => {
+    const stored = (await rows("member-priya")).filter((r) => r.message_id === null).length;
+    for (let index = 0; index < 50 - stored; index += 1) {
+      const res = await call("/document-requests", cookies["member-priya"], {
+        json: { question: `cap question number ${index}` },
+      });
+      expect(res.status, String(index)).toBe(200);
+    }
+    const over = await call("/document-requests", cookies["member-priya"], { json: { question: "one more than the cap" } });
+    expect(over.status).toBe(400);
+    const repeat = await call("/document-requests", cookies["member-priya"], { json: { question: "cap question number 3" } });
+    expect(repeat.status).toBe(200);
+    expect((await rows("member-priya")).filter((r) => r.message_id === null)).toHaveLength(50);
+    expect((await rows("member-priya")).map((r) => r.question_normalized)).not.toContain("one more than the cap");
+    // Another principal is unaffected.
+    expect((await call("/document-requests", cookies["member-maya"], { json: { question: "unrelated request" } })).status).toBe(200);
+  });
 });

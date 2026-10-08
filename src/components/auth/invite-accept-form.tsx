@@ -8,6 +8,7 @@ import { EyeIcon, EyeOffIcon } from "@/components/icons";
 import { Button, IconButton } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { UsefulBrainLogo } from "@/components/useful-brain-logo";
+import { DEFAULT_USEFUL_BRAIN_CONFIG } from "@/lib/useful-brain-config";
 
 const INVALID = "This invite link is no longer valid.";
 
@@ -91,7 +92,7 @@ export function InviteAcceptForm({ token }: { token: string }) {
             </Button>
           </form>
         </div>
-        <p className="text-xs text-ink-faint-text">Northwind Systems</p>
+        <p className="text-xs text-ink-faint-text">{DEFAULT_USEFUL_BRAIN_CONFIG.companyName} Systems</p>
       </div>
       <ProofStage />
     </main>

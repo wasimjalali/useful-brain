@@ -6,7 +6,7 @@ export const WORKERS_AI_SERVICE = "workers_ai";
 
 function failureCode(error: unknown): HealthDetailCode {
   const message = error instanceof Error ? error.message : "";
-  if (/timeout|timed out|abort/i.test(message)) {
+  if ((error instanceof Error && error.name === "TimeoutError") || /timeout|timed out/i.test(message)) {
     return "timeout";
   }
   if (/429|rate.?limit|too many requests/i.test(message)) {
@@ -15,21 +15,43 @@ function failureCode(error: unknown): HealthDetailCode {
   return "last_call_failed";
 }
 
-/** Last success write per service in this isolate, for the optional success throttle. */
-const lastSuccessWriteAt = new Map<string, number>();
+/**
+ * Last health write per service in this isolate, for the optional success
+ * throttle. Only a success that follows a success is throttled: the first
+ * success after a failure is always written so recovery shows at once.
+ */
+const lastWrite = new Map<string, { at: number; status: "ok" | "error" }>();
 
 /** Test hook: forget the throttle so one test cannot silence the next. */
 export function resetAiHealthThrottle(): void {
-  lastSuccessWriteAt.clear();
+  lastWrite.clear();
 }
 
 export type RecordedAiRunOptions = {
   /**
    * When set, a success is written at most once per interval in this isolate.
-   * Failures are always written.
+   * Failures are always written, and so is the first success after one.
    */
   successMinIntervalMs?: number;
+  /**
+   * Signal the caller can abort (user Stop, turn wall-time budget). A call
+   * that fails because that signal fired says nothing about Workers AI, so it
+   * is rethrown without a health event. A TimeoutError reason still counts.
+   */
+  signal?: AbortSignal;
 };
+
+/** True when the caller, not the service, ended the call. */
+function isCallerAbort(error: unknown, signal: AbortSignal | undefined): boolean {
+  if (error instanceof Error && error.name === "AbortError") {
+    return true;
+  }
+  if (!signal?.aborted) {
+    return false;
+  }
+  const reason: unknown = signal.reason;
+  return !(reason instanceof Error && reason.name === "TimeoutError");
+}
 
 /**
  * Wrap one `AI.run` call. Records the outcome as a Workers AI health event and
@@ -48,14 +70,23 @@ export async function recordedAiRun<T>(
     outcome = { status: "ok", code: "last_call_ok" };
     const interval = options.successMinIntervalMs;
     const at = now();
-    const last = lastSuccessWriteAt.get(WORKERS_AI_SERVICE);
-    if (interval === undefined || last === undefined || at - last >= interval) {
-      lastSuccessWriteAt.set(WORKERS_AI_SERVICE, at);
+    const last = lastWrite.get(WORKERS_AI_SERVICE);
+    if (
+      interval === undefined ||
+      last === undefined ||
+      last.status === "error" ||
+      at - last.at >= interval
+    ) {
+      lastWrite.set(WORKERS_AI_SERVICE, { at, status: "ok" });
       await record(db, outcome, now);
     }
     return value;
   } catch (error) {
+    if (isCallerAbort(error, options.signal)) {
+      throw error;
+    }
     outcome = { status: "error", code: failureCode(error) };
+    lastWrite.set(WORKERS_AI_SERVICE, { at: now(), status: "error" });
     await record(db, outcome, now);
     throw error;
   }

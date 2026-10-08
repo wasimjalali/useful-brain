@@ -15,6 +15,7 @@ import { withAiHealth } from "../models/ai-health-wrap";
 import { loadApprovalViewForMessage, recordPendingApproval } from "../store/approval-view";
 import { resolveScopedDocument } from "../store/library-queries";
 import { recordTurnSteps } from "../store/turn-steps";
+import { withMemberEvidenceView } from "./member-view";
 import { buildTurnSteps, type SearchRecord } from "./turn-trace";
 import { structuredJsonFromGroundedProse } from "../answer/prose-to-structured";
 import {
@@ -119,6 +120,12 @@ export type ExecuteTurnInput = {
 export async function executeTurn(
   input: ExecuteTurnInput,
 ): Promise<GroundedAnswerResponse & TurnResponseExtras> {
+  return withMemberEvidenceView(await executeTurnFull(input), input.principal);
+}
+
+async function executeTurnFull(
+  input: ExecuteTurnInput,
+): Promise<GroundedAnswerResponse & TurnResponseExtras> {
   const now = input.now ?? Date.now();
   const turnStartedAt = Date.now();
   const persist = input.persistConversation !== false;
@@ -199,6 +206,7 @@ export async function executeTurn(
       conversationId: input.conversationId,
       requestId: input.requestId,
       question: input.question,
+      scopeDocumentId: input.scopeDocumentId,
       reuseUserMessageId: input.reuseUserMessageId,
       now,
     });
@@ -345,13 +353,17 @@ export async function executeTurn(
     let approvalRecorded = false;
     let actionNote = false;
     if (result.pendingApproval) {
-      approvalRecorded = await recordApprovalOrRefuse(input.operations, {
-        assistantMessageId: pending.assistantMessageId,
-        conversationId: pending.conversationId,
-        principalId: input.principal.id,
-        corpusGenerationId,
-        result,
-      });
+      // Second guard behind the run's policy barrier: a proposal is recorded
+      // only when this turn's search produced evidence.
+      approvalRecorded =
+        result.evidence.length > 0 &&
+        (await recordApprovalOrRefuse(input.operations, {
+          assistantMessageId: pending.assistantMessageId,
+          conversationId: pending.conversationId,
+          principalId: input.principal.id,
+          corpusGenerationId,
+          result,
+        }));
       actionNote = approvalRecorded;
       if (!approvalRecorded) {
         // A proposal that could not be recorded is a refusal: no card, no

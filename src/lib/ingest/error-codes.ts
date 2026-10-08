@@ -13,6 +13,7 @@ export const UPLOAD_ERROR_MESSAGES: Record<UploadErrorCode, string> = {
   TIMED_OUT: "Reading this file took too long.",
   INDEX_UNAVAILABLE: "The search index couldn't be reached. Try again in a few minutes.",
   DRAFT_CLOSED: "The draft was discarded before this file finished.",
+  NOT_RECEIVED: "This file never finished uploading. Add it again.",
   INTERNAL: "Something went wrong while processing this file.",
 };
 

@@ -32,18 +32,51 @@ const SCOPES = [
   { value: "roles", label: "Roles" },
 ];
 
-/** Splits a selection into files the pipeline accepts and inline rejection messages. */
-export function validateUploadFiles(files: File[]): { accepted: File[]; rejections: string[] } {
+const MAX_FILES = 25;
+const MAX_NAME_LENGTH = 200;
+
+/** Same name rule as Brain's create-batch check, so a batch is never refused as a whole. */
+function nameAllowed(name: string): boolean {
+  const trimmed = name.trim();
+  return (
+    trimmed.length > 0 &&
+    trimmed.length <= MAX_NAME_LENGTH &&
+    !/[/\\\u0000-\u001f\u007f]/.test(trimmed) &&
+    !trimmed.startsWith(".")
+  );
+}
+
+/**
+ * Splits a selection into files the pipeline accepts and inline rejection messages.
+ * `existing` holds the names already in the list, which count towards the duplicate
+ * and 25-file limits.
+ */
+export function validateUploadFiles(
+  files: File[],
+  existing: string[] = [],
+): { accepted: File[]; rejections: string[] } {
   const accepted: File[] = [];
   const rejections: string[] = [];
+  const seen = new Set(existing.map((name) => name.trim().toLowerCase()));
+  let count = existing.length;
   for (const file of files) {
     const lower = file.name.toLowerCase();
     if (!UPLOAD_ACCEPTED_EXTENSIONS.some((ext) => lower.endsWith(ext))) {
       rejections.push(`${file.name}: unsupported file type`);
+    } else if (file.size < 1) {
+      rejections.push(`${file.name}: the file is empty`);
     } else if (file.size > UPLOAD_MAX_BYTES) {
       rejections.push(`${file.name}: larger than 25 MB`);
+    } else if (!nameAllowed(file.name)) {
+      rejections.push(`${file.name}: the file name isn't allowed`);
+    } else if (seen.has(file.name.trim().toLowerCase())) {
+      rejections.push(`${file.name}: a file with this name is already in the list`);
+    } else if (count >= MAX_FILES) {
+      rejections.push(`${file.name}: at most ${MAX_FILES} files at a time`);
     } else {
       accepted.push(file);
+      seen.add(file.name.trim().toLowerCase());
+      count += 1;
     }
   }
   return { accepted, rejections };
@@ -60,18 +93,27 @@ function segmentColor(stage: UploadStage, index: number) {
   return index === current ? "var(--ink-faint)" : "var(--sunken)";
 }
 
-function FileRow({ file }: { file: UploadFileView }) {
-  const stageText = file.stage === "failed" ? (file.error ?? "Failed") : STAGE_LABEL[file.stage];
+function FileRow({ file, onRemove }: { file: UploadFileView; onRemove?: (id: string) => void }) {
+  const stageText = file.stage === "failed" ? (file.error ?? "Failed") : (file.note ?? STAGE_LABEL[file.stage]);
   const tone =
     file.stage === "ready" ? "text-success" : file.stage === "failed" ? "text-danger" : "text-ink-muted";
   return (
-    <li className="grid h-11 grid-cols-[16px_minmax(0,1fr)_auto_112px] items-center gap-x-2.5 border-b border-border">
+    <li
+      className={`grid h-11 items-center gap-x-2.5 border-b border-border ${
+        file.stage === "failed" && onRemove
+          ? "grid-cols-[16px_minmax(0,1fr)_auto_112px_28px]"
+          : "grid-cols-[16px_minmax(0,1fr)_auto_112px]"
+      }`}
+    >
       <FileTextIcon className="size-4 text-ink-muted" />
       <span className="flex min-w-0 items-baseline gap-2">
         <span className="truncate text-[13px] font-medium" title={file.name}>
           {file.name}
         </span>
-        <span className="shrink-0 text-xs text-ink-faint-text">{file.sizeLabel}</span>
+        <span className="shrink-0 text-xs text-ink-faint-text">
+          {file.sizeLabel}
+          {file.readers ? ` · ${file.readers}` : ""}
+        </span>
       </span>
       <span className={`max-w-40 truncate text-xs ${tone}`} title={stageText}>
         {stageText}
@@ -85,6 +127,11 @@ function FileRow({ file }: { file: UploadFileView }) {
           />
         ))}
       </span>
+      {file.stage === "failed" && onRemove ? (
+        <IconButton aria-label={`Remove ${file.name}`} onClick={() => onRemove(file.id)}>
+          <XIcon className="size-3.5" />
+        </IconButton>
+      ) : null}
     </li>
   );
 }
@@ -99,6 +146,8 @@ export function UploadDialog({
   onScopeChange,
   onToggleGroup,
   onFilesAdded,
+  onRemoveFile,
+  locked = false,
   onCancel,
   onSubmit,
 }: {
@@ -112,6 +161,10 @@ export function UploadDialog({
   onToggleGroup: (group: string) => void;
   /** Called with only the files that passed type and size checks. */
   onFilesAdded: (files: File[]) => void;
+  /** Called to drop a failed file from the list. */
+  onRemoveFile?: (id: string) => void;
+  /** True once a file has started: its readers can no longer change. */
+  locked?: boolean;
   onCancel: () => void;
   onSubmit: () => void;
 }) {
@@ -128,7 +181,10 @@ export function UploadDialog({
     if (picked.length === 0) {
       return;
     }
-    const { accepted, rejections: rejected } = validateUploadFiles(picked);
+    const { accepted, rejections: rejected } = validateUploadFiles(
+      picked,
+      files.map((file) => file.name),
+    );
     setRejections(rejected);
     if (accepted.length > 0) {
       onFilesAdded(accepted);
@@ -206,7 +262,7 @@ export function UploadDialog({
         {files.length > 0 ? (
           <ul aria-label="Files" className="flex flex-col">
             {files.map((file) => (
-              <FileRow file={file} key={file.id} />
+              <FileRow file={file} key={file.id} onRemove={onRemoveFile} />
             ))}
           </ul>
         ) : null}
@@ -217,7 +273,7 @@ export function UploadDialog({
             <Segmented
               label="Who can read these"
               onChange={(value) => onScopeChange(value as UploadScope)}
-              options={SCOPES}
+              options={locked ? SCOPES.map((option) => ({ ...option, disabled: true })) : SCOPES}
               value={scope}
             />
           </div>
@@ -228,7 +284,7 @@ export function UploadDialog({
               {groups.map((group) => {
                 const on = selectedGroups.includes(group);
                 return (
-                  <FilterChip key={group} onClick={() => onToggleGroup(group)} pressed={on}>
+                  <FilterChip disabled={locked} key={group} onClick={() => onToggleGroup(group)} pressed={on}>
                     {on ? <CheckIcon className="size-[13px]" strokeWidth={2} /> : null}
                     {group}
                   </FilterChip>
@@ -237,6 +293,10 @@ export function UploadDialog({
             </div>
           )}
         </div>
+
+        {locked ? (
+          <span className="-mt-3 text-xs text-ink-faint-text">Readers are fixed once a file starts uploading.</span>
+        ) : null}
 
         <div className="flex items-start gap-2 text-[13px] leading-5 text-ink-muted">
           <LayersIcon className="mt-0.5 size-[15px] shrink-0" />

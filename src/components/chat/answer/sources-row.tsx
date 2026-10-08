@@ -11,6 +11,7 @@ function SourceButton({ source }: { source: SourceRefView }) {
       aria-label={`Source ${source.n}: ${source.document}, ${source.section}`}
       className="ub-ring inline-flex h-8 max-w-full items-center gap-2 whitespace-nowrap rounded-[10px] bg-sunken px-2.5 shadow-[inset_0_0_0_1px_var(--edge)]"
       data-active={active ? "true" : undefined}
+      data-opens-evidence="true"
       onBlur={() => onHover(false)}
       onClick={onClick}
       onFocus={() => onHover(true)}

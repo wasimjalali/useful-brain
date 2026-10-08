@@ -98,4 +98,20 @@ describe("PeopleWorkspace", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create invite" }));
     await waitFor(() => expect(create).toHaveBeenCalledWith(expect.objectContaining({ role: "standard" })));
   });
+
+  it("ignores an invite response that arrives after the dialog was closed", async () => {
+    let resolve: (value: unknown) => void = () => {};
+    const create = vi.fn().mockReturnValue(new Promise((r) => { resolve = r; }));
+    mount(create);
+    fireEvent.click(screen.getByRole("button", { name: "Invite people" }));
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@northwind.example" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create invite" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    await act(async () => {
+      resolve({ ok: true, data: { url: "/invite/old", expiresAt: Date.UTC(2026, 9, 15) } });
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Invite people" }));
+    expect(screen.queryByLabelText("Invite link")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Email")).toBeInTheDocument();
+  });
 });

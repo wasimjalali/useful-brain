@@ -39,6 +39,7 @@ export function SearchDialog({
   chats,
   documents,
   loading,
+  error = null,
   onQueryChange,
   onOpenChat,
   onOpenDocument,
@@ -49,6 +50,8 @@ export function SearchDialog({
   chats: SearchChatRowView[];
   documents: SearchDocumentRowView[];
   loading: boolean;
+  /** Set when the search itself failed; shown instead of an empty result. */
+  error?: string | null;
   onQueryChange: (value: string) => void;
   onOpenChat: (chatId: string) => void;
   onOpenDocument: (documentId: string) => void;
@@ -184,6 +187,10 @@ export function SearchDialog({
       {loading ? (
         <p className="px-5 py-8 text-[13px] text-ink-muted" role="status">
           Searching
+        </p>
+      ) : error ? (
+        <p className="px-5 py-8 text-[13px] text-danger" role="alert">
+          {error}
         </p>
       ) : items.length === 0 ? (
         <p className="px-5 py-8 text-[13px] text-ink-muted" role="status">

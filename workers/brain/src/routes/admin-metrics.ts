@@ -69,13 +69,18 @@ async function corpusHealth(corpus: SqlExecutor | undefined): Promise<HealthRow[
   if (!generationId) {
     return [corpusRow, { service: "vector_index", status: "warning", detail: "no_active_generation" }];
   }
-  const audit = await corpus
-    .prepare(
-      `SELECT status, missing_count, orphan_count, created_at FROM reconciliation_audits
-       WHERE generation_id = ? ORDER BY created_at DESC LIMIT 1`,
-    )
-    .bind(generationId)
-    .first<AuditRow>();
+  let audit: AuditRow | null;
+  try {
+    audit = await corpus
+      .prepare(
+        `SELECT status, missing_count, orphan_count, created_at FROM reconciliation_audits
+         WHERE generation_id = ? ORDER BY created_at DESC LIMIT 1`,
+      )
+      .bind(generationId)
+      .first<AuditRow>();
+  } catch {
+    return [corpusRow, { service: "vector_index", status: "error", detail: "unreachable" }];
+  }
   const vector = (status: HealthRow["status"], detail: HealthDetailCode): HealthRow => ({
     service: "vector_index",
     status,
@@ -127,7 +132,9 @@ type QuestionRecord = {
   note?: string;
 };
 
-/** Titles from the active catalog; a document the catalog lacks is simply absent. */
+const PRIVATE_DOCUMENT_TITLE = "Private document";
+
+/** Titles from the active catalog; a private-owner document is never named; a document the catalog lacks is simply absent. */
 async function catalogTitles(
   corpus: SqlExecutor | undefined,
   documentIds: string[],
@@ -142,13 +149,13 @@ async function catalogTitles(
   }
   const rows = await corpus
     .prepare(
-      `SELECT document_id, title FROM document_catalog
+      `SELECT document_id, title, access_scope FROM document_catalog
        WHERE generation_id = ? AND document_id IN (${documentIds.map(() => "?").join(",")})`,
     )
     .bind(generationId, ...documentIds)
-    .all<{ document_id: string; title: string }>();
+    .all<{ document_id: string; title: string; access_scope: string }>();
   for (const row of rows.results) {
-    titles.set(row.document_id, row.title);
+    titles.set(row.document_id, row.access_scope === "private" ? PRIVATE_DOCUMENT_TITLE : row.title);
   }
   return titles;
 }

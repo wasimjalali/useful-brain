@@ -95,15 +95,46 @@ describe("approval answer: failure cases first", () => {
     ]);
   });
 
-  it("with zero evidence the answer is only the action note", async () => {
+  it("a ticket proposed before any search is refused: no approval, no card, no run", async () => {
     const answer = await executeTurn(
       deps([
         fauxAssistantMessage([fauxText("Drafting."), fauxToolCall("create_ticket", TICKET)], { stopReason: "toolUse" }),
         fauxAssistantMessage([fauxText("Done.")], { stopReason: "stop" }),
       ]),
     );
-    expect(answer.approval?.state).toBe("pending");
+    expect(answer.approval).toBeUndefined();
     expect(answer.retrieval.results).toEqual([]);
+    expect(answer.structuredAnswer.answerType).toBe("insufficient_evidence");
+    expect(answer.structuredAnswer.paragraphs.some((p) => p.kind === "action_note")).toBe(false);
+    const runs = await env.OPERATIONS_DB.prepare(
+      `SELECT COUNT(*) AS n FROM agent_runs WHERE evidence_message_id = ?`,
+    )
+      .bind(answer.assistantMessageId)
+      .first<{ n: number }>();
+    expect(runs?.n).toBe(0);
+  });
+
+  it("a ticket proposed after a search that found nothing is refused too", async () => {
+    const answer = await executeTurn(
+      deps([
+        fauxAssistantMessage([fauxToolCall("search_knowledge", { query: "zzzqqq xxyyzz" })], { stopReason: "toolUse" }),
+        fauxAssistantMessage([fauxText("None."), fauxToolCall("create_ticket", TICKET)], { stopReason: "toolUse" }),
+        fauxAssistantMessage([fauxText("Done.")], { stopReason: "stop" }),
+      ]),
+    );
+    expect(answer.approval).toBeUndefined();
+    expect(answer.structuredAnswer.paragraphs.some((p) => p.kind === "action_note")).toBe(false);
+  });
+
+  it("with a search that found evidence but no citable explanation, the answer is only the action note", async () => {
+    const answer = await executeTurn(
+      deps([
+        fauxAssistantMessage([fauxToolCall("search_knowledge", SEARCH)], { stopReason: "toolUse" }),
+        fauxAssistantMessage([fauxText("Drafting."), fauxToolCall("create_ticket", TICKET)], { stopReason: "toolUse" }),
+        fauxAssistantMessage([fauxText("Done.")], { stopReason: "stop" }),
+      ]),
+    );
+    expect(answer.approval?.state).toBe("pending");
     expect(answer.structuredAnswer.paragraphs).toEqual([
       { text: ACTION_NOTE_TEXT, citations: [], kind: "action_note" },
     ]);

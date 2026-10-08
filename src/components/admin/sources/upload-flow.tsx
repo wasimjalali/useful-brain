@@ -9,6 +9,8 @@ import type { ActionResult } from "@/lib/rag/app-errors";
 import { UploadDialog } from "./upload-dialog";
 
 export const UPLOAD_POLL_MS = 1000;
+/** Five minutes of polling. A file still working after that is left to the Sources page. */
+export const UPLOAD_MAX_POLLS = 300;
 const MAX_STATUS_FAILURES = 3;
 
 export type UploadActions = {
@@ -51,11 +53,15 @@ type Entry = {
   key: string;
   file: File;
   started: boolean;
+  readers?: string;
+  note?: string;
   batchId?: string;
   fileId?: string;
   stage: UploadStage;
   error?: string;
 };
+
+const STILL_PROCESSING = "Still processing, check Sources";
 
 const isTerminal = (entry: Entry) => entry.stage === "ready" || entry.stage === "failed";
 
@@ -64,12 +70,15 @@ export function UploadFlow({
   peopleCount,
   onClose,
   onAdded,
+  onBatchSent,
 }: {
   actions: UploadActions;
   peopleCount: number;
   /** Closed without adding; `started` is true when a batch already created a draft. */
   onClose: (started: boolean) => void;
   onAdded: () => void;
+  /** All files of a batch were sent, even if the dialog was closed meanwhile. */
+  onBatchSent?: () => void;
 }) {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [scope, setScope] = useState<UploadScope>("everyone");
@@ -78,10 +87,14 @@ export function UploadFlow({
   const mounted = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const failures = useRef(0);
+  const polls = useRef(0);
+  const polling = useRef(false);
   const actionsRef = useRef(actions);
+  const batchSentRef = useRef(onBatchSent);
 
   useEffect(() => {
     actionsRef.current = actions;
+    batchSentRef.current = onBatchSent;
   });
 
   useEffect(() => {
@@ -97,7 +110,9 @@ export function UploadFlow({
 
   function commit(next: Entry[]) {
     entriesRef.current = next;
-    setEntries(next);
+    if (mounted.current) {
+      setEntries(next);
+    }
   }
 
   function patch(keys: string[], change: Partial<Entry> | ((entry: Entry) => Partial<Entry>)) {
@@ -121,45 +136,60 @@ export function UploadFlow({
   }
 
   async function poll() {
-    const open = entriesRef.current.filter((entry) => entry.batchId && entry.fileId && !isTerminal(entry));
-    const batchIds = [...new Set(open.map((entry) => entry.batchId as string))];
-    for (const batchId of batchIds) {
-      const result = await actionsRef.current.uploadStatus(batchId);
-      if (!mounted.current) {
-        return;
-      }
-      const keys = open.filter((entry) => entry.batchId === batchId).map((entry) => entry.key);
-      if (!result.ok) {
-        failures.current += 1;
-        if (failures.current >= MAX_STATUS_FAILURES) {
-          patch(keys, (entry) => (isTerminal(entry) ? {} : { stage: "failed", error: result.error.message }));
-        }
-        continue;
-      }
-      failures.current = 0;
-      const byFile = new Map(result.data.files.map((file) => [file.id, file]));
-      patch(keys, (entry) => {
-        const status = byFile.get(entry.fileId as string);
-        return status && !isTerminal(entry)
-          ? { stage: status.stage, error: status.errorMessage }
-          : {};
-      });
+    if (polling.current) {
+      return;
     }
-    if (mounted.current && entriesRef.current.some((entry) => entry.batchId && !isTerminal(entry))) {
-      schedulePoll();
+    polling.current = true;
+    try {
+      const open = entriesRef.current.filter((entry) => entry.batchId && entry.fileId && !isTerminal(entry));
+      const batchIds = [...new Set(open.map((entry) => entry.batchId as string))];
+      for (const batchId of batchIds) {
+        const result = await actionsRef.current.uploadStatus(batchId);
+        if (!mounted.current) {
+          return;
+        }
+        const keys = open.filter((entry) => entry.batchId === batchId).map((entry) => entry.key);
+        if (!result.ok) {
+          failures.current += 1;
+          if (failures.current >= MAX_STATUS_FAILURES) {
+            patch(keys, (entry) => (isTerminal(entry) ? {} : { stage: "failed", error: result.error.message }));
+          }
+          continue;
+        }
+        failures.current = 0;
+        const byFile = new Map(result.data.files.map((file) => [file.id, file]));
+        patch(keys, (entry) => {
+          const status = byFile.get(entry.fileId as string);
+          return status && !isTerminal(entry)
+            ? { stage: status.stage, error: status.errorMessage, note: undefined }
+            : {};
+        });
+      }
+      polls.current += 1;
+      const stillOpen = entriesRef.current.some((entry) => entry.batchId && !isTerminal(entry));
+      if (mounted.current && stillOpen) {
+        if (polls.current >= UPLOAD_MAX_POLLS) {
+          patch(
+            entriesRef.current.filter((entry) => entry.batchId && !isTerminal(entry)).map((entry) => entry.key),
+            { note: STILL_PROCESSING },
+          );
+        } else {
+          schedulePoll();
+        }
+      }
+    } finally {
+      polling.current = false;
     }
   }
 
   async function sendBatch(pending: Entry[], readers: UploadReaders) {
     const keys = pending.map((entry) => entry.key);
+    polls.current = 0;
     const created = await actionsRef.current.createUpload({
       readers,
       idempotencyKey: crypto.randomUUID(),
       files: pending.map((entry) => ({ name: entry.file.name, size: entry.file.size })),
     });
-    if (!mounted.current) {
-      return;
-    }
     if (!created.ok) {
       patch(keys, { stage: "failed", error: created.error.message });
       return;
@@ -169,19 +199,19 @@ export function UploadFlow({
       const fileId = files[index]?.id;
       patch([entry.key], fileId ? { batchId, fileId } : { stage: "failed", error: "Couldn't start this file." });
     });
+    // The transfers keep going if the dialog closes: the draft already exists and
+    // a file that never gets its bytes would leave it building forever.
     for (const [index, entry] of pending.entries()) {
       const fileId = files[index]?.id;
       if (!fileId) {
         continue;
       }
       const sent = await actionsRef.current.putFile(batchId, fileId, entry.file);
-      if (!mounted.current) {
-        return;
-      }
       if (!sent.ok) {
         patch([entry.key], { stage: "failed", error: sent.message });
       }
     }
+    batchSentRef.current?.();
     schedulePoll();
   }
 
@@ -191,7 +221,10 @@ export function UploadFlow({
     if (!readers || pending.length === 0) {
       return;
     }
-    patch(pending.map((entry) => entry.key), { started: true });
+    patch(pending.map((entry) => entry.key), {
+      started: true,
+      readers: nextScope === "everyone" ? "Everyone" : nextGroups.join(", "),
+    });
     void sendBatch(pending, readers);
   }
 
@@ -201,6 +234,10 @@ export function UploadFlow({
       ...files.map((file) => ({ key: crypto.randomUUID(), file, started: false, stage: "parsing" as const })),
     ]);
     flush(scope, groups);
+  }
+
+  function removeEntry(key: string) {
+    commit(entriesRef.current.filter((entry) => entry.key !== key));
   }
 
   function changeScope(next: UploadScope) {
@@ -221,13 +258,19 @@ export function UploadFlow({
     sizeLabel: sizeLabel(entry.file.size),
     stage: entry.stage,
     error: entry.error,
+    readers: entry.readers,
+    note: entry.note,
   }));
+  // Failed files never reach a draft, so they don't hold the choice.
+  const locked = entries.some((entry) => entry.started && entry.stage !== "failed");
 
   return (
     <UploadDialog
       files={views}
+      locked={locked}
       onCancel={() => onClose(entries.some((entry) => entry.batchId !== undefined))}
       onFilesAdded={addFiles}
+      onRemoveFile={removeEntry}
       onScopeChange={changeScope}
       onSubmit={onAdded}
       onToggleGroup={toggleGroup}

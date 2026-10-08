@@ -78,6 +78,7 @@ function DraftRow({
     tail = (
       <>
         <Progress percent={percent} />
+        {discard}
         {promote}
       </>
     );

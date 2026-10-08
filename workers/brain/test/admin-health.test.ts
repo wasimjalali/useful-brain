@@ -85,6 +85,17 @@ describe("GET /admin/health", () => {
     });
   });
 
+  it("still answers, with an unreachable vector index, when the audit query itself fails", async () => {
+    await env.CORPUS_DB.prepare(`ALTER TABLE reconciliation_audits RENAME TO reconciliation_audits_hidden`).run();
+    try {
+      const rows = await health();
+      expect(row(rows, "corpus_db")).toMatchObject({ status: "ok" });
+      expect(row(rows, "vector_index")).toMatchObject({ status: "error", detail: "unreachable" });
+    } finally {
+      await env.CORPUS_DB.prepare(`ALTER TABLE reconciliation_audits_hidden RENAME TO reconciliation_audits`).run();
+    }
+  });
+
   it("takes Workers AI from the latest health event", async () => {
     await recordServiceHealth(env.OPERATIONS_DB, { service: "workers_ai", status: "ok", code: "last_call_ok", at: 1000 });
     expect(row(await health(), "workers_ai")).toMatchObject({ status: "ok", detail: "last_call_ok", at: 1000 });

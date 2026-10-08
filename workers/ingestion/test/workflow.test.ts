@@ -10,6 +10,11 @@ import { beforeEach, describe, expect, it } from "vitest";
 import worker from "../src";
 import { readersToAcl } from "../../../src/lib/ingest/upload-validation";
 import { activeGenerationId } from "../../../src/lib/store/corpus-d1";
+import { ensureDraftGeneration } from "../../../src/lib/store/corpus-d1";
+import { DRAFT_CHECKS_PER_DAY } from "../../../src/lib/ingest/draft-checks";
+import { seedNorthwindCorpus } from "../../../src/lib/store/corpus-seed";
+import { promoteGeneration } from "../../../src/lib/store/corpus-d1";
+import { uploadDocumentId } from "../../../src/lib/ingest/upload-validation";
 import { ensureOpenDraft, failDraft } from "../../../src/lib/store/drafts";
 import {
   advanceStage,
@@ -21,8 +26,13 @@ import { ACTIVE_DOCUMENTS, buildZip, db, docxBytes, resetPipeline, seedActive } 
 
 beforeEach(resetPipeline);
 
-async function runWorkflow(id: string): Promise<unknown> {
+type Modify = Parameters<Awaited<ReturnType<typeof introspectWorkflowInstance>>["modify"]>[0];
+
+async function runWorkflow(id: string, modify?: Modify): Promise<unknown> {
   await using instance = await introspectWorkflowInstance(env.INGESTION_WORKFLOW, id);
+  if (modify) {
+    await instance.modify(modify);
+  }
   await env.INGESTION_WORKFLOW.create({ id, params: { jobId: id, idempotencyKey: id } });
   await instance.waitForStatus("complete");
   return instance.getOutput();
@@ -33,10 +43,11 @@ const enc = (text: string) => new TextEncoder().encode(text);
 type Setup = Awaited<ReturnType<typeof setup>>;
 
 async function setup(
-  files: Array<{ name: string; bytes: Uint8Array }>,
+  files: Array<{ name: string; bytes: Uint8Array; skipPut?: boolean }>,
   readers: Parameters<typeof readersToAcl>[0] = { kind: "departments", names: ["hr"] },
+  seed: () => ReturnType<typeof seedActive> = seedActive,
 ) {
-  const active = await seedActive();
+  const active = await seed();
   const { draft } = await ensureOpenDraft(db(), { kind: "upload", createdBy: "admin-test" });
   const batch = await createUploadBatch(db(), {
     generationId: draft.generationId,
@@ -46,6 +57,9 @@ async function setup(
     files: files.map((file) => ({ name: file.name, size: file.bytes.byteLength })),
   });
   for (const [index, created] of batch.files.entries()) {
+    if (files[index].skipPut) {
+      continue;
+    }
     const key = `uploads/${draft.generationId}/${batch.batchId}/${created.id}`;
     await env.SOURCES.put(key, files[index].bytes);
     await recordUploadedObject(db(), created.id, key);
@@ -68,11 +82,19 @@ async function chunkCount(generationId: string, documentId?: string): Promise<nu
   return row?.n ?? 0;
 }
 
-async function runDraftThenFiles(s: Setup) {
-  await runWorkflow(s.draft.generationId);
+async function runDraftThenFiles(s: Setup, modify?: Modify) {
+  await runWorkflow(s.draft.generationId, modify);
   for (const file of s.batch.files) {
-    await runWorkflow(file.id);
+    if ((await stageOf(file.id))?.r2_key) {
+      await runWorkflow(file.id, modify);
+    }
   }
+}
+
+async function checksOf(generationId: string) {
+  return env.CORPUS_DB.prepare("SELECT status, error_code, reconciled FROM draft_checks WHERE generation_id = ?")
+    .bind(generationId)
+    .first<{ status: string; error_code: string | null; reconciled: number }>();
 }
 
 describe("IngestionWorkflow job resolution", () => {
@@ -275,5 +297,135 @@ describe("reindex draft", () => {
       .bind(draft.generationId)
       .first<{ status: string; error_code: string }>();
     expect(checks).toEqual({ status: "failed", error_code: "RETRIEVAL_UNAVAILABLE" });
+  });
+});
+
+describe("draft that waits for the daily check budget", () => {
+  it("keeps its owner waiting and runs the checks in the next window instead of staying paused", async () => {
+    const now = Date.now();
+    for (let index = 0; index < DRAFT_CHECKS_PER_DAY; index += 1) {
+      const id = `g-spent-${crypto.randomUUID().slice(0, 8)}`;
+      await ensureDraftGeneration(db(), id);
+      await env.CORPUS_DB.prepare("INSERT INTO draft_checks (generation_id, status, started_at) VALUES (?, 'passed', ?)")
+        .bind(id, now)
+        .run();
+    }
+    try {
+      const s = await setup([{ name: "late.md", bytes: enc("# Late\n\nChecks wait for tomorrow.") }]);
+      await runDraftThenFiles(s, async (m) => {
+        await m.disableSleeps();
+      });
+      // Not left as "paused": the owner woke up in the next window and ran the checks.
+      const checks = await checksOf(s.draft.generationId);
+      expect(checks).toMatchObject({ status: "failed", error_code: "RETRIEVAL_UNAVAILABLE", reconciled: 1 });
+    } finally {
+      await env.CORPUS_DB.prepare("DELETE FROM draft_checks WHERE generation_id LIKE 'g-spent-%'").run();
+    }
+  });
+});
+
+describe("files that never arrived", () => {
+  it("expires them after the delivery window so the draft can finish", async () => {
+    const s = await setup([
+      { name: "arrived.md", bytes: enc("# Arrived\n\nThis one made it.") },
+      { name: "never.md", bytes: enc("unused"), skipPut: true },
+    ]);
+    await runDraftThenFiles(s);
+    // The delivered file is ready but the draft is held back by the file that never came.
+    expect((await stageOf(s.batch.files[0].id))?.stage).toBe("ready");
+    expect(await checksOf(s.draft.generationId)).toBeNull();
+    // The batch's expiry job fires once the delivery window is over.
+    const output = await runWorkflow(s.batch.batchId, async (m) => {
+      await m.disableSleeps();
+    });
+    expect(output).toMatchObject({ outcome: "sweep" });
+    expect(await stageOf(s.batch.files[1].id)).toMatchObject({ stage: "failed", error_code: "NOT_RECEIVED" });
+    expect((await stageOf(s.batch.files[0].id))?.stage).toBe("ready");
+    expect(await checksOf(s.draft.generationId)).toMatchObject({ status: "failed", error_code: "RETRIEVAL_UNAVAILABLE" });
+    const generation = await env.CORPUS_DB.prepare("SELECT state FROM corpus_generations WHERE id = ?")
+      .bind(s.draft.generationId)
+      .first<{ state: string }>();
+    expect(generation?.state).toBe("reconciling");
+  });
+
+  it("does nothing for a batch whose draft was discarded", async () => {
+    const s = await setup([{ name: "gone.md", bytes: enc("unused"), skipPut: true }]);
+    await failDraft(db(), s.draft.generationId, "DISCARDED");
+    const output = await runWorkflow(s.batch.batchId, async (m) => {
+      await m.disableSleeps();
+    });
+    expect(output).toMatchObject({ outcome: "closed" });
+    expect((await stageOf(s.batch.files[0].id))?.stage).toBe("parsing");
+  });
+});
+
+describe("a file that fails after indexing began", () => {
+  const failEmbedding: Modify = async (m) => {
+    await m.disableRetryDelays();
+    await m.mockStepError({ name: "embed-0" }, new Error("index unavailable"));
+  };
+
+  it("removes its content from the draft so it cannot be promoted", async () => {
+    const s = await setup([
+      { name: "keeps.md", bytes: enc("# Keeps\n\nThis file indexes normally.") },
+      { name: "breaks.md", bytes: enc("# Breaks\n\nThis file fails during embedding.") },
+    ]);
+    await runWorkflow(s.draft.generationId);
+    await runWorkflow(s.batch.files[0].id);
+    const breaking = await stageOf(s.batch.files[1].id);
+    await runWorkflow(s.batch.files[1].id, failEmbedding);
+    const failed = await stageOf(s.batch.files[1].id);
+    expect(failed).toMatchObject({ stage: "failed", error_code: "INDEX_UNAVAILABLE" });
+    // Nothing of the failed file is left in the draft.
+    for (const table of ["chunks", "document_catalog", "document_bodies", "document_versions"]) {
+      const row = await env.CORPUS_DB.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE generation_id = ? AND document_id = ?`)
+        .bind(s.draft.generationId, breaking!.document_id)
+        .first<{ n: number }>();
+      expect(row?.n, table).toBe(0);
+    }
+    // The other upload is intact and the live generation untouched.
+    expect(await chunkCount(s.draft.generationId, (await stageOf(s.batch.files[0].id))!.document_id)).toBeGreaterThan(0);
+    expect(await chunkCount(s.active.generationId)).toBeGreaterThan(0);
+  });
+
+  it("puts the previous version back when the failed upload replaced an existing document", async () => {
+    const documentId = await uploadDocumentId("Handbook.md");
+    const seedReplaceable = async () => {
+      const result = await seedNorthwindCorpus({
+        db: db(),
+        documents: [
+          {
+            documentId,
+            title: "Handbook",
+            sourceName: "Handbook.md",
+            sourcePath: "uploads/Handbook.md",
+            accessScope: "public",
+            allowedRoles: [],
+            allowedDepartments: [],
+            body: "# Handbook\n\nOriginal handbook wording about leave.",
+          },
+        ],
+      });
+      await promoteGeneration(db(), result.generationId);
+      return result;
+    };
+    const s = await setup(
+      [{ name: "Handbook.md", bytes: enc("# Handbook\n\nREPLACEMENT wording that never finishes.") }],
+      { kind: "everyone" },
+      seedReplaceable,
+    );
+    await runWorkflow(s.draft.generationId);
+    await runWorkflow(s.batch.files[0].id, failEmbedding);
+    expect(await stageOf(s.batch.files[0].id)).toMatchObject({ stage: "failed" });
+    const chunks = await env.CORPUS_DB.prepare("SELECT content FROM chunks WHERE generation_id = ? AND document_id = ?")
+      .bind(s.draft.generationId, documentId)
+      .all<{ content: string }>();
+    expect(chunks.results.length).toBeGreaterThan(0);
+    expect(chunks.results.map((row) => row.content).join(" ")).toContain("Original handbook wording");
+    expect(chunks.results.map((row) => row.content).join(" ")).not.toContain("REPLACEMENT");
+    const catalog = await env.CORPUS_DB.prepare("SELECT title FROM document_catalog WHERE generation_id = ? AND document_id = ?")
+      .bind(s.draft.generationId, documentId)
+      .first<{ title: string }>();
+    expect(catalog).toEqual({ title: "Handbook" });
   });
 });

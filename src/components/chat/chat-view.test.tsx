@@ -146,7 +146,7 @@ type RenderOptions = {
 
 function renderChat(options: RenderOptions = {}) {
   const actions = options.actions ?? makeActions();
-  const view = render(
+  const tree = () => (
     <AppShell
       deleteConversationAction={async () => actionSuccess(null)}
       embeddingStorageStatus={emptyEmbeddingStorageStatus}
@@ -167,9 +167,10 @@ function renderChat(options: RenderOptions = {}) {
         scopeDocumentId={options.scopeDocumentId}
         suggestions={options.suggestions}
       />
-    </AppShell>,
+    </AppShell>
   );
-  return { ...view, actions };
+  const view = render(tree());
+  return { ...view, actions, rerenderChat: () => view.rerender(tree()) };
 }
 
 function askQuestion(text: string) {
@@ -771,5 +772,168 @@ describe("view as", () => {
       ],
     });
     expect(screen.getByText(/Only you see this: Salary Bands exists, but only HR can read it\./)).toBeInTheDocument();
+  });
+});
+
+
+describe("review fixes", () => {
+  const turnOf = (id: string, question: string) => stored(id, question, { ...grounded, assistantMessageId: id });
+  const pendingApproval: ApprovalRecord = {
+    runId: "run1",
+    state: "pending",
+    tool: "create_ticket",
+    arguments: { desk: "Support", priority: "P1" as never, customer: "Halvorsen Freight", subject: "Atlas sync stalled" },
+    expiresAt: Date.now() + 15 * 60_000,
+  };
+  const approvalTurn = (approval: ApprovalRecord) =>
+    stored("msg-1", "Open a P1 ticket", grounded, { approval });
+  const conversationWith = (approval: ApprovalRecord) =>
+    actionSuccess({
+      id: "conversation-1",
+      title: "t",
+      createdAt: 0,
+      updatedAt: 0,
+      turns: [approvalTurn(approval) as never],
+    });
+
+  it("keeps polling past approved-without-ticket until the ticket exists", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: false });
+    const approvedNoTicket = { ...pendingApproval, state: "approved" as const };
+    const approvedWithTicket = {
+      ...approvedNoTicket,
+      ticket: { id: "SUP-4821", createdAt: new Date(2026, 8, 6, 9, 42).getTime() },
+    };
+    const loadConversation = vi
+      .fn()
+      .mockResolvedValueOnce(conversationWith(approvedNoTicket))
+      .mockResolvedValueOnce(conversationWith(approvedWithTicket));
+    renderChat({ actions: makeActions({ loadConversation }), initialTurns: [approvalTurn(pendingApproval)] });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Approve and run" }));
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(screen.queryByText("Ticket SUP-4821 created")).toBeNull();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(loadConversation).toHaveBeenCalledTimes(2);
+    expect(screen.getByText("Ticket SUP-4821 created")).toBeInTheDocument();
+  });
+
+  it("opens the ticket page from the done state", async () => {
+    renderChat({
+      initialTurns: [
+        approvalTurn({
+          ...pendingApproval,
+          state: "approved",
+          ticket: { id: "SUP-4821", createdAt: Date.now() },
+        }),
+      ],
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Open ticket/ }));
+    expect(nav.push).toHaveBeenCalledWith("/tickets/SUP-4821");
+  });
+
+  it("does not open the evidence panel for clicks that are not about citations", () => {
+    const actions = makeActions();
+    renderChat({ actions, initialTurns: [turnOf("msg-1", "How much leave?")] });
+    Object.assign(navigator, { clipboard: { writeText: vi.fn(async () => undefined) } });
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+    fireEvent.click(screen.getByRole("button", { name: "Good" }));
+    expect(panel()).toBeNull();
+    fireEvent.click(screen.getAllByRole("button", { name: "Citation 1" })[0]);
+    expect(panel()).not.toBeNull();
+    fireEvent.click(within(panel()).getByRole("button", { name: "Close evidence" }));
+    fireEvent.click(screen.getByRole("button", { name: "Bad" }));
+    expect(panel()).toBeNull();
+  });
+
+  it("keeps the tab when a click lands in the turn the open panel already shows", () => {
+    renderChat({ initialTurns: [turnOf("msg-1", "How much leave?")] });
+    fireEvent.click(screen.getByRole("button", { name: "Evidence" }));
+    fireEvent.click(within(panel()).getByRole("tab", { name: /Retrieved/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Good" }));
+    expect(within(panel()).getByRole("tab", { name: /Retrieved/ })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("opens a document from search while the chat is already mounted", async () => {
+    const actions = makeActions();
+    const { rerenderChat } = renderChat({ actions });
+    expect(panel()).toBeNull();
+    nav.search = "doc=nw_hr_parental_leave";
+    rerenderChat();
+    expect(await within(panel()).findByRole("heading", { name: "Parental Leave Policy" })).toBeInTheDocument();
+    expect(actions.loadDocument).toHaveBeenCalledWith({ documentId: "nw_hr_parental_leave" });
+  });
+
+  it("does not reopen a reader the person closed", async () => {
+    const actions = makeActions();
+    const { rerenderChat } = renderChat({ actions });
+    nav.search = "doc=nw_hr_parental_leave";
+    rerenderChat();
+    await within(panel()).findByRole("heading", { name: "Parental Leave Policy" });
+    fireEvent.click(within(panel()).getByRole("button", { name: /Close/ }));
+    rerenderChat();
+    expect(panel()).toBeNull();
+    expect(actions.loadDocument).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the query string when the URL moves to the conversation", async () => {
+    window.history.replaceState(null, "", "/chat?from=search");
+    renderChat();
+    askQuestion("one");
+    await screen.findByText(/You get sixteen weeks/);
+    expect(replaceState).toHaveBeenCalledWith(null, "", "/chat/conversation-1?from=search");
+  });
+
+  it("lights a citation only in the turn that was hovered", () => {
+    renderChat({ initialTurns: [turnOf("msg-1", "one"), turnOf("msg-2", "two")] });
+    const first = screen.getAllByRole("button", { name: "Citation 1" });
+    fireEvent.mouseEnter(first[0]);
+    expect(first[0]).toHaveAttribute("data-active", "true");
+    expect(first[1]).not.toHaveAttribute("data-active");
+  });
+
+  it("clears a pinned citation when the panel moves to another turn", () => {
+    renderChat({ initialTurns: [turnOf("msg-1", "one"), turnOf("msg-2", "two")] });
+    const chips = () => screen.getAllByRole("button", { name: "Citation 1" });
+    fireEvent.click(chips()[0]);
+    fireEvent.mouseLeave(chips()[0]);
+    expect(chips()[0]).toHaveAttribute("data-active", "true");
+    // The panel is open on turn 1; a click inside turn 2 retargets it.
+    fireEvent.click(screen.getAllByRole("button", { name: "Good" })[1]);
+    expect(chips()[0]).not.toHaveAttribute("data-active");
+  });
+
+  describe("failed turns", () => {
+    const failWith = (error: { code: string; message: string; retryable: boolean }) =>
+      renderChat({ askAction: async () => ({ ok: false, error } as never) });
+
+    it("sends an expired session to sign in and offers no Retry", async () => {
+      failWith({ code: "AUTH_REQUIRED", message: "Sign in required.", retryable: false });
+      askQuestion("one");
+      const alert = await screen.findByRole("alert");
+      expect(within(alert).queryByRole("button", { name: "Retry" })).toBeNull();
+      fireEvent.click(within(alert).getByRole("button", { name: "Sign in" }));
+      expect(nav.push).toHaveBeenCalledWith("/login");
+    });
+
+    it("shows a non-retryable reason without Retry", async () => {
+      failWith({ code: "FORBIDDEN", message: "You can't ask that here.", retryable: false });
+      askQuestion("one");
+      const alert = await screen.findByRole("alert");
+      expect(alert).toHaveTextContent("You can't ask that here.");
+      expect(within(alert).queryByRole("button", { name: "Retry" })).toBeNull();
+    });
+
+    it("keeps the saved-question copy and Retry for a retryable failure", async () => {
+      failWith({ code: "PROVIDER_TEMPORARY", message: "down", retryable: true });
+      askQuestion("one");
+      const alert = await screen.findByRole("alert");
+      expect(alert).toHaveTextContent("The answer stopped before it finished. Your question is saved.");
+      expect(within(alert).getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    });
   });
 });

@@ -18,12 +18,16 @@ import {
 import { activeGenerationId, getGeneration, promoteGeneration, type SqlExecutor } from "../../../../src/lib/store/corpus-d1";
 import {
   assertAcceptsUploads,
+  claimDiscard,
   closeDraft,
   draftAcceptsWrites,
   ensureOpenDraft,
   failDraft,
   getDraft,
+  markJobPublished,
+  unpublishedJobIds,
 } from "../../../../src/lib/store/drafts";
+import { GenerationTransitionError } from "../../../../src/lib/store/generations";
 import { buildSourcesView } from "../../../../src/lib/store/sources-view";
 import {
   createUploadBatch,
@@ -31,7 +35,7 @@ import {
   getUploadFile,
   getUploadStatus,
   recordUploadedObject,
-  uploadBatchKeyExists,
+  resolveUploadReplay,
 } from "../../../../src/lib/store/uploads";
 
 type QueueLike = { send(message: { jobId: string; idempotencyKey: string }): Promise<void> };
@@ -101,6 +105,42 @@ async function enqueueJob(queue: QueueLike, id: string): Promise<void> {
   await queue.send({ jobId: id, idempotencyKey: id });
 }
 
+/**
+ * Publishes the jobs of a draft that never reached the queue. The rows exist
+ * before anything is published and a job is marked only after the queue took it,
+ * so a crash between the two leaves the intent for the next request to finish.
+ * The draft job is mandatory: if it cannot be queued the draft is failed so it
+ * does not sit forever. A batch's expiry job is only a safety net for files that
+ * never arrive, so a failure there is logged and retried on the next request.
+ * Publishing twice is harmless: the workflow instance id is the job id.
+ */
+async function publishPendingJobs(
+  corpus: SqlExecutor,
+  queue: QueueLike,
+  generationId: string,
+  log: { requestId: string; started: number },
+): Promise<void> {
+  for (const jobId of await unpublishedJobIds(corpus, generationId)) {
+    try {
+      await enqueueJob(queue, jobId);
+    } catch (error) {
+      if (jobId === generationId) {
+        await failDraft(corpus, generationId, "ENQUEUE_FAILED");
+        throw error;
+      }
+      writeOperationalLog({
+        requestId: log.requestId,
+        operation: "admin-uploads-expiry-enqueue",
+        status: "error",
+        durationMs: Date.now() - log.started,
+        errorCode: "ENQUEUE_FAILED",
+      });
+      continue;
+    }
+    await markJobPublished(corpus, generationId, jobId);
+  }
+}
+
 function r2KeyFor(generationId: string, batchId: string, fileId: string): string {
   return `uploads/${generationId}/${batchId}/${fileId}`;
 }
@@ -154,26 +194,20 @@ export async function handleAdminSourcesRoute(input: {
     const body = parseUploadRequest(await readJson(request));
     const acl = readersToAcl(body.readers);
     const queue = requireQueue(env);
-    const replay = await uploadBatchKeyExists(corpus, body.idempotencyKey);
-    const { draft, created } = await ensureOpenDraft(corpus, { kind: "upload", createdBy: principal.id });
-    if (!replay) {
-      assertAcceptsUploads(draft);
+    const request_ = { createdBy: principal.id, acl, idempotencyKey: body.idempotencyKey, files: body.files };
+    // A replay is answered from what it created. It never opens a draft or
+    // queues a job of its own; it only finishes a publish the first attempt lost.
+    const replay = await resolveUploadReplay(corpus, request_);
+    if (replay) {
+      await publishPendingJobs(corpus, queue, replay.generationId, { requestId, started });
+      done("admin-uploads-replay");
+      return json({ batchId: replay.batchId, files: replay.files }, requestId);
     }
-    if (created) {
-      try {
-        await enqueueJob(queue, draft.generationId);
-      } catch (error) {
-        await failDraft(corpus, draft.generationId, "ENQUEUE_FAILED");
-        throw error;
-      }
-    }
-    const batch = await createUploadBatch(corpus, {
-      generationId: draft.generationId,
-      createdBy: principal.id,
-      acl,
-      idempotencyKey: body.idempotencyKey,
-      files: body.files,
-    });
+    const { draft } = await ensureOpenDraft(corpus, { kind: "upload", createdBy: principal.id });
+    assertAcceptsUploads(draft);
+    // Rows first, queue second: a job must never start before the files it waits for exist.
+    const batch = await createUploadBatch(corpus, { generationId: draft.generationId, ...request_ });
+    await publishPendingJobs(corpus, queue, draft.generationId, { requestId, started });
     done("admin-uploads-create");
     return json(batch, requestId);
   }
@@ -220,7 +254,12 @@ export async function handleAdminSourcesRoute(input: {
       await env.SOURCES.delete(key).catch(() => undefined);
       throw error instanceof WorkerValidationError ? error : new WorkerValidationError();
     }
-    await recordUploadedObject(corpus, fileId, key);
+    if (!(await recordUploadedObject(corpus, fileId, key))) {
+      // The file expired or its draft closed while the bytes were streaming.
+      await env.SOURCES.delete(key).catch(() => undefined);
+      throw new WorkerValidationError();
+    }
+    await publishPendingJobs(corpus, queue, batch.generation_id, { requestId, started });
     await enqueueJob(queue, fileId);
     done("admin-uploads-put");
     return json({ ok: true, stage: "parsing" } satisfies UploadFileAccepted, requestId);
@@ -241,12 +280,7 @@ export async function handleAdminSourcesRoute(input: {
     if (!created) {
       throw new WorkerValidationError("A draft is already open. Promote or discard it first.");
     }
-    try {
-      await enqueueJob(queue, draft.generationId);
-    } catch (error) {
-      await failDraft(corpus, draft.generationId, "ENQUEUE_FAILED");
-      throw error;
-    }
+    await publishPendingJobs(corpus, queue, draft.generationId, { requestId, started });
     done("admin-reindex");
     return json({ ok: true, generationId: draft.generationId } satisfies ReindexResponse, requestId);
   }
@@ -278,22 +312,30 @@ export async function handleAdminSourcesRoute(input: {
     ) {
       throw new WorkerValidationError("This draft hasn't passed its checks.");
     }
-    await promoteGeneration(corpus, generationId);
+    try {
+      await promoteGeneration(corpus, generationId);
+    } catch (error) {
+      if (error instanceof GenerationTransitionError) {
+        throw new WorkerValidationError("This draft hasn't passed its checks.");
+      }
+      throw error;
+    }
+    // The promotion is conditional on the draft still being ready, so a discard
+    // that landed first leaves it a no-op. Only report success if it took effect.
+    if ((await activeGenerationId(corpus)) !== generationId) {
+      throw new WorkerValidationError("This draft hasn't passed its checks.");
+    }
     await closeDraft(corpus, generationId);
     done("admin-draft-promote");
     return json({ ok: true, generationId } satisfies DraftActionResponse, requestId);
   }
 
-  // discard: stop further writes first, then remove what the draft holds. The
-  // active generation is never touched; failDraft only moves non-live states.
-  if (generation?.state === "active" || generation?.state === "archived") {
+  // discard: claim the draft atomically, then remove what it holds. Nothing is
+  // deleted unless the claim succeeded, so a promotion that wins the race (or a
+  // live generation) is never touched. The claim also stops further writes.
+  if (!(await claimDiscard(corpus, generationId))) {
     throw new WorkerValidationError();
   }
-  await failDraft(corpus, generationId, "DISCARDED");
-  await corpus
-    .prepare(`UPDATE corpus_generations SET error_code = 'DISCARDED' WHERE id = ? AND state = 'failed'`)
-    .bind(generationId)
-    .run();
   const vectorIds = await corpus
     .prepare(`SELECT vector_id FROM chunks WHERE generation_id = ?`)
     .bind(generationId)

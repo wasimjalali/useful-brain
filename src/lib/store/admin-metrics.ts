@@ -71,14 +71,36 @@ export function computeOverview(rows: TurnMetricRow[], now: number): OverviewRes
   };
 }
 
-/** Completed or failed assistant turns only. Pending turns are not yet an outcome. */
+/**
+ * One row per asked question: when a saved user message has several attempts
+ * (a failed answer and its retry), only the newest completed one counts, else
+ * the newest failed one. The same rule the conversation view uses, so Overview
+ * and Activity agree with each other and with what the asker sees.
+ */
+function latestAttempt(alias: string): string {
+  return `NOT EXISTS (
+    SELECT 1 FROM messages n
+    WHERE n.parent_user_message_id = ${alias}.parent_user_message_id
+      AND n.role = 'assistant' AND n.id <> ${alias}.id
+      AND n.status IN ('completed', 'failed')
+      AND (
+        (n.status = 'completed' AND ${alias}.status = 'failed')
+        OR (n.status = ${alias}.status
+            AND (n.created_at > ${alias}.created_at
+                 OR (n.created_at = ${alias}.created_at AND n.id > ${alias}.id)))
+      )
+  )`;
+}
+
+/** Completed or failed assistant turns only, one per question. Pending turns are not yet an outcome. */
 export async function loadOverview(db: OperationsDatabase, now: number): Promise<OverviewResponse> {
   const { results } = await db
     .prepare(
-      `SELECT created_at, answer_type, latency_ms
-       FROM messages
-       WHERE role = 'assistant' AND status IN ('completed', 'failed')
-         AND created_at >= ? AND created_at <= ?`,
+      `SELECT m.created_at AS created_at, m.answer_type AS answer_type, m.latency_ms AS latency_ms
+       FROM messages m
+       WHERE m.role = 'assistant' AND m.status IN ('completed', 'failed')
+         AND m.created_at >= ? AND m.created_at <= ?
+         AND ${latestAttempt("m")}`,
     )
     .bind(windowStart(now) - DAYS * DAY_MS, now)
     .all<TurnMetricRow>();
@@ -192,6 +214,7 @@ const ACTIVITY_CTE = `
     )
     WHERE m.role = 'assistant' AND m.status IN ('completed', 'failed')
       AND m.created_at >= ? AND m.created_at <= ?
+      AND ${latestAttempt("m")}
   )`;
 
 type ActivitySqlRow = {

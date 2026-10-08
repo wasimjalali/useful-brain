@@ -9,6 +9,7 @@ import { EyeIcon, EyeOffIcon } from "@/components/icons";
 import { Button, IconButton } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { UsefulBrainLogo } from "@/components/useful-brain-logo";
+import { DEFAULT_USEFUL_BRAIN_CONFIG } from "@/lib/useful-brain-config";
 
 export function AuthForm({
   mode,
@@ -62,7 +63,7 @@ export function AuthForm({
         <div className="flex max-w-[376px] flex-1 flex-col justify-center gap-7 py-10">
           <div className="flex flex-col gap-1.5">
             <h1 className="text-2xl font-semibold leading-8 tracking-[-0.02em] text-ink">
-              {isSignup ? "Create your account" : "Sign in to Northwind"}
+              {isSignup ? "Create your account" : `Sign in to ${DEFAULT_USEFUL_BRAIN_CONFIG.companyName}`}
             </h1>
             <p className="text-[15px] leading-6 text-ink-muted">
               Ask about company documents. Every answer shows the passage behind it.
@@ -139,7 +140,7 @@ export function AuthForm({
             )}
           </p>
         </div>
-        <p className="text-xs text-ink-faint-text">Northwind Systems</p>
+        <p className="text-xs text-ink-faint-text">{DEFAULT_USEFUL_BRAIN_CONFIG.companyName} Systems</p>
       </div>
       <ProofStage />
     </main>

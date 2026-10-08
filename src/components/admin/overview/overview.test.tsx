@@ -4,9 +4,13 @@ import { describe, expect, it, vi } from "vitest";
 import type { KpiView, SystemRowView } from "@/lib/contracts/admin-insights-view";
 
 import { EvalsSummary } from "./evals-summary";
+import { OverviewView } from "./overview-view";
 import { KpiStrip, sparklinePoints } from "./kpi-strip";
 import { SystemHealth } from "./system-health";
 import { UnansweredList } from "./unanswered-list";
+
+const push = vi.fn();
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 
 const kpi = (id: string, points: number[]): KpiView => ({
   id,
@@ -72,7 +76,7 @@ describe("SystemHealth", () => {
   });
   it("counts errors as warnings too and uses mono for detail", () => {
     render(<SystemHealth rows={[{ id: "x", name: "Brain", status: "error", detail: "Down" }, ...rows]} />);
-    expect(screen.getByText("2 warning")).toBeInTheDocument();
+    expect(screen.getByText("2 warnings")).toBeInTheDocument();
     expect(screen.getByText("Synced to g-c305cf57")).toHaveClass("font-mono");
     expect(within(screen.getAllByRole("listitem")[0]).getByText("Down")).toHaveClass("text-danger");
   });
@@ -90,5 +94,21 @@ describe("EvalsSummary", () => {
   it("never shows a leak count above zero as success", () => {
     render(<EvalsSummary onOpenEvals={() => {}} summary={{ passed: 1, total: 2, aclLeaks: 2, latestRunLabel: "x" }} />);
     expect(screen.getByText("2")).toHaveClass("text-danger");
+  });
+});
+
+describe("OverviewView", () => {
+  it("Add document opens the upload dialog without a question param", () => {
+    const item = { id: "u1", question: "Is there parking?", meta: "Last asked today", asks: 3 };
+    render(
+      <OverviewView
+        evals={{ latestLabel: "", passRate: "", runs: [] } as never}
+        kpis={[]}
+        system={[]}
+        unanswered={[item]}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Add document/ }));
+    expect(push).toHaveBeenCalledWith("/admin/sources?upload=1");
   });
 });

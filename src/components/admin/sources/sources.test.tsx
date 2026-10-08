@@ -41,7 +41,7 @@ describe("GenerationCard", () => {
     expect(screen.getByText("71%")).toBeInTheDocument();
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "71");
     expect(screen.getByRole("button", { name: "Promote draft" })).toBeDisabled();
-    expect(screen.queryByRole("button", { name: "Discard" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Discard" })).toBeEnabled();
   });
 
   it("building with zero total chunks shows 0% and does not divide by zero", () => {
@@ -86,13 +86,16 @@ const rows: SourceRowView[] = [
 ];
 
 describe("SourcesTable", () => {
-  it("renders title, mono file name, status pills and the em-dash for missing chunks", () => {
+  it("renders title, mono file name, status pills and a plain 0 for missing chunks", () => {
     render(<SourcesTable rows={rows} />);
     const row = screen.getByText("Anti-Harassment Policy").closest("[role=row]") as HTMLElement;
     expect(within(row).getByText("anti-harassment-policy.md")).toBeInTheDocument();
     expect(within(row).getByText("Active")).toBeInTheDocument();
     expect(screen.getByText("Draft")).toBeInTheDocument();
     expect(screen.getByText("Failed")).toBeInTheDocument();
+    const failed = screen.getByText("Failed").closest("[role=row]") as HTMLElement;
+    expect(within(failed).getByText("0")).toBeInTheDocument();
+    expect(failed.textContent).not.toContain("\u2014");
   });
 
   it("failed rows show the error line instead of the file name, with a full tooltip on long titles", () => {

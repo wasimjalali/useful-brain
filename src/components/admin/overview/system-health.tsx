@@ -11,7 +11,7 @@ export function SystemHealth({ rows }: { rows: SystemRowView[] }) {
   return (
     <section className="flex flex-col">
       <SectionHeader
-        right={warnings ? <span className="text-warning">{`${warnings} warning`}</span> : null}
+        right={warnings ? <span className="text-warning">{`${warnings} ${warnings === 1 ? "warning" : "warnings"}`}</span> : null}
         title="System"
       />
       <ul className="m-0 list-none p-0">

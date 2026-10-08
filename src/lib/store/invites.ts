@@ -7,7 +7,7 @@ import {
   nameFromEmail,
   type AuthSessionResult,
 } from "../auth/session-account";
-import { AuthRateLimitedError, AuthValidationError } from "../auth/session-errors";
+import { AuthValidationError } from "../auth/session-errors";
 import {
   INVITE_TTL_MS,
   NORTHWIND_DEPARTMENTS,
@@ -17,8 +17,6 @@ import {
 } from "../contracts/people";
 import { newBoundedId, type OperationsDatabase } from "./conversations";
 
-const ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
-const MAX_FAILED_ATTEMPTS = 5;
 const TOKEN_PATTERN = /^[0-9a-f]{64}$/;
 
 /** One generic failure for replayed, expired and unknown tokens. */
@@ -73,10 +71,16 @@ export async function createInvite(
   ) {
     throw new InviteRequestError("invalid_department", "Choose a valid department.");
   }
+  // A user principal can exist without an auth_users row (loopback operator,
+  // directory-loaded users). Accepting would then always hit UNIQUE(kind, subject).
   const existing = await db
-    .prepare(`SELECT id FROM auth_users WHERE email = ?`)
-    .bind(email)
-    .first<{ id: string }>();
+    .prepare(
+      `SELECT 1 AS found FROM auth_users WHERE email = ?
+       UNION ALL SELECT 1 FROM principals WHERE kind = 'user' AND subject = ?
+       LIMIT 1`,
+    )
+    .bind(email, email)
+    .first<{ found: number }>();
   if (existing) {
     throw new InviteRequestError("account_exists", "That email is already registered.");
   }
@@ -125,15 +129,10 @@ export async function acceptInvite(
   if (typeof input.token !== "string" || !TOKEN_PATTERN.test(input.token)) {
     throw new InviteInvalidError();
   }
+  // No failure counter: a miss writes nothing, so an unauthenticated caller cannot
+  // grow the database. Tokens are 256-bit random, so guessing is not the defence;
+  // volume is limited at the edge (WAF rate limit on /api/auth/invite).
   const tokenDigest = await sha256Hex(input.token);
-  const attemptKey = `invite:${tokenDigest}`;
-  const failures = await db
-    .prepare(`SELECT COUNT(*) AS n FROM auth_login_attempts WHERE email = ? AND attempted_at > ?`)
-    .bind(attemptKey, now - ATTEMPT_WINDOW_MS)
-    .first<{ n: number }>();
-  if (Number(failures?.n ?? 0) >= MAX_FAILED_ATTEMPTS) {
-    throw new AuthRateLimitedError();
-  }
   const invite = await db
     .prepare(
       `SELECT id, email, role, department FROM invites
@@ -142,10 +141,6 @@ export async function acceptInvite(
     .bind(tokenDigest, now)
     .first<InviteRow>();
   if (!invite) {
-    await db
-      .prepare(`INSERT INTO auth_login_attempts (email, attempted_at) VALUES (?, ?)`)
-      .bind(attemptKey, now)
-      .run();
     throw new InviteInvalidError();
   }
   const name = nameFromEmail(invite.email, input.name);

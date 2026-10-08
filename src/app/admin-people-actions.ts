@@ -34,8 +34,16 @@ export async function createInviteAction(input: CreateInviteRequest): Promise<Cr
     }
     // Same code mapping as brainJson for every other failure.
     const code =
-      response.status === 401 ? "AUTH_REQUIRED" : response.status === 403 ? "FORBIDDEN" : "INTERNAL_ERROR";
-    throw new AppError(code, typeof body.message === "string" ? body.message : "The request could not be completed.", response.status >= 500);
+      body.code === "RATE_LIMITED"
+        ? "RATE_LIMITED"
+        : body.code === "FORBIDDEN"
+          ? "FORBIDDEN"
+          : body.code === "AUTH_REQUIRED"
+            ? "AUTH_REQUIRED"
+            : body.code === "NOT_FOUND"
+              ? "NOT_FOUND"
+              : "INTERNAL_ERROR";
+    throw new AppError(code, typeof body.message === "string" ? body.message : "The request could not be completed.", response.status >= 500 || code === "RATE_LIMITED");
   } catch (error) {
     return {
       ok: false,

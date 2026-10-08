@@ -10,6 +10,13 @@ CREATE TABLE drafts (
   base_generation_id TEXT,
   created_by TEXT NOT NULL,
   base_copied_at INTEGER,
+  -- Durable enqueue intent: NULL until the draft job reached the queue. A crash
+  -- between the database write and the publish leaves it NULL and the next
+  -- request for this draft publishes it again.
+  job_enqueued_at INTEGER,
+  -- The workflow instance that won the finalization claim. The same instance
+  -- may resume a claim whose result it never saw; any other instance is refused.
+  finalize_owner TEXT,
   closed_at INTEGER,
   created_at INTEGER NOT NULL
 );
@@ -24,6 +31,8 @@ CREATE TABLE upload_batches (
   allowed_roles TEXT NOT NULL DEFAULT '[]',
   allowed_departments TEXT NOT NULL DEFAULT '[]',
   idempotency_key TEXT NOT NULL UNIQUE,
+  -- Same intent marker for the batch's delivery-expiry job.
+  job_enqueued_at INTEGER,
   created_at INTEGER NOT NULL
 );
 

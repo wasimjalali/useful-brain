@@ -5,6 +5,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { executeTurn } from "../../../src/lib/brain/execute-turn";
 import { countReadableDocuments } from "../../../src/lib/acl/access";
 import { createPendingTurn } from "../../../src/lib/store/conversations";
+import { pendingTurnProgress } from "../src/routes/chat";
 import {
   CHAT_CORPUS_TOTAL,
   MAYA,
@@ -252,5 +253,22 @@ describe("a real turn", () => {
       latency_ms: null,
       passages_retrieved: null,
     });
+  });
+});
+
+describe("pendingTurnProgress when the readable count fails", () => {
+  it("answers 'searching' with 0 instead of failing the poll", async () => {
+    const broken = {
+      CONVERSATION: env.CONVERSATION,
+      OPERATIONS_DB: env.OPERATIONS_DB,
+      CORPUS_DB: {
+        prepare() {
+          throw new Error("corpus hiccup");
+        },
+      },
+    };
+    await expect(
+      pendingTurnProgress(broken as never, MAYA, { conversationId: "conv-no-lock", runId: "run-x" }),
+    ).resolves.toEqual({ stage: "searching", readableDocuments: 0 });
   });
 });
