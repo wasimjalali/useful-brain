@@ -50,7 +50,7 @@ describe("ActivityView", () => {
     expect(loadTrace).not.toHaveBeenCalled();
     const toggle = screen.getByRole("button", { name: /Question a/ });
     fireEvent.click(toggle);
-    await waitFor(() => expect(screen.getByText("chunks: 6")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Chunks 6")).toBeInTheDocument());
     fireEvent.click(toggle);
     fireEvent.click(toggle);
     expect(loadTrace).toHaveBeenCalledTimes(1);
@@ -83,7 +83,7 @@ describe("ActivityView", () => {
     fireEvent.click(screen.getByRole("button", { name: /Question a/ }));
     await waitFor(() => expect(screen.getByText("Could not load this trace")).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: "Retry trace" }));
-    await waitFor(() => expect(screen.getByText("chunks: 6")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Chunks 6")).toBeInTheDocument());
     expect(loadTrace).toHaveBeenCalledTimes(2);
   });
 

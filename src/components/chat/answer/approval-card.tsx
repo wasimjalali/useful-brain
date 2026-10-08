@@ -1,5 +1,6 @@
 import { CircleCheckIcon, CircleXIcon, LockIcon, TicketIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
+import { StatusPill } from "@/components/ui/status";
 import type { ApprovalView } from "@/lib/contracts/chat-view";
 
 export function ApprovalCard({
@@ -24,7 +25,7 @@ export function ApprovalCard({
         <header className="flex items-center gap-2 px-4 pt-3.5">
           <TicketIcon className="size-4 text-ink-muted" />
           <h3 className="m-0 flex-1 text-sm font-semibold text-ink">Needs your approval</h3>
-          <span className="font-mono text-xs text-ink-muted">{approval.tool}</span>
+          <span className="text-xs text-ink-muted">Create ticket</span>
         </header>
         <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 px-4 py-3 font-mono text-[13px] leading-5">
           {approval.args.map(([key, value]) => (
@@ -51,17 +52,38 @@ export function ApprovalCard({
   }
 
   if (approval.status === "done") {
+    const created = new Date(approval.createdAt);
+    const time = `${String(created.getHours()).padStart(2, "0")}:${String(created.getMinutes()).padStart(2, "0")}`;
     return (
-      <div className="flex max-w-[640px] items-center gap-3 rounded-[14px] bg-bubble px-4 py-2.5 shadow-[0_0_0_1px_var(--edge),var(--lift)]">
-        <CircleCheckIcon className="size-4 shrink-0 text-success" />
-        <span className="text-sm font-medium text-ink">Ticket {approval.ticketId} created</span>
-        <span className="flex-1 font-mono text-xs text-ink-faint-text">{approval.meta}</span>
-        {onOpenTicket ? (
-          <Button onClick={onOpenTicket} size={32} variant="ghost">
-            Open ticket ↗
-          </Button>
-        ) : null}
-      </div>
+      <section
+        aria-label="Ticket created"
+        className="flex max-w-[640px] flex-col gap-2.5 rounded-xl bg-bubble px-3.5 py-3 shadow-[0_0_0_1px_var(--edge),var(--lift)]"
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusPill tone="active">
+            <CircleCheckIcon className="size-3.5" />
+            Created
+          </StatusPill>
+          <b className="font-mono text-[13.5px] font-semibold text-ink">{approval.ticketId}</b>
+          <span className="rounded-md bg-sunken px-1.5 py-0.5 text-xs font-medium text-ink-muted">
+            {approval.priority}
+          </span>
+          <span className="flex-1" />
+          {onOpenTicket ? (
+            <Button onClick={onOpenTicket} size={32} variant="ghost">
+              Open ticket ↗
+            </Button>
+          ) : null}
+        </div>
+        <dl className="m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3.5 gap-y-1 text-[13px]">
+          <dt className="text-ink-faint-text">Customer</dt>
+          <dd className="m-0 break-words text-ink">{approval.customer}</dd>
+          <dt className="text-ink-faint-text">Subject</dt>
+          <dd className="m-0 break-words text-ink">{approval.subject}</dd>
+          <dt className="text-ink-faint-text">Time</dt>
+          <dd className="m-0 text-ink">{time}</dd>
+        </dl>
+      </section>
     );
   }
 

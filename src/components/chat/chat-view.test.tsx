@@ -528,9 +528,12 @@ describe("evidence panel", () => {
 
     renderChat({ initialTurns: [turn()], identity: admin });
     fireEvent.click(screen.getByRole("button", { name: "Evidence" }));
+    fireEvent.click(within(panel()).getAllByRole("button", { name: "Retrieval details" })[0]);
     expect(panel()).toHaveTextContent("chunk_1");
     expect(panel()).toHaveTextContent("g-c305cf57");
-    expect(panel()).toHaveTextContent("Keyword 0.868 · Vector 0.840 · Rerank 0.991");
+    expect(panel()).toHaveTextContent("0.868");
+    expect(panel()).toHaveTextContent("0.840");
+    expect(panel()).toHaveTextContent("0.991");
   });
 
   it("opens the document with the message and citation, then goes back to evidence", async () => {
@@ -675,8 +678,10 @@ describe("approval", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1000);
     });
-    expect(screen.getByText("Ticket SUP-4821 created")).toBeInTheDocument();
-    expect(screen.getByText("create_ticket · P1 · 09:42")).toBeInTheDocument();
+    expect(screen.getAllByText("Created")).toHaveLength(1);
+    expect(screen.getByText("Time")).toBeTruthy();
+    expect(screen.getByText("SUP-4821")).toBeInTheDocument();
+    expect(screen.getByText("09:42")).toBeInTheDocument();
   });
 
   it("denies with decision reject and shows the denied state", async () => {
@@ -831,12 +836,13 @@ describe("review fixes", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1000);
     });
-    expect(screen.queryByText("Ticket SUP-4821 created")).toBeNull();
+    expect(screen.queryByText("Created")).toBeNull();
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1000);
     });
     expect(loadConversation).toHaveBeenCalledTimes(2);
-    expect(screen.getByText("Ticket SUP-4821 created")).toBeInTheDocument();
+    expect(screen.getAllByText("Created")).toHaveLength(1);
+    expect(screen.getByText("Time")).toBeTruthy();
   });
 
   it("opens the ticket page from the done state", async () => {

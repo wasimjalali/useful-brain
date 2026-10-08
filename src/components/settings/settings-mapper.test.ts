@@ -67,11 +67,16 @@ describe("mapAdminSettings", () => {
       activeGeneration: "g-c305cf57",
     });
     expect(connectors.map((c) => [c.name, c.status, c.description])).toEqual([
-      ["Uploads", "active", "Built in, 65 documents"],
-      ["Support desk", "connected", "create_ticket, every call needs approval"],
+      ["Uploads", "active", "Built in · 65 documents"],
+      ["Support desk", "connected", "Creates tickets, each one needs your approval"],
       ["GitHub", "not_connected", "Sync a repository folder into a draft"],
     ]);
     expect(connectors[2].connectable).toBe(true);
+  });
+
+  it("says document, not documents, for a single upload", () => {
+    const { connectors } = mapAdminSettings(config, 1);
+    expect(connectors[0].description).toBe("Built in · 1 document");
   });
 
   it("shows keyword retrieval and no generation honestly", () => {

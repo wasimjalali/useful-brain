@@ -3,11 +3,6 @@ import type { ApprovalView as ApprovalCardView } from "@/lib/contracts/chat-view
 
 const ARGUMENT_ORDER = ["desk", "priority", "customer", "subject"] as const;
 
-function clock(ms: number): string {
-  const date = new Date(ms);
-  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
-}
-
 /**
  * Card view of a stored approval. An approved record without its ticket yet
  * returns null: the run is still going, so there is nothing to claim.
@@ -28,7 +23,10 @@ export function approvalCardView(approval: ApprovalRecord, now: number): Approva
         ? {
             status: "done",
             ticketId: approval.ticket.id,
-            meta: `${approval.tool} · ${approval.arguments.priority} · ${clock(approval.ticket.createdAt)}`,
+            priority: approval.arguments.priority,
+            customer: approval.arguments.customer,
+            subject: approval.arguments.subject,
+            createdAt: approval.ticket.createdAt,
           }
         : null;
     case "denied":

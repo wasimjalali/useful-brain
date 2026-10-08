@@ -141,16 +141,103 @@ describe("EvidencePanel", () => {
   it("hides diagnostics from members", () => {
     render(<Harness />);
     expect(screen.queryByText("nw_hr_parental_leave:c02")).not.toBeInTheDocument();
-    expect(screen.queryByText(/Rerank 0.991/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Retrieval details" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: /Retrieved/ }));
     expect(screen.queryByText(/Rerank score · floor/)).not.toBeInTheDocument();
     expect(screen.queryByText("0.991")).not.toBeInTheDocument();
   });
 
-  it("shows chunk, generation, scores and the retrieved footer to admins", () => {
+  it("puts collapsed retrieval details below Open document for admins", () => {
+    window.localStorage.clear();
     render(<Harness isAdmin />);
-    expect(screen.getByText("nw_hr_parental_leave:c02")).toBeInTheDocument();
-    expect(screen.getByText("Keyword 0.868 · Vector 0.840 · Rerank 0.991")).toBeInTheDocument();
+    const toggle = screen.getAllByRole("button", { name: "Retrieval details" })[0];
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("nw_hr_parental_leave:c02")).not.toBeInTheDocument();
+    const open = screen.getAllByRole("button", { name: /Open document/ })[0];
+    expect(open.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("nw_hr_parental_leave:c02")).toHaveAttribute(
+      "title",
+      "nw_hr_parental_leave:c02",
+    );
+    expect(screen.getAllByText("0.868")[0]).toBeInTheDocument();
+    expect(screen.getAllByText("0.840")[0]).toBeInTheDocument();
+    expect(screen.getAllByText("0.991")[0]).toBeInTheDocument();
+    expect(screen.getAllByText("g-c305cf57")[0]).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Copy chunk ID" })[0]).toBeInTheDocument();
+  });
+
+  it("remembers the open state", () => {
+    window.localStorage.clear();
+    const first = render(<Harness isAdmin />);
+    fireEvent.click(screen.getAllByRole("button", { name: "Retrieval details" })[0]);
+    first.unmount();
+    render(<Harness isAdmin />);
+    expect(screen.getAllByRole("button", { name: "Retrieval details" })[0]).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    window.localStorage.clear();
+  });
+
+  it("copies the chunk id and shows Copied", async () => {
+    window.localStorage.clear();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    render(<Harness isAdmin />);
+    fireEvent.click(screen.getAllByRole("button", { name: "Retrieval details" })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: "Copy chunk ID" })[0]);
+    expect(writeText).toHaveBeenCalledWith("nw_hr_parental_leave:c02");
+    expect(await screen.findByText("Copied")).toBeInTheDocument();
+    window.localStorage.clear();
+  });
+
+  it("shows Copy failed, never Copied, when the clipboard rejects", async () => {
+    window.localStorage.clear();
+    const writeText = vi.fn().mockRejectedValue(new Error("denied"));
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    render(<Harness isAdmin />);
+    fireEvent.click(screen.getAllByRole("button", { name: "Retrieval details" })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: "Copy chunk ID" })[0]);
+    expect(await screen.findByText("Copy failed")).toBeInTheDocument();
+    expect(screen.queryByText("Copied")).toBeNull();
+    window.localStorage.clear();
+  });
+
+  it("shows Copy failed when the clipboard API is missing or throws synchronously", () => {
+    window.localStorage.clear();
+    render(<Harness isAdmin />);
+    fireEvent.click(screen.getAllByRole("button", { name: "Retrieval details" })[0]);
+    Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
+    fireEvent.click(screen.getAllByRole("button", { name: "Copy chunk ID" })[0]);
+    expect(screen.getByText("Copy failed")).toBeInTheDocument();
+    Object.defineProperty(navigator, "clipboard", {
+      value: {
+        writeText: () => {
+          throw new Error("sync");
+        },
+      },
+      configurable: true,
+    });
+    fireEvent.click(screen.getAllByRole("button", { name: "Copy chunk ID" })[0]);
+    expect(screen.getByText("Copy failed")).toBeInTheDocument();
+    expect(screen.queryByText("Copied")).toBeNull();
+    window.localStorage.clear();
+  });
+
+  it("gives the copy button a hit area of at least 32px", () => {
+    window.localStorage.clear();
+    render(<Harness isAdmin />);
+    fireEvent.click(screen.getAllByRole("button", { name: "Retrieval details" })[0]);
+    expect(screen.getAllByRole("button", { name: "Copy chunk ID" })[0].className).toContain(
+      "before:-inset-2",
+    );
+    window.localStorage.clear();
+  });
+
+  it("shows the retrieved footer to admins", () => {
+    render(<Harness isAdmin />);
     fireEvent.click(screen.getByRole("tab", { name: /Retrieved/ }));
     expect(screen.getByText("0.991")).toBeInTheDocument();
     expect(screen.getByText(/Rerank score · floor 0.05/)).toBeInTheDocument();

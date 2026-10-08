@@ -6,10 +6,10 @@ import { useEffect, useMemo, useState } from "react";
 import { searchAll } from "@/app/library-actions";
 import { useShell } from "@/components/shell/shell-context";
 import type { SearchResponse } from "@/lib/contracts/library";
-import type { SearchChatRowView, SearchDocumentRowView } from "@/lib/contracts/library-view";
+import type { SearchDocumentRowView } from "@/lib/contracts/library-view";
 import { departmentLabel } from "@/lib/labels";
 
-import { SearchDialog } from "./search-dialog";
+import { SearchDialog, type SearchChatRow } from "./search-dialog";
 
 const DEBOUNCE_MS = 200;
 const MIN_QUERY = 2;
@@ -24,6 +24,43 @@ function dateLabel(updatedAt: number | undefined, now: number): string {
   if (days < 7) return `${days}d`;
   if (days < 30) return `${Math.floor(days / 7)}w`;
   return `${Math.floor(days / 30)}mo`;
+}
+
+const normalizeTitle = (title: string) => title.trim().replace(/\s+/g, " ").toLowerCase();
+
+/**
+ * One row per distinct normalized title, at the position of its first hit. The row opens the
+ * most recently updated chat of the group (the server's order breaks ties and covers hits whose
+ * date the sidebar cache lacks).
+ */
+export function groupChatsByTitle(
+  hits: SearchResponse["chats"],
+  updatedAt: Map<string, number>,
+  now: number,
+): SearchChatRow[] {
+  const groups = new Map<string, SearchResponse["chats"]>();
+  for (const hit of hits) {
+    const key = normalizeTitle(hit.title);
+    const group = groups.get(key);
+    if (group) group.push(hit);
+    else groups.set(key, [hit]);
+  }
+  return [...groups.values()].map((group) => {
+    // Server order is by updated_at, so the first hit wins unless both timestamps are known
+    // and a later one is strictly newer. A missing timestamp (stale sidebar cache) never loses.
+    const best = group.reduce((a, b) => {
+      const ta = updatedAt.get(a.id);
+      const tb = updatedAt.get(b.id);
+      return ta !== undefined && tb !== undefined && tb > ta ? b : a;
+    });
+    return {
+      id: best.id,
+      title: best.title,
+      titleMatches: best.titleMatches,
+      dateLabel: dateLabel(updatedAt.get(best.id), now),
+      ...(group.length > 1 ? { count: group.length } : {}),
+    };
+  });
 }
 
 export function SearchHost({ onClose }: { onClose: () => void }) {
@@ -68,12 +105,7 @@ export function SearchHost({ onClose }: { onClose: () => void }) {
     () => new Map(conversations.map((conversation) => [conversation.id, conversation.updatedAt])),
     [conversations],
   );
-  const chats: SearchChatRowView[] = results.chats.map((hit) => ({
-    id: hit.id,
-    title: hit.title,
-    titleMatches: hit.titleMatches,
-    dateLabel: dateLabel(updatedAt.get(hit.id), now),
-  }));
+  const chats = groupChatsByTitle(results.chats, updatedAt, now);
   const documents: SearchDocumentRowView[] = results.documents.map((hit) => ({
     id: hit.id,
     title: hit.title,

@@ -169,7 +169,8 @@ describe("ApprovalCard", () => {
     const [onApprove, onDeny] = [vi.fn(), vi.fn()];
     render(<ApprovalCard approval={pending} onApprove={onApprove} onDeny={onDeny} />);
     expect(screen.getByText("Needs your approval")).toBeInTheDocument();
-    expect(screen.getByText("create_ticket")).toBeInTheDocument();
+    expect(screen.getByText("Create ticket")).toBeInTheDocument();
+    expect(screen.queryByText("create_ticket")).toBeNull();
     expect(screen.getByText("priority")).toBeInTheDocument();
     expect(screen.getByText("P1")).toBeInTheDocument();
     expect(screen.getByText("Approves these exact arguments only")).toBeInTheDocument();
@@ -189,12 +190,25 @@ describe("ApprovalCard", () => {
     const onOpenTicket = vi.fn();
     const { rerender } = render(
       <ApprovalCard
-        approval={{ status: "done", ticketId: "SUP-4821", meta: "create_ticket · P1 · 09:42" }}
+        approval={{
+          status: "done",
+          ticketId: "SUP-4821",
+          priority: "P1",
+          customer: "Halvorsen Freight",
+          subject: "Atlas sync stalled",
+          createdAt: new Date(2026, 8, 6, 9, 42).getTime(),
+        }}
         onOpenTicket={onOpenTicket}
       />,
     );
-    expect(screen.getByText("Ticket SUP-4821 created")).toBeInTheDocument();
-    expect(screen.getByText("create_ticket · P1 · 09:42")).toBeInTheDocument();
+    expect(screen.getAllByText("Created")).toHaveLength(1);
+    expect(screen.getByText("Time")).toBeTruthy();
+    expect(screen.getByText("SUP-4821")).toBeInTheDocument();
+    expect(screen.getByText("P1")).toBeInTheDocument();
+    expect(screen.getByText("Halvorsen Freight")).toBeInTheDocument();
+    expect(screen.getByText("Atlas sync stalled")).toBeInTheDocument();
+    expect(screen.getByText("09:42")).toBeInTheDocument();
+    expect(screen.queryByText(/create_ticket/)).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /Open ticket/ }));
     expect(onOpenTicket).toHaveBeenCalled();
     rerender(<ApprovalCard approval={{ status: "denied" }} />);
