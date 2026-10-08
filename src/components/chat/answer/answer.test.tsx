@@ -235,6 +235,34 @@ describe("StatusLine", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Writing a cited answer");
   });
 
+  it("shows Reading before Writing when a writing snapshot carries the passage count", () => {
+    const { rerender } = render(<StatusLine progress={{ kind: "searching", readableDocuments: 34 }} />);
+    act(() => void vi.advanceTimersByTime(300));
+    rerender(<StatusLine progress={{ kind: "writing", passages: 8 }} />);
+    act(() => void vi.advanceTimersByTime(0));
+    expect(screen.getByRole("status")).toHaveTextContent("Reading 8 passages");
+    act(() => void vi.advanceTimersByTime(259));
+    expect(screen.getByRole("status")).toHaveTextContent("Reading 8 passages");
+    act(() => void vi.advanceTimersByTime(1));
+    expect(screen.getByRole("status")).toHaveTextContent("Writing a cited answer");
+  });
+
+  it("goes straight to Writing when no passage count is known", () => {
+    const { rerender } = render(<StatusLine progress={{ kind: "searching", readableDocuments: 34 }} />);
+    act(() => void vi.advanceTimersByTime(300));
+    rerender(<StatusLine progress={{ kind: "writing" }} />);
+    act(() => void vi.advanceTimersByTime(0));
+    expect(screen.getByRole("status")).toHaveTextContent("Writing a cited answer");
+  });
+
+  it("does not repeat Reading when it was already shown", () => {
+    const { rerender } = render(<StatusLine progress={{ kind: "reading", passages: 8 }} />);
+    act(() => void vi.advanceTimersByTime(300));
+    rerender(<StatusLine progress={{ kind: "writing", passages: 8 }} />);
+    act(() => void vi.advanceTimersByTime(0));
+    expect(screen.getByRole("status")).toHaveTextContent("Writing a cited answer");
+  });
+
   it("skips a label that was replaced while waiting (latest wins, order kept)", () => {
     const { rerender } = render(<StatusLine progress={{ kind: "searching", readableDocuments: 34 }} />);
     rerender(<StatusLine progress={{ kind: "reading", passages: 8 }} />);

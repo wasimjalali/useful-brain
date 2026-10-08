@@ -61,7 +61,19 @@ function chunksOf<T>(items: T[], size: number): T[][] {
  * clean with mode "keyword_only". That path is never taken when a binding exists.
  */
 export async function reconcileDraft(
-  input: { db: SqlExecutor; vectors: VectorPort | null; generationId: string; now?: number },
+  input: {
+    db: SqlExecutor;
+    vectors: VectorPort | null;
+    generationId: string;
+    now?: number;
+    /**
+     * When true, vectors missing after the watermark gate (or a watermark that
+     * moved during the scan) throw MutationPendingError so the step retries,
+     * instead of recording a failed audit. Mutation ids are opaque, so the
+     * last-recorded id may not be the last-submitted one and lag looks like a gap.
+     */
+    missingIsPending?: boolean;
+  },
 ): Promise<ReconcileOutcome> {
   const now = input.now ?? Date.now();
   const { db, vectors, generationId } = input;
@@ -117,6 +129,9 @@ export async function reconcileDraft(
     expectedVectorIds: () => expected,
     vectorIds: () => present,
   });
+  if (input.missingIsPending && (report.missingVectors.length > 0 || report.status === "partial")) {
+    throw new MutationPendingError();
+  }
   await recordAudit(db, generationId, report, now);
   return {
     mode: "ledger_getbyids",

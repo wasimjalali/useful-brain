@@ -24,6 +24,8 @@ export type SystemRowView = {
   name: string;
   status: "ok" | "warning" | "error";
   detail?: string;
+  /** Full value behind a shortened detail. */
+  title?: string;
   mono?: boolean;
 };
 

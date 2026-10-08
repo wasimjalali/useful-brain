@@ -1,5 +1,4 @@
 import { OverviewView } from "@/components/admin/overview/overview-view";
-import { PageBody } from "@/components/shell/page-body";
 import { PageHeader } from "@/components/ui/page-header";
 import { brainJson } from "@/lib/cf/brain-client";
 import type {
@@ -22,14 +21,16 @@ export default async function OverviewPage() {
     brainJson<EvalsAdminView>("/evaluations?view=campaign"),
   ]);
   return (
-    <PageBody>
+    <div className="uv-scroll min-h-0 flex-1 overflow-y-auto">
       <PageHeader subtitle={rangeSubtitle(overview.daily)} title="Overview" />
+      <div className="px-12 pt-6 pb-10">
       <OverviewView
         evals={mapEvalsSummary(evals)}
         kpis={mapKpis(overview)}
         system={mapHealth(health.services)}
         unanswered={mapUnanswered(unanswered.questions, overview.generatedAt)}
       />
-    </PageBody>
+      </div>
+    </div>
   );
 }

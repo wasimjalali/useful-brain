@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
+import { useMediaQuery } from "@/lib/use-media-query";
 import { LayersIcon, PanelRightIcon } from "@/components/icons";
 import { Button, IconButton } from "@/components/ui/button";
 import type { ChatProgressView, SuggestionView } from "@/lib/contracts/chat-view";
@@ -65,6 +66,10 @@ export function ChatWorkspace({
     setQuestion("");
   }
 
+  // The mobile shell header already carries menu, title and new chat; evidence
+  // opens from the sources summary there.
+  const mobile = useMediaQuery("(max-width: 767px)");
+
   const composer = (
     <ChatComposer
       disabled={!ready}
@@ -81,25 +86,27 @@ export function ChatWorkspace({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {banner}
-      <header className="flex h-[52px] shrink-0 items-center gap-3 pl-6 pr-3">
-        <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink max-[1199px]:hidden">
-          {title}
-        </span>
-        <span className="min-[1200px]:hidden flex-1" />
-        {panelToggle ? (
-          <span
-            className={`rounded-[10px] ${panelToggle.open ? "bg-sunken" : ""}`}
-          >
-            <IconButton
-              aria-label="Evidence"
-              aria-pressed={panelToggle.open}
-              onClick={panelToggle.onToggle}
-            >
-              <PanelRightIcon className="size-4" />
-            </IconButton>
+      {mobile ? null : (
+        <header className="flex h-[52px] shrink-0 items-center gap-3 pl-6 pr-3">
+          <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink max-[1199px]:hidden">
+            {title}
           </span>
-        ) : null}
-      </header>
+          <span className="min-[1200px]:hidden flex-1" />
+          {panelToggle ? (
+            <span
+              className={`rounded-[10px] ${panelToggle.open ? "bg-sunken" : ""}`}
+            >
+              <IconButton
+                aria-label="Evidence"
+                aria-pressed={panelToggle.open}
+                onClick={panelToggle.onToggle}
+              >
+                <PanelRightIcon className="size-4" />
+              </IconButton>
+            </span>
+          ) : null}
+        </header>
+      )}
 
       {!ready ? (
         <SetupNotice onOpenKnowledge={onOpenKnowledge} />

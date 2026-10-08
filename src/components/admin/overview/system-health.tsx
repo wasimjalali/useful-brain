@@ -19,7 +19,7 @@ export function SystemHealth({ rows }: { rows: SystemRowView[] }) {
           <li className="flex h-10 items-center gap-2.5 border-b border-border" key={r.id}>
             <StatusDot tone={DOT[r.status]} />
             <span className="flex-1 text-[13px] text-ink">{r.name}</span>
-            <span className={`text-xs ${TEXT[r.status]} ${r.mono ? "font-mono" : ""}`}>
+            <span className={`text-xs ${TEXT[r.status]} ${r.mono ? "font-mono" : ""}`} title={r.title}>
               {r.detail ?? (r.status === "ok" ? "Healthy" : "")}
             </span>
           </li>

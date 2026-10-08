@@ -15,6 +15,7 @@ import {
   decideChecks,
   finishCheckRun,
   reconcileDraft,
+  type ReconcileOutcome,
   reserveCheckRun,
   RETRIEVAL_BATCH,
   runRetrievalBatch,
@@ -69,6 +70,31 @@ const RECONCILE_CONFIG = {
   retries: { limit: 12, delay: "15 seconds", backoff: "constant" },
   timeout: "5 minutes",
 } as const;
+
+type ReconcileRunner = (missingIsPending: boolean) => Promise<ReconcileOutcome>;
+
+/**
+ * Reconcile with missing vectors treated as ingestion lag (retried). If the
+ * retries run out, or anything else throws, a final step records the audit with
+ * missing vectors counted as a real gap. If even that throws, the outcome is a
+ * synthetic failure, so the draft always ends with a recorded RECONCILIATION_FAILED
+ * check and never stays in reconciling.
+ */
+export async function reconcileWithFinalRecord(
+  step: Pick<WorkflowStep, "do">,
+  run: ReconcileRunner,
+): Promise<ReconcileOutcome> {
+  try {
+    return await step.do("reconcile", RECONCILE_CONFIG, async () => run(true));
+  } catch {
+    // Fall through to the recorded final attempt.
+  }
+  try {
+    return await step.do("reconcile-final", STEP_CONFIG, async () => run(false));
+  } catch {
+    return { mode: "ledger_getbyids", reconciled: false, status: "partial", missing: 0, expected: 0 };
+  }
+}
 const WAIT_BASE_ITERATIONS = 60;
 /** A paused draft waits at most this many UTC days for budget before it stays paused for an operator. */
 const MAX_BUDGET_WINDOWS = 7;
@@ -548,8 +574,8 @@ export class IngestionWorkflow extends WorkflowEntrypoint<Env, IngestionWorkflow
     const context = this.context();
     // A MutationPendingError is thrown on purpose: the step retries until the
     // index reports it processed the newest mutation.
-    const reconciled = await step.do("reconcile", RECONCILE_CONFIG, async () =>
-      reconcileDraft({ db: context.db, vectors: context.vectors, generationId }),
+    const reconciled = await reconcileWithFinalRecord(step, (missingIsPending) =>
+      reconcileDraft({ db: context.db, vectors: context.vectors, generationId, missingIsPending }),
     );
     const probe = await step.do("acl-parity", STEP_CONFIG, async () => {
       const documents = await this.uploadedAclDocuments(generationId);

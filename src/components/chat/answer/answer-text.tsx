@@ -7,10 +7,10 @@ import type { AnswerParagraphView } from "@/lib/contracts/chat-view";
 
 import { useCitationBinding } from "../evidence/citation-link";
 
-function LinkedChip({ n }: { n: number }) {
+function LinkedChip({ n, display }: { n: number; display: number }) {
   const { active, onHover, onClick } = useCitationBinding(n);
   return (
-    <CitationChip active={active} data-opens-evidence="true" n={n} onClick={onClick} onHover={onHover} />
+    <CitationChip active={active} data-opens-evidence="true" n={display} onClick={onClick} onHover={onHover} />
   );
 }
 
@@ -29,14 +29,14 @@ function Paragraph({ paragraph, muted }: { paragraph: AnswerParagraphView; muted
           return <Fragment key={index}>{part}</Fragment>;
         }
         const n = Number(part);
-        return valid.has(n) ? <LinkedChip key={index} n={n} /> : null;
+        return valid.has(n) ? <LinkedChip display={paragraph.display?.[n] ?? n} key={index} n={n} /> : null;
       })}
       {hasInline
         ? null
         : paragraph.citations.map((n) => (
             <Fragment key={n}>
               {" "}
-              <LinkedChip n={n} />
+              <LinkedChip display={paragraph.display?.[n] ?? n} n={n} />
             </Fragment>
           ))}
     </p>

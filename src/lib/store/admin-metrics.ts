@@ -195,7 +195,15 @@ const ACTIVITY_CTE = `
            COALESCE(u.name, p.subject) AS person,
            COALESCE(q.content, '') AS question,
            (SELECT COUNT(DISTINCT COALESCE(e.document_id, e.source))
-              FROM evidence_snapshots e WHERE e.message_id = m.id) AS sources,
+              FROM evidence_snapshots e
+              WHERE e.message_id = m.id
+                AND e.citation_label IN (
+                  SELECT c.value
+                  FROM json_each(CASE WHEN json_valid(m.structured_paragraphs_json)
+                                       AND json_type(m.structured_paragraphs_json) = 'array'
+                                      THEN m.structured_paragraphs_json ELSE '[]' END) p,
+                       json_each(p.value, '$.citations') c
+                )) AS sources,
            CASE
              WHEN ap.status = 'approved' THEN 'approved'
              WHEN ap.status = 'rejected' THEN 'denied'

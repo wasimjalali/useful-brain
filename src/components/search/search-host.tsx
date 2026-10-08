@@ -7,7 +7,7 @@ import { searchAll } from "@/app/library-actions";
 import { useShell } from "@/components/shell/shell-context";
 import type { SearchResponse } from "@/lib/contracts/library";
 import type { SearchChatRowView, SearchDocumentRowView } from "@/lib/contracts/library-view";
-import { departmentLabel } from "@/lib/library/mappers";
+import { departmentLabel } from "@/lib/labels";
 
 import { SearchDialog } from "./search-dialog";
 

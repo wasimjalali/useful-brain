@@ -20,7 +20,7 @@ function Span({ segment, activeN }: { segment: ReaderSegmentView; activeN: numbe
   const strong = active || n === activeN;
   return (
     <span ref={ref}>
-      <CitationChip active={strong} n={n} onClick={onClick} onHover={onHover} style={{ marginRight: 4 }} />
+      <CitationChip active={strong} n={segment.display ?? n} onClick={onClick} onHover={onHover} style={{ marginRight: 4 }} />
       <Highlight active={strong}>{segment.text}</Highlight>
     </span>
   );

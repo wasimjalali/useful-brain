@@ -1,3 +1,4 @@
+import { departmentLabel } from "@/lib/labels";
 import type {
   GroupRowView,
   InviteState,
@@ -6,10 +7,6 @@ import type {
 import type { GroupView, InviteReason, PersonView } from "@/lib/contracts/people";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-function capitalize(value: string): string {
-  return value === "hr" ? "HR" : value.charAt(0).toUpperCase() + value.slice(1);
-}
 
 function formatDate(ms: number): string {
   const date = new Date(ms);
@@ -34,7 +31,7 @@ export function mapPeople(people: PersonView[], now = Date.now()): PersonRowView
     name: person.name,
     email: person.email,
     role: person.role === "admin" ? "Admin" : "Member",
-    department: person.department ? capitalize(person.department) : "None",
+    department: person.department ? departmentLabel(person.department) : "None",
     readableCount: person.readableDocuments,
     lastActiveLabel: lastActiveLabel(person.lastActive, now),
   }));

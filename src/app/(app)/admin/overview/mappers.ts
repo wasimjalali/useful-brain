@@ -1,3 +1,4 @@
+import { departmentLabel, shortGenerationId } from "@/lib/labels";
 import type { KpiView, SystemRowView, UnansweredView } from "@/lib/contracts/admin-insights-view";
 import type {
   HealthDetailCode,
@@ -105,7 +106,7 @@ export function mapUnanswered(items: UnansweredQuestion[], now: number): Unanswe
   return items.map((u) => {
     const parts = [`Last asked ${lastAsked(u.lastAskedAt, now)}`];
     if (u.requests > 0) parts.push(`${u.requests} document request${u.requests === 1 ? "" : "s"}`);
-    if (u.likelyDepartment) parts.push(`likely ${u.likelyDepartment}`);
+    if (u.likelyDepartment) parts.push(`likely ${departmentLabel(u.likelyDepartment)}`);
     return { id: u.question, question: u.question, meta: parts.join(DOT), asks: u.asks };
   });
 }
@@ -139,13 +140,14 @@ const DETAIL_COPY: Record<HealthDetailCode, string> = {
 export function mapHealth(rows: HealthRow[]): SystemRowView[] {
   return rows.map((r) => {
     const synced = r.detail === "synced";
-    const detail = synced && r.generationId ? `Synced to ${r.generationId}` : DETAIL_COPY[r.detail];
+    const detail = synced && r.generationId ? `Synced to ${shortGenerationId(r.generationId)}` : DETAIL_COPY[r.detail];
     return {
       id: `${r.service}-${r.detail}`,
       name: SERVICE_NAME[r.service],
       status: r.status,
       detail,
       mono: synced && Boolean(r.generationId),
+      ...(synced && r.generationId ? { title: r.generationId } : {}),
     };
   });
 }

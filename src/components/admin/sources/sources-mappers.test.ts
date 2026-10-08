@@ -74,7 +74,7 @@ describe("mapSources", () => {
       }),
     ).rows;
     expect(rows[0]).toMatchObject({ readers: "HR, Finance", department: "HR" });
-    expect(rows[1]).toMatchObject({ readers: "Hr manager", department: "None" });
+    expect(rows[1]).toMatchObject({ readers: "HR managers", department: "None" });
   });
 
   it("counts statuses and ignores failed files in the document count", () => {

@@ -8,7 +8,7 @@ function SourceButton({ source }: { source: SourceRefView }) {
   const { active, onHover, onClick } = useCitationBinding(source.n);
   return (
     <button
-      aria-label={`Source ${source.n}: ${source.document}, ${source.section}`}
+      aria-label={`Source ${source.display ?? source.n}: ${source.document}, ${source.section}`}
       className="ub-ring inline-flex h-8 max-w-full items-center gap-2 whitespace-nowrap rounded-[10px] bg-sunken px-2.5 shadow-[inset_0_0_0_1px_var(--edge)]"
       data-active={active ? "true" : undefined}
       data-opens-evidence="true"
@@ -25,7 +25,7 @@ function SourceButton({ source }: { source: SourceRefView }) {
           active ? "bg-accent text-accent-ink" : "bg-bubble text-ink-muted"
         }`}
       >
-        {source.n}
+        {source.display ?? source.n}
       </span>
       <span className="truncate text-[13px] font-medium text-ink">{source.document}</span>
       <span className="truncate text-xs text-ink-faint-text">{source.section}</span>

@@ -36,7 +36,7 @@ describe("SearchDialog", () => {
     expect(screen.getByRole("listbox")).toBeTruthy();
     expect(screen.getAllByRole("option").length).toBe(3);
     expect(input.getAttribute("aria-activedescendant")).toBe(screen.getAllByRole("option")[0].id);
-    expect(screen.getByText("1 chats · 2 documents")).toBeTruthy();
+    expect(screen.getByText("1 chat · 2 documents")).toBeTruthy();
     expect(screen.getAllByText("Parental")[0].tagName).toBe("SPAN");
     expect(screen.getAllByText("Parental")[0].style.fontWeight).toBe("600");
   });

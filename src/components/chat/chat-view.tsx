@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ShellPanel, useShell } from "@/components/shell/shell-context";
 import { WorkspaceLoadError } from "@/components/shell/workspace-load-error";
 import type { ApprovalBinding } from "@/lib/agent/policy";
+import { departmentLabel } from "@/lib/labels";
 import { assumedPrincipalFor, loadAssumedPrincipalKey } from "@/lib/chat/assumed-principal";
 import type { FeedbackValue } from "@/lib/contracts/chat";
 import type { EvidenceTab, ReaderDocumentView, SuggestionView } from "@/lib/contracts/chat-view";
@@ -18,6 +19,7 @@ import { REAL_STACK_FINGERPRINT } from "@/lib/retrieve/fingerprint";
 import { UserBubble, ViewAsBanner } from "./answer";
 import {
   citedPassages,
+  displayNumbers,
   documentIdForCitation,
   paragraphViews,
   readerFromDocument,
@@ -90,6 +92,10 @@ export function ChatSession(props: ChatViewProps) {
 
   // A saved conversation keeps its own instance. A blank chat starts over
   // whenever New chat is chosen, even when the URL does not change.
+  // The evidence panel is seeded from the URL only until New chat is chosen:
+  // after that the query string still names the previous chat's reader.
+  const [firstNonce] = useState(newChatNonce);
+  const seedFromUrl = newChatNonce === firstNonce;
   const key = `${props.initialConversation ? props.initialConversation.id : `new:${newChatNonce}`}:${viewAsId ?? ""}`;
   return (
     <ChatView
@@ -100,6 +106,7 @@ export function ChatSession(props: ChatViewProps) {
         window.history.replaceState(null, "", window.location.pathname);
         newChat();
       }}
+      seedFromUrl={seedFromUrl}
       viewAsId={viewAsId}
     />
   );
@@ -160,8 +167,9 @@ function ChatView({
   scopeDocumentId = null,
   suggestions = [],
   viewAsId,
+  seedFromUrl,
   onExitViewAs,
-}: ChatViewProps & { viewAsId: string | null; onExitViewAs: () => void }) {
+}: ChatViewProps & { viewAsId: string | null; seedFromUrl: boolean; onExitViewAs: () => void }) {
   const router = useRouter();
   const shell = useShell();
   const searchParams = useSearchParams();
@@ -194,12 +202,12 @@ function ChatView({
   // --- evidence panel ------------------------------------------------------
   const [initialUrl] = useState(() => parseEvidenceUrl(searchParams ?? new URLSearchParams()));
   const [panel, setPanel] = useState<PanelState>(() => ({
-    open: initialUrl.evidence !== null || initialUrl.doc !== null,
-    tab: initialUrl.evidence ?? "cited",
+    open: seedFromUrl && (initialUrl.evidence !== null || initialUrl.doc !== null),
+    tab: (seedFromUrl && initialUrl.evidence) || "cited",
     turnId: null,
   }));
   const [reader, setReader] = useState<ReaderState | null>(() =>
-    initialUrl.doc ? loadingReader(initialUrl.doc, initialUrl.c, null, "") : null,
+    seedFromUrl && initialUrl.doc ? loadingReader(initialUrl.doc, initialUrl.c, null, "") : null,
   );
   const readerSeq = useRef(0);
 
@@ -218,6 +226,7 @@ function ChatView({
 
   const fetchReader = useCallback(
     async (seq: number, documentId: string, n: number | null, turn: ChatTurnState | null) => {
+      const display = turn?.answer ? displayNumbers(turn.answer) : undefined;
       const messageId = turn ? messageIdOf(turn) : null;
       const load = actions.loadDocument;
       const failed: ActionResult<DocumentResponse> = {
@@ -241,7 +250,7 @@ function ChatView({
         setReader((current) => (current ? { ...current, status } : current));
         return;
       }
-      const { view, activeN } = readerFromDocument(result.data);
+      const { view, activeN } = readerFromDocument(result.data, display);
       setReader((current) =>
         current ? { ...current, status: "ready", view, title: view.title, activeN: activeN ?? current.n } : current,
       );
@@ -262,7 +271,7 @@ function ChatView({
   // reader starts in its loading state; this only fetches the document.
   const deepLinked = useRef(false);
   useEffect(() => {
-    if (deepLinked.current || !initialUrl.doc) return;
+    if (deepLinked.current || !seedFromUrl || !initialUrl.doc) return;
     deepLinked.current = true;
     readerSeq.current += 1;
     void fetchReader(
@@ -271,7 +280,7 @@ function ChatView({
       initialUrl.c,
       initialUrl.c !== null ? panelTurn : null,
     );
-  }, [fetchReader, initialUrl, panelTurn]);
+  }, [fetchReader, initialUrl, panelTurn, seedFromUrl]);
 
   // A doc link that arrives while the chat is mounted (Cmd+K on /chat) changes
   // the search params without remounting, so follow it here. Our own URL
@@ -470,7 +479,7 @@ function ChatView({
   const title = turns[0]
     ? (shell.conversations.find((conversation) => conversation.id === chat.conversationId)?.title ??
       deriveConversationTitle(turns[0].question))
-    : "New chat";
+    : "";
   const placeholder = echo
     ? `Ask as ${echo.displayName}`
     : turns.length > 0 || chat.pendingQuestion
@@ -493,7 +502,7 @@ function ChatView({
         banner={
           echo ? (
             <ViewAsBanner
-              department={echo.department ?? "No department"}
+              department={echo.department ? departmentLabel(echo.department) : "No department"}
               documentCount={echo.readableDocuments}
               name={echo.displayName}
               onExit={onExitViewAs}

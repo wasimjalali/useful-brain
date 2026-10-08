@@ -2,7 +2,8 @@ import { env } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { workerErrorResponse, WorkerNotFoundError } from "../../../src/lib/cf/worker-errors";
-import { backfillDocumentCatalog } from "../../../src/lib/store/document-catalog";
+import { splitSections } from "../../../src/lib/store/library-queries";
+import { backfillDocumentCatalog, reconstructBody } from "../../../src/lib/store/document-catalog";
 import { CORPUS_DOCUMENT_IDS, seedCorpus } from "./seed";
 
 let generationId: string;
@@ -131,6 +132,38 @@ describe("catalog backfill", () => {
     expect(JSON.parse(rebuilt!.headings_json)).toEqual(["Paging", "Rollback", "Postmortem"]);
     expect(rebuilt!.access_scope).toBe("department");
     expect(await backfillDocumentCatalog(env.CORPUS_DB, gen)).toBe(0);
+  });
+});
+
+describe("reconstructed bodies", () => {
+  it("restore the original headings as reader sections", async () => {
+    const gen = (await seedCorpus()).generationId;
+    await env.CORPUS_DB.batch([
+      env.CORPUS_DB.prepare(`DELETE FROM document_catalog WHERE generation_id = ?`).bind(gen),
+      env.CORPUS_DB.prepare(`DELETE FROM document_bodies WHERE generation_id = ?`).bind(gen),
+    ]);
+    await backfillDocumentCatalog(env.CORPUS_DB, gen);
+    const row = await env.CORPUS_DB.prepare(
+      `SELECT body, reconstructed FROM document_bodies WHERE generation_id = ? AND document_id = 'doc-eng-runbook'`,
+    )
+      .bind(gen)
+      .first<{ body: string; reconstructed: number }>();
+    expect(row!.reconstructed).toBe(1);
+    const headings = splitSections(row!.body, "Incident Runbook").map((section) => section.heading);
+    expect(headings).toEqual(expect.arrayContaining(["Paging", "Rollback", "Postmortem"]));
+  });
+
+  it("groups chunks by heading and drops the overlap between neighbours of one section", () => {
+    const body = reconstructBody([
+      { heading: "Paging", content: "Page the on-call engineer first. Then confirm the alert." },
+      { heading: "Paging", content: "Then confirm the alert. Open an incident channel." },
+      { heading: "Rollback", content: "Roll back the last release." },
+      { heading: "Rollback", content: "Unrelated second chunk." },
+    ]);
+    expect(body).toBe(
+      "## Paging\n\nPage the on-call engineer first. Then confirm the alert. Open an incident channel." +
+        "\n\n## Rollback\n\nRoll back the last release.\n\nUnrelated second chunk.",
+    );
   });
 });
 

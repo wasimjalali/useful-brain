@@ -40,6 +40,8 @@ export type SeedMessage = {
   bestCandidateDepartment?: string | null;
   approval?: "approved" | "rejected" | "pending";
   evidenceDocuments?: string[];
+  /** Citation labels the answer's paragraphs cite, e.g. ["[1]"]. Omitted means no structured paragraphs. */
+  citedLabels?: string[];
 };
 
 /** Seeds one conversation with a user question and its assistant message, directly in D1. */
@@ -64,8 +66,9 @@ export async function seedTurn(input: SeedMessage): Promise<void> {
       .prepare(
         `INSERT INTO messages (
            id, conversation_id, role, content, status, answer_type, latency_ms,
-           best_candidate_department, parent_user_message_id, created_at, updated_at
-         ) VALUES (?, ?, 'assistant', 'answer', ?, ?, ?, ?, ?, ?, ?)`,
+           best_candidate_department, parent_user_message_id, created_at, updated_at,
+           structured_paragraphs_json
+         ) VALUES (?, ?, 'assistant', 'answer', ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         input.id,
@@ -77,6 +80,9 @@ export async function seedTurn(input: SeedMessage): Promise<void> {
         userId,
         input.at,
         input.at,
+        input.citedLabels
+          ? JSON.stringify([{ text: 'answer', citations: input.citedLabels }])
+          : null,
       ),
   ];
   for (const [index, documentId] of (input.evidenceDocuments ?? []).entries()) {

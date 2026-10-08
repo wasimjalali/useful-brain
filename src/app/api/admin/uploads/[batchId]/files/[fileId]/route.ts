@@ -8,6 +8,30 @@ export const dynamic = "force-dynamic";
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
+/**
+ * Same-origin check that holds behind OpenNext, where request.url carries an
+ * internal origin. The browser sets Sec-Fetch-Site and Host itself; a page on
+ * another site can't forge either.
+ */
+function isSameOriginRequest(request: Request): boolean {
+  const fetchSite = request.headers.get("sec-fetch-site");
+  if (fetchSite !== null && fetchSite !== "same-origin" && fetchSite !== "none") {
+    return false;
+  }
+  const origin = request.headers.get("origin");
+  if (origin === null) {
+    return true;
+  }
+  let originHost: string;
+  try {
+    originHost = new URL(origin).host;
+  } catch {
+    return false;
+  }
+  const host = request.headers.get("host") ?? new URL(request.url).host;
+  return originHost === host;
+}
+
 function reject(status: number, code: string, message: string): Response {
   return Response.json({ code, message }, { status, headers: { "cache-control": "no-store" } });
 }
@@ -22,8 +46,7 @@ export async function PUT(
   { params }: { params: Promise<{ batchId: string; fileId: string }> },
 ): Promise<Response> {
   // A cookie-authenticated write from another site is refused outright.
-  const origin = request.headers.get("origin");
-  if (origin !== null && origin !== new URL(request.url).origin) {
+  if (!isSameOriginRequest(request)) {
     return reject(403, "FORBIDDEN", "This request came from another site.");
   }
   const { batchId, fileId } = await params;

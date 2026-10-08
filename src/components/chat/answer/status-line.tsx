@@ -19,31 +19,42 @@ export function progressLabel(progress: ChatProgressView): string {
   }
 }
 
-/** Shows the latest label, but keeps each one on screen for at least `minMs`. */
-function useHeldLabel(label: string, minMs: number): string {
-  const [shown, setShown] = useState(label);
+/**
+ * Walks the given labels in order, keeping each on screen for at least
+ * `minMs`. A label already shown (or past) is not repeated.
+ */
+function useHeldLabel(steps: string[], minMs: number): string {
+  const [shown, setShown] = useState(steps[0]);
   const shownAt = useRef<number | null>(null);
-  const current = useRef(shown);
+  const key = steps.join("\n");
 
   useEffect(() => {
     shownAt.current ??= Date.now();
-    if (label === current.current) {
+    const list = key.split("\n");
+    const index = list.indexOf(shown);
+    if (index === list.length - 1) {
       return;
     }
+    const next = list[index + 1];
     const wait = Math.max(0, minMs - (Date.now() - shownAt.current));
     const timer = setTimeout(() => {
-      current.current = label;
       shownAt.current = Date.now();
-      setShown(label);
+      setShown(next);
     }, wait);
     return () => clearTimeout(timer);
-  }, [label, minMs]);
+  }, [key, minMs, shown]);
 
   return shown;
 }
 
 export function StatusLine({ progress }: { progress: ChatProgressView }) {
-  const label = useHeldLabel(progressLabel(progress), MIN_DWELL_MS);
+  // The reading stage can be shorter than a poll; when writing reports the
+  // passages it read, show that stage first.
+  const steps =
+    progress.kind === "writing" && progress.passages !== undefined
+      ? [progressLabel({ kind: "reading", passages: progress.passages }), progressLabel(progress)]
+      : [progressLabel(progress)];
+  const label = useHeldLabel(steps, MIN_DWELL_MS);
   return (
     <div
       aria-live="polite"

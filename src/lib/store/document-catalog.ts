@@ -44,6 +44,42 @@ type BackfillChunkRow = {
   content: string;
 };
 
+const MAX_OVERLAP_CHARS = 1000;
+const MIN_OVERLAP_CHARS = 8;
+
+/** Longest suffix of `previous` that is also a prefix of `next`, within the bounds. */
+function overlapLength(previous: string, next: string): number {
+  const limit = Math.min(MAX_OVERLAP_CHARS, previous.length, next.length);
+  for (let length = limit; length >= MIN_OVERLAP_CHARS; length -= 1) {
+    if (previous.endsWith(next.slice(0, length))) {
+      return length;
+    }
+  }
+  return 0;
+}
+
+/**
+ * Rebuilds a markdown body from ordered chunks: consecutive chunks that share a
+ * heading form one section under a `## heading` line, and the repeated overlap
+ * between neighbouring chunks of a section is dropped.
+ */
+export function reconstructBody(chunks: BackfillChunkRow[]): string {
+  const parts: string[] = [];
+  for (let index = 0; index < chunks.length; ) {
+    const heading = chunks[index].heading;
+    let text = chunks[index].content;
+    index += 1;
+    while (index < chunks.length && chunks[index].heading === heading) {
+      const next = chunks[index].content;
+      const overlap = overlapLength(text, next);
+      text = overlap > 0 ? text + next.slice(overlap) : `${text}\n\n${next}`;
+      index += 1;
+    }
+    parts.push(heading ? `## ${heading}\n\n${text}` : text);
+  }
+  return parts.join("\n\n");
+}
+
 type AclChunkRow = {
   access_scope: string;
   allowed_roles: string;
@@ -167,7 +203,8 @@ async function documentAclKey(db: SqlExecutor, generationId: string, documentId:
 /**
  * Idempotent: rebuilds catalog and body rows for documents of a generation
  * that lack them. The original text is not stored for such generations, so the
- * body is reconstructed from chunk text (overlap repeated) and marked
+ * body is reconstructed section by section from chunk text (headings restored,
+ * chunk overlap removed) and marked
  * `reconstructed = 1`; offsets do not index into a reconstructed body.
  * Existing rows are never overwritten.
  *
@@ -240,7 +277,7 @@ export async function backfillDocumentCatalog(
       db.prepare(INSERT_MISSING_BODY_SQL).bind(
         documentId,
         generationId,
-        chunks.map((chunk) => chunk.content).join("\n\n"),
+        reconstructBody(chunks),
         1,
       ),
     ]);
