@@ -17,7 +17,8 @@
     "IDENTITY_MODE": "loopback",
     "RESOURCES_PROVISIONED": "false",
     "WRANGLER_ACCESS_DEV": "false",
-    "LOOPBACK_RUNTIME": "true"
+    "LOOPBACK_RUNTIME": "true",
+    "VECTORIZE_INDEX_NAME": "useful-brain-development"
   },
   "d1_databases": [
     {
@@ -70,7 +71,8 @@
         "IDENTITY_MODE": "loopback",
         "RESOURCES_PROVISIONED": "false",
         "WRANGLER_ACCESS_DEV": "false",
-        "LOOPBACK_RUNTIME": "true"
+        "LOOPBACK_RUNTIME": "true",
+        "VECTORIZE_INDEX_NAME": "useful-brain-development"
       },
       "d1_databases": [
         {
@@ -118,7 +120,8 @@
         "IDENTITY_MODE": "disabled",
         "RESOURCES_PROVISIONED": "true",
         "WRANGLER_ACCESS_DEV": "false",
-        "LOOPBACK_RUNTIME": "false"
+        "LOOPBACK_RUNTIME": "false",
+        "VECTORIZE_INDEX_NAME": "useful-brain-staging"
       },
       "d1_databases": [
         {
@@ -162,7 +165,8 @@
         "IDENTITY_MODE": "access",
         "RESOURCES_PROVISIONED": "false",
         "WRANGLER_ACCESS_DEV": "false",
-        "LOOPBACK_RUNTIME": "false"
+        "LOOPBACK_RUNTIME": "false",
+        "VECTORIZE_INDEX_NAME": "useful-brain-production"
       },
       "d1_databases": [
         {

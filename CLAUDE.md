@@ -40,7 +40,7 @@ The target backend is the Cloudflare path in `docs/useful-brain-master-plan.md`.
 - `src/app/`: Next.js App Router, server actions, global styles and metadata. Member routes live in the `src/app/(app)/` route group, with the admin routes beside them (Overview, Sources, People, Evals, Activity).
 - `src/components/`: `shell` (rail, stage, shortcuts), `chat` (with `chat/answer` and `chat/evidence`), `library`, `search` (Cmd+K), `admin/*` (activity, evals, overview, people, sources), `settings/settings-dialog` and `ui` (primitives).
 - `src/lib/contracts/`: typed Brain and UI contracts. `src/lib/labels.ts` and `src/lib/theme.ts` hold user-facing labels and theme handling. `src/lib/library/` maps library data. `src/lib/ingest/` holds parsing, chunking and draft checks.
-- `migrations/operations/` (0001-0015) and `migrations/corpus/` (0001-0005): D1 migrations.
+- `migrations/operations/` (0001-0015) and `migrations/corpus/` (0001-0006): D1 migrations.
 - `scripts/seed-demo.ts`: seeds demo people into the local database (`npm run seed:demo`, needs `DEMO_PASSWORD`).
 - `src/lib/rag/`: loading, chunking, retrieval types and answer helpers.
 - `src/lib/eval/`: evaluation battery.
