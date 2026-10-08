@@ -9,6 +9,7 @@ import type { Model, StreamFunction } from "@earendil-works/pi-ai";
 
 import type { Principal } from "../acl/access";
 import { PROMPT_VERSION, type CitedRetrievalResult } from "../answer/contract";
+import { ExtractionTruncatedError } from "./extraction-truncated";
 import { hintedUncitedDocuments } from "./pointer-completion";
 import type { KnowledgePipeline } from "../retrieve/pipeline";
 import { mutatingIdempotencyKey } from "./approvals";
@@ -57,6 +58,8 @@ export type KnowledgeRunResult = {
   evidence: CitedRetrievalResult[];
   /** Searches this run whose vector channel failed and ran keyword-only. */
   vectorDegradedCount: number;
+  /** Quote-extraction calls that ran out of completion budget before answering. */
+  extractionTruncatedCount: number;
   /** Why an insufficient-evidence answer was kept despite retrieved evidence. */
   refusalReason?: "model_abstained" | "model_abstained_with_evidence";
 };
@@ -578,6 +581,12 @@ export async function runKnowledgeAgent(input: {
 
   // Re-evaluated before every repair attempt: an abort landing between
   // passes must not start another model call.
+  let extractionTruncatedCount = 0;
+  const noteExtractionFailure = (error: unknown) => {
+    if (error instanceof ExtractionTruncatedError) {
+      extractionTruncatedCount += 1;
+    }
+  };
   const canRepair = () =>
     Boolean(input.runtime?.repairGroundedAnswer) &&
     !input.abort?.signal.aborted &&
@@ -603,7 +612,8 @@ export async function runKnowledgeAgent(input: {
       if (repaired && !wall.aborted && !input.abort?.signal.aborted) {
         grounded = enforce(repaired);
       }
-    } catch {
+    } catch (error) {
+      noteExtractionFailure(error);
       grounded = BRAIN_INVALID_CITATION;
     }
   }
@@ -648,7 +658,8 @@ export async function runKnowledgeAgent(input: {
             refusalReason = undefined;
           }
         }
-      } catch {
+      } catch (error) {
+        noteExtractionFailure(error);
         // Keep the refusal.
       }
     }
@@ -686,7 +697,8 @@ export async function runKnowledgeAgent(input: {
           refusalReason = undefined;
         }
       }
-    } catch {
+    } catch (error) {
+      noteExtractionFailure(error);
       // Keep the refusal.
     }
   }
@@ -743,7 +755,8 @@ export async function runKnowledgeAgent(input: {
           grounded = candidate;
         }
       }
-    } catch {
+    } catch (error) {
+      noteExtractionFailure(error);
       // Keep the validated draft.
     }
   }
@@ -780,6 +793,7 @@ export async function runKnowledgeAgent(input: {
     errorMessage: agent.state.errorMessage ?? budgetErrorMessage,
     evidence,
     vectorDegradedCount: evidenceLedger.vectorDegradedCount,
+    extractionTruncatedCount,
     refusalReason: searchFailed ? undefined : refusalReason,
   };
 }

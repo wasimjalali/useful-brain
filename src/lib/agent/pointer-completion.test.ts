@@ -148,8 +148,14 @@ describe("hintedUncitedDocuments", () => {
 // 3. citation labels such as [8] are read as figures;
 // 4. "30-day" and "30 days", or "$2,000" split by normalization, fail to
 //    match the same figure;
-// 5. named-title neighbors fill the hint cap and evict the restating owner;
-// 6. a chunk of an already cited document is hinted as its own twin.
+// 5. numeric coincidence: shared years (2024, 2026), section or list
+//    numbers, or bare counts make an unrelated document a "twin";
+// 6. a unit qualifier is dropped, so 5 business days matches 5 calendar
+//    days;
+// 7. restating twins evict documents the question names, or explicit
+//    contrasts, under the hint cap; or named neighbors from cited text
+//    evict the twin;
+// 8. a chunk of an already cited document is hinted as its own twin.
 const PROCESS_WINDOWS = item(
   "[8]",
   "acme_request_process",
@@ -174,9 +180,33 @@ const NEIGHBOR_ONE_FIGURE = item(
   "Records requests have a 30-day response window regardless of ticket priority.",
 );
 
-function namedNeighbor(label: string, documentId: string, source: string): CitedRetrievalResult {
-  return item(label, documentId, source, "Overview", "General guidance without figures.");
+function neighbor(label: string, documentId: string, source: string, text = "General guidance without figures."): CitedRetrievalResult {
+  return item(label, documentId, source, "Overview", text);
 }
+
+describe("figureTokens", () => {
+  it("matches hyphenated units, thousands separators, currency and percent", () => {
+    expect(figureTokens("a 30-day window and 30 days later")).toEqual(["30 day"]);
+    expect(figureTokens("a flat $2,000 payout, 4 business hours, 8% of ACV")).toEqual([
+      "2000 dollar",
+      "4 business hour",
+      "8 percent",
+    ]);
+    expect(figureTokens("a 1.5 hour window")).toEqual(["1.5 hour"]);
+  });
+
+  it("ignores citation labels, years, section numbers and bare counts", () => {
+    expect(figureTokens("The window applies. [2] [4]")).toEqual([]);
+    expect(figureTokens("Effective 2026 and reviewed in 2024, per section 4.2 and step 3 of 10 steps.")).toEqual([]);
+    expect(figureTokens("SEV-2 tickets and P1 issues under clause 7.3(b)")).toEqual([]);
+  });
+
+  it("keeps day qualifiers apart", () => {
+    expect(figureTokens("within 5 business days")).toEqual(["5 business day"]);
+    expect(figureTokens("within 5 calendar days")).toEqual(["5 calendar day"]);
+    expect(figureTokens("within 5 days")).toEqual(["5 day"]);
+  });
+});
 
 describe("hintedPointerGroups: restated figures", () => {
   const question = "How long do we have to answer a records request?";
@@ -194,35 +224,81 @@ describe("hintedPointerGroups: restated figures", () => {
     ]);
   });
 
-  it("does not hint on a single shared figure or on citation labels", () => {
+  it("does not hint on a single shared figure", () => {
     expect(
       hintedPointerGroups(question, "The standard response window is 30 days from the request date. [8]", [
         PROCESS_WINDOWS,
         NEIGHBOR_ONE_FIGURE,
       ]),
     ).toEqual([]);
-    // [2] and [4] are labels, not figures: no paragraph carries two figures.
-    expect(figureTokens("The window applies. [2] [4]")).toEqual([]);
   });
 
-  it("matches hyphenated units and thousands separators", () => {
-    expect(figureTokens("a 30-day window and 30 days later")).toEqual(["30 day"]);
-    expect(figureTokens("a flat $2,000 payout, 4 business hours, 8% of ACV")).toEqual([
-      "2000",
-      "4 hour",
-      "8 percent",
-    ]);
+  it("does not hint on shared years or section numbers", () => {
+    const cited = neighbor(
+      "[1]",
+      "acme_budget",
+      "budget-policy.md",
+      "The 2026 budget follows section 4 of the plan approved in 2024.",
+    );
+    const unrelated = neighbor(
+      "[2]",
+      "acme_badges",
+      "badge-policy.md",
+      "Badges issued in 2024 are replaced in 2026 under section 4.",
+    );
+    expect(
+      hintedPointerGroups("What changed in the budget?", "The 2026 budget follows section 4 of the plan approved in 2024. [1]", [
+        cited,
+        unrelated,
+      ]),
+    ).toEqual([]);
   });
 
-  it("ranks restating twins ahead of named neighbors under the hint cap", () => {
+  it("does not treat business days and calendar days as the same figures", () => {
+    const cited = neighbor("[1]", "acme_refunds", "refunds.md", "Refunds are paid within 5 business days and confirmed within 10 business days.");
+    const other = neighbor("[2]", "acme_returns", "returns.md", "Returns are accepted within 5 calendar days and inspected within 10 calendar days.");
+    expect(
+      hintedPointerGroups("When are refunds paid?", "Refunds are paid within 5 business days and confirmed within 10 business days. [1]", [
+        cited,
+        other,
+      ]),
+    ).toEqual([]);
+  });
+
+  it("protects documents named in the question and explicit contrasts from restating twins", () => {
     const evidence = [
       PROCESS_WINDOWS,
-      namedNeighbor("[3]", "acme_alpha", "alpha.md"),
-      namedNeighbor("[5]", "acme_beta", "beta.md"),
-      namedNeighbor("[6]", "acme_gamma", "gamma.md"),
+      neighbor("[3]", "acme_alpha", "alpha.md"),
+      neighbor("[5]", "acme_beta", "beta.md"),
+      neighbor("[6]", "acme_gamma", "gamma.md"),
       OWNER_RIGHTS,
     ];
-    const groups = hintedPointerGroups(`${question} alpha beta gamma`, draft, evidence);
+    const named = hintedPointerGroups(`${question} alpha beta gamma`, draft, evidence);
+    expect(named.map((group) => group.items[0]?.documentId)).toEqual(["acme_alpha", "acme_beta", "acme_gamma"]);
+
+    const contrast = neighbor(
+      "[7]",
+      "acme_express",
+      "express-requests.md",
+      "The express request is a different program from the records request process.",
+    );
+    const withContrast = hintedPointerGroups(`${question} alpha beta`, draft, [...evidence.slice(0, 3), contrast, OWNER_RIGHTS]);
+    expect(withContrast.map((group) => group.reason)).toEqual(["contrast", "named", "named"]);
+  });
+
+  it("lets a restating twin outrank neighbors only the cited text names", () => {
+    const citedNamesNeighbors = {
+      ...PROCESS_WINDOWS,
+      text: `${PROCESS_WINDOWS.text} See the alpha, beta and gamma policies for related rules.`,
+    };
+    const evidence = [
+      citedNamesNeighbors,
+      neighbor("[3]", "acme_alpha", "alpha.md"),
+      neighbor("[5]", "acme_beta", "beta.md"),
+      neighbor("[6]", "acme_gamma", "gamma.md"),
+      OWNER_RIGHTS,
+    ];
+    const groups = hintedPointerGroups(question, draft, evidence);
     expect(groups).toHaveLength(3);
     expect(groups[0]?.reason).toBe("restates");
     expect(groups[0]?.items[0]?.documentId).toBe("acme_rights_policy");

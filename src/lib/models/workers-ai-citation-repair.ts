@@ -5,6 +5,7 @@ import {
   type CitedRetrievalResult,
 } from "../answer/contract";
 import type { AnswerCoveragePass, GroundedAnswerRepair } from "../agent/run";
+import { ExtractionTruncatedError } from "../agent/extraction-truncated";
 import { hintedPointerGroups, type PointerReason } from "../agent/pointer-completion";
 import { MODELS_WITH_MANDATORY_REASONING, MODELS_WITHOUT_THINKING_TOGGLE } from "./eval-override";
 import { parseWorkersAiChatMessage, runUntilAborted, type WorkersAiChatRunner } from "./workers-ai-chat";
@@ -37,6 +38,39 @@ function extractionDecoding(modelId: string): Record<string, unknown> {
   return MODELS_WITHOUT_THINKING_TOGGLE.has(modelId)
     ? base
     : { ...base, chat_template_kwargs: { enable_thinking: false } };
+}
+
+/**
+ * Throws when an extraction ran out of completion budget before writing any
+ * content (finish_reason "length", empty answer). That is a failed call, not
+ * "no quotes", so it must never be cached or read as an empty result. The
+ * one-line warning carries no question, evidence or reasoning text.
+ */
+function assertNotTruncated(
+  response: unknown,
+  modelId: string,
+  pass: ExtractionTruncatedError["pass"],
+): void {
+  const choice = isRecord(response) && Array.isArray(response.choices) ? response.choices[0] : undefined;
+  if (!isRecord(choice) || choice.finish_reason !== "length") {
+    return;
+  }
+  const message = isRecord(choice.message) ? choice.message : {};
+  const content = typeof message.content === "string" ? message.content.trim() : "";
+  const toolCalls = Array.isArray(message.tool_calls) ? message.tool_calls : [];
+  if (content || toolCalls.length > 0) {
+    return;
+  }
+  const usage = isRecord(response) && isRecord(response.usage) ? response.usage : {};
+  console.warn(
+    JSON.stringify({
+      event: "extraction_truncated",
+      pass,
+      model: modelId,
+      completionTokens: typeof usage.completion_tokens === "number" ? usage.completion_tokens : null,
+    }),
+  );
+  throw new ExtractionTruncatedError(pass);
 }
 
 export function createWorkersAiCitationRepair(
@@ -125,6 +159,7 @@ async function extractQuoteResponse(
     options.signal,
   );
   options.signal?.throwIfAborted();
+  assertNotTruncated(response, modelId, "repair");
   options.extractionCache?.set(key, response);
   return response;
 }
@@ -317,6 +352,7 @@ export function createWorkersAiCoveragePass(
       signal,
     );
     signal?.throwIfAborted();
+    assertNotTruncated(response, modelId, "coverage");
     const message = parseWorkersAiChatMessage(response, modelId);
     const raw = message.content
       .filter((part) => part.type === "text")
@@ -336,7 +372,7 @@ export function createWorkersAiCoveragePass(
 
 const POINTER_HINTS: Record<PointerReason, (label: string, source: string) => string> = {
   restates: (label, source) =>
-    `The document behind ${label} (${source}) states the same figures as a cited draft paragraph, so it states the same rule. Include its exact sentence stating those figures so both sources are cited.`,
+    `The document behind ${label} (${source}) states the same figures as a cited draft paragraph. That can be coincidence. Only if its Text states the same rule for the same topic the question asks about, include its exact sentence so both sources are cited; otherwise ignore it.`,
   contrast: (label, source) =>
     `The evidence says the program or policy behind ${label} (${source}) is different from one the draft cites. If the question's wording could mean ${label}'s program, include its exact sentence too, so the answer shows each program with its own numbers.`,
   named: (label, source) =>

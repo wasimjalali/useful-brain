@@ -60,52 +60,35 @@ function documentKey(item: CitedRetrievalResult): string {
   return item.documentId ?? item.source;
 }
 
-const FIGURE_UNITS = new Map([
-  ["percent", "percent"],
-  ["minute", "minute"],
-  ["minutes", "minute"],
-  ["hour", "hour"],
-  ["hours", "hour"],
-  ["day", "day"],
-  ["days", "day"],
-  ["week", "week"],
-  ["weeks", "week"],
-  ["month", "month"],
-  ["months", "month"],
-  ["year", "year"],
-  ["years", "year"],
-]);
-const FIGURE_QUALIFIERS = new Set(["business", "calendar", "working"]);
 const CITATION_LABEL_RE = /\[\d{1,2}\]/g;
-/** One shared number is coincidence; two in one passage is a restatement. */
+/**
+ * A figure is a quantity with a unit: a duration, a percentage or an amount
+ * of money. Bare numbers (years, section and step numbers, counts) never
+ * count, so a shared "2026" or "section 4" is not a restatement. Day and hour
+ * qualifiers stay part of the figure: 5 business days is not 5 calendar days.
+ */
+const FIGURE_RE =
+  /(\d+(?:\.\d+)?)\s+(?:(business|calendar|working)\s+)?(percent|dollars?|minutes?|hours?|days?|weeks?|months?|years?)\b/g;
+/** One shared figure is coincidence; two in one passage is a restatement candidate. */
 const MIN_SHARED_FIGURES = 2;
 
 /**
- * Distinct figures in a text: a number with its unit when one follows
- * ("30-day" and "30 days" are both "30 day"; "4 business hours" is
- * "4 hour"), or the bare number ("$2,000" is "2000"). Citation labels are
- * not figures.
+ * Distinct figures in a text, in order: "30-day" and "30 days" are both
+ * "30 day", "4 business hours" is "4 business hour", "$2,000" is
+ * "2000 dollar" and "8%" is "8 percent". Citation labels are not figures.
  */
 export function figureTokens(text: string): string[] {
-  const tokens = normalizeSupportText(
-    text.replace(CITATION_LABEL_RE, " ").replace(/%/g, " percent "),
-  ).split(" ");
+  const prepared = text
+    .toLowerCase()
+    .replace(CITATION_LABEL_RE, " ")
+    .replace(/(\d),(?=\d{3}\b)/g, "$1")
+    .replace(/\$\s?(\d+(?:\.\d+)?)/g, "$1 dollar")
+    .replace(/(\d)\s?%/g, "$1 percent")
+    .replace(/(\d)-(?=[a-z])/g, "$1 ");
   const figures: string[] = [];
-  for (let index = 0; index < tokens.length; index += 1) {
-    if (!/^\d+$/.test(tokens[index])) {
-      continue;
-    }
-    let number = tokens[index];
-    while (/^\d{3}$/.test(tokens[index + 1] ?? "")) {
-      index += 1;
-      number += tokens[index];
-    }
-    let next = index + 1;
-    if (FIGURE_QUALIFIERS.has(tokens[next] ?? "")) {
-      next += 1;
-    }
-    const unit = FIGURE_UNITS.get(tokens[next] ?? "");
-    const figure = unit ? `${number} ${unit}` : number;
+  for (const match of prepared.matchAll(FIGURE_RE)) {
+    const [, amount, qualifier, unit] = match;
+    const figure = [amount, qualifier, unit.replace(/s$/, "")].filter(Boolean).join(" ");
     if (!figures.includes(figure)) {
       figures.push(figure);
     }
@@ -115,7 +98,13 @@ export function figureTokens(text: string): string[] {
 
 export type PointerReason = "restates" | "contrast" | "named";
 
-const REASON_PRIORITY: Record<PointerReason, number> = { restates: 0, contrast: 1, named: 2 };
+/**
+ * Hint-cap order. Explicit contrasts and documents the question itself
+ * names are protected; restating twins fill the remaining slots ahead of
+ * documents named only by the draft or the cited evidence, which are the
+ * noisiest signal (a cited chunk often lists every related policy).
+ */
+const TIER = { contrast: 0, namedInQuestion: 1, restates: 2, namedElsewhere: 3 } as const;
 
 export type PointerGroup = { reason: PointerReason; items: CitedRetrievalResult[] };
 
@@ -130,16 +119,17 @@ export function hintedUncitedDocuments(
 
 /**
  * Uncited evidence documents the coverage pass should look at, with why:
- * - `restates`: a chunk states every figure (at least two) of one cited
- *   draft paragraph, so it restates the same rule; this is how a process
- *   document and the policy that owns its rule show up when neither names
- *   the other in the retrieved chunks;
+ * - `restates`: a chunk states every figure (at least two, with units) of
+ *   one cited draft paragraph, so it may state the same rule; this is how a
+ *   process document and the policy that owns its rule show up when neither
+ *   names the other in the retrieved chunks. It is a candidate for the model
+ *   to judge, never a finding;
  * - `contrast`: it explicitly contrasts itself with a cited document ("a
  *   different program");
  * - `named`: the question, draft or cited evidence names it by title.
- * Returned per document, strongest reason first and then in ledger order,
- * so every chunk of a hinted document is visible to the coverage pass and
- * the hint cap never evicts a restating twin in favor of a named neighbor.
+ * Returned per document in hint-cap order (contrast, named in the
+ * question, restates, named elsewhere) and then ledger order, so every
+ * chunk of a hinted document is visible to the coverage pass.
  */
 export function hintedPointerGroups(
   question: string,
@@ -157,6 +147,7 @@ export function hintedPointerGroups(
       }
     }
   }
+  const questionText = normalizeSupportText(question);
   const haystack = normalizeSupportText(`${question} ${draft} ${citedTexts.join(" ")}`);
   const citedTitles = new Map<string, string[]>();
   for (const item of evidence) {
@@ -171,7 +162,7 @@ export function hintedPointerGroups(
     .filter((paragraph) => /\[\d{1,2}\]/.test(paragraph))
     .map((paragraph) => figureTokens(paragraph))
     .filter((figures) => figures.length >= MIN_SHARED_FIGURES);
-  const reasons = new Map<string, PointerReason>();
+  const best = new Map<string, { tier: number; reason: PointerReason }>();
   for (const item of evidence) {
     const key = documentKey(item);
     if (draftLabels.has(item.citationLabel) || citedByDocument.has(key) || !item.text) {
@@ -182,30 +173,28 @@ export function hintedPointerGroups(
       figures.every((figure) => itemFigures.has(figure)),
     );
     const titleTokens = documentTitleTokens(item.source);
-    const named = titleReferenced(titleTokens, haystack);
     const contrasts =
       CONTRAST_RES.some((pattern) => pattern.test(item.text)) &&
       [...citedTitles.values()].some(
         (citedTokens) => citedTokens.length > 0 && titleReferenced(citedTokens, normalizeSupportText(item.text)),
       );
-    const reason: PointerReason | null = restates
-      ? "restates"
-      : contrasts
-        ? "contrast"
-        : named
-          ? "named"
-          : null;
-    const previous = reasons.get(key);
-    if (reason && (!previous || REASON_PRIORITY[reason] < REASON_PRIORITY[previous])) {
-      reasons.set(key, reason);
+    const candidate = contrasts
+      ? { tier: TIER.contrast, reason: "contrast" as const }
+      : titleReferenced(titleTokens, questionText)
+        ? { tier: TIER.namedInQuestion, reason: "named" as const }
+        : restates
+          ? { tier: TIER.restates, reason: "restates" as const }
+          : titleReferenced(titleTokens, haystack)
+            ? { tier: TIER.namedElsewhere, reason: "named" as const }
+            : null;
+    const previous = best.get(key);
+    if (candidate && (!previous || candidate.tier < previous.tier)) {
+      best.set(key, candidate);
     }
   }
-  const ranked = [...reasons.entries()]
-    .map(([key, reason], order) => ({ key, reason, order }))
-    .sort(
-      (left, right) =>
-        REASON_PRIORITY[left.reason] - REASON_PRIORITY[right.reason] || left.order - right.order,
-    )
+  const ranked = [...best.entries()]
+    .map(([key, { tier, reason }], order) => ({ key, tier, reason, order }))
+    .sort((left, right) => left.tier - right.tier || left.order - right.order)
     .slice(0, MAX_HINTED_DOCUMENTS);
   return ranked.map(({ key, reason }) => ({
     reason,

@@ -1,5 +1,6 @@
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import { ingestNorthwind } from "./ingest-northwind";
@@ -24,6 +25,52 @@ import { CHAT_MODEL_ID } from "../models/selection";
 
 export const EVAL_OUTPUT_DIR = path.join(process.cwd(), "eval-output");
 const LOCKED_QUESTIONS_FILE = path.join(process.cwd(), "content/northwind/questions.json");
+
+/** Canonical, case-folded path, so a symlink, `..` or case variant compares equal. */
+function canonicalPath(file: string): string {
+  let resolved = path.resolve(file);
+  try {
+    resolved = realpathSync.native(resolved);
+  } catch {
+    // A path that does not exist cannot be the locked file through a link;
+    // compare its resolved spelling.
+  }
+  return resolved.toLowerCase();
+}
+
+function isLockedQuestionsFile(file: string): boolean {
+  return canonicalPath(file) === canonicalPath(LOCKED_QUESTIONS_FILE);
+}
+
+/**
+ * Loads a tuning question file against the corpus. A file that yields no
+ * questions (an empty list or a misspelled key) fails closed: it must never
+ * produce an empty run that reads as a clean pass.
+ */
+export function loadTuningQuestions(file: string, documents: NorthwindDocument[]): EvalQuestion[] {
+  const { questions } = loadQuestions(file, documents);
+  if (questions.length === 0) {
+    throw new Error(`${path.basename(file)} has no questions`);
+  }
+  return questions;
+}
+
+/**
+ * Which harness build produced a run. The Brain's own prompt and pipeline
+ * versions are recorded per run from its responses; this is the commit of
+ * the harness checkout, which can differ from the Brain under test.
+ */
+export function harnessProvenance(): { harnessGitSha: string | null; harnessDirty: boolean | null } {
+  try {
+    const sha = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+    const status = execFileSync("git", ["status", "--porcelain", "--untracked-files=no"], {
+      encoding: "utf8",
+    });
+    return { harnessGitSha: sha, harnessDirty: status.trim().length > 0 };
+  } catch {
+    return { harnessGitSha: null, harnessDirty: null };
+  }
+}
 
 // Bumped when scoring semantics change so a resume never mixes rows scored
 // under different identity or metric rules.
@@ -101,7 +148,7 @@ export function parseArgs(argv: string[]) {
     throw new Error("--questions requires a question file");
   }
   const questionsFile = questionsArg ? path.resolve(questionsArg) : undefined;
-  if (questionsFile && questionsFile === LOCKED_QUESTIONS_FILE) {
+  if (questionsFile && isLockedQuestionsFile(questionsFile)) {
     throw new Error("--questions is for tuning sets; run the locked battery without it");
   }
   return {
@@ -291,6 +338,7 @@ async function runLiveLayer(
   generationId: string;
   results: NorthwindAnswerScore[];
   latenciesMs: Record<string, number>;
+  pipelineVersion: string | undefined;
 }> {
   const generationId = await ensureSeeded(brainUrl);
   const paths = outputPaths(model, questionsFile);
@@ -387,7 +435,7 @@ async function runLiveLayer(
     } satisfies LiveCheckpoint);
     await sleep(250);
   }
-  return { generationId, results, latenciesMs };
+  return { generationId, results, latenciesMs, pipelineVersion };
 }
 
 function latencySummary(latenciesMs: Record<string, number>, total: number) {
@@ -499,7 +547,7 @@ async function main() {
   // but it is not the locked battery, so the locked category distribution
   // check does not apply to it.
   const questions = args.questionsFile
-    ? loadQuestions(args.questionsFile, documents).questions
+    ? loadTuningQuestions(args.questionsFile, documents)
     : corpus.questions;
   if (!args.questionsFile) {
     const gaps = coverageGaps(countByCategory(questions));
@@ -513,12 +561,18 @@ async function main() {
     generationId: string;
     results: NorthwindAnswerScore[];
     latenciesMs: Record<string, number>;
+    pipelineVersion: string | undefined;
   } | null = null;
+  const provenance = {
+    ...(args.questionsFile ? { questionsFile: path.relative(process.cwd(), args.questionsFile) } : {}),
+    ...harnessProvenance(),
+  };
   if (args.live) {
     live = await runLiveLayer(questions, args.brainUrl, args.resume, args.model, args.questionsFile);
     writeJson(paths.summary, {
       model: args.model ?? CHAT_MODEL_ID,
-      ...(args.questionsFile ? { questionsFile: path.relative(process.cwd(), args.questionsFile) } : {}),
+      ...provenance,
+      pipelineVersion: live.pipelineVersion ?? null,
       generationId: live.generationId,
       latency: latencySummary(live.latenciesMs, live.results.length),
       results: live.results,
@@ -526,7 +580,8 @@ async function main() {
   }
   const findings = {
     model: args.model ?? CHAT_MODEL_ID,
-    ...(args.questionsFile ? { questionsFile: path.relative(process.cwd(), args.questionsFile) } : {}),
+    ...provenance,
+    ...(live ? { pipelineVersion: live.pipelineVersion ?? null } : {}),
     ...(live ? { latency: latencySummary(live.latenciesMs, live.results.length) } : {}),
     ...summarize(retrieval, live?.results ?? null, questions),
   };

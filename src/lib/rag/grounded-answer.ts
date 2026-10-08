@@ -43,6 +43,8 @@ export type GroundedAnswerResponse = {
   promptVersion?: string;
   /** Searches this turn whose vector channel failed and ran keyword-only. */
   vectorDegradedCount?: number;
+  /** Quote-extraction calls this turn that ran out of completion budget before answering. */
+  extractionTruncatedCount?: number;
   /** Why an insufficient-evidence answer was kept despite retrieved evidence. */
   refusalReason?: string;
   /** Loopback-only retrieval principal this turn was scoped to, when assumed. */

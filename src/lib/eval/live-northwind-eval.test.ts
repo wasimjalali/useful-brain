@@ -1,8 +1,18 @@
+import { mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { EVAL_OUTPUT_DIR, brainJson, liveTurn, outputPaths, parseArgs } from "./live-northwind-eval";
+import {
+  EVAL_OUTPUT_DIR,
+  harnessProvenance,
+  brainJson,
+  liveTurn,
+  loadTuningQuestions,
+  outputPaths,
+  parseArgs,
+} from "./live-northwind-eval";
 import { loadDocuments, loadQuestions } from "./northwind-loader";
 
 // Ways a tuning run could be mistaken for the locked battery:
@@ -50,13 +60,83 @@ describe("live Northwind eval --questions", () => {
 
   it("loads the checked-in tuning set against the corpus", () => {
     const root = path.join(process.cwd(), "content/northwind");
-    const { questions } = loadQuestions(
-      path.join(root, "tuning-questions.json"),
+    const questions = loadTuningQuestions(path.join(root, "tuning-questions.json"), loadDocuments(root));
+    expect(questions.length).toBeGreaterThanOrEqual(10);
+    expect(questions.every((question) => question.questionId.startsWith("tu"))).toBe(true);
+  });
+
+  it("loads the checked-in abstention guard against the corpus", () => {
+    const root = path.join(process.cwd(), "content/northwind");
+    const questions = loadTuningQuestions(
+      path.join(root, "tuning-abstention-questions.json"),
       loadDocuments(root),
     );
-    expect(questions.length).toBeGreaterThanOrEqual(10);
-    expect(questions.every((question) => question.questionId.startsWith("tq"))).toBe(true);
+    expect(questions.length).toBeGreaterThanOrEqual(3);
+    expect(questions.every((question) => question.category === "unanswerable")).toBe(true);
   });
+
+  it("fails closed on a question file with zero questions", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "tuning-"));
+    const file = path.join(dir, "empty.json");
+    // A misspelled key loads as zero questions, which must never pass as a run.
+    writeFileSync(file, JSON.stringify({ principals: {}, question: [] }));
+    expect(() => loadTuningQuestions(file, [])).toThrow(/no questions/);
+  });
+
+  it("records the harness commit beside each run", () => {
+    const provenance = harnessProvenance();
+    expect(provenance.harnessGitSha).toMatch(/^[0-9a-f]{40}$/);
+    expect(typeof provenance.harnessDirty).toBe("boolean");
+  });
+
+  it("refuses the locked file through another spelling of its path", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "tuning-"));
+    const link = path.join(dir, "linked.json");
+    symlinkSync(path.resolve("content/northwind/questions.json"), link);
+    expect(() => parseArgs(["--questions", link])).toThrow(/tuning sets/);
+    expect(() => parseArgs(["--questions", "content/northwind/QUESTIONS.json"])).toThrow(/tuning sets/);
+    expect(() => parseArgs(["--questions", "content/northwind/../northwind/questions.json"])).toThrow(
+      /tuning sets/,
+    );
+  });
+});
+
+// A tuning set that repeats locked facts tunes on the locked baseline by
+// another name. Ways that could slip in:
+// 1. a tuning question asks a locked question's fact (same gold document and
+//    the same expected section);
+// 2. a tuning id equals a locked id, so a merged report mixes the two;
+// 3. a tuning file repeats an id within itself (the loader rejects this).
+describe("tuning sets stay apart from the locked battery", () => {
+  const root = path.join(process.cwd(), "content/northwind");
+  const documents = loadDocuments(root);
+  const locked = loadQuestions(path.join(root, "questions.json"), documents).questions;
+  const lockedPairs = new Set(
+    locked.flatMap((question) =>
+      question.expectedDocumentIds.flatMap((documentId) =>
+        question.expectedSections.map((section) => `${documentId}#${section}`),
+      ),
+    ),
+  );
+  for (const file of ["tuning-questions.json", "tuning-abstention-questions.json"]) {
+    it(`${file} shares no gold document and section with a locked question`, () => {
+      const tuning = loadTuningQuestions(path.join(root, file), documents);
+      const overlaps = tuning.flatMap((question) =>
+        question.expectedDocumentIds.flatMap((documentId) =>
+          question.expectedSections
+            .filter((section) => lockedPairs.has(`${documentId}#${section}`))
+            .map((section) => `${question.questionId}: ${documentId} / ${section}`),
+        ),
+      );
+      expect(overlaps).toEqual([]);
+    });
+
+    it(`${file} ids never collide with locked ids`, () => {
+      const lockedIds = new Set(locked.map((question) => question.questionId));
+      const tuning = loadTuningQuestions(path.join(root, file), documents);
+      expect(tuning.filter((question) => lockedIds.has(question.questionId))).toEqual([]);
+    });
+  }
 });
 
 afterEach(() => {

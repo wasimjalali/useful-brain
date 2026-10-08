@@ -8,6 +8,7 @@ import {
 
 import type { CitedRetrievalResult } from "../answer/contract";
 import { BudgetExceededError } from "../agent/budgets";
+import { ExtractionTruncatedError } from "../agent/extraction-truncated";
 import { SEARCH_KNOWLEDGE_TOOL } from "../agent/host-grounding";
 import { runKnowledgeAgent } from "../agent/run";
 import { FakeEmbeddingProvider } from "../retrieve/fake-embed";
@@ -125,6 +126,9 @@ describe("Workers AI citation repair", () => {
     expect(user).toContain(
       "The document behind [2] (customer-rights-policy.md) states the same figures as a cited draft paragraph",
     );
+    // A candidate for the model to judge, never an assertion of the same rule.
+    expect(user).toContain("Only if its Text states the same rule for the same topic");
+    expect(user).not.toContain("so it states the same rule");
   });
 
   it("keeps the thinking toggle and the 1,024 cap for models that honor it", async () => {
@@ -555,6 +559,79 @@ function quotesResponse(quotes: Array<{ quote: string; citation: string }>) {
     ],
   };
 }
+
+// Truncated extraction (finish_reason "length", empty content). Failure
+// modes:
+// 1. it reads as "no quotes" (null), indistinguishable from a real answer;
+// 2. citation repair caches it, so a later strict retry or abstention
+//    recheck in the same run replays the truncation instead of retrying;
+// 3. the warning leaks evidence or reasoning text into logs;
+// 4. a truncated response that did write content is treated as truncated.
+describe("truncated extraction", () => {
+  const truncated = {
+    choices: [
+      {
+        finish_reason: "length",
+        message: { content: "", reasoning_content: "Thinking about the P1 response target..." },
+      },
+    ],
+    usage: { completion_tokens: 4096 },
+  };
+
+  it("rejects a truncated repair, warns without content and never caches it", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const run = vi.fn().mockResolvedValue(truncated);
+    const repair = createWorkersAiCitationRepair({ run });
+    const extractionCache = new Map<string, unknown>();
+    const input = { question: "What is the P1 first-response target?", evidence, extractionCache };
+
+    await expect(repair(input)).rejects.toBeInstanceOf(ExtractionTruncatedError);
+    expect(extractionCache.size).toBe(0);
+    await expect(repair({ ...input, lexicalFallback: false })).rejects.toBeInstanceOf(
+      ExtractionTruncatedError,
+    );
+    // The second pass asked the provider again instead of replaying.
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(warn).toHaveBeenCalledTimes(2);
+    const logged = String(warn.mock.calls[0]?.[0]);
+    expect(JSON.parse(logged)).toMatchObject({ event: "extraction_truncated", pass: "repair" });
+    expect(logged).not.toContain("P1");
+    expect(logged).not.toContain("Thinking");
+    warn.mockRestore();
+  });
+
+  it("rejects a truncated coverage pass instead of returning no additions", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const run = vi.fn().mockResolvedValue(truncated);
+    await expect(
+      createWorkersAiCoveragePass({ run })({
+        question: "What is the P1 response target?",
+        draft: "P1 tickets have a first-response target of 1 hour. [1]",
+        evidence,
+      }),
+    ).rejects.toBeInstanceOf(ExtractionTruncatedError);
+    expect(JSON.parse(String(warn.mock.calls[0]?.[0]))).toMatchObject({ pass: "coverage" });
+    warn.mockRestore();
+  });
+
+  it("parses a length-limited response that still wrote its answer", async () => {
+    const run = vi.fn().mockResolvedValue({
+      choices: [
+        {
+          finish_reason: "length",
+          message: {
+            content: JSON.stringify({
+              quotes: [{ quote: "P1 tickets have a first-response target of 1 hour.", citation: "[1]" }],
+            }),
+          },
+        },
+      ],
+    });
+    await expect(
+      createWorkersAiCitationRepair({ run })({ question: "What is the P1 first-response target?", evidence }),
+    ).resolves.toBe("P1 tickets have a first-response target of 1 hour. [1]");
+  });
+});
 
 describe("run-local extraction reuse", () => {
   it("reuses one extraction across a strict rejection and a non-lexical abstention recheck", async () => {

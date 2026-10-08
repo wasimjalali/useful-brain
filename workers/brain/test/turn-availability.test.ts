@@ -128,6 +128,7 @@ function aiStub(options: {
   embeddingFails?: boolean;
   rerankFails?: boolean;
   onRerank?: () => void;
+  extractionTruncated?: boolean;
 }) {
   let chatCalls = 0;
   const script = options.chatReplies ?? [
@@ -154,6 +155,13 @@ function aiStub(options: {
         throw new Error("internal error; reference = 6h7skgod0dt04a0cdq6holq4");
       }
       return { response: [{ id: 0, score: 0.95 }] };
+    }
+    if (options.extractionTruncated) {
+      // Reasoning used the whole completion budget: no content at all.
+      return {
+        choices: [{ finish_reason: "length", message: { content: "", reasoning_content: "..." } }],
+        usage: { completion_tokens: 4096 },
+      };
     }
     // Repair and coverage passes return nothing useful.
     return { choices: [{ finish_reason: "stop", message: { content: "null" } }] };
@@ -238,6 +246,32 @@ describe("retrieval backend failures on a turn", () => {
     });
     expect(answer.structuredAnswer.answerType).toBe("grounded");
     expect(answer.vectorDegradedCount).toBe(1);
+  });
+
+  it("reports a truncated extraction call on the turn", async () => {
+    await seedPrincipals();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const answer = await ephemeralTurn({
+      requestId: "req-avail-truncated",
+      vectorize: workingVectorize,
+      // Uncited prose that is not verbatim evidence, so citation repair runs and is truncated.
+      run: aiStub({
+        finalReply: "Refunds take roughly two weeks on yearly plans.",
+        extractionTruncated: true,
+      }),
+    });
+    expect(answer.extractionTruncatedCount).toBeGreaterThanOrEqual(1);
+    warn.mockRestore();
+  });
+
+  it("omits the truncation count when every extraction answered", async () => {
+    await seedPrincipals();
+    const answer = await ephemeralTurn({
+      requestId: "req-avail-not-truncated",
+      vectorize: workingVectorize,
+      run: aiStub({ finalReply: "Annual plans have a fourteen day refund window." }),
+    });
+    expect(answer.extractionTruncatedCount).toBeUndefined();
   });
 
   it("records a degradation when Vectorize fails", async () => {
