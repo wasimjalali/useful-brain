@@ -1,0 +1,37 @@
+{
+  "description": "Abstention guard authored 2026-10-08 beside tuning-questions.json. Not part of the locked baseline. Each question sits next to evidence that states a similar but different fact, so a repair or coverage pass that quotes too eagerly turns a correct refusal into an unsupported answer.",
+  "principals": {
+    "eng_ic": { "user_id": "eng_ic", "roles": ["standard"], "departments": ["engineering"] },
+    "sales_manager": { "user_id": "sales_manager", "roles": ["sales_manager"], "departments": ["sales"] },
+    "hr_generalist": { "user_id": "hr_generalist", "roles": ["standard"], "departments": ["hr"] }
+  },
+  "questions": [
+    {
+      "id": "ta01",
+      "category": "unanswerable",
+      "query": "What does a reseller partner get paid for referring a job candidate we end up hiring?",
+      "principal": "sales_manager",
+      "expected_document_ids": [],
+      "expected_sections": [],
+      "note": "The hiring referral bonus is for employees; the partner program pays commission on deals. Nothing covers partners referring candidates."
+    },
+    {
+      "id": "ta02",
+      "category": "unanswerable",
+      "query": "What is the daily meal per-diem for a business trip to Tokyo?",
+      "principal": "eng_ic",
+      "expected_document_ids": [],
+      "expected_sections": [],
+      "note": "Per-diems are stated for the US, London and Singapore only."
+    },
+    {
+      "id": "ta03",
+      "category": "unanswerable",
+      "query": "How much is the monthly parking subsidy for employees who commute to an office?",
+      "principal": "hr_generalist",
+      "expected_document_ids": [],
+      "expected_sections": [],
+      "note": "The onboarding guide lists parking subsidies as a commuter benefit without an amount."
+    }
+  ]
+}

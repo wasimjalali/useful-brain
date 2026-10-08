@@ -1,0 +1,2 @@
+instrumentation-v10.log calls 67 empty 45 finish length 39 finish stop 21 completion tokens median 1024.0 max 1024 n 60
+instrumentation-v11.log calls 63 empty 0 finish length 0 finish stop 63 completion tokens median 91 max 401 n 63

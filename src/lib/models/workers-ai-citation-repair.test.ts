@@ -66,11 +66,87 @@ describe("Workers AI citation repair", () => {
         stream: false,
         temperature: 0,
         seed: 7,
-        max_completion_tokens: 1024,
-        chat_template_kwargs: { enable_thinking: false },
+        max_completion_tokens: 4096,
+        reasoning_effort: "low",
       }),
       { signal: undefined },
     );
+    expect(run.mock.calls[0]?.[1]).not.toHaveProperty("chat_template_kwargs");
+  });
+
+  // Extraction decoding failures measured 2026-10-08 on the live worker:
+  // 1. GLM-5.3 Flash ignores chat_template_kwargs.enable_thinking (its
+  //    schema: "Reasoning cannot be disabled") and reasons at max effort;
+  // 2. max-effort reasoning fills a 1,024-token cap, finish_reason
+  //    "length", empty content, so coverage and repair return nothing;
+  // 3. the fix must not send reasoning_effort to models that have a
+  //    working thinking toggle or no reasoning schema at all.
+  it("uses the lowest documented reasoning effort for models that cannot disable reasoning", async () => {
+    const run = vi.fn().mockResolvedValue({
+      choices: [{ finish_reason: "stop", message: { content: JSON.stringify({ quotes: [] }) } }],
+    });
+    const cover = createWorkersAiCoveragePass({ run }, "@cf/zai-org/glm-5.3");
+    await cover({ question: "What is the P1 response target?", draft: "None. [1]", evidence });
+    expect(run.mock.calls[0]?.[1]).toMatchObject({ reasoning_effort: "low", max_completion_tokens: 4096 });
+    expect(run.mock.calls[0]?.[1]).not.toHaveProperty("chat_template_kwargs");
+  });
+
+  it("tells the coverage pass why each uncited document was hinted", async () => {
+    const run = vi.fn().mockResolvedValue({
+      choices: [{ finish_reason: "stop", message: { content: JSON.stringify({ quotes: [] }) } }],
+    });
+    const twinEvidence: CitedRetrievalResult[] = [
+      {
+        ...evidence[0],
+        chunkId: "process__windows__001",
+        source: "records-request-process.md",
+        documentId: "records-request-process",
+        text: "The standard response window is 30 days. Complex requests can be extended by up to 60 days.",
+      },
+      {
+        ...evidence[0],
+        rank: 2,
+        chunkId: "rights__rights__001",
+        source: "customer-rights-policy.md",
+        documentId: "customer-rights-policy",
+        citationLabel: "[2]",
+        text: "We respond within 30 days, extendable by up to 60 days with notice.",
+      },
+    ];
+    await createWorkersAiCoveragePass({ run })({
+      question: "How long do we have to answer a records request?",
+      draft: "The standard response window is 30 days. Complex requests can be extended by up to 60 days. [1]",
+      evidence: twinEvidence,
+    });
+    const user = (run.mock.calls[0]?.[1] as { messages: Array<{ role: string; content: string }> })
+      .messages[1].content;
+    expect(user).toContain(
+      "The document behind [2] (customer-rights-policy.md) states the same figures as a cited draft paragraph",
+    );
+  });
+
+  it("keeps the thinking toggle and the 1,024 cap for models that honor it", async () => {
+    const run = vi.fn().mockResolvedValue({
+      choices: [{ finish_reason: "stop", message: { content: JSON.stringify({ quotes: [] }) } }],
+    });
+    await createWorkersAiCoveragePass({ run }, "@cf/google/gemma-4-26b-a4b-it")({
+      question: "What is the P1 response target?",
+      draft: "None. [1]",
+      evidence,
+    });
+    await createWorkersAiCoveragePass({ run }, "@cf/meta/llama-4-scout-17b-16e-instruct")({
+      question: "What is the P1 response target?",
+      draft: "None. [1]",
+      evidence,
+    });
+    expect(run.mock.calls[0]?.[1]).toMatchObject({
+      max_completion_tokens: 1024,
+      chat_template_kwargs: { enable_thinking: false },
+    });
+    expect(run.mock.calls[0]?.[1]).not.toHaveProperty("reasoning_effort");
+    expect(run.mock.calls[1]?.[1]).toMatchObject({ max_completion_tokens: 1024 });
+    expect(run.mock.calls[1]?.[1]).not.toHaveProperty("reasoning_effort");
+    expect(run.mock.calls[1]?.[1]).not.toHaveProperty("chat_template_kwargs");
   });
 
   it("forwards the abort signal into the ai.run options", async () => {

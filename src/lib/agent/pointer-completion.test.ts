@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import type { CitedRetrievalResult } from "../answer/contract";
-import { documentTitleTokens, hintedUncitedDocuments } from "./pointer-completion";
+import {
+  documentTitleTokens,
+  figureTokens,
+  hintedPointerGroups,
+  hintedUncitedDocuments,
+} from "./pointer-completion";
 
 function item(
   citationLabel: string,
@@ -132,5 +137,105 @@ describe("hintedUncitedDocuments", () => {
     const question = "What happens to my unused sick days if I transfer from Austin to Singapore?";
     const draft = "Sick days do not roll over. [2]";
     expect(hintedUncitedDocuments(question, draft, [SICK_LEAVE, DSAR_RESPONSE])).toEqual([]);
+  });
+});
+
+// Twin documents that restate a rule without naming each other. Ways the
+// "same figures" detection could go wrong:
+// 1. the owner states the same two figures as the cited process document
+//    but is never hinted because no title is named (the 2026-10-08 miss);
+// 2. one shared figure ("30 days") hints every neighbor in evidence;
+// 3. citation labels such as [8] are read as figures;
+// 4. "30-day" and "30 days", or "$2,000" split by normalization, fail to
+//    match the same figure;
+// 5. named-title neighbors fill the hint cap and evict the restating owner;
+// 6. a chunk of an already cited document is hinted as its own twin.
+const PROCESS_WINDOWS = item(
+  "[8]",
+  "acme_request_process",
+  "records-request-process.md",
+  "Response Windows",
+  "The standard response window is 30 days from the request date. Complex requests can be extended by up to 60 days, with written notice to the requester.",
+);
+
+const OWNER_RIGHTS = item(
+  "[2]",
+  "acme_rights_policy",
+  "customer-rights-policy.md",
+  "Rights",
+  "Acme responds within 30 days; where a request is complex, the response can be extended by up to 60 days, with notice.",
+);
+
+const NEIGHBOR_ONE_FIGURE = item(
+  "[4]",
+  "acme_ticket_policy",
+  "ticket-targets.md",
+  "Relationship to Other Policies",
+  "Records requests have a 30-day response window regardless of ticket priority.",
+);
+
+function namedNeighbor(label: string, documentId: string, source: string): CitedRetrievalResult {
+  return item(label, documentId, source, "Overview", "General guidance without figures.");
+}
+
+describe("hintedPointerGroups: restated figures", () => {
+  const question = "How long do we have to answer a records request?";
+  const draft =
+    "The standard response window is 30 days from the request date. [8]\n\nComplex requests can be extended by up to 60 days, with written notice to the requester within the first 30 days. [8]";
+
+  it("hints an uncited document that states the same two figures as one cited paragraph", () => {
+    const groups = hintedPointerGroups(question, draft, [
+      PROCESS_WINDOWS,
+      OWNER_RIGHTS,
+      NEIGHBOR_ONE_FIGURE,
+    ]);
+    expect(groups.map((group) => [group.reason, group.items[0]?.documentId])).toEqual([
+      ["restates", "acme_rights_policy"],
+    ]);
+  });
+
+  it("does not hint on a single shared figure or on citation labels", () => {
+    expect(
+      hintedPointerGroups(question, "The standard response window is 30 days from the request date. [8]", [
+        PROCESS_WINDOWS,
+        NEIGHBOR_ONE_FIGURE,
+      ]),
+    ).toEqual([]);
+    // [2] and [4] are labels, not figures: no paragraph carries two figures.
+    expect(figureTokens("The window applies. [2] [4]")).toEqual([]);
+  });
+
+  it("matches hyphenated units and thousands separators", () => {
+    expect(figureTokens("a 30-day window and 30 days later")).toEqual(["30 day"]);
+    expect(figureTokens("a flat $2,000 payout, 4 business hours, 8% of ACV")).toEqual([
+      "2000",
+      "4 hour",
+      "8 percent",
+    ]);
+  });
+
+  it("ranks restating twins ahead of named neighbors under the hint cap", () => {
+    const evidence = [
+      PROCESS_WINDOWS,
+      namedNeighbor("[3]", "acme_alpha", "alpha.md"),
+      namedNeighbor("[5]", "acme_beta", "beta.md"),
+      namedNeighbor("[6]", "acme_gamma", "gamma.md"),
+      OWNER_RIGHTS,
+    ];
+    const groups = hintedPointerGroups(`${question} alpha beta gamma`, draft, evidence);
+    expect(groups).toHaveLength(3);
+    expect(groups[0]?.reason).toBe("restates");
+    expect(groups[0]?.items[0]?.documentId).toBe("acme_rights_policy");
+  });
+
+  it("never hints a chunk of a cited document as its own twin", () => {
+    const sameDocument = { ...OWNER_RIGHTS, documentId: "acme_request_process", citationLabel: "[9]" };
+    expect(hintedPointerGroups(question, draft, [PROCESS_WINDOWS, sameDocument])).toEqual([]);
+  });
+
+  it("keeps the flat group list for existing callers", () => {
+    expect(hintedUncitedDocuments(question, draft, [PROCESS_WINDOWS, OWNER_RIGHTS])).toEqual([
+      [OWNER_RIGHTS],
+    ]);
   });
 });

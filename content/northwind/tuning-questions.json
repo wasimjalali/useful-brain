@@ -1,0 +1,287 @@
+{
+  "description": "Tuning set authored 2026-10-08 for the twin-document and similar-program citation work. Not part of the locked 120-question baseline: tune against these, confirm on questions.json. Twin questions (tq01-tq04, tq12-tq14) ask a fact a process or neighbor document restates while naming the owning policy; the owner is the gold. Similar-program questions (tq05-tq11, tq15-tq16) sit next to a similarly named program or policy the corpus calls different. tq12-tq16 were added after the first 11 all passed on the first baseline repeat: they phrase the question in the restating document's own vocabulary, the way q028 does.",
+  "principals": {
+    "eng_lead": {
+      "user_id": "eng_lead",
+      "roles": [
+        "manager"
+      ],
+      "departments": [
+        "engineering"
+      ]
+    },
+    "eng_dir": {
+      "user_id": "eng_dir",
+      "roles": [
+        "director"
+      ],
+      "departments": [
+        "engineering"
+      ]
+    },
+    "fin_manager": {
+      "user_id": "fin_manager",
+      "roles": [
+        "finance_manager"
+      ],
+      "departments": [
+        "finance"
+      ]
+    },
+    "sales_manager": {
+      "user_id": "sales_manager",
+      "roles": [
+        "sales_manager"
+      ],
+      "departments": [
+        "sales"
+      ]
+    },
+    "support_agent": {
+      "user_id": "support_agent",
+      "roles": [
+        "standard"
+      ],
+      "departments": [
+        "support"
+      ]
+    },
+    "support_manager": {
+      "user_id": "support_manager",
+      "roles": [
+        "support_manager"
+      ],
+      "departments": [
+        "support"
+      ]
+    }
+  },
+  "questions": [
+    {
+      "id": "tq01",
+      "category": "factual",
+      "query": "A customer emailed us about a P2 issue. How quickly should they get a first reply?",
+      "principal": "support_agent",
+      "expected_document_ids": [
+        "nw_support_sla_policy"
+      ],
+      "expected_sections": [
+        "Response and Resolution Targets"
+      ],
+      "note": "Twin: Channel and Hours restates P2 4 business hours 'within the Support SLA Policy targets'; the SLA policy owns the table."
+    },
+    {
+      "id": "tq02",
+      "category": "factual",
+      "query": "Above what contract value does a vendor agreement need legal review before we sign it?",
+      "principal": "fin_manager",
+      "expected_document_ids": [
+        "nw_legal_contract_review"
+      ],
+      "expected_sections": [
+        "When Legal Review Is Required"
+      ],
+      "note": "Twin: Vendor and Procurement restates $100,000 'per the Contract Review and Approval Policy's thresholds'; the contract review policy owns the threshold."
+    },
+    {
+      "id": "tq03",
+      "category": "factual",
+      "query": "How fast must a P0 ticket get its first human response?",
+      "principal": "support_manager",
+      "expected_document_ids": [
+        "nw_support_sla_policy"
+      ],
+      "expected_sections": [
+        "Response and Resolution Targets",
+        "P0 and P1 Tickets"
+      ],
+      "note": "Twin: the Agent Performance Scorecard restates 15 minutes 'measured against the Support SLA Policy targets'; Channel and Hours has a different 5-minute phone answer time."
+    },
+    {
+      "id": "tq04",
+      "category": "factual",
+      "query": "Once a refund is approved, how long until the money reaches the customer?",
+      "principal": "support_agent",
+      "expected_document_ids": [
+        "nw_finance_refund_policy"
+      ],
+      "expected_sections": [
+        "Refund Processing Time"
+      ],
+      "note": "Twin: the Customer Complaint Escalation Path restates 5 to 10 business days as 'the Refund Policy's payment processing'."
+    },
+    {
+      "id": "tq05",
+      "category": "factual",
+      "query": "A customer asks to speak to someone about how their case was handled. How quickly must we acknowledge it, and when does it move up to the next escalation level?",
+      "principal": "support_agent",
+      "expected_document_ids": [
+        "nw_support_complaint_escalation"
+      ],
+      "expected_sections": [
+        "ESC-1: Complaint Logged",
+        "ESC-2: Support Manager Review"
+      ],
+      "note": "Similar program: the complaint path (ESC levels) says it is separate from the technical Incident Escalation Matrix (SEV levels). Four business hours, then ESC-2 after two business days."
+    },
+    {
+      "id": "tq06",
+      "category": "multi_hop",
+      "query": "A reseller partner brings in a new customer. What does the partner earn on that deal, and does the account rep get commission on it?",
+      "principal": "sales_manager",
+      "expected_document_ids": [
+        "nw_sales_partner_program",
+        "nw_sales_commission_plan"
+      ],
+      "expected_sections": [
+        "Partner Commissions and Payouts",
+        "Commission Rates"
+      ],
+      "note": "Similar program: the Partner Program says it is separate from the employee customer Referral Program ($2,000 flat). 10% recurring commission; partner-sourced deals are not commissioned to the rep."
+    },
+    {
+      "id": "tq07",
+      "category": "multi_hop",
+      "query": "An auditor asks how long we keep customer invoices and how long aggregated metrics logs are kept. What are both periods?",
+      "principal": "eng_dir",
+      "expected_document_ids": [
+        "nw_legal_data_retention",
+        "nw_engineering_log_retention"
+      ],
+      "expected_sections": [
+        "Financial and Contract Records",
+        "Retention Schedule"
+      ],
+      "note": "Similar policies: the Data Retention Policy says system logs are a different document with different periods. Invoices seven years from invoice date; aggregated logs one year."
+    },
+    {
+      "id": "tq08",
+      "category": "multi_hop",
+      "query": "A manager wants to know when a new hire's formal onboarding checkpoint happens and when the annual performance reviews take place. What are both?",
+      "principal": "eng_lead",
+      "expected_document_ids": [
+        "nw_hr_onboarding_guide",
+        "nw_hr_performance_review"
+      ],
+      "expected_sections": [
+        "The 90-Day Checkpoint",
+        "Review Cycle Timeline"
+      ],
+      "note": "Similar processes: the onboarding guide calls the 90-day checkpoint administratively distinct from the review cycle. Day 90; reviews March 1 to 31."
+    },
+    {
+      "id": "tq09",
+      "category": "multi_hop",
+      "query": "A customer hit by a SEV-2 outage is now complaining about how we handled it. What is the SEV-2 resolution target, and how much goodwill can a support manager offer on their own?",
+      "principal": "support_manager",
+      "expected_document_ids": [
+        "nw_engineering_incident_escalation",
+        "nw_support_complaint_escalation"
+      ],
+      "expected_sections": [
+        "SEV-2: Major Incident",
+        "ESC-2: Support Manager Review",
+        "Goodwill and Compensation Rules"
+      ],
+      "note": "Similar escalation paths the corpus calls separate. 24 hours; $500."
+    },
+    {
+      "id": "tq10",
+      "category": "factual",
+      "query": "A customer opened a P2 ticket asking for an export of their personal data. What deadline applies to delivering the export?",
+      "principal": "support_agent",
+      "expected_document_ids": [
+        "nw_support_dsar_process",
+        "nw_legal_privacy_policy"
+      ],
+      "expected_sections": [
+        "Response Windows",
+        "How Requests Arrive",
+        "Individual Rights"
+      ],
+      "note": "Similar processes: a data request is not a ticket and does not run on the Support SLA clock (P2 is 3 business days). Export within 30 days."
+    },
+    {
+      "id": "tq11",
+      "category": "multi_hop",
+      "query": "What commission does a partner earn on a renewal invoice, and what does an account rep earn on a renewal?",
+      "principal": "sales_manager",
+      "expected_document_ids": [
+        "nw_sales_partner_program",
+        "nw_sales_commission_plan"
+      ],
+      "expected_sections": [
+        "Partner Commissions and Payouts",
+        "Commission Rates"
+      ],
+      "note": "Two commission programs the corpus keeps apart (partner deals are paid under the Partner Program, not the rep plan). Partner 10% of renewal invoices; rep 4% of ACV."
+    },
+    {
+      "id": "tq12",
+      "category": "factual",
+      "query": "A support manager approved a goodwill payment on a complaint. How long until the money reaches the customer?",
+      "principal": "support_manager",
+      "expected_document_ids": [
+        "nw_finance_refund_policy"
+      ],
+      "expected_sections": [
+        "Refund Processing Time"
+      ],
+      "note": "Twin in the restating document's vocabulary: the complaint path says money paid as goodwill 'follows the Refund Policy's payment processing (5 to 10 business days)'."
+    },
+    {
+      "id": "tq13",
+      "category": "factual",
+      "query": "Under our vendor procurement process, at what value does a vendor contract need legal review?",
+      "principal": "fin_manager",
+      "expected_document_ids": [
+        "nw_legal_contract_review"
+      ],
+      "expected_sections": [
+        "When Legal Review Is Required"
+      ],
+      "note": "Twin in the restating document's vocabulary: the procurement policy says vendor contracts follow the Contract Review and Approval Policy's thresholds ($100,000)."
+    },
+    {
+      "id": "tq14",
+      "category": "factual",
+      "query": "On the email support channel, how fast do we have to reply to a P3 request?",
+      "principal": "support_agent",
+      "expected_document_ids": [
+        "nw_support_sla_policy"
+      ],
+      "expected_sections": [
+        "Response and Resolution Targets"
+      ],
+      "note": "Twin in the restating document's vocabulary: Channel and Hours gives 'first response within the Support SLA Policy targets (P3: 1 business day)'."
+    },
+    {
+      "id": "tq15",
+      "category": "factual",
+      "query": "A customer who is unhappy with how support treated them has been escalated past the first level. How soon must the support manager call them?",
+      "principal": "support_agent",
+      "expected_document_ids": [
+        "nw_support_complaint_escalation"
+      ],
+      "expected_sections": [
+        "ESC-2: Support Manager Review"
+      ],
+      "note": "Similar program: ESC-2 (call within one business day) versus the separate Incident Escalation Matrix SEV-2 (30-minute response)."
+    },
+    {
+      "id": "tq16",
+      "category": "multi_hop",
+      "query": "A sales manager wants to explain how commission works on a partner-sourced deal and on a new direct deal. What are both numbers?",
+      "principal": "sales_manager",
+      "expected_document_ids": [
+        "nw_sales_partner_program",
+        "nw_sales_commission_plan"
+      ],
+      "expected_sections": [
+        "Partner Commissions and Payouts",
+        "Commission Rates"
+      ],
+      "note": "Two commission programs with a shared word: the partner earns 10% recurring and the rep is not commissioned on partner deals; a new direct deal pays the rep 8% of ACV."
+    }
+  ]
+}

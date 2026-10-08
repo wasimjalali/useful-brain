@@ -8,6 +8,7 @@ import {
   ABSTENTION_CATEGORIES,
   EVAL_CATEGORIES,
   loadNorthwindCorpus,
+  loadQuestions,
   type EvalCategory,
   type EvalQuestion,
   type NorthwindDocument,
@@ -22,7 +23,7 @@ import type { GroundedAnswerResponse } from "../rag/grounded-answer";
 import { CHAT_MODEL_ID } from "../models/selection";
 
 export const EVAL_OUTPUT_DIR = path.join(process.cwd(), "eval-output");
-const RETRIEVAL_REPORT = path.join(EVAL_OUTPUT_DIR, "retrieval-report.json");
+const LOCKED_QUESTIONS_FILE = path.join(process.cwd(), "content/northwind/questions.json");
 
 // Bumped when scoring semantics change so a resume never mixes rows scored
 // under different identity or metric rules.
@@ -54,19 +55,32 @@ function questionSetDigest(questions: EvalQuestion[]): string {
   return createHash("sha256").update(JSON.stringify(canonical)).digest("hex").slice(0, 32);
 }
 
-/** Per-model output files so one candidate's run never overwrites another's. */
-function outputPaths(model: string | undefined) {
+/**
+ * Per-model output files so one candidate's run never overwrites another's.
+ * A run over a non-locked question file (`--questions`) writes under
+ * `eval-output/tuning/<file name>/`, so a tuning run can never be mistaken
+ * for, or resumed into, the locked 120-question run.
+ */
+export function outputPaths(model: string | undefined, questionsFile?: string) {
   const suffix = model
     ? `.${model.replace(/^@cf\//, "").replace(/[^a-zA-Z0-9.-]+/g, "-")}`
     : "";
+  const dir = questionsFile
+    ? path.join(
+        EVAL_OUTPUT_DIR,
+        "tuning",
+        path.basename(questionsFile).replace(/\.json$/i, "").replace(/[^a-zA-Z0-9.-]+/g, "-"),
+      )
+    : EVAL_OUTPUT_DIR;
   return {
-    checkpoint: path.join(EVAL_OUTPUT_DIR, `live-checkpoint${suffix}.json`),
-    summary: path.join(EVAL_OUTPUT_DIR, `live-summary${suffix}.json`),
-    findings: path.join(EVAL_OUTPUT_DIR, `findings${suffix}.json`),
+    checkpoint: path.join(dir, `live-checkpoint${suffix}.json`),
+    summary: path.join(dir, `live-summary${suffix}.json`),
+    findings: path.join(dir, `findings${suffix}.json`),
+    retrievalReport: path.join(dir, "retrieval-report.json"),
   };
 }
 
-function parseArgs(argv: string[]) {
+export function parseArgs(argv: string[]) {
   const liveIndex = argv.indexOf("--live");
   const brainUrl = (liveIndex >= 0 ? argv[liveIndex + 1] : process.env.NORTHWIND_EVAL_LIVE_URL) ?? "";
   if (liveIndex >= 0 && (!brainUrl || brainUrl.startsWith("--"))) {
@@ -79,11 +93,23 @@ function parseArgs(argv: string[]) {
     // production model and record the run as the baseline.
     throw new Error("--model requires a model id");
   }
+  const questionsIndex = argv.indexOf("--questions");
+  const questionsArg = questionsIndex >= 0 ? argv[questionsIndex + 1] : undefined;
+  if (questionsIndex >= 0 && (!questionsArg || questionsArg.startsWith("--"))) {
+    // Fail closed: a dangling --questions must never fall back to the
+    // locked battery and record a tuning run as the baseline.
+    throw new Error("--questions requires a question file");
+  }
+  const questionsFile = questionsArg ? path.resolve(questionsArg) : undefined;
+  if (questionsFile && questionsFile === LOCKED_QUESTIONS_FILE) {
+    throw new Error("--questions is for tuning sets; run the locked battery without it");
+  }
   return {
     live: Boolean(brainUrl),
     brainUrl: brainUrl.replace(/\/$/, ""),
     resume: argv.includes("--resume") || process.env.NORTHWIND_EVAL_RESUME === "1",
     model,
+    questionsFile,
   };
 }
 
@@ -103,10 +129,14 @@ function writeJson(file: string, value: unknown) {
   writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
 }
 
-async function runRetrievalLayer(questions: EvalQuestion[], documents: NorthwindDocument[]) {
+async function runRetrievalLayer(
+  questions: EvalQuestion[],
+  documents: NorthwindDocument[],
+  reportFile: string,
+) {
   const { pipeline } = await ingestNorthwind(documents);
   const report = await runRetrievalEvals(pipeline, questions, 3);
-  writeJson(RETRIEVAL_REPORT, report);
+  writeJson(reportFile, report);
   return report;
 }
 
@@ -229,13 +259,14 @@ async function runLiveLayer(
   brainUrl: string,
   resume: boolean,
   model: string | undefined,
+  questionsFile: string | undefined,
 ): Promise<{
   generationId: string;
   results: NorthwindAnswerScore[];
   latenciesMs: Record<string, number>;
 }> {
   const generationId = await ensureSeeded(brainUrl);
-  const paths = outputPaths(model);
+  const paths = outputPaths(model, questionsFile);
   const expectedModel = model ?? CHAT_MODEL_ID;
   const digest = questionSetDigest(questions);
   let results: NorthwindAnswerScore[] = [];
@@ -435,22 +466,32 @@ function summarize(
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const { documents, questions } = loadNorthwindCorpus();
-  const gaps = coverageGaps(countByCategory(questions));
-  if (gaps.length > 0) {
-    throw new Error(`Northwind coverage gaps: ${gaps.join("; ")}`);
+  const corpus = loadNorthwindCorpus();
+  const { documents } = corpus;
+  // A tuning file is scored by the same scorer against the same corpus,
+  // but it is not the locked battery, so the locked category distribution
+  // check does not apply to it.
+  const questions = args.questionsFile
+    ? loadQuestions(args.questionsFile, documents).questions
+    : corpus.questions;
+  if (!args.questionsFile) {
+    const gaps = coverageGaps(countByCategory(questions));
+    if (gaps.length > 0) {
+      throw new Error(`Northwind coverage gaps: ${gaps.join("; ")}`);
+    }
   }
-  const retrieval = await runRetrievalLayer(questions, documents);
-  const paths = outputPaths(args.model);
+  const paths = outputPaths(args.model, args.questionsFile);
+  const retrieval = await runRetrievalLayer(questions, documents, paths.retrievalReport);
   let live: {
     generationId: string;
     results: NorthwindAnswerScore[];
     latenciesMs: Record<string, number>;
   } | null = null;
   if (args.live) {
-    live = await runLiveLayer(questions, args.brainUrl, args.resume, args.model);
+    live = await runLiveLayer(questions, args.brainUrl, args.resume, args.model, args.questionsFile);
     writeJson(paths.summary, {
       model: args.model ?? CHAT_MODEL_ID,
+      ...(args.questionsFile ? { questionsFile: path.relative(process.cwd(), args.questionsFile) } : {}),
       generationId: live.generationId,
       latency: latencySummary(live.latenciesMs, live.results.length),
       results: live.results,
@@ -458,6 +499,7 @@ async function main() {
   }
   const findings = {
     model: args.model ?? CHAT_MODEL_ID,
+    ...(args.questionsFile ? { questionsFile: path.relative(process.cwd(), args.questionsFile) } : {}),
     ...(live ? { latency: latencySummary(live.latenciesMs, live.results.length) } : {}),
     ...summarize(retrieval, live?.results ?? null, questions),
   };

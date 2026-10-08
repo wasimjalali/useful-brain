@@ -5,24 +5,35 @@ import {
   type CitedRetrievalResult,
 } from "../answer/contract";
 import type { AnswerCoveragePass, GroundedAnswerRepair } from "../agent/run";
-import { hintedUncitedDocuments } from "../agent/pointer-completion";
-import { MODELS_WITHOUT_THINKING_TOGGLE } from "./eval-override";
+import { hintedPointerGroups, type PointerReason } from "../agent/pointer-completion";
+import { MODELS_WITH_MANDATORY_REASONING, MODELS_WITHOUT_THINKING_TOGGLE } from "./eval-override";
 import { parseWorkersAiChatMessage, type WorkersAiChatRunner } from "./workers-ai-chat";
 import { CHAT_MODEL_ID } from "./selection";
 
 // Quote extraction needs no chain-of-thought: with thinking enabled the
 // selected chat model can spend the whole completion budget reasoning and
 // return empty content (finish_reason "length"), and its reasoning time can
-// outlive the run's remaining wall budget. Thinking stays off (where the
-// model schema has the toggle) and the seed is pinned so extraction is fast
-// and repeatable.
+// outlive the run's remaining wall budget. Thinking stays off where the
+// model schema has the toggle, and the seed is pinned so extraction is fast
+// and repeatable. Models that cannot turn reasoning off run at the lowest
+// documented effort with room for that reasoning plus the JSON answer.
+const EXTRACTION_MAX_TOKENS = 1024;
+const MANDATORY_REASONING_MAX_TOKENS = 4096;
+
 function extractionDecoding(modelId: string): Record<string, unknown> {
   const base = {
     stream: false,
     temperature: 0,
     seed: 7,
-    max_completion_tokens: 1024,
+    max_completion_tokens: EXTRACTION_MAX_TOKENS,
   };
+  if (MODELS_WITH_MANDATORY_REASONING.has(modelId)) {
+    return {
+      ...base,
+      max_completion_tokens: MANDATORY_REASONING_MAX_TOKENS,
+      reasoning_effort: "low",
+    };
+  }
   return MODELS_WITHOUT_THINKING_TOGGLE.has(modelId)
     ? base
     : { ...base, chat_template_kwargs: { enable_thinking: false } };
@@ -317,30 +328,29 @@ export function createWorkersAiCoveragePass(
   };
 }
 
-/**
- * Evidence documents the draft or question names by title without the draft
- * citing them. These are the "pointer" cases: the cited document restates a
- * rule owned by a dedicated policy that is itself in evidence.
- */
-function referencedUncitedDocuments(
-  question: string,
-  draft: string,
-  evidence: CitedRetrievalResult[],
-): CitedRetrievalResult[] {
-  return hintedUncitedDocuments(question, draft, evidence).flat();
-}
+const POINTER_HINTS: Record<PointerReason, (label: string, source: string) => string> = {
+  restates: (label, source) =>
+    `The document behind ${label} (${source}) states the same figures as a cited draft paragraph, so it states the same rule. Include its exact sentence stating those figures so both sources are cited.`,
+  contrast: (label, source) =>
+    `The evidence says the program or policy behind ${label} (${source}) is different from one the draft cites. If the question's wording could mean ${label}'s program, include its exact sentence too, so the answer shows each program with its own numbers.`,
+  named: (label, source) =>
+    `The question or draft names the document behind ${label} (${source}) but the draft does not cite it. If its Text states an asked fact, include its exact sentence.`,
+};
 
 function coverageMessages(
   question: string,
   draft: string,
   evidence: CitedRetrievalResult[],
 ): Array<{ role: "system" | "user"; content: string }> {
-  const referenced = referencedUncitedDocuments(question, draft, evidence);
-  const hints = referenced.map(
-    (item) =>
+  const hints = hintedPointerGroups(question, draft, evidence).flatMap((group) =>
+    group.items.map((item) =>
       // The source name is corpus data; keep it out of instruction position
       // unsanitized. Only word characters survive into the hint.
-      `The question or draft names the document behind ${item.citationLabel} (${item.source.replace(/[^\w.\- ]+/g, "").slice(0, 64)}) but the draft does not cite it. If its Text states an asked fact, include its exact sentence.`,
+      POINTER_HINTS[group.reason](
+        item.citationLabel,
+        item.source.replace(/[^\w.\- ]+/g, "").slice(0, 64),
+      ),
+    ),
   );
   return [
     {

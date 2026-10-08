@@ -39,6 +39,19 @@ export const MODELS_WITHOUT_THINKING_TOGGLE: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * Models whose reasoning cannot be turned off on Workers AI. Their schema
+ * documents `reasoning_effort` (low, high, max; default max) and states
+ * "Reasoning cannot be disabled", so `chat_template_kwargs.enable_thinking`
+ * is ignored and the default max effort runs. Measured 2026-10-08: with a
+ * 1,024-token completion cap the reasoning alone used the whole budget on
+ * most extraction calls (finish_reason "length", empty content).
+ */
+export const MODELS_WITH_MANDATORY_REASONING: ReadonlySet<string> = new Set([
+  "@cf/zai-org/glm-5.3-flash",
+  "@cf/zai-org/glm-5.3",
+]);
+
+/**
  * Parse an optional caller-supplied eval-only chat model. Fails closed the
  * same way as `parseAssumedPrincipal`: any presence outside loopback
  * identity mode is forbidden, and anything but an approved Cloudflare-hosted
