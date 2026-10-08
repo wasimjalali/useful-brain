@@ -145,7 +145,7 @@ export function ActivityTable({
                   ) : trace.length === 0 ? (
                     <span className="text-ink-faint-text">No trace recorded</span>
                   ) : (
-                    <TraceTimeline steps={trace} />
+                    <TraceTimeline steps={trace} total={r.latency} />
                   )}
                 </div>
               ) : null}

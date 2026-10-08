@@ -123,10 +123,10 @@ function Chips({ step, detail }: { step: string; detail: string }) {
   );
 }
 
-export function TraceTimeline({ steps }: { steps: TraceStepView[] }) {
+/** `total` is the turn latency as shown in the table row. Steps overlap, so durations are never summed. */
+export function TraceTimeline({ steps, total }: { steps: TraceStepView[]; total?: string }) {
   const timings = steps.map((s) => millis(s.duration));
   const longest = Math.max(0, ...timings.map((t) => t ?? 0));
-  const total = timings.reduce<number>((sum, t) => sum + (t ?? 0), 0);
   return (
     <>
       {steps.map((s, i) => {
@@ -145,7 +145,7 @@ export function TraceTimeline({ steps }: { steps: TraceStepView[] }) {
             </span>
             <span className="flex items-center justify-end gap-2 text-xs text-ink-muted">
               {s.step === "result" ? (
-                total > 0 ? <span>{`${(total / 1000).toFixed(1)} s total`}</span> : null
+                total && total !== "-" ? <span>{`${total} total`}</span> : null
               ) : ms === null || ms === 0 ? (
                 <span className="text-ink-faint-text">instant</span>
               ) : (

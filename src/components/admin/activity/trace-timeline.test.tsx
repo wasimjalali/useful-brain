@@ -65,6 +65,14 @@ describe("TraceTimeline", () => {
     expect(screen.getByText("Wobble 3")).toBeInTheDocument();
   });
 
+  it("shows the turn latency as the total, never a sum, and nothing when missing", () => {
+    const { rerender } = render(<TraceTimeline steps={steps} total="43.2 s" />);
+    expect(screen.getByText("43.2 s total")).toBeInTheDocument();
+    expect(screen.queryByText(/57/)).toBeNull();
+    rerender(<TraceTimeline steps={steps} total="-" />);
+    expect(screen.queryByText(/total/)).toBeNull();
+  });
+
   it("keeps an unknown step and a bare dash detail", () => {
     render(<TraceTimeline steps={[{ step: "new_step", detail: "-", duration: "-" }]} />);
     expect(screen.getByText("New step")).toBeInTheDocument();
