@@ -34,7 +34,7 @@ Recommendation (for Wasim to decide):
 2. If a connector is wanted, wire GitHub end to end first (the logic exists): Connect, path prefix, sync into a draft, the normal draft checks, promote.
 3. Then Drive the simple way: one org-level service account with `drive.readonly`, syncing a shared folder into a draft like GitHub. The key is a Worker secret. Per-user OAuth only if multiple people need their own Drives, and that's the heavier security milestone.
 4. Drive needs a Google Cloud project and a service account created by Wasim (an account action). The Drive API is free at this volume.
-5. Until then, consider hiding the disabled GitHub "Connect" button so nothing in Settings looks broken.
+5. Until then, consider hiding the disabled "Connect" button. It shows for any connectable connector that is not connected yet (GitHub today, and HTTP sources where configured), so nothing in Settings looks broken.
 
 ## How things run locally
 
