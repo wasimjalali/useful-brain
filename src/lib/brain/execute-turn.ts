@@ -348,16 +348,12 @@ async function executeTurnFull(
     if (runAbort.signal.aborted || (await lock.cancelled())) {
       throw new WorkerCancelledError();
     }
-    // An internal abort (wall-time budget exhausted inside the run) must
-    // fail the turn the same way an external cancellation does: the run
-    // never produced a validated answer, so persisting one would store an
-    // unvalidated result as a completed answer.
-    if (result.aborted) {
-      throw new WorkerCancelledError();
-    }
-    // A failed search is not a refusal: the turn fails as unavailable
-    // instead of persisting an insufficient-evidence answer.
-    if (result.finalResponse === BRAIN_KNOWLEDGE_UNAVAILABLE) {
+    // Only the member's own stop (checked above) is a cancellation. An
+    // internal abort (model error, exhausted budget or wall time) and a
+    // failed search never produced a validated answer: the turn fails as
+    // unavailable, so the member sees a retryable failure instead of a
+    // quiet "stopped" turn or an insufficient-evidence answer.
+    if (result.aborted || result.finalResponse === BRAIN_KNOWLEDGE_UNAVAILABLE) {
       throw new WorkerUnavailableError();
     }
     await markStage("writing");

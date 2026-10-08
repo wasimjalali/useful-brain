@@ -110,14 +110,17 @@ async function runRetrievalLayer(questions: EvalQuestion[], documents: Northwind
   return report;
 }
 
+const BRAIN_ATTEMPTS = 4;
+
 /**
- * Retries 429 and 5xx, then throws. A turn the Brain reports as unavailable
- * (503 UNAVAILABLE: a retrieval backend or the model failed) is never scored:
- * the run stops loudly and can resume with --resume once the Brain is healthy.
+ * Retries 429 and 5xx with backoff, then throws with every attempt's status.
+ * A turn the Brain reports as unavailable (503 UNAVAILABLE: a retrieval
+ * backend or the model failed) is never scored: the run stops loudly and can
+ * resume with --resume once the Brain is healthy.
  */
 export async function brainJson<T>(brainUrl: string, pathName: string, init: RequestInit = {}): Promise<T> {
-  let lastError: unknown;
-  for (let attempt = 0; attempt < 4; attempt += 1) {
+  const statuses: number[] = [];
+  for (let attempt = 0; attempt < BRAIN_ATTEMPTS; attempt += 1) {
     const response = await fetch(`${brainUrl}${pathName}`, {
       ...init,
       headers: {
@@ -126,12 +129,10 @@ export async function brainJson<T>(brainUrl: string, pathName: string, init: Req
       },
     });
     if (response.status === 429 || response.status >= 500) {
-      lastError = new Error(
-        response.status === 503
-          ? `Brain ${pathName} was unavailable (503) on every attempt; the question was not scored`
-          : `Brain ${pathName} returned ${response.status}`,
-      );
-      await sleep(1000 * 2 ** attempt);
+      statuses.push(response.status);
+      if (attempt < BRAIN_ATTEMPTS - 1) {
+        await sleep(1000 * 2 ** attempt);
+      }
       continue;
     }
     const payload = (await response.json()) as T & { code?: string; message?: string };
@@ -140,7 +141,24 @@ export async function brainJson<T>(brainUrl: string, pathName: string, init: Req
     }
     return payload;
   }
-  throw lastError instanceof Error ? lastError : new Error(`Brain ${pathName} failed`);
+  throw new Error(
+    `Brain ${pathName} failed after ${BRAIN_ATTEMPTS} attempts (statuses ${statuses.join(", ")})${
+      pathName === "/turns" ? "; the question was not scored" : ""
+    }`,
+  );
+}
+
+/** One live turn; any failure names the question it stopped the run on. */
+export async function liveTurn(
+  brainUrl: string,
+  questionId: string,
+  init: RequestInit,
+): Promise<GroundedAnswerResponse> {
+  try {
+    return await brainJson<GroundedAnswerResponse>(brainUrl, "/turns", init);
+  } catch (error) {
+    throw new Error(`${questionId}: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 function sleep(ms: number) {
@@ -276,7 +294,7 @@ async function runLiveLayer(
     process.stderr.write(`live ${index + 1}/${questions.length} ${question.questionId}\n`);
     const requestId = `eval-live-${question.questionId}-${Date.now()}`;
     const startedAt = Date.now();
-    const response = await brainJson<GroundedAnswerResponse>(brainUrl, "/turns", {
+    const response = await liveTurn(brainUrl, question.questionId, {
       method: "POST",
       body: JSON.stringify({
         question: question.query,

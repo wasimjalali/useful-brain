@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { AGENT_BUDGETS } from "../../../src/lib/agent/budgets";
 import { BRAIN_KNOWLEDGE_UNAVAILABLE, BRAIN_NOT_ENOUGH_EVIDENCE } from "../../../src/lib/agent/host-grounding";
 import { executeTurn } from "../../../src/lib/brain/execute-turn";
+import { TICKET_DESK } from "../../../src/lib/contracts/approvals";
 import {
   WorkerUnavailableError,
   workerErrorResponse,
@@ -38,7 +39,9 @@ const chunkRow = {
   path: "refund.md",
 };
 
-function corpusDatabase(options: { ftsFails?: boolean } = {}): CorpusSql {
+/** `ftsFailures`: how many FTS queries fail before the channel recovers. */
+function corpusDatabase(options: { ftsFails?: boolean; ftsFailures?: number } = {}): CorpusSql {
+  let ftsFailuresLeft = options.ftsFailures ?? 0;
   return {
     prepare(sql) {
       return {
@@ -56,7 +59,8 @@ function corpusDatabase(options: { ftsFails?: boolean } = {}): CorpusSql {
                   },
                 ];
               } else if (sql.includes("chunks_fts MATCH")) {
-                if (options.ftsFails) {
+                if (options.ftsFails || ftsFailuresLeft > 0) {
+                  ftsFailuresLeft -= 1;
                   throw new Error("D1_ERROR: Network connection lost.");
                 }
                 rows = [{ chunk_id: chunkRow.chunk_id }];
@@ -95,43 +99,44 @@ const failingVectorize: VectorizeIndex = {
   },
 };
 
+function toolCallReply(name: string, args: Record<string, unknown>, id = "call-1") {
+  return {
+    choices: [
+      {
+        finish_reason: "tool_calls",
+        message: {
+          tool_calls: [{ id, type: "function", function: { name, arguments: JSON.stringify(args) } }],
+        },
+      },
+    ],
+  };
+}
+
 /**
- * Workers AI stub: the first chat call asks for one search, the second
- * replies with `finalReply`. Embedding and rerank calls succeed unless told
- * to fail.
+ * Workers AI stub: by default the first chat call asks for one search and
+ * the second replies with `finalReply`; `chatReplies` replaces that script.
+ * Embedding and rerank calls succeed unless told to fail.
  */
 function aiStub(options: {
-  finalReply: string;
+  finalReply?: string;
+  chatReplies?: unknown[];
+  chatFails?: boolean;
   embeddingFails?: boolean;
   rerankFails?: boolean;
   onRerank?: () => void;
 }) {
   let chatCalls = 0;
+  const script = options.chatReplies ?? [
+    toolCallReply("search_knowledge", { query: "refund window" }),
+    { choices: [{ finish_reason: "stop", message: { content: options.finalReply ?? "" } }] },
+  ];
   return vi.fn().mockImplementation(async (_model: string, input: Record<string, unknown>) => {
     if ("tools" in input) {
-      chatCalls += 1;
-      if (chatCalls === 1) {
-        return {
-          choices: [
-            {
-              finish_reason: "tool_calls",
-              message: {
-                tool_calls: [
-                  {
-                    id: "call-1",
-                    type: "function",
-                    function: {
-                      name: "search_knowledge",
-                      arguments: JSON.stringify({ query: "refund window" }),
-                    },
-                  },
-                ],
-              },
-            },
-          ],
-        };
+      if (options.chatFails) {
+        throw new Error("internal error; reference = vgfnh682ou39cinckuahekmj");
       }
-      return { choices: [{ finish_reason: "stop", message: { content: options.finalReply } }] };
+      chatCalls += 1;
+      return script[Math.min(chatCalls, script.length) - 1];
     }
     if ("queries" in input) {
       if (options.embeddingFails) {
@@ -151,11 +156,14 @@ function aiStub(options: {
   });
 }
 
-function lockStub() {
+function lockStub(state: { released: string[] } = { released: [] }) {
   return () => ({
     acquire: async (runId: string) => ({ ok: true as const, runId }),
     cancelled: async () => false,
-    release: async () => ({ ok: true as const }),
+    release: async (runId: string) => {
+      state.released.push(runId);
+      return { ok: true as const };
+    },
   });
 }
 
@@ -262,30 +270,6 @@ describe("retrieval backend failures on a turn", () => {
     }
   });
 
-  it("fails a persisted turn as temporarily unavailable instead of storing a refusal", async () => {
-    await seedPrincipals();
-    await expect(
-      executeTurn({
-        operations: env.OPERATIONS_DB,
-        corpus: corpusDatabase({ ftsFails: true }),
-        vectorize: workingVectorize,
-        principal,
-        question: "What is the refund window?",
-        requestId: "req-avail-persisted",
-        lockFor: lockStub(),
-        ai: { run: aiStub({ finalReply: BRAIN_NOT_ENOUGH_EVIDENCE }) },
-      }),
-    ).rejects.toBeInstanceOf(WorkerUnavailableError);
-
-    const stored = await env.OPERATIONS_DB.prepare(
-      `SELECT status, error_code, content FROM messages
-       WHERE request_id = ? AND role = 'assistant'`,
-    )
-      .bind("req-avail-persisted")
-      .first<{ status: string; error_code: string; content: string }>();
-    expect(stored).toMatchObject({ status: "failed", error_code: "PROVIDER_TEMPORARY", content: "" });
-  });
-
   it("maps the availability error to a deterministic retryable 503", async () => {
     const response = workerErrorResponse(new WorkerUnavailableError(), "req-503");
     expect(response.status).toBe(503);
@@ -294,6 +278,158 @@ describe("retrieval backend failures on a turn", () => {
       message: BRAIN_KNOWLEDGE_UNAVAILABLE,
       retryable: true,
       requestId: "req-503",
+    });
+  });
+});
+
+async function assistantRow(requestId: string) {
+  return env.OPERATIONS_DB.prepare(
+    `SELECT id, conversation_id, status, error_code, content FROM messages
+     WHERE request_id = ? AND role = 'assistant'`,
+  )
+    .bind(requestId)
+    .first<{ id: string; conversation_id: string; status: string; error_code: string; content: string }>();
+}
+
+async function countRows(sql: string, ...binds: unknown[]): Promise<number> {
+  const row = await env.OPERATIONS_DB.prepare(sql).bind(...binds).first<{ n: number }>();
+  return Number(row?.n ?? 0);
+}
+
+function persistedTurn(input: {
+  requestId: string;
+  run: ReturnType<typeof aiStub>;
+  corpus?: CorpusSql;
+  lock?: { released: string[] };
+  conversationId?: string;
+  reuseUserMessageId?: string;
+}) {
+  return executeTurn({
+    operations: env.OPERATIONS_DB,
+    corpus: input.corpus ?? corpusDatabase(),
+    vectorize: workingVectorize,
+    principal,
+    question: "What is the refund window?",
+    requestId: input.requestId,
+    conversationId: input.conversationId,
+    reuseUserMessageId: input.reuseUserMessageId,
+    lockFor: lockStub(input.lock),
+    ai: { run: input.run },
+  });
+}
+
+describe("persisted turns that hit a backend failure", () => {
+  it("fails as temporarily unavailable, releases the lock and answers on retry", async () => {
+    await seedPrincipals();
+    const lock = { released: [] as string[] };
+    await expect(
+      persistedTurn({
+        requestId: "req-avail-persisted",
+        corpus: corpusDatabase({ ftsFails: true }),
+        lock,
+        run: aiStub({ finalReply: BRAIN_NOT_ENOUGH_EVIDENCE }),
+      }),
+    ).rejects.toBeInstanceOf(WorkerUnavailableError);
+
+    const failed = await assistantRow("req-avail-persisted");
+    expect(failed).toMatchObject({ status: "failed", error_code: "PROVIDER_TEMPORARY", content: "" });
+    expect(lock.released).toEqual([failed!.id]);
+
+    // The member's retry re-runs the saved question once the backend is back.
+    const userMessage = await env.OPERATIONS_DB.prepare(
+      `SELECT id FROM messages WHERE conversation_id = ? AND role = 'user'`,
+    )
+      .bind(failed!.conversation_id)
+      .first<{ id: string }>();
+    const retried = await persistedTurn({
+      requestId: "req-avail-persisted-retry",
+      conversationId: failed!.conversation_id,
+      reuseUserMessageId: userMessage!.id,
+      run: aiStub({ finalReply: "Annual plans have a fourteen day refund window.[1]" }),
+    });
+    expect(retried.structuredAnswer.answerType).toBe("grounded");
+    expect(await assistantRow("req-avail-persisted-retry")).toMatchObject({ status: "completed" });
+  });
+
+  it("records no approval when a search failed before a ticket proposal", async () => {
+    await seedPrincipals();
+    const ticket = {
+      desk: TICKET_DESK,
+      priority: "P1",
+      customer: "Acme Logistics",
+      subject: "Refund stuck after chargeback",
+    };
+    const run = aiStub({
+      chatReplies: [
+        toolCallReply("search_knowledge", { query: "refund window" }, "call-1"),
+        toolCallReply("search_knowledge", { query: "refund policy" }, "call-2"),
+        toolCallReply("create_ticket", ticket, "call-3"),
+        { choices: [{ finish_reason: "stop", message: { content: "Done." } }] },
+      ],
+    });
+    await expect(
+      persistedTurn({
+        requestId: "req-avail-approval",
+        // The first search fails, the retry search returns evidence, so the
+        // ticket proposal itself is allowed through the search-first gate.
+        corpus: corpusDatabase({ ftsFailures: 1 }),
+        run,
+      }),
+    ).rejects.toBeInstanceOf(WorkerUnavailableError);
+
+    // The model did reach the ticket proposal (three chat calls); the
+    // pending approval was stopped by the failed search, not by the gate.
+    expect(run.mock.calls.filter(([, input]) => "tools" in (input as object))).toHaveLength(3);
+
+    const failed = await assistantRow("req-avail-approval");
+    expect(failed).toMatchObject({ status: "failed", error_code: "PROVIDER_TEMPORARY" });
+    expect(
+      await countRows(`SELECT COUNT(*) AS n FROM approvals WHERE conversation_id = ?`, failed!.conversation_id),
+    ).toBe(0);
+    expect(
+      await countRows(`SELECT COUNT(*) AS n FROM agent_runs WHERE evidence_message_id = ?`, failed!.id),
+    ).toBe(0);
+  });
+
+  it("fails as temporarily unavailable, not stopped, when the chat model errors", async () => {
+    await seedPrincipals();
+    const lock = { released: [] as string[] };
+    await expect(
+      persistedTurn({
+        requestId: "req-avail-model-error",
+        lock,
+        run: aiStub({ chatFails: true }),
+      }),
+    ).rejects.toBeInstanceOf(WorkerUnavailableError);
+
+    const failed = await assistantRow("req-avail-model-error");
+    expect(failed).toMatchObject({ status: "failed", error_code: "PROVIDER_TEMPORARY", content: "" });
+    expect(lock.released).toEqual([failed!.id]);
+  });
+
+  it("fails as temporarily unavailable, not stopped, when the wall-time budget runs out", async () => {
+    await seedPrincipals();
+    const realNow = Date.now;
+    let offset = 0;
+    const clock = vi.spyOn(Date, "now").mockImplementation(() => realNow() + offset);
+    try {
+      await expect(
+        persistedTurn({
+          requestId: "req-avail-persisted-wall",
+          run: aiStub({
+            finalReply: "Annual plans have a fourteen day refund window.[1]",
+            onRerank: () => {
+              offset = AGENT_BUDGETS.wallTimeMs + 1_000;
+            },
+          }),
+        }),
+      ).rejects.toBeInstanceOf(WorkerUnavailableError);
+    } finally {
+      clock.mockRestore();
+    }
+    expect(await assistantRow("req-avail-persisted-wall")).toMatchObject({
+      status: "failed",
+      error_code: "PROVIDER_TEMPORARY",
     });
   });
 });

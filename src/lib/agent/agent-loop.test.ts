@@ -1777,6 +1777,80 @@ describe("retrieval availability", () => {
     expect(result.vectorDegradedCount).toBe(1);
   }, 20_000);
 
+  // Frozen clock: elapsed time is exactly `offset`, so the budget edge is
+  // deterministic instead of depending on how fast the test machine runs.
+  function frozenClock() {
+    const base = Date.now();
+    const clock = { offset: 0 };
+    const spy = vi.spyOn(Date, "now").mockImplementation(() => base + clock.offset);
+    return { clock, restore: () => spy.mockRestore() };
+  }
+  const abortError = () => new DOMException("The operation was aborted.", "AbortError");
+
+  it("ends unavailable when an abstention recheck uses the last of the wall-time budget", async () => {
+    const pipeline = await tinyPipeline();
+    const { clock, restore } = frozenClock();
+    try {
+      // The repair deadline fires at exactly zero remaining wall time, before
+      // the separate wall signal, and the catch keeps the refusal.
+      const repairGroundedAnswer = vi.fn().mockImplementation(async () => {
+        clock.offset = AGENT_BUDGETS.wallTimeMs;
+        throw abortError();
+      });
+      const result = await runKnowledgeAgent({
+        question: "Does the company offer a stock purchase plan?",
+        pipeline,
+        principal,
+        policyPrincipal,
+        conversationId: "c-wall-repair",
+        runtime: {
+          ...scriptedRuntime("useful-brain-wall-repair", [
+            searchCall("stock purchase plan"),
+            finalText("The retrieved documents do not contain any information about a stock purchase plan."),
+          ]),
+          repairGroundedAnswer,
+        },
+      });
+
+      expect(repairGroundedAnswer).toHaveBeenCalledTimes(1);
+      expect(result.aborted).toBe(true);
+      expect(result.finalResponse).toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
+    } finally {
+      restore();
+    }
+  }, 20_000);
+
+  it("ends unavailable when a coverage pass outlives the wall-time budget", async () => {
+    const pipeline = await escalationPipeline();
+    const { clock, restore } = frozenClock();
+    try {
+      const coverAnswerParts = vi.fn().mockImplementation(async () => {
+        clock.offset = AGENT_BUDGETS.wallTimeMs + 1;
+        throw abortError();
+      });
+      const result = await runKnowledgeAgent({
+        question: "How do billing disputes and complaints interact?",
+        pipeline,
+        principal,
+        policyPrincipal,
+        conversationId: "c-wall-coverage",
+        runtime: {
+          ...scriptedRuntime("useful-brain-wall-coverage", [
+            searchCall("billing dispute complaint"),
+            finalText("Billing disputes open more than 30 days move to ESC-3.[1]"),
+          ]),
+          coverAnswerParts,
+        },
+      });
+
+      expect(coverAnswerParts).toHaveBeenCalledTimes(1);
+      expect(result.aborted).toBe(true);
+      expect(result.finalResponse).toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
+    } finally {
+      restore();
+    }
+  }, 20_000);
+
   it("ends a run whose wall-time budget runs out mid-search as aborted and unavailable", async () => {
     const pipeline = await tinyPipeline();
     const realNow = Date.now;
