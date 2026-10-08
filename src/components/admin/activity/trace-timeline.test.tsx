@@ -50,13 +50,25 @@ describe("TraceTimeline", () => {
     expect(screen.getByText("GLM 5.3 Flash")).toHaveAttribute("title", "@cf/zai-org/glm-5.3-flash");
   });
 
-  it("formats durations in seconds, says instant, and scales the bars", () => {
+  it("formats durations in seconds, scales the bars", () => {
     render(<TraceTimeline steps={steps} />);
     expect(screen.getByText("14.0 s")).toBeInTheDocument();
     expect(screen.getByText("43.2 s")).toBeInTheDocument();
-    expect(screen.getAllByText("instant")).toHaveLength(2);
+    expect(screen.queryByText("instant")).toBeNull();
     expect(screen.getByTestId("bar-generate").style.width).toBe("100%");
     expect(screen.getByTestId("bar-retrieve").style.width).toBe("32%");
+  });
+
+  it("says instant only for a measured 0 ms", () => {
+    render(<TraceTimeline steps={[{ step: "rerank", detail: "floor: 0.05", duration: "0 ms" }]} />);
+    expect(screen.getByText("instant")).toBeInTheDocument();
+  });
+
+  it("is an ordered list of steps that stacks below sm", () => {
+    render(<TraceTimeline steps={steps} />);
+    expect(screen.getByRole("list").tagName).toBe("OL");
+    expect(screen.getAllByRole("listitem")).toHaveLength(5);
+    expect(screen.getAllByRole("listitem")[0].className).toContain("grid-cols-1");
   });
 
   it("renders the result as an outcome pill and keeps unknown keys as humanized chips", () => {
