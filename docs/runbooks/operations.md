@@ -42,6 +42,16 @@ npx wrangler secret put CLOUDFLARE_ACCOUNT_ID -c workers/ingestion/wrangler.json
 
 Local dev: put `VECTORIZE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` in `workers/ingestion/.dev.vars` (gitignored). The index name is the plain var `VECTORIZE_INDEX_NAME` in `workers/ingestion/wrangler.jsonc`, kept equal to each environment's Vectorize `index_name` by a test. Apply corpus migration `0006_draft_inventory.sql` before deploying.
 
+Behavior to know:
+
+- Set both secrets or neither. With only some of the three settings present, reconciliation fails closed (not reconciled, reason "inventory partly configured") and the worker logs the missing setting names.
+- An orphan in the draft's own namespace (a vector in the index with no D1 row) fails the draft after the retries run out. Orphans in other namespaces are counted only.
+- More than 2,000 unknown vectors (ids in the index with no D1 row) fails closed at once with a reason naming the count, because the rest could hide an in-draft orphan. Clean up the index first, then run the check again.
+- A 429 from the API is waited out when `Retry-After` is 60 seconds or less, up to 120 seconds in total. Anything longer fails the attempt and the step retries.
+- Orphan counts are written to `draft_checks` (`inventory_checked`, `orphan_vectors`, `orphan_vectors_in_draft`) and are not shown in the admin UI. Read them with `wrangler d1 execute` against the corpus database. `inventory_checked = 0` means the check ran binding-only.
+
+Verify after setting the secrets: upload one file on staging, let the draft finish, and confirm its `draft_checks` row has `inventory_checked = 1`. The live API's all-namespace listing and `totalCount` semantics are unverified until this runs once. If it fails closed with a "list is incomplete" or "more ids than totalCount" error, the count semantics differ from the docs and the check needs adjusting.
+
 ## Incidents (fail closed)
 
 - Missing identity, ACL, corpus state, citations, or tool permission: refuse.

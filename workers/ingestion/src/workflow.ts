@@ -39,7 +39,7 @@ import {
 import { extractUploadText } from "../../../src/lib/ingest/extract";
 import { MAX_UPLOAD_BYTES, uploadSourcePath } from "../../../src/lib/ingest/upload-validation";
 import { acknowledgeIngestJob } from "../../../src/lib/ingest/queue-message";
-import { createRestVectorInventory, type VectorInventory } from "../../../src/lib/ingest/vector-inventory";
+import { inventoryFromSettings, type InventorySettings } from "../../../src/lib/ingest/vector-inventory";
 import type { VectorizeIndex } from "../../../src/lib/retrieve/cloudflare-pipeline";
 import type { SqlExecutor } from "../../../src/lib/store/corpus-d1";
 import { draftAcceptsWrites, failDraft, getDraft, markBaseCopied } from "../../../src/lib/store/drafts";
@@ -148,23 +148,16 @@ export class IngestionWorkflow extends WorkflowEntrypoint<Env, IngestionWorkflow
 
   /**
    * Full-index listing for draft reconciliation. Present only when the token,
-   * the account id and the index name are all configured; otherwise
-   * reconciliation stays binding-only. Secrets are read here and nowhere else.
+   * the account id and the index name are all configured. None configured is
+   * binding-only; some but not all fails closed in reconcileDraft. Secrets are
+   * read here and nowhere else, and a warning names settings, never values.
    */
-  private inventory(): VectorInventory | null {
-    const config = this.env as unknown as {
-      VECTORIZE_API_TOKEN?: string;
-      CLOUDFLARE_ACCOUNT_ID?: string;
-      VECTORIZE_INDEX_NAME?: string;
-    };
-    if (!config.VECTORIZE_API_TOKEN || !config.CLOUDFLARE_ACCOUNT_ID || !config.VECTORIZE_INDEX_NAME) {
-      return null;
+  private inventorySettings(): ReturnType<typeof inventoryFromSettings> {
+    const result = inventoryFromSettings(this.env as unknown as InventorySettings);
+    if (result.partlyConfigured) {
+      console.warn("vectorize inventory partly configured, missing:", result.missing.join(", "));
     }
-    return createRestVectorInventory({
-      apiToken: config.VECTORIZE_API_TOKEN,
-      accountId: config.CLOUDFLARE_ACCOUNT_ID,
-      indexName: config.VECTORIZE_INDEX_NAME,
-    });
+    return result;
   }
 
   private async assertOpen(generationId: string): Promise<void> {
@@ -610,6 +603,7 @@ export class IngestionWorkflow extends WorkflowEntrypoint<Env, IngestionWorkflow
       return;
     }
     const context = this.context();
+    const { inventory, partlyConfigured } = this.inventorySettings();
     // A MutationPendingError is thrown on purpose: the step retries until every
     // ledger vector is visible in the index.
     const reconciled = await reconcileWithFinalRecord(
@@ -618,7 +612,8 @@ export class IngestionWorkflow extends WorkflowEntrypoint<Env, IngestionWorkflow
         reconcileDraft({
           db: context.db,
           vectors: context.vectors,
-          inventory: this.inventory(),
+          inventory,
+          inventoryPartlyConfigured: partlyConfigured,
           generationId,
           missingIsPending,
         }),

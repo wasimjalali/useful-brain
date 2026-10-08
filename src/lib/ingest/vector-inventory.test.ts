@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   createRestVectorInventory,
+  inventoryFromSettings,
   VECTOR_LIST_PAGE_SIZE,
   VectorInventoryError,
+  VectorInventoryRateLimited,
 } from "./vector-inventory";
 
 const TOKEN = "tok_SECRET_value_1234567890";
@@ -69,7 +71,7 @@ function fakeFetch(responses: Array<Response | Error | ((call: Call) => Response
 
 function inventory(
   responses: Parameters<typeof fakeFetch>[0],
-  options: { now?: () => number } = {},
+  options: { now?: () => number; maxPages?: number } = {},
 ) {
   const sleeps: number[] = [];
   const fake = fakeFetch(responses);
@@ -83,6 +85,7 @@ function inventory(
       sleeps.push(ms);
     },
     ...(options.now ? { now: options.now } : {}),
+    ...(options.maxPages ? { maxPages: options.maxPages } : {}),
   });
   return { port, sleeps, calls: fake.calls };
 }
@@ -181,14 +184,97 @@ describe("REST vector inventory", () => {
     expectNoSecrets(error);
   });
 
-  it("fails closed when the server keeps paging past the cap derived from totalCount", async () => {
-    // totalCount 1000 allows one page plus two spare. A fourth request is a runaway.
-    const endless = () => body({ ids: ids("v", 0, 1000), totalCount: 1000, nextCursor: "again" });
-    const { port, calls } = inventory([endless(), endless(), endless(), endless(), endless()]);
+  it("accepts short pages: count is a maximum, so 1000 ids as four 250-id pages is a complete listing", async () => {
+    const all = ids("v", 0, 1000);
+    const { port, calls } = inventory([
+      body({ ids: all.slice(0, 250), totalCount: 1000, nextCursor: "c1" }),
+      body({ ids: all.slice(250, 500), totalCount: 1000, nextCursor: "c2" }),
+      body({ ids: all.slice(500, 750), totalCount: 1000, nextCursor: "c3" }),
+      body({ ids: all.slice(750), totalCount: 1000 }),
+    ]);
+    const listing = await port.listAll();
+    expect(listing.ids).toEqual(all);
+    expect(calls).toHaveLength(4);
+  });
+
+  it("fails closed when a truncated page adds no new ids", async () => {
+    const same = (cursor: string) => body({ ids: ids("v", 0, 500), totalCount: 1000, nextCursor: cursor });
+    const { port, calls } = inventory([same("c1"), same("c2"), same("c3"), same("c4")]);
     const error = await failure(port.listAll());
     expect(error).toBeInstanceOf(VectorInventoryError);
+    expect(error.message).toMatch(/no progress/);
+    expect(calls).toHaveLength(2);
+    expectNoSecrets(error);
+  });
+
+  it("fails closed when the cursor repeats", async () => {
+    const { port } = inventory([
+      body({ ids: ids("a", 0, 100), totalCount: 1000, nextCursor: "same" }),
+      body({ ids: ids("b", 0, 100), totalCount: 1000, nextCursor: "same" }),
+      body({ ids: ids("c", 0, 100), totalCount: 1000, nextCursor: "same" }),
+    ]);
+    const error = await failure(port.listAll());
+    expect(error.message).toMatch(/repeated a cursor/);
+  });
+
+  it("fails closed when unique ids exceed the first page's totalCount", async () => {
+    const { port } = inventory([
+      body({ ids: ids("a", 0, 600), totalCount: 1000, nextCursor: "c1" }),
+      body({ ids: ids("b", 0, 600), totalCount: 1000 }),
+    ]);
+    const error = await failure(port.listAll());
+    expect(error.message).toMatch(/more ids than totalCount/);
+  });
+
+  it("stops at the safety cap on pages even when every page makes progress", async () => {
+    const page = (n: number) => body({ ids: ids(`p${n}`, 0, 10), totalCount: 100_000, nextCursor: `c${n}` });
+    const { port, calls } = inventory([page(1), page(2), page(3), page(4), page(5)], { maxPages: 3 });
+    const error = await failure(port.listAll());
     expect(error.message).toMatch(/page limit/);
-    expect(calls.length).toBeLessThanOrEqual(4);
+    expect(calls).toHaveLength(3);
+  });
+
+  it("rejects a count that disagrees with the vectors returned", async () => {
+    const lying = new Response(
+      JSON.stringify({
+        success: true,
+        result: { count: 5, isTruncated: false, totalCount: 2, vectors: [{ id: "a" }, { id: "b" }] },
+      }),
+    );
+    const { port } = inventory([lying]);
+    expect(await failure(port.listAll())).toBeInstanceOf(VectorInventoryError);
+    const missing = new Response(
+      JSON.stringify({ success: true, result: { isTruncated: false, totalCount: 1, vectors: [{ id: "a" }] } }),
+    );
+    expect(await failure(inventory([missing]).port.listAll())).toBeInstanceOf(VectorInventoryError);
+  });
+
+  it("honours Retry-After on a 429 within a bounded budget, then continues", async () => {
+    const limited = (seconds: string) => new Response("slow down", { status: 429, headers: { "retry-after": seconds } });
+    const { port, sleeps, calls } = inventory([limited("2"), limited("3"), body({ ids: ids("v", 0, 3), totalCount: 3 })]);
+    const listing = await port.listAll();
+    expect(listing.ids).toHaveLength(3);
+    expect(calls).toHaveLength(3);
+    expect(sleeps).toEqual([2000, 3000]);
+  });
+
+  it("throws a typed rate-limit error when Retry-After is missing, too long, or the budget is spent", async () => {
+    const limited = (headers?: Record<string, string>) => new Response("slow down", { status: 429, headers });
+    const none = inventory([limited()]);
+    const noHeader = await failure(none.port.listAll());
+    expect(noHeader).toBeInstanceOf(VectorInventoryRateLimited);
+    expect(none.sleeps).toEqual([]);
+    expectNoSecrets(noHeader);
+
+    const tooLong = inventory([limited({ "retry-after": "61" })]);
+    expect(await failure(tooLong.port.listAll())).toBeInstanceOf(VectorInventoryRateLimited);
+    expect(tooLong.sleeps).toEqual([]);
+
+    const spent = inventory([limited({ "retry-after": "50" }), limited({ "retry-after": "50" }), limited({ "retry-after": "50" })]);
+    const error = await failure(spent.port.listAll());
+    expect(error).toBeInstanceOf(VectorInventoryRateLimited);
+    expect(error.name).toBe("VectorInventoryRateLimited");
+    expect(spent.sleeps).toEqual([50_000, 50_000]);
     expectNoSecrets(error);
   });
 
@@ -261,5 +347,36 @@ describe("REST vector inventory", () => {
       expectNoSecrets(error);
     }
     expect(fake.calls).toHaveLength(0);
+  });
+});
+
+describe("inventory settings", () => {
+  const all = { VECTORIZE_API_TOKEN: TOKEN, CLOUDFLARE_ACCOUNT_ID: ACCOUNT, VECTORIZE_INDEX_NAME: INDEX };
+
+  it("builds a listing only when all three settings are present", () => {
+    const full = inventoryFromSettings(all);
+    expect(full.inventory).not.toBeNull();
+    expect(full).toMatchObject({ partlyConfigured: false, missing: [] });
+  });
+
+  it("none set is binding-only, not a misconfiguration; empty strings count as unset", () => {
+    expect(inventoryFromSettings({})).toEqual({
+      inventory: null,
+      partlyConfigured: false,
+      missing: ["VECTORIZE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID", "VECTORIZE_INDEX_NAME"],
+    });
+    expect(inventoryFromSettings({ VECTORIZE_API_TOKEN: "", CLOUDFLARE_ACCOUNT_ID: "" }).partlyConfigured).toBe(false);
+  });
+
+  it("some but not all set is partly configured and names only the missing settings", () => {
+    for (const absent of Object.keys(all) as Array<keyof typeof all>) {
+      const { [absent]: _removed, ...rest } = all;
+      void _removed;
+      const result = inventoryFromSettings(rest);
+      expect(result.inventory).toBeNull();
+      expect(result.partlyConfigured).toBe(true);
+      expect(result.missing).toEqual([absent]);
+      expect(JSON.stringify(result)).not.toContain(TOKEN);
+    }
   });
 });

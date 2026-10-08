@@ -795,13 +795,94 @@ describe("reconciliation", () => {
       expect(await auditRow(draft.generationId)).toEqual({ status: "complete", missing_count: 0, orphan_count: 0 });
     });
 
-    it("a listed id that is already gone from the index is a race, not an orphan", async () => {
+    it("a listed id the binding no longer returns is retried while pending, and on the final attempt is no orphan but is counted in the reason", async () => {
       const { vectors, draft } = await draftWithVectors();
       const gone: VectorInventory = {
         listAll: async () => ({ ids: [...vectors.store.keys(), "deleted-after-listing"], totalCount: vectors.store.size + 1 }),
       };
+      await expect(
+        reconcileDraft({ db: db(), vectors: vectors.port, inventory: gone, generationId: draft.generationId, missingIsPending: true }),
+      ).rejects.toBeInstanceOf(MutationPendingError);
+      expect(await auditRow(draft.generationId)).toBeNull();
       const outcome = await reconcileDraft({ db: db(), vectors: vectors.port, inventory: gone, generationId: draft.generationId });
       expect(outcome).toMatchObject({ reconciled: true, orphanVectors: 0, orphanVectorsInDraft: 0 });
+      expect(outcome.reason).toBe("1 listed vectors could not be resolved");
+      expect(outcome.reason).not.toMatch(/deleted-after-listing/);
+    });
+
+    it("an in-draft orphan from a delete the index has not processed yet is retried while pending, then clears", async () => {
+      const { vectors, draft } = await draftWithVectors();
+      const namespace = await generationNamespace(draft.generationId);
+      addOrphan(vectors, "removed-document-chunk", namespace);
+      // Asynchronous delete: accepted now, applied later (removeDocumentFromDraft behaves this way).
+      const pendingDeletes: string[] = [];
+      const lagging = {
+        ...vectors.port,
+        deleteByIds: async (ids: string[]) => {
+          pendingDeletes.push(...ids);
+        },
+      };
+      await lagging.deleteByIds(["removed-document-chunk"]);
+      const run = (missingIsPending: boolean) =>
+        reconcileDraft({ db: db(), vectors: lagging, inventory: listing(vectors.store), generationId: draft.generationId, missingIsPending });
+      await expect(run(true)).rejects.toBeInstanceOf(MutationPendingError);
+      expect(await auditRow(draft.generationId)).toBeNull();
+      // The final attempt still fails closed while the vector is there.
+      expect(await run(false)).toMatchObject({ reconciled: false, orphanVectorsInDraft: 1 });
+      for (const id of pendingDeletes) vectors.store.delete(id);
+      expect(await run(true)).toMatchObject({ reconciled: true, orphanVectors: 0, orphanVectorsInDraft: 0 });
+    });
+
+    it("more unknown ids than the cap fails closed at once, even while pending, without resolving any", async () => {
+      const { vectors, draft } = await draftWithVectors();
+      for (let index = 0; index < 5; index += 1) addOrphan(vectors, `junk-${index}`, "some-other-namespace");
+      const calls: string[][] = [];
+      const counting = { ...vectors.port, getByIds: async (ids: string[]) => { calls.push(ids); return vectors.port.getByIds(ids); } };
+      const run = (missingIsPending: boolean) =>
+        reconcileDraft({ db: db(), vectors: counting, inventory: listing(vectors.store), generationId: draft.generationId, orphanResolveCap: 4, missingIsPending });
+      const pending = await run(true);
+      expect(pending).toMatchObject({ reconciled: false, status: "partial", inventoryChecked: true, orphanVectors: 5, orphanVectorsInDraft: null });
+      expect(pending.reason).toBe("5 unknown vectors exceed the check limit of 4");
+      expect(calls).toHaveLength(1); // the ledger fetch only
+      expect(await auditRow(draft.generationId)).toMatchObject({ status: "partial" });
+      // At the cap exactly it still resolves.
+      vectors.store.delete("junk-0");
+      expect(await run(false)).toMatchObject({ reconciled: true, orphanVectors: 4 });
+    });
+
+    it("resolves more than 20 unknown ids in batches of 20", async () => {
+      const { vectors, draft } = await draftWithVectors();
+      for (let index = 0; index < 45; index += 1) addOrphan(vectors, `junk-${index}`, "some-other-namespace");
+      const batches: number[] = [];
+      const counting = {
+        ...vectors.port,
+        getByIds: async (ids: string[]) => {
+          batches.push(ids.length);
+          return vectors.port.getByIds(ids);
+        },
+      };
+      const outcome = await reconcileDraft({ db: db(), vectors: counting, inventory: listing(vectors.store), generationId: draft.generationId });
+      expect(outcome).toMatchObject({ reconciled: true, orphanVectors: 45, orphanVectorsInDraft: 0 });
+      expect(batches).toEqual([1, 20, 20, 5]);
+    });
+
+    it("partly configured inventory fails closed at once without listing or fetching, even while pending", async () => {
+      const { vectors, draft } = await draftWithVectors();
+      let touched = 0;
+      const spy = { ...vectors.port, getByIds: async (ids: string[]) => { touched += 1; return vectors.port.getByIds(ids); } };
+      for (const missingIsPending of [true, false]) {
+        const outcome = await reconcileDraft({
+          db: db(),
+          vectors: spy,
+          inventory: null,
+          inventoryPartlyConfigured: true,
+          generationId: draft.generationId,
+          missingIsPending,
+        });
+        expect(outcome).toMatchObject({ mode: "ledger_getbyids", reconciled: false, status: "partial", reason: "inventory partly configured", inventoryChecked: false });
+      }
+      expect(touched).toBe(0);
+      expect(await auditRow(draft.generationId)).toMatchObject({ status: "partial" });
     });
 
     it("fails when the listing lacks a ledger id the binding can still fetch", async () => {
@@ -852,21 +933,29 @@ describe("reconciliation", () => {
       expect(listed).toBe(0);
     });
 
-    it("vectors held by discarded drafts, and by other generations, are known and not orphans", async () => {
+    it("vectors held by discarded drafts and by other generations are known, read in keyset pages", async () => {
       const { vectors, draft } = await draftWithVectors();
       const namespace = await generationNamespace(draft.generationId);
-      addOrphan(vectors, "tombstoned-vector", namespace);
-      await env.CORPUS_DB.prepare("INSERT INTO discarded_vectors (generation_id, vector_id) VALUES (?, ?)")
-        .bind("some-discarded-generation", "tombstoned-vector")
-        .run();
-      const other = await env.CORPUS_DB.prepare("SELECT vector_id FROM chunks WHERE generation_id <> ? LIMIT 1")
-        .bind(draft.generationId)
-        .first<{ vector_id: string }>();
-      if (other) {
-        addOrphan(vectors, other.vector_id, "some-other-namespace");
+      // Another generation with its own chunks, seeded here so the test owns its data.
+      const active = await seedActive();
+      const others = (
+        await env.CORPUS_DB.prepare("SELECT vector_id FROM chunks WHERE generation_id = ?").bind(active.generationId).all<{ vector_id: string }>()
+      ).results;
+      expect(others.length).toBeGreaterThan(2);
+      for (const row of others) addOrphan(vectors, row.vector_id, "some-other-namespace");
+      for (let index = 0; index < 5; index += 1) {
+        const id = `tombstoned-${index}`;
+        addOrphan(vectors, id, namespace);
+        await env.CORPUS_DB.prepare("INSERT INTO discarded_vectors (generation_id, vector_id) VALUES (?, ?)")
+          .bind("some-discarded-generation", id)
+          .run();
       }
-      const outcome = await reconcileDraft({ db: db(), vectors: vectors.port, inventory: listing(vectors.store), generationId: draft.generationId });
+      const batches: number[] = [];
+      const counting = { ...vectors.port, getByIds: async (ids: string[]) => { batches.push(ids.length); return vectors.port.getByIds(ids); } };
+      // Page size 2 forces several keyset pages over both tables.
+      const outcome = await reconcileDraft({ db: db(), vectors: counting, inventory: listing(vectors.store), generationId: draft.generationId, knownPageSize: 2 });
       expect(outcome).toMatchObject({ reconciled: true, inventoryChecked: true, orphanVectors: 0, orphanVectorsInDraft: 0 });
+      expect(batches).toEqual([1]); // only the ledger fetch: nothing known was treated as unknown
     });
 
     it("a listing error rethrows while pending so the step retries, and records nothing", async () => {
@@ -1180,6 +1269,13 @@ describe("reconcileWithFinalRecord", () => {
       "keyword_only",
     );
     expect(names).toEqual(["reconcile", "reconcile-final"]);
-    expect(outcome).toMatchObject({ reconciled: false, mode: "keyword_only", expected: null });
+    expect(outcome).toMatchObject({
+      reconciled: false,
+      mode: "keyword_only",
+      expected: null,
+      inventoryChecked: false,
+      orphanVectors: null,
+      orphanVectorsInDraft: null,
+    });
   });
 });
