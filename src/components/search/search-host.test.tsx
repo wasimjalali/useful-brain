@@ -91,6 +91,8 @@ describe("SearchHost", () => {
     expect(push).toHaveBeenLastCalledWith("/chat?scope=d1");
     // A fresh chat, so the scope applies to the first turn and not to an old conversation.
     expect(newChat).toHaveBeenCalledOnce();
+    // push follows, so newChat must not add its own /chat history entry.
+    expect(newChat).toHaveBeenCalledWith({ pushUrl: false });
     expect(newChat.mock.invocationCallOrder[0]).toBeLessThan(push.mock.invocationCallOrder[0]);
   });
 

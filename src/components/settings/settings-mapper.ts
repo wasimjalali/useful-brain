@@ -4,7 +4,8 @@ import type {
   SettingsConnector,
   SettingsModelConfig,
 } from "@/lib/contracts/settings-view";
-import { capitalize } from "@/lib/format";
+import { departmentLabel } from "@/lib/labels";
+import { shortGenerationId } from "@/lib/labels";
 
 /** Brain `GET /config` (admin only). */
 export type BrainConfig = {
@@ -32,7 +33,7 @@ export function mapAccount(identity: WorkspaceIdentity, totalDocuments?: number)
     name: identity.name ?? subject,
     email: identity.email ?? subject,
     role: identity.isAdmin ? "Admin" : "Member",
-    department: identity.department ? capitalize(identity.department) : "None",
+    department: identity.department ? departmentLabel(identity.department) : "None",
     readableDocuments: identity.readableDocumentCount,
     ...(identity.isAdmin && totalDocuments !== undefined ? { totalDocuments } : {}),
   };
@@ -79,7 +80,7 @@ export function mapAdminSettings(
       retrieval: config.retrieval.mode === "hybrid" ? "Hybrid, keyword and vector" : "Keyword",
       passagesPerAnswer: config.retrieval.passages,
       rerankFloor: config.retrieval.rerankFloor,
-      activeGeneration: config.activeGenerationId ?? "None",
+      activeGeneration: config.activeGenerationId ? shortGenerationId(config.activeGenerationId) : "None",
     },
     connectors,
   };

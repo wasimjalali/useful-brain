@@ -20,6 +20,16 @@ export type EvalsPageView = {
 
 const NUMBER_WORD: Record<number, string> = { 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven" };
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "2026-09-06" as "6 Sep 2026", or "6 Sep" without the year. */
+export function formatRunDate(date: string, withYear: boolean): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(date);
+  if (!match) return date;
+  const base = `${Number(match[3])} ${MONTHS[Number(match[2]) - 1] ?? match[2]}`;
+  return withYear ? `${base} ${match[1]}` : base;
+}
+
 function latestRun(view: EvalsAdminView) {
   const run = view.runs.find((r) => r.key === view.latestKey);
   if (!run) throw new Error("evals view has no latest run");
@@ -32,7 +42,7 @@ export function mapEvalsSummary(view: EvalsAdminView): EvalsSummaryView {
     passed: run.passed,
     total: run.scored,
     aclLeaks: view.retrieval.aclLeaks,
-    latestRunLabel: `Latest run ${run.date}`,
+    latestRunLabel: formatRunDate(run.date, true),
   };
 }
 
@@ -43,7 +53,7 @@ export function mapEvals(view: EvalsAdminView): EvalsPageView {
   return {
     subtitle: `${view.questions} questions across ${NUMBER_WORD[count] ?? count} categories, run against the active generation`,
     model: view.model,
-    runs: view.runs.map((x) => ({ id: x.key, name: x.label, date: x.date, passed: x.passed, total: x.scored })),
+    runs: view.runs.map((x) => ({ id: x.key, name: x.label, date: formatRunDate(x.date, x.key === view.latestKey), passed: x.passed, total: x.scored })),
     categories: view.categories.map((c) => ({ id: c.id, name: c.label, passed: c.passed, total: c.scored })),
     metrics: [
       { id: "acl", label: "ACL leaks", value: String(r.aclLeaks), tone: r.aclLeaks === 0 ? "success" : undefined },

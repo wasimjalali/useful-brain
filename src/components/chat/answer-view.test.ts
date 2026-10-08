@@ -5,6 +5,8 @@ import type { GroundedAnswerResponse } from "@/lib/rag/grounded-answer";
 
 import {
   citedPassages,
+  displayNumbers,
+  paragraphDisplayViews,
   highlightRanges,
   labelNumber,
   paragraphViews,
@@ -88,8 +90,8 @@ describe("paragraphViews", () => {
 describe("sourceRefs and passages", () => {
   it("lists only cited sources, never the action note, using the catalog title", () => {
     expect(sourceRefs(answer())).toEqual([
-      { n: 1, document: "Parental Leave Policy", section: "Section 1" },
-      { n: 2, document: "doc_2.md", section: "Section 2" },
+      { n: 1, display: 1, document: "Parental Leave Policy", section: "Section 1" },
+      { n: 2, display: 2, document: "doc_2.md", section: "Section 2" },
     ]);
   });
 
@@ -255,5 +257,49 @@ describe("evidence url state", () => {
     expect(applyEvidenceUrl("?settings=1&evidence=cited&doc=a&c=2", { evidence: null, doc: null, c: null })).toBe(
       "settings=1",
     );
+  });
+});
+
+describe("display numbers", () => {
+  const sparse = answer({
+    structuredAnswer: {
+      answerType: "grounded",
+      paragraphs: [{ text: "Late rank first [3]. Then [1].", citations: ["[1]", "[3]"] }],
+    },
+  });
+
+  it("numbers cited sources 1, 2 in order of first citation and keeps retrieval ranks", () => {
+    expect([...displayNumbers(sparse)]).toEqual([
+      [3, 1],
+      [1, 2],
+    ]);
+    expect(paragraphDisplayViews(sparse)[0].display).toEqual({ 3: 1, 1: 2 });
+    expect(sourceRefs(sparse).map((s) => [s.n, s.display])).toEqual([
+      [3, 1],
+      [1, 2],
+    ]);
+    expect(citedPassages(sparse, { isAdmin: false }).map((p) => [p.n, p.display])).toEqual([
+      [3, 1],
+      [1, 2],
+    ]);
+    expect(retrievedPassages(sparse, { isAdmin: false }).map((r) => r.rank)).toEqual([1, 2, 3]);
+  });
+
+  it("gives the reader's span chip the same display number", () => {
+    const { view } = readerFromDocument(
+      {
+        id: "d",
+        title: "T",
+        version: null,
+        effectiveDate: null,
+        ownerDepartment: "hr",
+        readers: { kind: "everyone", names: [] },
+        sections: [{ heading: "H", text: "Alpha beta." }],
+        spans: [{ section: 0, start: 0, end: 5, citation: "[3]", active: true }],
+      } as never,
+      displayNumbers(sparse),
+    );
+    expect(view.sections[0].paragraphs[0][0]).toMatchObject({ citation: 3, display: 1 });
+    expect(view.owner).toBe("HR");
   });
 });

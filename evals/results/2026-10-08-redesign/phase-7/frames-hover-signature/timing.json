@@ -1,0 +1,8 @@
+{
+  "frames": 30,
+  "seconds": 1.367837905883789,
+  "maxGapMs": 873,
+  "capturedFrames": 30,
+  "keptFrames": 23,
+  "note": "Each unique frame is stored once (first occurrence). frames-index.json maps every captured frame (index, ms since start) to its stored file, so the full sequence is reconstructable."
+}

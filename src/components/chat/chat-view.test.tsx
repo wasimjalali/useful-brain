@@ -577,6 +577,16 @@ describe("evidence panel", () => {
     });
   });
 
+  it("closes the evidence panel and reader when New chat starts, even with the old query string", async () => {
+    nav.search = "evidence=cited&doc=nw_hr_parental_leave";
+    window.history.replaceState(null, "", "/chat?evidence=cited&doc=nw_hr_parental_leave");
+    renderChat();
+    expect(await within(panel()).findByRole("heading", { name: "Parental Leave Policy" })).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("link", { name: /New chat/ })[0]);
+    expect(panel()).toBeNull();
+    expect(window.location.search).toBe("");
+  });
+
   it("opens a document from search without spans and without a Back button", async () => {
     nav.search = "doc=nw_hr_parental_leave";
     window.history.replaceState(null, "", "/chat?doc=nw_hr_parental_leave");
@@ -585,6 +595,13 @@ describe("evidence panel", () => {
     expect(await within(panel()).findByRole("heading", { name: "Parental Leave Policy" })).toBeInTheDocument();
     expect(actions.loadDocument).toHaveBeenCalledWith({ documentId: "nw_hr_parental_leave" });
     expect(within(panel()).queryByRole("button", { name: "Back to evidence" })).toBeNull();
+  });
+
+  it("always renders the chat head and hides it below 768px with CSS, so SSR and hydration match", () => {
+    setViewport(390);
+    renderChat({ initialTurns: [turn()] });
+    const toggle = screen.getByRole("button", { name: "Evidence" });
+    expect(toggle.closest("header")).toHaveClass("max-[767px]:hidden");
   });
 
   it("uses the bottom sheet and a 44px sources summary on a narrow screen", () => {

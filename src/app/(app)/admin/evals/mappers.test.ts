@@ -57,7 +57,7 @@ describe("mapEvals", () => {
 
 describe("mapEvalsSummary", () => {
   it("takes the latest run and leaks", () => {
-    expect(mapEvalsSummary(view())).toEqual({ passed: 118, total: 120, aclLeaks: 0, latestRunLabel: "Latest run 6 Sep 2026" });
+    expect(mapEvalsSummary(view())).toEqual({ passed: 118, total: 120, aclLeaks: 0, latestRunLabel: "6 Sep 2026" });
   });
   it("fails loud without a latest run", () => {
     expect(() => mapEvalsSummary(view({ latestKey: "x" }))).toThrow();

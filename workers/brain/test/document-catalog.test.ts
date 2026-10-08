@@ -2,7 +2,9 @@ import { env } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { workerErrorResponse, WorkerNotFoundError } from "../../../src/lib/cf/worker-errors";
-import { backfillDocumentCatalog } from "../../../src/lib/store/document-catalog";
+import { chunkDocument } from "../../../src/lib/ingest/chunker";
+import { splitSections } from "../../../src/lib/store/library-queries";
+import { backfillDocumentCatalog, reconstructBody } from "../../../src/lib/store/document-catalog";
 import { CORPUS_DOCUMENT_IDS, seedCorpus } from "./seed";
 
 let generationId: string;
@@ -131,6 +133,79 @@ describe("catalog backfill", () => {
     expect(JSON.parse(rebuilt!.headings_json)).toEqual(["Paging", "Rollback", "Postmortem"]);
     expect(rebuilt!.access_scope).toBe("department");
     expect(await backfillDocumentCatalog(env.CORPUS_DB, gen)).toBe(0);
+  });
+});
+
+describe("reconstructed bodies", () => {
+  it("restore the original headings as reader sections", async () => {
+    const gen = (await seedCorpus()).generationId;
+    await env.CORPUS_DB.batch([
+      env.CORPUS_DB.prepare(`DELETE FROM document_catalog WHERE generation_id = ?`).bind(gen),
+      env.CORPUS_DB.prepare(`DELETE FROM document_bodies WHERE generation_id = ?`).bind(gen),
+    ]);
+    await backfillDocumentCatalog(env.CORPUS_DB, gen);
+    const row = await env.CORPUS_DB.prepare(
+      `SELECT body, reconstructed FROM document_bodies WHERE generation_id = ? AND document_id = 'doc-eng-runbook'`,
+    )
+      .bind(gen)
+      .first<{ body: string; reconstructed: number }>();
+    expect(row!.reconstructed).toBe(1);
+    const headings = splitSections(row!.body, "Incident Runbook").map((section) => section.heading);
+    expect(headings).toEqual(expect.arrayContaining(["Paging", "Rollback", "Postmortem"]));
+  });
+
+  it("groups chunks by heading and drops only the verified source-range overlap between neighbours", () => {
+    const body = reconstructBody([
+      { heading: "Paging", content: "Page the on-call engineer first. Then confirm the alert.", start_offset: 10, end_offset: 66 },
+      { heading: "Paging", content: "Then confirm the alert. Open an incident channel.", start_offset: 43, end_offset: 92 },
+      { heading: "Rollback", content: "Roll back the last release.", start_offset: 110, end_offset: 137 },
+      { heading: "Rollback", content: "Unrelated second chunk.", start_offset: 138, end_offset: 161 },
+    ]);
+    expect(body).toBe(
+      "## Paging\n\nPage the on-call engineer first. Then confirm the alert. Open an incident channel." +
+        "\n\n## Rollback\n\nRoll back the last release.\n\nUnrelated second chunk.",
+    );
+  });
+
+  it("keeps text when overlapping ranges do not actually match", () => {
+    const body = reconstructBody([
+      { heading: "A", content: "The first chunk ends with alpha beta gamma.", start_offset: 0, end_offset: 42 },
+      { heading: "A", content: "alpha beta gamma! Then a different tail.", start_offset: 25, end_offset: 65 },
+    ]);
+    expect(body).toContain("alpha beta gamma.\n\nalpha beta gamma! Then a different tail.");
+  });
+
+  it("keeps two sections that share a heading and repeated text separate, using real chunker output", () => {
+    const sentences = (prefix: string) =>
+      Array.from({ length: 160 }, (_, i) => `${prefix} sentence number ${i} says the same thing twice.`).join(" ");
+    const shared = sentences("Shared");
+    const content = `# Guide\n\n## Steps\n\n${shared}\n\n## Steps\n\n${shared}\n`;
+    const chunks = chunkDocument({ documentId: "doc-repeat", content });
+    expect(chunks.length).toBeGreaterThan(3);
+    const rows = chunks.map((chunk) => ({
+      heading: chunk.sectionHeading,
+      content: chunk.content,
+      start_offset: chunk.charStart,
+      end_offset: chunk.charEnd,
+    }));
+    expect(reconstructBody(rows)).toBe(`## Steps\n\n${shared}\n\n## Steps\n\n${shared}`);
+  });
+
+  it("keeps one section when a long whitespace gap separates two chunks of the same heading", () => {
+    const body = reconstructBody([
+      { heading: "Policy", content: "First half of the policy.", start_offset: 12, end_offset: 37 },
+      { heading: "Policy", content: "Second half of the policy.", start_offset: 37 + 1600, end_offset: 37 + 1626 },
+    ]);
+    expect(body).toBe("## Policy\n\nFirst half of the policy.\n\nSecond half of the policy.");
+  });
+
+  it("keeps repeated text inside one section when the chunk ranges do not overlap", () => {
+    const paragraph = "Repeat this line exactly, it is policy text.";
+    const body = reconstructBody([
+      { heading: "Policy", content: paragraph, start_offset: 12, end_offset: 56 },
+      { heading: "Policy", content: paragraph, start_offset: 58, end_offset: 102 },
+    ]);
+    expect(body).toBe(`## Policy\n\n${paragraph}\n\n${paragraph}`);
   });
 });
 

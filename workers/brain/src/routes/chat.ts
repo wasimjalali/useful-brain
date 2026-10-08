@@ -81,7 +81,7 @@ export async function pendingTurnProgress(
   const lock = await env.CONVERSATION.getByName(handle.conversationId).progress();
   const stage = lock.runId === handle.runId ? normalizeTurnStage(lock.stage) : null;
   if (stage === "writing") {
-    return { stage: "writing" };
+    return lock.count !== null ? { stage: "writing", passages: lock.count } : { stage: "writing" };
   }
   if (stage === "reading" && lock.count !== null) {
     return { stage: "reading", passages: lock.count };

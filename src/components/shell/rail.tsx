@@ -7,7 +7,8 @@ import type { WorkspaceIdentity } from "@/app/actions";
 import { SettingsIcon, TrashIcon, XIcon } from "@/components/icons";
 import { UsefulBrainMarkPaths } from "@/components/useful-brain-logo";
 import { IconButton } from "@/components/ui/button";
-import { capitalize, initials } from "@/lib/format";
+import { initials } from "@/lib/format";
+import { departmentLabel } from "@/lib/labels";
 import { groupConversations } from "@/lib/chat/groups";
 import { DEFAULT_USEFUL_BRAIN_CONFIG } from "@/lib/useful-brain-config";
 
@@ -65,7 +66,7 @@ export function Rail({
   const role = identity?.isAdmin
     ? "Admin"
     : identity?.department
-      ? capitalize(identity.department)
+      ? departmentLabel(identity.department)
       : null;
 
   return (

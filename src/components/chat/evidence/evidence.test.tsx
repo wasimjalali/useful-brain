@@ -153,7 +153,7 @@ describe("EvidencePanel", () => {
     expect(screen.getByText("Keyword 0.868 · Vector 0.840 · Rerank 0.991")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: /Retrieved/ }));
     expect(screen.getByText("0.991")).toBeInTheDocument();
-    expect(screen.getByText("Rerank score · floor 0.05 · g-c305cf57")).toBeInTheDocument();
+    expect(screen.getByText(/Rerank score · floor 0.05/)).toBeInTheDocument();
   });
 
   it("marks only the relied-on span and opens the document", () => {

@@ -17,7 +17,6 @@ import {
 import { WorkersAiReranker } from "../retrieve/workers-ai-reranker";
 import { auditStoreConsistency } from "../store/inventory-audit";
 import { loadExpectedVectorIds, recordAudit, type SqlExecutor } from "../store/corpus-d1";
-import { mutationReached } from "../store/vectorize-projection";
 import type { VectorPort } from "./draft-index";
 
 /** Draft checks per UTC day. Above it a draft waits as "paused". */
@@ -27,10 +26,10 @@ export const DRAFT_LIVE_RECALL_FLOOR = 0.95;
 export const RETRIEVAL_BATCH = 20;
 const VECTOR_GET_LIMIT = 20;
 
-/** Retryable: the index has not processed our newest mutation yet. */
+/** Retryable: ledger vectors are not visible in the index yet (ingestion lag). */
 export class MutationPendingError extends Error {
   constructor() {
-    super("Vectorize has not processed the newest mutation yet");
+    super("Ledger vectors are not visible in the index yet");
     this.name = "MutationPendingError";
   }
 }
@@ -40,7 +39,13 @@ export type ReconcileOutcome = {
   reconciled: boolean;
   status: "complete" | "partial" | "unsupported";
   missing: number;
-  expected: number;
+  /** Null only for the synthetic outcome when even the ledger could not be read. */
+  expected: number | null;
+  /** Why an audit is partial, when it is. Diagnostic only; the audit table has no column for it. */
+  reason?: string;
+  /** Index-wide processed mutation before and after the scan. Advisory, never a gate. */
+  startWatermark?: string | null;
+  endWatermark?: string | null;
 };
 
 function chunksOf<T>(items: T[], size: number): T[][] {
@@ -51,17 +56,53 @@ function chunksOf<T>(items: T[], size: number): T[][] {
   return out;
 }
 
+/** Closed set of names safe to log. Anything else is logged as "Error". */
+export function sanitizedErrorName(error: unknown): string {
+  const name = error instanceof Error ? error.name : "";
+  return /^[A-Za-z0-9_]{1,64}$/.test(name) ? name : "Error";
+}
+
+/**
+ * The watermark is diagnostic only, so a failure to read it never discards a
+ * verified inventory: it reads as an empty watermark instead.
+ */
+async function readWatermark(vectors: VectorPort): Promise<string> {
+  try {
+    return String((await vectors.describe()).processedUpToMutation ?? "");
+  } catch {
+    return "";
+  }
+}
+
 /**
  * Reconciles the draft's D1 vector ledger with the index. With a Vectorize
- * binding: waits (by retry) until the index reports it processed the newest
- * recorded mutation, then fetches every ledger id back and checks namespace and
- * ACL metadata. The binding has no list call, so orphan vectors cannot be
- * enumerated here; that gap is part of the recorded mode. With no binding
- * (keyword-only) there are no vectors, so the audit is recorded as empty and
- * clean with mode "keyword_only". That path is never taken when a binding exists.
+ * binding it fetches every ledger id back and checks namespace and ACL
+ * metadata. That per-id check is the decisive one. The index is shared by every
+ * generation, so its processed-mutation watermark can move for reasons that are
+ * not this draft's (another draft, a purge). The watermark is therefore only
+ * recorded for diagnostics and never gates the result; lag shows up as missing
+ * ids, which `missingIsPending` retries. The binding has no list call, so
+ * orphan vectors cannot be enumerated here; that gap is part of the recorded
+ * mode. With no binding (keyword-only) there are no vectors, so the audit is
+ * recorded as empty and clean with mode "keyword_only".
+ *
+ * On the final attempt (`missingIsPending` false) an audit is always recorded:
+ * if the index cannot be read, a partial audit is written with the real ledger
+ * count and the reason, and the outcome is not reconciled.
  */
 export async function reconcileDraft(
-  input: { db: SqlExecutor; vectors: VectorPort | null; generationId: string; now?: number },
+  input: {
+    db: SqlExecutor;
+    vectors: VectorPort | null;
+    generationId: string;
+    now?: number;
+    /**
+     * When true, ids missing from the index throw MutationPendingError so the
+     * step retries instead of recording a failed audit. Mutation ids are opaque,
+     * so lag looks like a gap.
+     */
+    missingIsPending?: boolean;
+  },
 ): Promise<ReconcileOutcome> {
   const now = input.now ?? Date.now();
   const { db, vectors, generationId } = input;
@@ -78,45 +119,69 @@ export async function reconcileDraft(
     await recordAudit(db, generationId, report, now);
     return { mode: "keyword_only", reconciled: report.clean, status: report.status, missing: 0, expected: expectedCount };
   }
-  const newest = await db
-    .prepare(
-      `SELECT mutation_id FROM vector_mutations WHERE generation_id = ? ORDER BY rowid DESC LIMIT 1`,
-    )
-    .bind(generationId)
-    .first<{ mutation_id: string }>();
-  const processedBefore = String((await vectors.describe()).processedUpToMutation ?? "");
-  if (newest && !mutationReached(newest.mutation_id, processedBefore)) {
-    throw new MutationPendingError();
-  }
-  const aclRows = await db
-    .prepare(`SELECT vector_id, acl_group FROM chunks WHERE generation_id = ?`)
-    .bind(generationId)
-    .all<{ vector_id: string; acl_group: string }>();
-  const aclByVector = new Map(aclRows.results.map((row) => [row.vector_id, row.acl_group]));
-  const namespace = await generationNamespace(generationId);
-  const present: string[] = [];
-  for (const batch of chunksOf(Object.keys(expected), VECTOR_GET_LIMIT)) {
-    for (const vector of await vectors.getByIds(batch)) {
-      // Both fields must be present and equal. An absent namespace or ACL
-      // metadata cannot be verified, so it counts as missing, never as valid.
-      const ledgerAcl = aclByVector.get(vector.id);
-      const namespaceOk = vector.namespace === namespace;
-      const aclOk = typeof ledgerAcl === "string" && vector.metadata?.acl_group === ledgerAcl;
-      if (namespaceOk && aclOk && expected[vector.id] !== undefined) {
-        present.push(vector.id);
+  let present: string[];
+  let processedBefore: string;
+  let processedAfter: string;
+  try {
+    processedBefore = await readWatermark(vectors);
+    const aclRows = await db
+      .prepare(`SELECT vector_id, acl_group FROM chunks WHERE generation_id = ?`)
+      .bind(generationId)
+      .all<{ vector_id: string; acl_group: string }>();
+    const aclByVector = new Map(aclRows.results.map((row) => [row.vector_id, row.acl_group]));
+    const namespace = await generationNamespace(generationId);
+    present = [];
+    for (const batch of chunksOf(Object.keys(expected), VECTOR_GET_LIMIT)) {
+      for (const vector of await vectors.getByIds(batch)) {
+        // Both fields must be present and equal. An absent namespace or ACL
+        // metadata cannot be verified, so it counts as missing, never as valid.
+        const ledgerAcl = aclByVector.get(vector.id);
+        const namespaceOk = vector.namespace === namespace;
+        const aclOk = typeof ledgerAcl === "string" && vector.metadata?.acl_group === ledgerAcl;
+        if (namespaceOk && aclOk && expected[vector.id] !== undefined) {
+          present.push(vector.id);
+        }
       }
     }
+    processedAfter = await readWatermark(vectors);
+  } catch (error) {
+    if (input.missingIsPending) {
+      throw error;
+    }
+    // Final attempt: leave a partial audit with the real ledger count rather
+    // than no audit at all. Nothing could be verified, so every id is unverified.
+    console.error("reconcile scan failed", sanitizedErrorName(error));
+    const reason = `index scan failed: ${sanitizedErrorName(error)}`;
+    await recordAudit(
+      db,
+      generationId,
+      {
+        missingVectors: Object.values(expected),
+        orphanVectors: [],
+        status: "partial",
+        reason,
+        expectedCount,
+        actualCount: 0,
+        startWatermark: null,
+        endWatermark: null,
+        clean: false,
+      },
+      now,
+    );
+    return { mode: "ledger_getbyids", reconciled: false, status: "partial", missing: expectedCount, expected: expectedCount, reason };
   }
-  const processedAfter = String((await vectors.describe()).processedUpToMutation ?? "");
+  // The watermark is advisory: a constant stands in for it so a shared index
+  // moving under us cannot turn a verified inventory into a partial one.
   const report = auditStoreConsistency({
-    inventoryWatermark: (() => {
-      const marks = [newest ? processedBefore : null, newest ? processedAfter : null];
-      let call = 0;
-      return () => marks[call++] ?? null;
-    })(),
+    inventoryWatermark: () => "advisory",
     expectedVectorIds: () => expected,
     vectorIds: () => present,
   });
+  report.startWatermark = processedBefore || null;
+  report.endWatermark = processedAfter || null;
+  if (input.missingIsPending && (report.missingVectors.length > 0 || report.status === "partial")) {
+    throw new MutationPendingError();
+  }
   await recordAudit(db, generationId, report, now);
   return {
     mode: "ledger_getbyids",
@@ -124,6 +189,9 @@ export async function reconcileDraft(
     status: report.status,
     missing: report.missingVectors.length,
     expected: expectedCount,
+    ...(report.reason ? { reason: report.reason } : {}),
+    startWatermark: report.startWatermark,
+    endWatermark: report.endWatermark,
   };
 }
 

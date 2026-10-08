@@ -37,11 +37,13 @@
   "vectorize": [
     {
       "binding": "VECTORIZE",
-      "index_name": "useful-brain-development"
+      "index_name": "useful-brain-development",
+      "remote": true
     }
   ],
   "ai": {
-    "binding": "AI"
+    "binding": "AI",
+    "remote": true
   },
   "queues": {
     "consumers": [
@@ -85,8 +87,8 @@
           "jurisdiction": "eu"
         }
       ],
-      "vectorize": [{ "binding": "VECTORIZE", "index_name": "useful-brain-development" }],
-      "ai": { "binding": "AI" },
+      "vectorize": [{ "binding": "VECTORIZE", "index_name": "useful-brain-development", "remote": true }],
+      "ai": { "binding": "AI", "remote": true },
       "queues": {
         "consumers": [
           {

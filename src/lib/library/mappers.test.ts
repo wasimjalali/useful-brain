@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import type { LibraryDocument } from "@/lib/contracts/library";
 
-import { buildChips, departmentLabel, filterDocuments, readersLabel, toRows } from "./mappers";
+import { departmentLabel } from "@/lib/labels";
+import { buildChips, filterDocuments, readersLabel, toRows } from "./mappers";
 
 const doc = (over: Partial<LibraryDocument>): LibraryDocument => ({
   id: "d",

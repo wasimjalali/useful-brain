@@ -168,8 +168,8 @@ export class ConversationRunLock extends DurableObject {
     }
     return this.ctx.storage.transactionSync(() => {
       const row = this.ctx.storage.sql
-        .exec<{ run_id: string; stage: string | null }>(
-          "SELECT run_id, stage FROM run_lock WHERE id = 1",
+        .exec<{ run_id: string; stage: string | null; stage_n: number | null }>(
+          "SELECT run_id, stage, stage_n FROM run_lock WHERE id = 1",
         )
         .toArray()[0];
       if (!row || row.run_id !== requested) {
@@ -182,10 +182,18 @@ export class ConversationRunLock extends DurableObject {
       if (current === normalized) {
         return { ok: true as const, runId: requested, changed: false };
       }
+      // Writing carries no count of its own: it keeps the passage count the
+      // reading stage stored, so the poll can still report what was read.
+      const carried =
+        normalized === "writing" && current === "reading"
+          ? (turnStageCount("reading", (this.ctx.storage.sql
+              .exec<{ stage_n: number | null }>("SELECT stage_n FROM run_lock WHERE id = 1")
+              .toArray()[0])?.stage_n) ?? null)
+          : storedCount;
       this.ctx.storage.sql.exec(
         "UPDATE run_lock SET stage = ?, stage_n = ? WHERE id = 1",
         normalized,
-        storedCount,
+        carried,
       );
       return { ok: true as const, runId: requested, changed: true };
     });
@@ -198,7 +206,7 @@ export class ConversationRunLock extends DurableObject {
       )
       .toArray()[0];
     const stage = normalizeTurnStage(row?.stage);
-    const count = stage && stage !== "writing" ? turnStageCount(stage, row?.stage_n) : null;
+    const count = stage ? turnStageCount(stage === "writing" ? "reading" : stage, row?.stage_n) : null;
     return {
       runId: row?.run_id ?? null,
       stage,

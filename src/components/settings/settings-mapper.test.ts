@@ -23,7 +23,7 @@ const config: BrainConfig = {
     reranker: "@cf/baai/bge-reranker-base",
   },
   retrieval: { mode: "hybrid", passages: 8, rerankFloor: 0.05, configVersion: "cfg" },
-  activeGenerationId: "g-c305cf57",
+  activeGenerationId: "g-c305cf57-9f37-4620-a847-1cefae894469",
   connectors: [
     { id: "source-upload", label: "upload", kind: "upload", approval: false, status: "active" },
     { id: "tool-create_ticket", label: "create_ticket", kind: "action", approval: true, status: "connected" },

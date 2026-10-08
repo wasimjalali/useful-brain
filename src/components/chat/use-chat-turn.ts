@@ -69,7 +69,9 @@ export function parseProgress(body: unknown): ChatProgressView | null {
   const record = body as Record<string, unknown>;
   const stage = normalizeTurnStage(record.stage);
   if (stage === "writing") {
-    return { kind: "writing" };
+    return isTurnProgressCount(record.passages)
+      ? { kind: "writing", passages: record.passages }
+      : { kind: "writing" };
   }
   if (stage === "searching" && isTurnProgressCount(record.readableDocuments)) {
     return { kind: "searching", readableDocuments: record.readableDocuments };

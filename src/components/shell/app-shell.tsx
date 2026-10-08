@@ -100,7 +100,24 @@ export function AppShell({
     return () => window.removeEventListener("keydown", onKey);
   }, [panel, panelMode]);
 
-  const newChat = useCallback(() => setNewChatNonce((value) => value + 1), []);
+  // New chat from a saved conversation leaves the URL where it was (the blank
+  // chat remounts in place), so the active rail row follows this marker: the
+  // path New chat was chosen on, valid until the path changes.
+  const [freshFromPath, setFreshFromPath] = useState<string | null>(null);
+  if (freshFromPath !== null && freshFromPath !== pathname) {
+    setFreshFromPath(null);
+  }
+  const activePath = freshFromPath !== null ? "/chat" : pathname;
+  const newChat = useCallback((options?: { pushUrl?: boolean }) => {
+    setNewChatNonce((value) => value + 1);
+    setFreshFromPath(pathname);
+    // The URL must say /chat too, so a reload or a shared link opens the blank
+    // chat rather than the conversation that was on screen. pushState keeps
+    // that conversation one Back away; Next syncs usePathname without a navigation.
+    if (options?.pushUrl !== false && window.location.pathname !== "/chat") {
+      window.history.pushState(null, "", "/chat");
+    }
+  }, [pathname]);
   const openSearch = useCallback(() => setSearchOpen(true), []);
 
   const withSettings = useCallback(
@@ -221,7 +238,7 @@ export function AppShell({
     }
   }
 
-  const title = titleForPath(pathname, conversations);
+  const title = titleForPath(activePath, conversations);
 
   return (
     <ShellContext.Provider value={context}>
@@ -239,7 +256,7 @@ export function AppShell({
           onSearch={openSearch}
           onSettings={openSettings}
           overlay={overlayRail}
-          pathname={pathname}
+          pathname={activePath}
           railRef={railRef}
         />
         {railOpen ? (
@@ -261,13 +278,17 @@ export function AppShell({
               >
                 <MenuIcon className="size-5" />
               </IconButton>
-              <span className="ub-header-title">{title}</span>
+              {conversationIdFromPath(activePath) ? (
+                <h1 className="ub-header-title m-0">{title}</h1>
+              ) : (
+                <span className="ub-header-title m-0">{title}</span>
+              )}
               <Link
                 aria-label="New chat"
                 className="ub-iconbtn ub-ring"
                 data-nav="true"
                 href="/chat"
-                onClick={newChat}
+                onClick={() => newChat()}
               >
                 <SquarePenIcon className="size-5" />
               </Link>

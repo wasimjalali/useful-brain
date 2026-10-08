@@ -11,7 +11,7 @@ const HEADING = "m-0 border-b border-border pb-2.5 text-xs font-medium text-ink-
 export function EvalsView({ view }: { view: EvalsPageView }) {
   return (
     <div className="flex flex-col gap-10">
-      <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid gap-14 lg:grid-cols-[minmax(0,1fr)_340px]">
         <section aria-label="Pass rate by run">
           <RunsChart runs={view.runs} />
         </section>

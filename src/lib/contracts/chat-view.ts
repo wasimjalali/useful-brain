@@ -4,10 +4,14 @@
 export type AnswerParagraphView = {
   text: string;
   citations: number[];
+  /** Citation number to the number its chip shows (order of first citation). */
+  display?: Record<number, number>;
 };
 
 export type SourceRefView = {
   n: number;
+  /** Shown number. `n` stays the key. */
+  display?: number;
   document: string;
   section: string;
 };
@@ -20,7 +24,7 @@ export type SuggestionView = {
 export type ChatProgressView =
   | { kind: "searching"; readableDocuments: number }
   | { kind: "reading"; passages: number }
-  | { kind: "writing" };
+  | { kind: "writing"; passages?: number };
 
 export type FeedbackValue = "up" | "down";
 
@@ -29,6 +33,8 @@ export type HighlightRange = { start: number; end: number };
 
 export type CitedPassageView = {
   n: number;
+  /** Shown number. `n` stays the key. */
+  display?: number;
   chunkId: string;
   document: string;
   section: string;
@@ -57,6 +63,8 @@ export type ReaderSegmentView = {
   text: string;
   /** Present when this span is the passage a citation relied on. */
   citation?: number;
+  /** Shown number for `citation`. */
+  display?: number;
 };
 
 export type ReaderSectionView = {

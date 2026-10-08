@@ -15,6 +15,8 @@ import {
   decideChecks,
   finishCheckRun,
   reconcileDraft,
+  sanitizedErrorName,
+  type ReconcileOutcome,
   reserveCheckRun,
   RETRIEVAL_BATCH,
   runRetrievalBatch,
@@ -69,6 +71,36 @@ const RECONCILE_CONFIG = {
   retries: { limit: 12, delay: "15 seconds", backoff: "constant" },
   timeout: "5 minutes",
 } as const;
+
+type ReconcileRunner = (missingIsPending: boolean) => Promise<ReconcileOutcome>;
+
+/**
+ * Reconcile with missing vectors treated as ingestion lag (retried). If the
+ * retries run out, or anything else throws, a final step records the audit with
+ * missing vectors counted as a real gap, and records a partial audit if the
+ * index cannot be read. If even that throws (D1 down), the outcome is a
+ * synthetic failure with an unknown ledger count, so the draft always ends with
+ * a recorded RECONCILIATION_FAILED check and never stays in reconciling.
+ * `mode` names the reconcile mode the run would have used.
+ */
+export async function reconcileWithFinalRecord(
+  step: Pick<WorkflowStep, "do">,
+  run: ReconcileRunner,
+  mode: ReconcileOutcome["mode"],
+): Promise<ReconcileOutcome> {
+  try {
+    return await step.do("reconcile", RECONCILE_CONFIG, async () => run(true));
+  } catch (error) {
+    // Fall through to the recorded final attempt.
+    console.error("reconcile retries ended", sanitizedErrorName(error));
+  }
+  try {
+    return await step.do("reconcile-final", STEP_CONFIG, async () => run(false));
+  } catch (error) {
+    console.error("reconcile-final failed", sanitizedErrorName(error));
+    return { mode, reconciled: false, status: "partial", missing: 0, expected: null, reason: "reconcile could not record an audit" };
+  }
+}
 const WAIT_BASE_ITERATIONS = 60;
 /** A paused draft waits at most this many UTC days for budget before it stays paused for an operator. */
 const MAX_BUDGET_WINDOWS = 7;
@@ -546,10 +578,13 @@ export class IngestionWorkflow extends WorkflowEntrypoint<Env, IngestionWorkflow
       return;
     }
     const context = this.context();
-    // A MutationPendingError is thrown on purpose: the step retries until the
-    // index reports it processed the newest mutation.
-    const reconciled = await step.do("reconcile", RECONCILE_CONFIG, async () =>
-      reconcileDraft({ db: context.db, vectors: context.vectors, generationId }),
+    // A MutationPendingError is thrown on purpose: the step retries until every
+    // ledger vector is visible in the index.
+    const reconciled = await reconcileWithFinalRecord(
+      step,
+      (missingIsPending) =>
+        reconcileDraft({ db: context.db, vectors: context.vectors, generationId, missingIsPending }),
+      context.vectors ? "ledger_getbyids" : "keyword_only",
     );
     const probe = await step.do("acl-parity", STEP_CONFIG, async () => {
       const documents = await this.uploadedAclDocuments(generationId);

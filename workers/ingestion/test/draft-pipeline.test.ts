@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import { reconcileWithFinalRecord } from "../src/workflow";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
@@ -569,14 +570,25 @@ describe("reconciliation", () => {
     expect(audit).toEqual({ status: "complete", missing_count: 0, orphan_count: 0 });
   });
 
-  it("waits (by throwing) until the index processed the newest mutation", async () => {
+  it("a lagging watermark does not block: the per-id check decides, and the watermarks are reported", async () => {
     const { vectors, draft } = await draftWithVectors({ lag: true });
-    await expect(
-      reconcileDraft({ db: db(), vectors: vectors.port, generationId: draft.generationId }),
-    ).rejects.toBeInstanceOf(MutationPendingError);
-    vectors.catchUp();
     const outcome = await reconcileDraft({ db: db(), vectors: vectors.port, generationId: draft.generationId });
     expect(outcome).toMatchObject({ mode: "ledger_getbyids", reconciled: true, status: "complete", missing: 0 });
+    expect(outcome.expected).toBe(1);
+    expect(outcome.startWatermark).toBeNull();
+  });
+
+  it("lag as missing ids is still retried: pending throws until they appear", async () => {
+    const { vectors, draft, doc } = await draftWithVectors({ lag: true });
+    const row = await env.CORPUS_DB.prepare("SELECT vector_id FROM chunks WHERE generation_id = ? AND document_id = ?")
+      .bind(draft.generationId, doc.documentId)
+      .first<{ vector_id: string }>();
+    const stored = vectors.store.get(row!.vector_id)!;
+    vectors.drop(row!.vector_id);
+    const run = () => reconcileDraft({ db: db(), vectors: vectors.port, generationId: draft.generationId, missingIsPending: true });
+    await expect(run()).rejects.toBeInstanceOf(MutationPendingError);
+    vectors.store.set(row!.vector_id, stored);
+    expect(await run()).toMatchObject({ reconciled: true, status: "complete" });
   });
 
   it("fails reconciliation when a ledger vector is missing from the index", async () => {
@@ -589,6 +601,35 @@ describe("reconciliation", () => {
     expect(outcome.mode).toBe("ledger_getbyids");
     expect(outcome.reconciled).toBe(false);
     expect(outcome.missing).toBe(1);
+  });
+
+  it("missingIsPending throws instead of recording while vectors are missing, then reconciles once they appear", async () => {
+    const { vectors, draft, doc } = await draftWithVectors();
+    const row = await env.CORPUS_DB.prepare("SELECT vector_id FROM chunks WHERE generation_id = ? AND document_id = ?")
+      .bind(draft.generationId, doc.documentId)
+      .first<{ vector_id: string }>();
+    const stored = vectors.store.get(row!.vector_id)!;
+    vectors.drop(row!.vector_id);
+    const run = () => reconcileDraft({ db: db(), vectors: vectors.port, generationId: draft.generationId, missingIsPending: true });
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await expect(run()).rejects.toBeInstanceOf(MutationPendingError);
+    }
+    const audits = () => env.CORPUS_DB.prepare("SELECT COUNT(*) AS n FROM reconciliation_audits WHERE id = ?").bind(draft.generationId).first<{ n: number }>();
+    expect((await audits())!.n).toBe(0);
+    vectors.store.set(row!.vector_id, stored);
+    expect(await run()).toMatchObject({ reconciled: true, status: "complete", missing: 0 });
+  });
+
+  it("a watermark that moves during the scan (other generations mutating the shared index) does not fail a healthy draft", async () => {
+    const { vectors, draft } = await draftWithVectors();
+    let calls = 0;
+    const moving = {
+      ...vectors.port,
+      describe: async () => (++calls === 1 ? vectors.port.describe() : { processedUpToMutation: "m-999" }),
+    };
+    const outcome = await reconcileDraft({ db: db(), vectors: moving, generationId: draft.generationId, missingIsPending: true });
+    expect(outcome).toMatchObject({ reconciled: true, status: "complete", missing: 0 });
+    expect(outcome.startWatermark).not.toBe(outcome.endWatermark);
   });
 
   it("treats a vector with the wrong ACL metadata or namespace as missing", async () => {
@@ -623,19 +664,60 @@ describe("reconciliation", () => {
     expect((await reconcileDraft({ db: db(), vectors: vectors.port, generationId: draft.generationId })).reconciled).toBe(true);
   });
 
-  it("is partial when the index moves during the audit", async () => {
+  it("later mutations from another generation never make the gate unreachable", async () => {
+    const { vectors, draft } = await draftWithVectors();
+    // Another draft, or a purge, mutates the shared index after ours.
+    await vectors.port.upsert([]);
+    await vectors.port.deleteByIds(["someone-elses-vector"]);
+    const outcome = await reconcileDraft({ db: db(), vectors: vectors.port, generationId: draft.generationId });
+    expect(outcome).toMatchObject({ reconciled: true, status: "complete", missing: 0 });
+  });
+
+  it("a watermark that is never reported still reconciles when every vector verifies", async () => {
+    const { vectors, draft } = await draftWithVectors();
+    const silent = { ...vectors.port, describe: async () => ({ processedUpToMutation: undefined }) };
+    const outcome = await reconcileDraft({ db: db(), vectors: silent as never, generationId: draft.generationId });
+    expect(outcome).toMatchObject({ reconciled: true, status: "complete" });
+  });
+
+  it("a watermark read that throws after a verified scan keeps the verified inventory", async () => {
     const { vectors, draft } = await draftWithVectors();
     let calls = 0;
-    const moving = {
+    const flaky = {
       ...vectors.port,
       describe: async () => {
         calls += 1;
-        return calls === 1 ? vectors.port.describe() : { processedUpToMutation: "m-999" };
+        if (calls === 2) throw new Error("describe down");
+        return vectors.port.describe();
       },
     };
-    const outcome = await reconcileDraft({ db: db(), vectors: moving, generationId: draft.generationId });
-    expect(outcome.status).toBe("partial");
-    expect(outcome.reconciled).toBe(false);
+    for (const missingIsPending of [true, false]) {
+      calls = 0;
+      const outcome = await reconcileDraft({ db: db(), vectors: flaky as never, generationId: draft.generationId, missingIsPending });
+      expect(outcome).toMatchObject({ reconciled: true, status: "complete", missing: 0 });
+    }
+  });
+
+  it("final attempt with an unreadable index records a partial audit with the real count and never throws", async () => {
+    const { vectors, draft } = await draftWithVectors();
+    const broken = { ...vectors.port, getByIds: async () => { throw new Error("index down"); } };
+    const outcome = await reconcileDraft({ db: db(), vectors: broken as never, generationId: draft.generationId });
+    expect(outcome).toMatchObject({ mode: "ledger_getbyids", reconciled: false, status: "partial", expected: 1 });
+    expect(outcome.reason).toMatch(/index scan failed/);
+    const audit = await env.CORPUS_DB.prepare("SELECT status, missing_count FROM reconciliation_audits WHERE id = ?")
+      .bind(draft.generationId)
+      .first<Record<string, unknown>>();
+    expect(audit).toEqual({ status: "partial", missing_count: 1 });
+  });
+
+  it("a scan failure while pending rethrows so the step retries and records nothing", async () => {
+    const { vectors, draft } = await draftWithVectors();
+    const broken = { ...vectors.port, getByIds: async () => { throw new Error("boom"); } };
+    await expect(
+      reconcileDraft({ db: db(), vectors: broken as never, generationId: draft.generationId, missingIsPending: true }),
+    ).rejects.toThrow("boom");
+    const n = await env.CORPUS_DB.prepare("SELECT COUNT(*) AS n FROM reconciliation_audits WHERE id = ?").bind(draft.generationId).first<{ n: number }>();
+    expect(n!.n).toBe(0);
   });
 });
 
@@ -804,5 +886,88 @@ describe("retrieval and ACL guard on a draft", () => {
     await expect(
       runRetrievalBatch({ db: db(), ai, vectorize, generationId: draft.generationId, fixture: bad, from: 0, to: 1 }),
     ).rejects.toThrow(/unknown principal/);
+  });
+});
+
+describe("reconcileWithFinalRecord", () => {
+  // Fake step: retries the callback like RECONCILE_CONFIG would, up to `limit` attempts.
+  function fakeStep(limit: number) {
+    const names: string[] = [];
+    return {
+      names,
+      step: {
+        do: async (name: string, _config: unknown, fn: () => Promise<unknown>) => {
+          names.push(name);
+          let last: unknown;
+          for (let attempt = 0; attempt < limit; attempt += 1) {
+            try {
+              return await fn();
+            } catch (error) {
+              last = error;
+            }
+          }
+          throw last;
+        },
+      } as never,
+    };
+  }
+
+  it("absorbs lag: vectors that appear after N attempts reconcile with no failure recorded", async () => {
+    const vectors = fakeVectors();
+    const ai = fakeAi();
+    const draft = await newDraft();
+    const ctx = { db: db(), ai, vectors: vectors.port };
+    const doc = deptDoc(`upl-lag-${crypto.randomUUID().slice(0, 8)}`, ["hr"]);
+    const written = await writeDocumentChunks(ctx, { generationId: draft.generationId, doc, body: "# L\n\nlagging", ensureDocumentRow: true });
+    await embedChunkRange(ctx, { generationId: draft.generationId, documentId: doc.documentId, from: 0, to: written.chunkCount, reuseFromGenerationId: null });
+    const row = await env.CORPUS_DB.prepare("SELECT vector_id FROM chunks WHERE generation_id = ?").bind(draft.generationId).first<{ vector_id: string }>();
+    const stored = vectors.store.get(row!.vector_id)!;
+    vectors.drop(row!.vector_id);
+    let attempts = 0;
+    const { step, names } = fakeStep(12);
+    const outcome = await reconcileWithFinalRecord(step, (pending) => {
+      attempts += 1;
+      if (attempts === 4) {
+        vectors.store.set(row!.vector_id, stored);
+      }
+      return reconcileDraft({ db: db(), vectors: vectors.port, generationId: draft.generationId, missingIsPending: pending });
+    });
+    expect(attempts).toBe(4);
+    expect(names).toEqual(["reconcile"]);
+    expect(outcome).toMatchObject({ reconciled: true, status: "complete" });
+  });
+
+  it("vectors that never appear end in a recorded failed audit via reconcile-final", async () => {
+    const vectors = fakeVectors();
+    const ai = fakeAi();
+    const draft = await newDraft();
+    const ctx = { db: db(), ai, vectors: vectors.port };
+    const doc = deptDoc(`upl-gap-${crypto.randomUUID().slice(0, 8)}`, ["hr"]);
+    const written = await writeDocumentChunks(ctx, { generationId: draft.generationId, doc, body: "# G\n\nnever", ensureDocumentRow: true });
+    await embedChunkRange(ctx, { generationId: draft.generationId, documentId: doc.documentId, from: 0, to: written.chunkCount, reuseFromGenerationId: null });
+    const row = await env.CORPUS_DB.prepare("SELECT vector_id FROM chunks WHERE generation_id = ?").bind(draft.generationId).first<{ vector_id: string }>();
+    vectors.drop(row!.vector_id);
+    const { step, names } = fakeStep(3);
+    const outcome = await reconcileWithFinalRecord(step, (pending) =>
+      reconcileDraft({ db: db(), vectors: vectors.port, generationId: draft.generationId, missingIsPending: pending }),
+    "ledger_getbyids");
+    expect(names).toEqual(["reconcile", "reconcile-final"]);
+    expect(outcome).toMatchObject({ reconciled: false, missing: 1 });
+    const audit = await env.CORPUS_DB.prepare("SELECT missing_count FROM reconciliation_audits WHERE id = ?").bind(draft.generationId).first<{ missing_count: number }>();
+    expect(audit?.missing_count).toBe(1);
+    expect(decideChecks({ reconciled: outcome.reconciled, aclLeaks: 0, parityErrors: 0, liveRecall: 1, retrievalAvailable: true, documentsAdded: 1 }).errorCode).toBe("RECONCILIATION_FAILED");
+  });
+
+  it("an unexpected error in both steps still yields a failed outcome, never a thrown workflow", async () => {
+    const { step, names } = fakeStep(2);
+    const outcome = await reconcileWithFinalRecord(
+      step,
+      async () => {
+        throw new Error("D1 down");
+      },
+      "keyword_only",
+    );
+    expect(names).toEqual(["reconcile", "reconcile-final"]);
+    expect(outcome).toMatchObject({ reconciled: false, mode: "keyword_only", expected: null });
   });
 });

@@ -7,7 +7,7 @@ import { searchAll } from "@/app/library-actions";
 import { useShell } from "@/components/shell/shell-context";
 import type { SearchResponse } from "@/lib/contracts/library";
 import type { SearchChatRowView, SearchDocumentRowView } from "@/lib/contracts/library-view";
-import { departmentLabel } from "@/lib/library/mappers";
+import { departmentLabel } from "@/lib/labels";
 
 import { SearchDialog } from "./search-dialog";
 
@@ -94,7 +94,8 @@ export function SearchHost({ onClose }: { onClose: () => void }) {
       error={error}
       loading={loading}
       onAskDocument={(id) => {
-        newChat();
+        // router.push follows, so skip the history entry newChat would add.
+        newChat({ pushUrl: false });
         go(`/chat?scope=${encodeURIComponent(id)}`);
       }}
       onClose={onClose}

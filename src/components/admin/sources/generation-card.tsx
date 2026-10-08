@@ -1,5 +1,6 @@
 import { CircleCheckIcon, CircleXIcon, ClockIcon, LoaderCircleIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
+import { shortGenerationId } from "@/lib/labels";
 import { StatusDot } from "@/components/ui/status";
 import type { ActiveGenerationView, DraftGenerationView } from "@/lib/contracts/admin-manage-view";
 
@@ -41,7 +42,9 @@ function DraftRow({
   onPromote: () => void;
   onDiscard: () => void;
 }) {
-  const id = <span className="font-mono text-xs text-ink-muted">{draft.id}</span>;
+  const id = <span className="font-mono text-xs text-ink-muted" title={draft.id}>
+      {shortGenerationId(draft.id)}
+    </span>;
   const canPromote = draft.state === "checks_passed" && !busy;
   const promote = (
     <Button
@@ -140,9 +143,9 @@ export function GenerationCard({
       <div className="grid grid-cols-[minmax(0,1.4fr)_repeat(4,minmax(0,1fr))] items-center px-5 py-4">
         <div className="flex flex-col gap-1">
           <span className="text-xs font-medium text-ink-faint-text">Active generation</span>
-          <span className="inline-flex items-center gap-2 font-mono text-sm font-medium">
+          <span className="inline-flex items-center gap-2 font-mono text-sm font-medium" title={active.id}>
             <StatusDot tone="success" />
-            {active.id}
+            {shortGenerationId(active.id)}
           </span>
         </div>
         <Fact label="Promoted">{active.promotedLabel}</Fact>

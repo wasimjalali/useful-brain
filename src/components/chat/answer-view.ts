@@ -10,6 +10,7 @@ import type {
 } from "@/lib/contracts/chat-view";
 import type { ChatEvidenceRow } from "@/lib/contracts/chat";
 import type { DocumentReaders, DocumentResponse } from "@/lib/contracts/library";
+import { departmentLabel, roleLabel } from "@/lib/labels";
 import type { CitedRetrievalResult, GroundedAnswerResponse } from "@/lib/rag/grounded-answer";
 
 /** "[3]" becomes 3. Anything else is not a citation label. */
@@ -54,17 +55,38 @@ export function paragraphViews(answer: GroundedAnswerResponse): AnswerParagraphV
   });
 }
 
-/** Citation numbers the answer relied on, ascending. */
+/** Paragraphs for display: the same validated citations, plus the number each chip shows. */
+export function paragraphDisplayViews(answer: GroundedAnswerResponse): AnswerParagraphView[] {
+  const display = Object.fromEntries(displayNumbers(answer));
+  return paragraphViews(answer).map((paragraph) => ({ ...paragraph, display }));
+}
+
+/** Citation numbers the answer relied on, in order of first citation. */
 export function citedNumbers(answer: GroundedAnswerResponse): number[] {
-  const all = paragraphViews(answer).flatMap((paragraph) => paragraph.citations);
-  return [...new Set(all)].sort((a, b) => a - b);
+  const order: number[] = [];
+  for (const paragraph of paragraphViews(answer)) {
+    const valid = new Set(paragraph.citations);
+    const inline = [...paragraph.text.matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1])).filter((n) => valid.has(n));
+    for (const n of [...inline, ...paragraph.citations]) {
+      if (!order.includes(n)) order.push(n);
+    }
+  }
+  return order;
+}
+
+/** Retrieval citation number to the 1, 2, ... shown to the reader. Presentation only. */
+export function displayNumbers(answer: GroundedAnswerResponse): Map<number, number> {
+  return new Map(citedNumbers(answer).map((n, index) => [n, index + 1]));
 }
 
 export function sourceRefs(answer: GroundedAnswerResponse): SourceRefView[] {
   const byNumber = resultByNumber(answer.retrieval.results);
+  const display = displayNumbers(answer);
   return citedNumbers(answer).flatMap((n) => {
     const result = byNumber.get(n);
-    return result ? [{ n, document: documentName(result), section: result.section }] : [];
+    return result
+      ? [{ n, display: display.get(n) ?? n, document: documentName(result), section: result.section }]
+      : [];
   });
 }
 
@@ -110,6 +132,7 @@ export function citedPassages(
 ): CitedPassageView[] {
   const byNumber = resultByNumber(answer.retrieval.results);
   const paragraphs = paragraphViews(answer);
+  const display = displayNumbers(answer);
   return citedNumbers(answer).flatMap((n) => {
     const result = byNumber.get(n);
     if (!result) {
@@ -119,6 +142,7 @@ export function citedPassages(
     return [
       {
         n,
+        display: display.get(n) ?? n,
         chunkId: result.chunkId,
         document: documentName(result),
         section: result.section,
@@ -165,17 +189,21 @@ function listPhrase(names: string[], joiner: string): string {
   return `${names.slice(0, -1).join(", ")} ${joiner} ${names[names.length - 1]}`;
 }
 
+function readerNames(readers: DocumentReaders): string[] {
+  return readers.names.map(readers.kind === "roles" ? roleLabel : departmentLabel);
+}
+
 /** "only {phrase} can read it". */
 export function readersPhrase(readers: DocumentReaders): string {
   if (readers.kind === "everyone") return "everyone";
   if (readers.kind === "private") return "its owner";
-  return listPhrase(readers.names, "and");
+  return listPhrase(readerNames(readers), "and");
 }
 
 function readersLabel(readers: DocumentReaders): { label: string; everyone: boolean } {
   if (readers.kind === "everyone") return { label: "Everyone", everyone: true };
   if (readers.kind === "private") return { label: "Private", everyone: false };
-  return { label: readers.names.join(", "), everyone: false };
+  return { label: readerNames(readers).join(", "), everyone: false };
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -189,7 +217,12 @@ function formatEffective(date: string | null): string {
 
 type SpanInput = NonNullable<DocumentResponse["spans"]>[number];
 
-function segmentsFor(text: string, offset: number, spans: SpanInput[]): ReaderSegmentView[] {
+function segmentsFor(
+  text: string,
+  offset: number,
+  spans: SpanInput[],
+  display: Map<number, number>,
+): ReaderSegmentView[] {
   const end = offset + text.length;
   const inside = spans
     .map((span) => ({
@@ -207,7 +240,8 @@ function segmentsFor(text: string, offset: number, spans: SpanInput[]): ReaderSe
     if (start > cursor) {
       segments.push({ text: text.slice(cursor - offset, start - offset) });
     }
-    segments.push({ text: text.slice(start - offset, span.end - offset), citation: span.n as number });
+    const n = span.n as number;
+    segments.push({ text: text.slice(start - offset, span.end - offset), citation: n, ...(display.has(n) ? { display: display.get(n) } : {}) });
     cursor = span.end;
   }
   if (cursor < end) {
@@ -216,21 +250,29 @@ function segmentsFor(text: string, offset: number, spans: SpanInput[]): ReaderSe
   return segments;
 }
 
-function sectionView(heading: string, text: string, spans: SpanInput[]): ReaderSectionView {
+function sectionView(
+  heading: string,
+  text: string,
+  spans: SpanInput[],
+  display: Map<number, number>,
+): ReaderSectionView {
   const paragraphs: ReaderSegmentView[][] = [];
   let cursor = 0;
   for (const part of text.split(/\n{2,}/)) {
     const start = text.indexOf(part, cursor);
     cursor = start + part.length;
     if (part.trim()) {
-      paragraphs.push(segmentsFor(part, start, spans));
+      paragraphs.push(segmentsFor(part, start, spans, display));
     }
   }
   return { heading, paragraphs };
 }
 
 /** Reader view of a stored document, with the relied-on spans marked in place. */
-export function readerFromDocument(doc: DocumentResponse): { view: ReaderDocumentView; activeN: number | null } {
+export function readerFromDocument(
+  doc: DocumentResponse,
+  display: Map<number, number> = new Map(),
+): { view: ReaderDocumentView; activeN: number | null } {
   const spans = doc.spans ?? [];
   const active = spans.find((span) => span.active);
   return {
@@ -239,12 +281,13 @@ export function readerFromDocument(doc: DocumentResponse): { view: ReaderDocumen
       version: doc.version ?? NOT_SET,
       effective: formatEffective(doc.effectiveDate),
       readableBy: readersLabel(doc.readers),
-      owner: doc.ownerDepartment ?? NOT_SET,
+      owner: doc.ownerDepartment ? departmentLabel(doc.ownerDepartment) : NOT_SET,
       sections: doc.sections.map((section, index) =>
         sectionView(
           section.heading,
           section.text,
           spans.filter((span) => span.section === index),
+          display,
         ),
       ),
     },

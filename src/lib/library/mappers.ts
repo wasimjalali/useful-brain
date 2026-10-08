@@ -1,27 +1,8 @@
+import { departmentLabel, roleLabel } from "@/lib/labels";
 import type { DocumentReaders, LibraryDocument } from "@/lib/contracts/library";
 import type { LibraryChipView, LibraryRowView } from "@/lib/contracts/library-view";
 
 const NO_DEPARTMENT = "General";
-
-const ROLE_LABELS: Record<string, string> = {
-  manager: "Managers",
-  director: "Directors",
-  executive: "Executives",
-  hr_manager: "HR managers",
-  finance_manager: "Finance managers",
-  support_manager: "Support managers",
-  sales_manager: "Sales managers",
-};
-
-function capitalize(value: string): string {
-  const spaced = value.replace(/_/g, " ");
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
-}
-
-/** Wire department ids ("hr", "sales") as people read them ("HR", "Sales"). */
-export function departmentLabel(name: string): string {
-  return name === "hr" ? "HR" : capitalize(name);
-}
 
 export function readersLabel(readers: DocumentReaders): string {
   switch (readers.kind) {
@@ -30,7 +11,7 @@ export function readersLabel(readers: DocumentReaders): string {
     case "private":
       return "Only you";
     case "roles":
-      return readers.names.map((name) => ROLE_LABELS[name] ?? capitalize(name)).join(", ");
+      return readers.names.map(roleLabel).join(", ");
     default:
       return readers.names.map(departmentLabel).join(", ");
   }

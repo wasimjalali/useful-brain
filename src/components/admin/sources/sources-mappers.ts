@@ -1,3 +1,4 @@
+import { departmentLabel, roleLabel } from "@/lib/labels";
 import type {
   ActiveGenerationView,
   DraftGenerationView,
@@ -14,15 +15,10 @@ function formatDate(ms: number): string {
   return `${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
 }
 
-function label(value: string): string {
-  const spaced = value.replace(/_/g, " ");
-  return spaced === "hr" ? "HR" : spaced.charAt(0).toUpperCase() + spaced.slice(1);
-}
-
 function readersLabel(readers: SourcesDocument["readers"]): string {
   if (readers.kind === "everyone") return "Everyone";
   if (readers.kind === "private") return "Private";
-  return readers.names.map(label).join(", ");
+  return readers.names.map(readers.kind === "roles" ? roleLabel : departmentLabel).join(", ");
 }
 
 /** Closed check codes (src/lib/ingest/draft-checks.ts decideChecks) to plain language. */
@@ -74,7 +70,7 @@ function mapRow(document: SourcesDocument): SourceRowView {
     title: isPrivate ? null : document.title,
     fileName: isPrivate ? null : document.fileName || null,
     errorMessage: document.errorMessage ?? null,
-    department: document.department ? label(document.department) : "None",
+    department: document.department ? departmentLabel(document.department) : "None",
     readers: readersLabel(document.readers),
     chunks: document.status === "failed" ? null : document.chunks,
     updatedLabel: formatDate(document.updatedAt),

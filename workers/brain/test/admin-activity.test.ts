@@ -27,12 +27,19 @@ beforeAll(async () => {
       at: now - (index + 1) * MIN,
       question: `question ${index}`,
       owner: index % 2 === 0 ? "member-maya" : "member-priya",
-      evidenceDocuments: index === 0 ? ["doc-a", "doc-a", "doc-b"] : [],
+      evidenceDocuments: index === 0 ? ["doc-a", "doc-a", "doc-b", "doc-c"] : [],
+      citedLabels: index === 0 ? ["[1]", "[2]", "[4]"] : undefined,
     });
   }
   await seedTurn({ id: "ac-tie-a", at: now - 10 * MIN, question: "tie a" });
   await seedTurn({ id: "ac-tie-b", at: now - 10 * MIN, question: "tie b" });
-  await seedTurn({ id: "ac-ne", at: now - 11 * MIN, question: "none", answerType: "insufficient_evidence" });
+  await seedTurn({
+    id: "ac-ne",
+    at: now - 11 * MIN,
+    question: "none",
+    answerType: "insufficient_evidence",
+    evidenceDocuments: ["doc-a"],
+  });
   await seedTurn({ id: "ac-ok", at: now - 12 * MIN, question: "ticket", approval: "approved" });
   await seedTurn({ id: "ac-no", at: now - 13 * MIN, question: "ticket 2", approval: "rejected" });
   await seedTurn({ id: "ac-err", at: now - 14 * MIN, question: "boom", status: "failed", answerType: null });
@@ -58,6 +65,7 @@ describe("GET /admin/activity", () => {
     const body = await page("range=7d&limit=50");
     const byId = new Map(body.rows.map((row) => [row.messageId, row]));
     expect(byId.get("ac-ne")!.outcome).toBe("no_evidence");
+    expect(byId.get("ac-ne")!.sources).toBe(0);
     expect(byId.get("ac-ok")!.outcome).toBe("approved");
     expect(byId.get("ac-no")!.outcome).toBe("denied");
     expect(byId.get("ac-err")!.outcome).toBe("error");

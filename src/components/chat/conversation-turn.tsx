@@ -11,7 +11,7 @@ import {
   SourcesSummary,
 } from "./answer";
 import { approvalCardView } from "./approval-card-view";
-import { paragraphViews, readersPhrase, sourceRefs } from "./answer-view";
+import { paragraphDisplayViews, readersPhrase, sourceRefs } from "./answer-view";
 import type { ChatTurnState } from "./turn-model";
 import type { FeedbackValue } from "@/lib/contracts/chat-view";
 
@@ -91,7 +91,7 @@ export function AssistantTurn({
   const card = turn.approval ? approvalCardView(turn.approval, now) : null;
   return (
     <div className="flex flex-col gap-4">
-      <AnswerText paragraphs={paragraphViews(answer)} />
+      <AnswerText paragraphs={paragraphDisplayViews(answer)} />
       {card ? (
         <ApprovalCard
           approval={card}

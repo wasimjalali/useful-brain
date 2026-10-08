@@ -24,9 +24,9 @@ export function SourcesSummary({
         {sources.map((source) => (
           <span
             className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-md bg-bubble px-[5px] font-mono text-[11px] font-medium leading-none text-ink-muted"
-            key={source.n}
+            key={source.display ?? source.n}
           >
-            {source.n}
+            {source.display ?? source.n}
           </span>
         ))}
       </span>

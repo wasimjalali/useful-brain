@@ -13,6 +13,7 @@ import type {
 import { Highlight } from "@/components/ui/highlight";
 import { CitationChip } from "@/components/ui/citation-chip";
 
+import { shortGenerationId } from "@/lib/labels";
 import { useCitationBinding } from "./citation-link";
 import { useScrollWhenActive } from "./use-scroll-when-active";
 
@@ -69,7 +70,7 @@ function CitedRow({
       ref={ref}
     >
       <div className="flex items-center gap-2">
-        <CitationChip active={active} n={passage.n} onClick={onClick} onHover={onHover} />
+        <CitationChip active={active} n={passage.display ?? passage.n} onClick={onClick} onHover={onHover} />
         <span className="truncate text-[13px] font-medium text-ink">{passage.document}</span>
         <span className="truncate text-xs text-ink-faint-text">{passage.section}</span>
       </div>
@@ -81,7 +82,9 @@ function CitedRow({
           {passage.generation ? (
             <>
               <dt>generation</dt>
-              <dd className="m-0 text-ink-muted">{passage.generation}</dd>
+              <dd className="m-0 text-ink-muted" title={passage.generation}>
+                {shortGenerationId(passage.generation)}
+              </dd>
             </>
           ) : null}
           <dt>scores</dt>
@@ -193,7 +196,7 @@ export function EvidencePanel({
             ))}
             {isAdmin && generation ? (
               <div className="mx-5 mt-2.5 border-t border-border pt-3 font-mono text-[11px] leading-[17px] text-ink-faint-text">
-                Rerank score · floor {rerankFloor ?? "n/a"} · {generation}
+                Rerank score · floor {rerankFloor ?? "n/a"} · <span title={generation}>{shortGenerationId(generation)}</span>
               </div>
             ) : null}
           </div>

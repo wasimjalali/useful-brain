@@ -209,7 +209,7 @@ export function SearchDialog({
         <span className="flex items-center gap-1.5">
           <Kbd>⌘↵</Kbd> Ask about this
         </span>
-        <span className="ml-auto tabular-nums">{`${chats.length} chats · ${documents.length} documents`}</span>
+        <span className="ml-auto tabular-nums">{`${chats.length} ${chats.length === 1 ? "chat" : "chats"} · ${documents.length} ${documents.length === 1 ? "document" : "documents"}`}</span>
       </div>
     </Dialog>
   );

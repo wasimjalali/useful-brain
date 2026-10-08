@@ -44,7 +44,7 @@ export type TurnFailureCode = (typeof TURN_FAILURE_CODES)[number];
 export type TurnProgress =
   | { stage: "searching"; readableDocuments: number }
   | { stage: "reading"; passages: number }
-  | { stage: "writing" }
+  | { stage: "writing"; passages?: number }
   | { stage: "done" }
   | { stage: "failed"; errorCode: TurnFailureCode };
 

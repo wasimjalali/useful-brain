@@ -72,7 +72,7 @@ describe("conversation lock progress union", () => {
     expect(await stub.setStage("run-1", "done")).toEqual({ ok: false, status: 400 });
     expect(await stub.setStage("run-1", "failed")).toEqual({ ok: false, status: 400 });
     expect(await stub.setStage("run-other", "writing")).toEqual({ ok: false, status: 409 });
-    expect(await stub.progress()).toEqual({ runId: "run-1", stage: "writing", count: null });
+    expect(await stub.progress()).toEqual({ runId: "run-1", stage: "writing", count: 4 });
   });
 
   it("rehydrates the count after eviction and clears it when a new run takes the lock", async () => {
@@ -112,7 +112,20 @@ describe("progress route payload", () => {
 
     await stub.setStage(pending.assistantMessageId, "writing");
     res = await call("/turns/req-prog-shapes/progress", cookies["member-maya"]);
-    expect(await res.json()).toEqual({ stage: "writing" });
+    expect(await res.json()).toEqual({ stage: "writing", passages: 6 });
+  });
+
+  it("writing carries the passage count the run read, and omits it when none was read", async () => {
+    const stub = env.CONVERSATION.getByName("lock-writing-passages");
+    await stub.acquire("run-1");
+    await stub.setStage("run-1", "searching", 9);
+    await stub.setStage("run-1", "reading", 4);
+    await stub.setStage("run-1", "writing");
+    expect(await stub.progress()).toEqual({ runId: "run-1", stage: "writing", count: 4 });
+    const bare = env.CONVERSATION.getByName("lock-writing-bare");
+    await bare.acquire("run-1");
+    await bare.setStage("run-1", "writing");
+    expect(await bare.progress()).toEqual({ runId: "run-1", stage: "writing", count: null });
   });
 
   it("a legacy stage written by an old run reads as writing", async () => {

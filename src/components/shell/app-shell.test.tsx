@@ -23,7 +23,7 @@ vi.mock("@/app/library-actions", () => ({ searchAll: vi.fn() }));
 import { ChatComposer } from "@/components/chat/chat-composer";
 
 import { AppShell } from "./app-shell";
-import { ShellPanel } from "./shell-context";
+import { ShellPanel, useShell } from "./shell-context";
 import { admin, clearViewport, member, setViewport } from "./test-support";
 
 const conversation = {
@@ -33,12 +33,14 @@ const conversation = {
   updatedAt: Date.now(),
 };
 
-function renderShell(options: {
+type ShellOptions = {
   identity?: typeof member;
   children?: React.ReactNode;
   deleteConversationAction?: () => Promise<ReturnType<typeof actionSuccess<null>>>;
-} = {}) {
-  return render(
+};
+
+function shellElement(options: ShellOptions = {}) {
+  return (
     <AppShell
       deleteConversationAction={options.deleteConversationAction ?? (async () => actionSuccess(null))}
       embeddingStorageStatus={emptyEmbeddingStorageStatus}
@@ -48,8 +50,12 @@ function renderShell(options: {
       retrievalReady
     >
       {options.children ?? <p>page content</p>}
-    </AppShell>,
+    </AppShell>
   );
+}
+
+function renderShell(options: ShellOptions = {}) {
+  return render(shellElement(options));
 }
 
 function press(key: string, init: KeyboardEventInit = {}, target: Element = document.body) {
@@ -133,6 +139,25 @@ describe("global shortcuts", () => {
     press("k", { ctrlKey: true });
     press("n", { ctrlKey: true });
     expect(nav.push).not.toHaveBeenCalled();
+  });
+});
+
+describe("shell title heading", () => {
+  it("is a span on /library at 1000px so the page header owns the only h1", () => {
+    setViewport(1000);
+    nav.pathname = "/library";
+    renderShell({ children: <h1>Library</h1> });
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(document.querySelector(".ub-header-title")?.tagName).toBe("SPAN");
+  });
+
+  it("is the h1 on a conversation at 1000px", () => {
+    setViewport(1000);
+    nav.pathname = "/chat/c1";
+    renderShell();
+    const h1s = screen.getAllByRole("heading", { level: 1 });
+    expect(h1s).toHaveLength(1);
+    expect(h1s[0]).toHaveTextContent("Parental leave");
   });
 });
 
@@ -306,6 +331,48 @@ describe("settings and chats", () => {
     expect(deleteConversationAction).toHaveBeenCalledWith("c1");
     expect(screen.queryByRole("link", { name: "Parental leave" })).toBeNull();
     expect(nav.push).toHaveBeenCalledWith("/chat");
+  });
+
+  it("makes New chat the active row, and no conversation, once New chat is chosen", () => {
+    nav.pathname = "/chat/c1";
+    renderShell();
+    const rail = () => document.querySelector("#app-rail") as HTMLElement;
+    expect(within(rail()).getByRole("link", { name: "Parental leave" })).toHaveAttribute("aria-current", "page");
+    expect(within(rail()).getByRole("link", { name: /New chat/ })).not.toHaveAttribute("aria-current");
+
+    window.history.replaceState(null, "", "/chat/c1");
+    fireEvent.click(within(rail()).getByRole("link", { name: /New chat/ }));
+    expect(within(rail()).getByRole("link", { name: "Parental leave" })).not.toHaveAttribute("aria-current");
+    expect(within(rail()).getByRole("link", { name: /New chat/ })).toHaveAttribute("aria-current", "page");
+    // The address bar says /chat too, so a reload opens the blank chat.
+    expect(window.location.pathname).toBe("/chat");
+  });
+
+  it("skips the /chat history entry when the caller navigates itself", () => {
+    nav.pathname = "/chat/c1";
+    const push = vi.spyOn(window.history, "pushState");
+    window.history.replaceState(null, "", "/chat/c1");
+    function Ask() {
+      const { newChat } = useShell();
+      return <button onClick={() => newChat({ pushUrl: false })}>ask</button>;
+    }
+    renderShell({ children: <Ask /> });
+    fireEvent.click(screen.getByRole("button", { name: "ask" }));
+    expect(push).not.toHaveBeenCalled();
+    expect(window.location.pathname).toBe("/chat/c1");
+    push.mockRestore();
+  });
+
+  it("follows the conversation again when the user opens it from elsewhere", () => {
+    nav.pathname = "/chat/c1";
+    const view = renderShell();
+    const rail = () => document.querySelector("#app-rail") as HTMLElement;
+    fireEvent.click(within(rail()).getByRole("link", { name: /New chat/ }));
+    nav.pathname = "/library";
+    view.rerender(shellElement());
+    nav.pathname = "/chat/c1";
+    view.rerender(shellElement());
+    expect(within(rail()).getByRole("link", { name: "Parental leave" })).toHaveAttribute("aria-current", "page");
   });
 
   it("keeps the chat and shows the error when delete fails", async () => {
