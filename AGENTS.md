@@ -103,20 +103,22 @@ Stop and batch remaining manual work only when: a change contradicts the fixed a
 - Keep changes surgical and update markdown made stale by the change.
 - Verify every completed change with `npx tsc --noEmit`, `npm run lint`, `npm test`, `npm run build`, relevant workerd tests, Wrangler dry runs, the dependency audit and security tests.
 - For Next.js and Cloudflare changes, verify current official documentation rather than relying on memory.
-- Run independent review with a second model. Fix every confirmed P0/P1 and every confirmed high or critical security finding. Merge automatically only when GitHub checks and independent review are green.
+- Reviews scale with the PR: Sonnet alone for small changes, plus GPT Sol via Codex for features, plus Opus for sensitive ones. This repo's auth, ACL and tool-policy code is always the sensitive row. At most 3 rounds; fix everything above low, then fix lows. Merge only when GitHub checks and review are green.
 
 ## Interface
 
-Useful Brain is a local portfolio product. Keep the existing left-aligned workspace, visible evidence inspector and role-named tokens in `src/app/globals.css`. Follow the `design-craft` discipline for all UI changes. Do not add helper copy that restates headings or labels.
+Useful Brain is a local portfolio product. Keep the existing left-aligned workspace, visible evidence inspector and role-named tokens in `src/app/globals.css`. Follow the `useful-design` skill for all UI changes. Do not add helper copy that restates headings or labels.
 
 ## Visual verification on this Mac
 
 Verify UI changes in the running app, never from code alone. Everything below runs in the background and never takes Wasim's pointer or focus.
 
-- **cua-driver** (`~/.local/bin/cua-driver`): window screenshots and accessibility trees without disturbing the session. Start it with `cua-driver serve --socket /Users/wasimjalali/Library/Caches/cua-driver/cua-driver.sock` if `list_windows` reports the daemon is not running. `call list_windows '{}'` finds windows; `call get_window_state '{"window_id": N, "pid": PID}'` (both fields required, pid from `list_windows`) returns a base64 PNG plus the AX tree. Take a fresh snapshot before every click. Never target the `cua-driver` process itself; it refuses self-targeting by design.
+Maintainers: the `mac-app-verify` skill has the full recipe.
+
+- **cua-driver** (`~/.local/bin/cua-driver`): window screenshots and accessibility trees without disturbing the session. Start it with `cua-driver serve --socket ~/Library/Caches/cua-driver/cua-driver.sock` if `list_windows` reports the daemon is not running. `call list_windows '{}'` finds windows; `call get_window_state '{"window_id": N, "pid": PID}'` (both fields required, pid from `list_windows`) returns a base64 PNG plus the AX tree. Take a fresh snapshot before every click. Never target the `cua-driver` process itself; it refuses self-targeting by design.
 - **Anything that moves is verified frame by frame.** `winrec <windowId> <seconds> <outDir> [fps]` records one window at 30 fps or more, even when covered, without touching the pointer. Then `framesheet <outDir> <sheet.jpg>` tiles every frame that changed (up to 24) into one reviewable image. Spaced screenshots miss states that last a few milliseconds.
-- **The perf-guard rig** (`~/Desktop/useful-bot/perf/`, portable template at `~/.claude/skills/perf-regression-guard/template/`) is the reference technique for measurable UI performance verification: in-app launch-argument harness instead of accessibility clicks, one `CLOCK_UPTIME_RAW` clock across app marks and frame recorder, judged pixels with the app's own mark as a second number, landing reasons recorded, frozen fixtures, 30+ samples for the tail, preflight for locked screen/Low Power Mode/busy machine, `open -g` background launches, per-case budgets that fail a PR before merge, and every run's record kept under `evals/results/<date>-perf-<kind>-<sha>/`. Adapt it into this repo's `perf/` before making any perf budget a merge gate here.
-- Screenshots and frame sheets land in the repo root or `evals/results/`, never in a temp directory alone. For WKWebView app checks, build and install with `make -C macos test|bundle|install` (see `docs/macos-app.md`) and re-run the affected flows in the app window using the same background tools.
+- **The perf-guard rig** (the `perf/` folder in the Useful Bot repo, portable template at `~/.claude/skills/perf-regression-guard/template/`) is the reference technique for measurable UI performance verification: in-app launch-argument harness instead of accessibility clicks, one `CLOCK_UPTIME_RAW` clock across app marks and frame recorder, judged pixels with the app's own mark as a second number, landing reasons recorded, frozen fixtures, 30+ samples for the tail, preflight for locked screen/Low Power Mode/busy machine, `open -g` background launches, per-case budgets that fail a PR before merge, and every run's record kept under `evals/results/<date>-perf-<kind>-<sha>/`. Adapt it into this repo's `perf/` before making any perf budget a merge gate here.
+- Verification screenshots, recordings and frame sheets go in `verify/<branch>/` (gitignored). Measurements that shaped a decision go in `evals/results/`. For WKWebView app checks, build and install with `make -C macos test|bundle|install` (see `docs/macos-app.md`) and re-run the affected flows in the app window using the same background tools.
 
 ## Deployment model
 

@@ -4,9 +4,7 @@ The project rules, safety constraints and migration gate live in `AGENTS.md` and
 
 @AGENTS.md
 
-The production architecture and phased delivery plan live in:
-
-@docs/useful-brain-master-plan.md
+Architecture: `docs/useful-brain-master-plan.md` (read the relevant section on demand).
 
 ## Commands
 

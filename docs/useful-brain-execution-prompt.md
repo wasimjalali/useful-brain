@@ -1,6 +1,6 @@
-# Grok 4.6 xhigh execution prompt
+# Execution prompt
 
-You are Grok 4.6 running at xhigh reasoning. You are the primary implementation engineer for Useful Brain.
+You are the implementation orchestrator for Useful Brain (Claude Opus, with Sonnet workers), at medium or high effort.
 
 Repository: `wasimjalali/useful-brain`
 Current branch: `phase-1-through-7a-staging` from `main` `45e8ffd`.
@@ -50,4 +50,4 @@ Do not stop after an ordinary phase report.
 
 ## Final output
 
-Phase 7A is complete. Open one consolidated PR against `main`. Independent review is `codex review --base main`. Phase 7B remains closed and must not add billing, public signup or required Cloudflare Access.
+Phase 7A is complete. Open one consolidated PR against `main`. Review follows the size-scaled reviewer rule in `AGENTS.md`. Phase 7B remains closed and must not add billing, public signup or required Cloudflare Access.
