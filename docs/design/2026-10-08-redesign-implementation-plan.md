@@ -70,7 +70,7 @@ Status (2026-10-08): Phases 0-6 are delivered ([PR #59](https://github.com/wasim
 | 4 Search and Library | `/search`, `/library`, document-scoped chat; ⌘K dialog and Library page. | ACL leak tests by title, search and id. |
 | 5 Admin | Overview, health, unanswered, activity plus `turn_steps`, sources, uploads pipeline and draft checks, people, groups, invites, view as, evals read-out; all admin pages. Legacy `/knowledge` UI and the monolith deleted. | Admin endpoint tests; Overview reconciles with Activity on seeded data. |
 | 6 Settings, sign in, mobile | Settings dialog with `/config`; auth restyle; mobile slide-over and evidence sheet. | Keyboard pass, contrast at least 4.5:1 in both themes. |
-| 7 Verification | Full checks, `preview:cf` screenshots and frame recordings into `evals/results/2026-10-xx-redesign/`, `npm run eval:northwind` (no regression from 118/120, 0 ACL leaks), final review, PR to `main`. | Everything green. |
+| 7 Verification | Full checks, `preview:cf` screenshots and frame recordings into `evals/results/2026-10-xx-redesign/`, `npm run eval:northwind` (no regression from 118/120, 0 ACL leaks), final review, PR to `main`. | Everything green. Result: 115/120 twice with 0 ACL leaks and unchanged retrieval; the A/B in `evals/system-evals/2026-10-08-redesign-verification.md` finds no sign the redesign caused the gap from 118 (small control, flagged for Wasim). |
 
 ## 5. Test list
 
