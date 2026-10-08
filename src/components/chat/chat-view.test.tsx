@@ -678,8 +678,9 @@ describe("approval", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1000);
     });
-    expect(screen.getByText("Ticket SUP-4821 created")).toBeInTheDocument();
-    expect(screen.getByText("create_ticket · P1 · 09:42")).toBeInTheDocument();
+    expect(screen.getAllByText("Created")).toHaveLength(2);
+    expect(screen.getByText("SUP-4821")).toBeInTheDocument();
+    expect(screen.getByText("09:42")).toBeInTheDocument();
   });
 
   it("denies with decision reject and shows the denied state", async () => {
@@ -834,7 +835,7 @@ describe("review fixes", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1000);
     });
-    expect(screen.queryByText("Ticket SUP-4821 created")).toBeNull();
+    expect(screen.queryByText("Created")).toBeNull();
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1000);
     });

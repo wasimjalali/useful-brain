@@ -530,7 +530,17 @@ export function DesignCheckGallery() {
           onApprove={noop}
           onDeny={noop}
         />
-        <ApprovalCard approval={{ status: "done", ticketId: "SUP-204", meta: "IT Support queue, created 09:14" }} onOpenTicket={noop} />
+        <ApprovalCard
+          approval={{
+            status: "done",
+            ticketId: "SUP-204",
+            priority: "P2",
+            customer: "Halvorsen Freight",
+            subject: "VPN drops every hour",
+            createdAt: new Date(2026, 8, 6, 9, 14).getTime(),
+          }}
+          onOpenTicket={noop}
+        />
         <ApprovalCard approval={{ status: "denied" }} />
         <ApprovalCard approval={{ status: "expired" }} />
       </Group>
