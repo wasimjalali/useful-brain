@@ -1,6 +1,7 @@
 import { InlineAlert } from "@/components/ui/inline-alert";
 
 const STOPPED = "The answer stopped before it finished. Your question is saved.";
+const UNAVAILABLE = "The knowledge base is unavailable right now. Your question is saved.";
 const SIGNED_OUT = "Your session has ended. Sign in to continue.";
 
 export function ErrorAlert({
@@ -10,6 +11,7 @@ export function ErrorAlert({
   message,
   retryable = true,
   signedOut = false,
+  unavailable = false,
 }: {
   partialText?: string;
   onRetry: () => void;
@@ -18,6 +20,8 @@ export function ErrorAlert({
   message?: string | null;
   retryable?: boolean;
   signedOut?: boolean;
+  /** Retrieval or the model was down: say so instead of "stopped". */
+  unavailable?: boolean;
 }) {
   const action = signedOut
     ? onSignIn
@@ -30,7 +34,7 @@ export function ErrorAlert({
     <div className="flex flex-col gap-3">
       {partialText ? <p className="m-0 text-[15px] leading-6 text-ink-muted">{partialText}</p> : null}
       <InlineAlert action={action}>
-        {signedOut ? SIGNED_OUT : retryable ? STOPPED : (message ?? STOPPED)}
+        {signedOut ? SIGNED_OUT : retryable ? (unavailable ? UNAVAILABLE : STOPPED) : (message ?? STOPPED)}
       </InlineAlert>
     </div>
   );

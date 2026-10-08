@@ -1,3 +1,5 @@
+import { BRAIN_KNOWLEDGE_UNAVAILABLE } from "../agent/host-grounding";
+import type { FailedTurnRef } from "../rag/app-errors";
 import { AccessJwtError, AccessJwtUnavailable } from "../auth/access-jwt";
 import { IdentityConfigError } from "../auth/identity-mode";
 import { PrincipalResolutionError } from "../auth/principal";
@@ -49,6 +51,33 @@ export class WorkerCancelledError extends Error {
   }
 }
 
+/**
+ * Retrieval failed for this turn (backend error or search timeout), or an
+ * ephemeral turn's run aborted (model error or exhausted wall-time budget).
+ * Never a refusal: the client sees the deterministic availability message
+ * and may retry.
+ */
+export class WorkerUnavailableError extends Error {
+  constructor() {
+    super(BRAIN_KNOWLEDGE_UNAVAILABLE);
+    this.name = "WorkerUnavailableError";
+  }
+}
+
+const failedTurns = new WeakMap<object, FailedTurnRef>();
+
+/**
+ * Tags a persisted-turn failure with its owner's conversation and failed
+ * assistant message. Only the error response reads the tag; the error keeps
+ * its class, so callers still match it with instanceof.
+ */
+export function markFailedTurn<T>(error: T, turn: FailedTurnRef): T {
+  if (typeof error === "object" && error !== null) {
+    failedTurns.set(error, { conversationId: turn.conversationId, assistantMessageId: turn.assistantMessageId });
+  }
+  return error;
+}
+
 export type WorkerErrorCode =
   | "AUTH_REQUIRED"
   | "FORBIDDEN"
@@ -64,6 +93,7 @@ export type PublicWorkerError = {
   message: string;
   retryable: boolean;
   requestId: string;
+  turn?: FailedTurnRef;
 };
 
 const HOST_LEAK = /https?:\/\/|:\d{2,5}|cloudflareaccess\.com|127\.0\.0\.1/i;
@@ -141,6 +171,14 @@ export function toPublicWorkerError(error: unknown, requestId: string): PublicWo
       requestId,
     };
   }
+  if (error instanceof WorkerUnavailableError) {
+    return {
+      code: "UNAVAILABLE",
+      message: BRAIN_KNOWLEDGE_UNAVAILABLE,
+      retryable: true,
+      requestId,
+    };
+  }
   if (error instanceof AccessJwtUnavailable) {
     return {
       code: "UNAVAILABLE",
@@ -194,6 +232,10 @@ export function workerErrorResponse(error: unknown, requestId: string): Response
   if (HOST_LEAK.test(body.message)) {
     body.message = "The request could not be completed.";
     body.code = "INTERNAL_ERROR";
+  }
+  const turn = typeof error === "object" && error !== null ? failedTurns.get(error) : undefined;
+  if (turn) {
+    body.turn = turn;
   }
   const status =
     body.code === "AUTH_REQUIRED" || body.code === "FORBIDDEN"

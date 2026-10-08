@@ -114,6 +114,67 @@ describe("CloudflareKnowledgePipeline failures", () => {
     expect(result.hits[0]?.chunkId).toBe(chunkRow.chunk_id);
   });
 
+  function ftsFailingDatabase(): CorpusSql {
+    const db = keywordDatabase();
+    return {
+      prepare(sql) {
+        if (sql.includes("chunks_fts MATCH")) {
+          return {
+            bind() {
+              return {
+                async all<T>(): Promise<{ results: T[] }> {
+                  throw new Error("D1_ERROR: Network connection lost.");
+                },
+                async first<T>() {
+                  return null as T | null;
+                },
+              };
+            },
+          };
+        }
+        return db.prepare(sql);
+      },
+    };
+  }
+
+  it("raises a D1 FTS failure instead of returning an empty result", async () => {
+    const pipeline = new CloudflareKnowledgePipeline({
+      db: ftsFailingDatabase(),
+      vectorize: { query: async () => ({ matches: [{ id: "vector-1", score: 0.8 }] }) },
+      ai: { run: async () => ({ data: [Array.from({ length: 1024 }, () => 0.1)] }) },
+      reranker: { rerank: async (_query, passages) => passages.map(() => 0.9) },
+      generationId: "g-1",
+    });
+
+    await expect(pipeline.search({ query: "refund window", principal })).rejects.toThrow(
+      "Network connection lost",
+    );
+  });
+
+  it("raises when every channel fails instead of returning an empty result", async () => {
+    // The vector channel degrades first; the keyword failure behind it must
+    // still surface rather than leave an empty keyword-only result.
+    const pipeline = new CloudflareKnowledgePipeline({
+      db: ftsFailingDatabase(),
+      vectorize: {
+        query: async () => {
+          throw new Error("vectorize internal error");
+        },
+      },
+      ai: {
+        run: async () => {
+          throw new Error("embedding unavailable");
+        },
+      },
+      reranker: { rerank: async (_query, passages) => passages.map(() => 0.9) },
+      generationId: "g-1",
+    });
+
+    await expect(pipeline.search({ query: "refund window", principal })).rejects.toThrow(
+      "Network connection lost",
+    );
+  });
+
   it("still fails closed on an over-wide serialized ACL filter instead of degrading", async () => {
     // 70 distinct ACL shapes all readable by one role produce 70 group keys,
     // pushing the serialized Vectorize filter past its byte ceiling.

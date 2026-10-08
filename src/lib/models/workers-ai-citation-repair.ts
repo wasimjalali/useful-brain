@@ -7,7 +7,7 @@ import {
 import type { AnswerCoveragePass, GroundedAnswerRepair } from "../agent/run";
 import { hintedUncitedDocuments } from "../agent/pointer-completion";
 import { MODELS_WITHOUT_THINKING_TOGGLE } from "./eval-override";
-import { parseWorkersAiChatMessage, type WorkersAiChatRunner } from "./workers-ai-chat";
+import { parseWorkersAiChatMessage, runUntilAborted, type WorkersAiChatRunner } from "./workers-ai-chat";
 import { CHAT_MODEL_ID } from "./selection";
 
 // Quote extraction needs no chain-of-thought: with thinking enabled the
@@ -109,7 +109,10 @@ async function extractQuoteResponse(
     return options.extractionCache.get(key);
   }
   options.noteModelCall?.();
-  const response = await ai.run(modelId, request, { signal: options.signal });
+  const response = await runUntilAborted(
+    ai.run(modelId, request, { signal: options.signal }),
+    options.signal,
+  );
   options.signal?.throwIfAborted();
   options.extractionCache?.set(key, response);
   return response;
@@ -291,13 +294,16 @@ export function createWorkersAiCoveragePass(
 ): AnswerCoveragePass {
   return async ({ question, draft, evidence, signal }) => {
     signal?.throwIfAborted();
-    const response = await ai.run(
-      modelId,
-      {
-        messages: coverageMessages(question, draft, evidence),
-        ...extractionDecoding(modelId),
-      },
-      { signal },
+    const response = await runUntilAborted(
+      ai.run(
+        modelId,
+        {
+          messages: coverageMessages(question, draft, evidence),
+          ...extractionDecoding(modelId),
+        },
+        { signal },
+      ),
+      signal,
     );
     signal?.throwIfAborted();
     const message = parseWorkersAiChatMessage(response, modelId);

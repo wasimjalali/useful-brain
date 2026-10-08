@@ -9,8 +9,19 @@ import {
   type ToolCall,
 } from "@earendil-works/pi-ai";
 
+import { awaitWithDeadline } from "../agent/deadlines";
 import { CHAT_MODEL_PROVIDER } from "../models/selection";
 import type { WorkersAiRunOptions } from "../embeddings/workers-ai-embed";
+
+/**
+ * Settle a model call on its signal even when the provider does not. A
+ * remote Workers AI binding can ignore the forwarded abort and hold the
+ * request for many minutes; the caller's signal carries the model timeout
+ * and the run's abort, so the turn ends on its budget instead.
+ */
+export function runUntilAborted<T>(call: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
+  return signal ? awaitWithDeadline(call, signal) : call;
+}
 
 export class ChatModelError extends Error {
   constructor(message: string) {
@@ -144,7 +155,7 @@ async function runChat(
   if (tools.length > 0) {
     payload.tools = tools;
   }
-  const response = await ai.run(model.id, payload, { signal: options?.signal });
+  const response = await runUntilAborted(ai.run(model.id, payload, { signal: options?.signal }), options?.signal);
   options?.signal?.throwIfAborted();
   const message = parseWorkersAiChatMessage(response, model.id);
   const doneReason = message.stopReason === "toolUse" ? ("toolUse" as const) : ("stop" as const);

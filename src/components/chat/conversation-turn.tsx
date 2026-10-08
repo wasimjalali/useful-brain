@@ -65,6 +65,7 @@ export function AssistantTurn({
         onSignIn={onSignIn}
         retryable={turn.errorRetryable !== false}
         signedOut={turn.errorCode === "AUTH_REQUIRED"}
+        unavailable={turn.errorCode === "PROVIDER_TEMPORARY"}
       />
     );
   }

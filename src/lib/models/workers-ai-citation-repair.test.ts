@@ -17,6 +17,8 @@ import {
   createWorkersAiCitationRepair,
   createWorkersAiCoveragePass,
 } from "./workers-ai-citation-repair";
+import { createWorkersAiChatStream } from "./workers-ai-chat";
+import { glm53FlashModel } from "./glm-5-3-flash";
 import { CHAT_MODEL_ID } from "./selection";
 
 const evidence: CitedRetrievalResult[] = [
@@ -208,6 +210,58 @@ describe("Workers AI citation repair", () => {
       }),
     ).rejects.toMatchObject({ name: "AbortError" });
   });
+
+  it("rejects on the deadline when the repair call never settles", async () => {
+    const run = vi.fn().mockImplementation(() => new Promise(() => undefined));
+    const repair = createWorkersAiCitationRepair({ run });
+
+    await expect(
+      repair({
+        question: "What is the first-response target for a P1 support ticket?",
+        evidence,
+        signal: AbortSignal.timeout(20),
+      }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+  }, 2_000);
+
+  it("rejects on the deadline when the coverage call never settles", async () => {
+    const run = vi.fn().mockImplementation(() => new Promise(() => undefined));
+    const cover = createWorkersAiCoveragePass({ run });
+
+    await expect(
+      cover({
+        question: "What is the P1 response target?",
+        draft: "P1 tickets have a first-response target of 1 hour.[1]",
+        evidence,
+        signal: AbortSignal.timeout(20),
+      }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+  }, 2_000);
+
+  it("ends a knowledge run on abort when the chat provider never settles", async () => {
+    const abort = new AbortController();
+    const run = vi.fn().mockImplementation(() => new Promise(() => undefined));
+    setTimeout(() => abort.abort(), 20);
+    const result = await runKnowledgeAgent({
+      question: "What is the first-response target for a P1 support ticket?",
+      pipeline: {
+        search: async () => {
+          throw new Error("search must not run");
+        },
+      },
+      principal: { userId: "support", roles: ["standard"], departments: ["support"] },
+      policyPrincipal: { id: "principal-alice" },
+      conversationId: "c-hung-provider",
+      abort,
+      runtime: {
+        model: glm53FlashModel(),
+        stream: createWorkersAiChatStream({ run }),
+      },
+    });
+
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(result.aborted).toBe(true);
+  }, 2_000);
 
   it("fails closed when the repaired claim is not supported", async () => {
     const run = vi.fn().mockResolvedValue({

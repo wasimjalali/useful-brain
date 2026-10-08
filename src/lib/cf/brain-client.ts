@@ -1,7 +1,7 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { headers } from "next/headers";
 
-import { AppError } from "@/lib/rag/app-errors";
+import { AppError, type FailedTurnRef } from "@/lib/rag/app-errors";
 import {
   createBrainServiceRequest,
   type BrainService,
@@ -86,7 +86,23 @@ export async function brainJson<T>(
       code,
       typeof record.message === "string" ? record.message : "The request could not be completed.",
       response.status >= 500 || code === "RATE_LIMITED" || code === "PROVIDER_TEMPORARY",
+      failedTurnRef((payload as { turn?: unknown } | null)?.turn),
     );
   }
   return payload as T;
+}
+
+const MAX_TURN_REF_ID = 200;
+
+/** Only two bounded id strings pass; anything else in the field is dropped. */
+function failedTurnRef(value: unknown): FailedTurnRef | undefined {
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+  const { conversationId, assistantMessageId } = value as Record<string, unknown>;
+  const valid = (id: unknown): id is string =>
+    typeof id === "string" && id.length > 0 && id.length <= MAX_TURN_REF_ID;
+  return valid(conversationId) && valid(assistantMessageId)
+    ? { conversationId, assistantMessageId }
+    : undefined;
 }
