@@ -46,14 +46,21 @@ type BackfillChunkRow = {
   end_offset: number;
 };
 
-/** Gap text between two chunks of one section is whitespace; a new section adds its heading line. */
+/**
+ * Gap text between two chunks of one section is whitespace; a new section adds
+ * its heading line. A same-heading boundary is inferred only when the gap fits a
+ * heading line exactly ("#" to "######", a space, the heading, and a few
+ * newlines). Any other gap stays in one section: text is never lost either way,
+ * and an ambiguous gap must not invent a section that never existed.
+ */
 function startsNewSection(previous: BackfillChunkRow, next: BackfillChunkRow): boolean {
   if (previous.heading !== next.heading) {
     return true;
   }
   const gap = next.start_offset - previous.end_offset;
-  // "#" + space + heading is the shortest heading line that can sit in the gap.
-  return gap >= next.heading.length + 2;
+  const shortest = next.heading.length + 2; // "# " + heading
+  const longest = next.heading.length + 7 + 6; // "###### " + heading, up to six newlines around it
+  return gap >= shortest && gap <= longest;
 }
 
 /**

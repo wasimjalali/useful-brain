@@ -63,6 +63,18 @@ export function sanitizedErrorName(error: unknown): string {
 }
 
 /**
+ * The watermark is diagnostic only, so a failure to read it never discards a
+ * verified inventory: it reads as an empty watermark instead.
+ */
+async function readWatermark(vectors: VectorPort): Promise<string> {
+  try {
+    return String((await vectors.describe()).processedUpToMutation ?? "");
+  } catch {
+    return "";
+  }
+}
+
+/**
  * Reconciles the draft's D1 vector ledger with the index. With a Vectorize
  * binding it fetches every ledger id back and checks namespace and ACL
  * metadata. That per-id check is the decisive one. The index is shared by every
@@ -111,7 +123,7 @@ export async function reconcileDraft(
   let processedBefore: string;
   let processedAfter: string;
   try {
-    processedBefore = String((await vectors.describe()).processedUpToMutation ?? "");
+    processedBefore = await readWatermark(vectors);
     const aclRows = await db
       .prepare(`SELECT vector_id, acl_group FROM chunks WHERE generation_id = ?`)
       .bind(generationId)
@@ -131,7 +143,7 @@ export async function reconcileDraft(
         }
       }
     }
-    processedAfter = String((await vectors.describe()).processedUpToMutation ?? "");
+    processedAfter = await readWatermark(vectors);
   } catch (error) {
     if (input.missingIsPending) {
       throw error;

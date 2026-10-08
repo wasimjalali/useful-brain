@@ -680,9 +680,27 @@ describe("reconciliation", () => {
     expect(outcome).toMatchObject({ reconciled: true, status: "complete" });
   });
 
+  it("a watermark read that throws after a verified scan keeps the verified inventory", async () => {
+    const { vectors, draft } = await draftWithVectors();
+    let calls = 0;
+    const flaky = {
+      ...vectors.port,
+      describe: async () => {
+        calls += 1;
+        if (calls === 2) throw new Error("describe down");
+        return vectors.port.describe();
+      },
+    };
+    for (const missingIsPending of [true, false]) {
+      calls = 0;
+      const outcome = await reconcileDraft({ db: db(), vectors: flaky as never, generationId: draft.generationId, missingIsPending });
+      expect(outcome).toMatchObject({ reconciled: true, status: "complete", missing: 0 });
+    }
+  });
+
   it("final attempt with an unreadable index records a partial audit with the real count and never throws", async () => {
     const { vectors, draft } = await draftWithVectors();
-    const broken = { ...vectors.port, describe: async () => { throw new Error("index down"); } };
+    const broken = { ...vectors.port, getByIds: async () => { throw new Error("index down"); } };
     const outcome = await reconcileDraft({ db: db(), vectors: broken as never, generationId: draft.generationId });
     expect(outcome).toMatchObject({ mode: "ledger_getbyids", reconciled: false, status: "partial", expected: 1 });
     expect(outcome.reason).toMatch(/index scan failed/);

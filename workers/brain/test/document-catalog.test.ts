@@ -191,6 +191,14 @@ describe("reconstructed bodies", () => {
     expect(reconstructBody(rows)).toBe(`## Steps\n\n${shared}\n\n## Steps\n\n${shared}`);
   });
 
+  it("keeps one section when a long whitespace gap separates two chunks of the same heading", () => {
+    const body = reconstructBody([
+      { heading: "Policy", content: "First half of the policy.", start_offset: 12, end_offset: 37 },
+      { heading: "Policy", content: "Second half of the policy.", start_offset: 37 + 1600, end_offset: 37 + 1626 },
+    ]);
+    expect(body).toBe("## Policy\n\nFirst half of the policy.\n\nSecond half of the policy.");
+  });
+
   it("keeps repeated text inside one section when the chunk ranges do not overlap", () => {
     const paragraph = "Repeat this line exactly, it is policy text.";
     const body = reconstructBody([
