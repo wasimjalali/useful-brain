@@ -1,8 +1,8 @@
 import { EMBEDDING_DIMENSIONS, EMBEDDING_METRIC, EMBEDDING_MODEL } from "../embeddings/instructions";
 import { RERANKER_MODEL } from "../retrieve/rerank";
 
-export const CHAT_MODEL_ID = "@cf/zai-org/glm-5.3-flash";
-export const CHAT_MODEL_NAME = "GLM-5.3 Flash";
+export const CHAT_MODEL_ID = "@cf/deepseek-ai/deepseek-v4.1-flash-1017";
+export const CHAT_MODEL_NAME = "DeepSeek V4.1 Flash";
 export const CHAT_MODEL_PROVIDER = "cloudflare-workers-ai";
 
 export const SELECTED_MODELS = {

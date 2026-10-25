@@ -18,7 +18,7 @@ const member: WorkspaceIdentity = {
 
 const config: BrainConfig = {
   models: {
-    answer: "@cf/zai-org/glm-5.3-flash",
+    answer: "@cf/deepseek-ai/deepseek-v4.1-flash-1017",
     embedding: "@cf/baai/bge-m3",
     reranker: "@cf/baai/bge-reranker-base",
   },
@@ -58,7 +58,7 @@ describe("mapAdminSettings", () => {
   it("maps live config and connectors", () => {
     const { config: mapped, connectors } = mapAdminSettings(config, 65);
     expect(mapped).toEqual({
-      answerModel: "@cf/zai-org/glm-5.3-flash",
+      answerModel: "@cf/deepseek-ai/deepseek-v4.1-flash-1017",
       embeddingModel: "@cf/baai/bge-m3",
       rerankerModel: "@cf/baai/bge-reranker-base",
       retrieval: "Hybrid, keyword and vector",

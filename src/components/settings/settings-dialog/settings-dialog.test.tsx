@@ -12,7 +12,7 @@ const account = {
   readableDocuments: 34,
 };
 const config: SettingsModelConfig = {
-  answerModel: "@cf/zai-org/glm-5.3-flash",
+  answerModel: "@cf/deepseek-ai/deepseek-v4.1-flash-1017",
   embeddingModel: "@cf/baai/bge-m3",
   rerankerModel: "@cf/baai/bge-reranker-base",
   retrieval: "Hybrid, keyword and vector",
@@ -103,7 +103,7 @@ describe("SettingsDialog", () => {
     expect(screen.queryByText("Read-only. Changes go through evals.")).toBeNull();
     expect(screen.getByText("BGE-M3")).toBeInTheDocument();
     expect(screen.getByText("@cf/baai/bge-m3")).toBeInTheDocument();
-    expect(screen.getByText("GLM 5.3 Flash")).toBeInTheDocument();
+    expect(screen.getByText("DeepSeek V4.1 Flash")).toBeInTheDocument();
     expect(screen.getByText("Models")).toBeInTheDocument();
     expect(screen.getByText("Retrieval")).toBeInTheDocument();
     expect(screen.getByText("g-c305cf57")).toBeInTheDocument();

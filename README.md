@@ -83,7 +83,7 @@ flowchart LR
 
 Hybrid retrieval fuses D1 FTS5 keyword search with Vectorize dense search (both ACL-filtered store-side), rescores keywords over the allowed set only, then reranks with a cross-encoder and applies an eval-calibrated relevance floor. D1 is authoritative; Vectorize is a rebuildable projection with exact inventory reconciliation before any generation is promoted.
 
-Models (all Cloudflare-hosted, selected by measured bake-off): `@cf/zai-org/glm-5.3-flash` for chat, `@cf/baai/bge-m3` for embeddings, `@cf/baai/bge-reranker-base` for reranking.
+Models (all Cloudflare-hosted, selected by measured bake-off): `@cf/deepseek-ai/deepseek-v4.1-flash-1017` (DeepSeek V4.1 Flash) for chat, `@cf/baai/bge-m3` for embeddings, `@cf/baai/bge-reranker-base` for reranking.
 
 ## Run it locally
 

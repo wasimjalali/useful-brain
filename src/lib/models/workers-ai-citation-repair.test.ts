@@ -19,7 +19,7 @@ import {
   createWorkersAiCoveragePass,
 } from "./workers-ai-citation-repair";
 import { createWorkersAiChatStream } from "./workers-ai-chat";
-import { glm53FlashModel } from "./glm-5-3-flash";
+import { GLM_5_3_FLASH_ID, glm53FlashModel } from "./glm-5-3-flash";
 import { CHAT_MODEL_ID } from "./selection";
 
 const evidence: CitedRetrievalResult[] = [
@@ -55,7 +55,7 @@ describe("Workers AI citation repair", () => {
         },
       ],
     });
-    const repair = createWorkersAiCitationRepair({ run });
+    const repair = createWorkersAiCitationRepair({ run }, GLM_5_3_FLASH_ID);
 
     await expect(
       repair({
@@ -64,7 +64,7 @@ describe("Workers AI citation repair", () => {
       }),
     ).resolves.toBe("P1 tickets have a first-response target of 1 hour. [1]");
     expect(run).toHaveBeenCalledWith(
-      CHAT_MODEL_ID,
+      GLM_5_3_FLASH_ID,
       expect.objectContaining({
         stream: false,
         temperature: 0,
@@ -92,6 +92,23 @@ describe("Workers AI citation repair", () => {
     await cover({ question: "What is the P1 response target?", draft: "None. [1]", evidence });
     expect(run.mock.calls[0]?.[1]).toMatchObject({ reasoning_effort: "low", max_completion_tokens: 4096 });
     expect(run.mock.calls[0]?.[1]).not.toHaveProperty("chat_template_kwargs");
+  });
+
+  it("sends the production chat model the thinking toggle and the 1,024-token cap, as the eval measured", async () => {
+    const run = vi.fn().mockResolvedValue({
+      choices: [{ finish_reason: "stop", message: { content: JSON.stringify({ quotes: [] }) } }],
+    });
+    const cover = createWorkersAiCoveragePass({ run });
+    await cover({ question: "What is the P1 response target?", draft: "None. [1]", evidence });
+    expect(run.mock.calls[0]?.[0]).toBe("@cf/deepseek-ai/deepseek-v4.1-flash-1017");
+    expect(run.mock.calls[0]?.[1]).toEqual({
+      stream: false,
+      temperature: 0,
+      seed: 7,
+      max_completion_tokens: 1024,
+      chat_template_kwargs: { enable_thinking: false },
+      messages: expect.any(Array),
+    });
   });
 
   it("tells the coverage pass why each uncited document was hinted", async () => {

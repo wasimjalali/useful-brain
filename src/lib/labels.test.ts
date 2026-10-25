@@ -22,6 +22,7 @@ describe("labels", () => {
 
 describe("modelDisplayName", () => {
   it("names known models and passes unknown ids through", () => {
+    expect(modelDisplayName("@cf/deepseek-ai/deepseek-v4.1-flash-1017")).toBe("DeepSeek V4.1 Flash");
     expect(modelDisplayName("@cf/zai-org/glm-5.3-flash")).toBe("GLM 5.3 Flash");
     expect(modelDisplayName("@cf/zai-org/glm-5.3")).toBe("GLM 5.3");
     expect(modelDisplayName("@cf/baai/bge-m3")).toBe("BGE-M3");

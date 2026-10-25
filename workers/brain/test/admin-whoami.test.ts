@@ -123,7 +123,7 @@ describe("GET /config", () => {
       connectors: Array<{ id: string; kind: string; approval: boolean; status: string }>;
     };
     expect(body.models).toEqual({
-      answer: "@cf/zai-org/glm-5.3-flash",
+      answer: "@cf/deepseek-ai/deepseek-v4.1-flash-1017",
       embedding: "@cf/baai/bge-m3",
       reranker: "@cf/baai/bge-reranker-base",
     });
