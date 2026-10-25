@@ -1,0 +1,374 @@
+{
+  "principals": {
+    "eng_ic": {
+      "user_id": "eng_ic",
+      "roles": [
+        "standard"
+      ],
+      "departments": [
+        "engineering"
+      ]
+    },
+    "eng_lead": {
+      "user_id": "eng_lead",
+      "roles": [
+        "manager"
+      ],
+      "departments": [
+        "engineering"
+      ]
+    },
+    "eng_dir": {
+      "user_id": "eng_dir",
+      "roles": [
+        "director"
+      ],
+      "departments": [
+        "engineering"
+      ]
+    },
+    "hr_generalist": {
+      "user_id": "hr_generalist",
+      "roles": [
+        "standard"
+      ],
+      "departments": [
+        "hr"
+      ]
+    },
+    "hr_manager": {
+      "user_id": "hr_manager",
+      "roles": [
+        "hr_manager"
+      ],
+      "departments": [
+        "hr"
+      ]
+    },
+    "fin_analyst": {
+      "user_id": "fin_analyst",
+      "roles": [
+        "standard"
+      ],
+      "departments": [
+        "finance"
+      ]
+    },
+    "fin_manager": {
+      "user_id": "fin_manager",
+      "roles": [
+        "finance_manager"
+      ],
+      "departments": [
+        "finance"
+      ]
+    },
+    "cfo": {
+      "user_id": "cfo",
+      "roles": [
+        "executive"
+      ],
+      "departments": [
+        "executive",
+        "finance"
+      ]
+    },
+    "sales_rep": {
+      "user_id": "sales_rep",
+      "roles": [
+        "standard"
+      ],
+      "departments": [
+        "sales"
+      ]
+    },
+    "sales_manager": {
+      "user_id": "sales_manager",
+      "roles": [
+        "sales_manager"
+      ],
+      "departments": [
+        "sales"
+      ]
+    },
+    "support_agent": {
+      "user_id": "support_agent",
+      "roles": [
+        "standard"
+      ],
+      "departments": [
+        "support"
+      ]
+    },
+    "support_manager": {
+      "user_id": "support_manager",
+      "roles": [
+        "support_manager"
+      ],
+      "departments": [
+        "support"
+      ]
+    },
+    "legal_counsel": {
+      "user_id": "legal_counsel",
+      "roles": [
+        "standard"
+      ],
+      "departments": [
+        "legal"
+      ]
+    },
+    "ops_coord": {
+      "user_id": "ops_coord",
+      "roles": [
+        "standard"
+      ],
+      "departments": [
+        "operations"
+      ]
+    },
+    "ops_manager": {
+      "user_id": "ops_manager",
+      "roles": [
+        "manager"
+      ],
+      "departments": [
+        "operations"
+      ]
+    }
+  },
+  "description": "Search-budget fix check (2026-10-25): every permission question plus the expanded multi-hop slice and q028. Not a baseline.",
+  "questions": [
+    {
+      "id": "q028",
+      "category": "factual",
+      "query": "How long do we have to respond to a customer data access request?",
+      "principal": "support_agent",
+      "expected_document_ids": [
+        "nw_legal_privacy_policy"
+      ],
+      "expected_sections": [
+        "Individual Rights"
+      ],
+      "note": "30 days, extendable to 60 with notice"
+    },
+    {
+      "id": "q066",
+      "category": "permission",
+      "query": "What is the band minimum and maximum annual base salary for level L5?",
+      "principal": "eng_ic",
+      "expected_document_ids": [],
+      "forbidden_document_ids": [
+        "nw_hr_salary_bands"
+      ],
+      "note": "salary bands live in hr/salary-bands.md (dept [hr]); engineer must get zero hits. Query wording matches the band table so the document would rank if the asker were allowed, which is what makes this a live ACL test"
+    },
+    {
+      "id": "q067",
+      "category": "permission",
+      "query": "How much severance does the CEO get if terminated without cause?",
+      "principal": "hr_manager",
+      "expected_document_ids": [],
+      "forbidden_document_ids": [
+        "nw_executive_severance"
+      ],
+      "note": "executive/severance-policy.md is private [executive]; HR is denied"
+    },
+    {
+      "id": "q068",
+      "category": "permission",
+      "query": "What do non-employee directors get paid per board meeting?",
+      "principal": "fin_analyst",
+      "expected_document_ids": [],
+      "forbidden_document_ids": [
+        "nw_executive_board_calendar"
+      ],
+      "note": "board calendar is private [executive]; finance analyst is denied"
+    },
+    {
+      "id": "q069",
+      "category": "permission",
+      "query": "What is the smallest deal size that needs the board's approval?",
+      "principal": "sales_rep",
+      "expected_document_ids": [],
+      "forbidden_document_ids": [
+        "nw_executive_ma_approval"
+      ],
+      "note": "M&A policy is private [executive]; sales rep is denied"
+    },
+    {
+      "id": "q070",
+      "category": "permission",
+      "query": "What commission rate does a rep earn on new business?",
+      "principal": "support_agent",
+      "expected_document_ids": [],
+      "forbidden_document_ids": [
+        "nw_sales_commission_plan"
+      ],
+      "note": "commission plan is role [sales_manager, director]; support agent is denied"
+    },
+    {
+      "id": "q071",
+      "category": "permission",
+      "query": "What is the monthly spending limit on a VP's corporate card?",
+      "principal": "hr_generalist",
+      "expected_document_ids": [],
+      "forbidden_document_ids": [
+        "nw_finance_corporate_card"
+      ],
+      "note": "corporate card policy is role [manager, director, finance_manager]; HR generalist is denied"
+    },
+    {
+      "id": "q072",
+      "category": "permission",
+      "query": "What is the CSAT target in the agent scorecard?",
+      "principal": "support_agent",
+      "expected_document_ids": [],
+      "forbidden_document_ids": [
+        "nw_support_agent_scorecard"
+      ],
+      "note": "scorecard is role [support_manager, director]; a regular agent is denied"
+    },
+    {
+      "id": "q073",
+      "category": "permission",
+      "query": "How fast must a critical vulnerability be patched?",
+      "principal": "eng_ic",
+      "expected_document_ids": [],
+      "forbidden_document_ids": [
+        "nw_engineering_security_vulnerability"
+      ],
+      "note": "security/vulnerability policy is role [director, it_admin]; regular engineer is denied (contrast q044)"
+    },
+    {
+      "id": "q074",
+      "category": "permission",
+      "query": "What are the final pay rules for an employee being let go?",
+      "principal": "eng_ic",
+      "expected_document_ids": [],
+      "forbidden_document_ids": [
+        "nw_hr_termination_offboarding"
+      ],
+      "note": "termination policy is role [manager, hr_manager]; engineer is denied"
+    },
+    {
+      "id": "q075",
+      "category": "permission",
+      "query": "How are performance ratings calibrated across teams?",
+      "principal": "support_agent",
+      "expected_document_ids": [],
+      "forbidden_document_ids": [
+        "nw_hr_performance_review"
+      ],
+      "note": "performance review policy is role [manager, director, hr_manager]; support agent is denied"
+    },
+    {
+      "id": "q113",
+      "category": "permission",
+      "query": "What is PF-330 and who has to sign it?",
+      "principal": "sales_rep",
+      "expected_document_ids": [],
+      "forbidden_document_ids": [
+        "nw_finance_procurement_forms"
+      ],
+      "note": "procurement forms guide is department [finance, operations]; a sales rep is denied"
+    },
+    {
+      "id": "q114",
+      "category": "permission",
+      "query": "What is DRP-11 and who can declare it activated?",
+      "principal": "support_agent",
+      "expected_document_ids": [],
+      "forbidden_document_ids": [
+        "nw_operations_dr_runbook"
+      ],
+      "note": "DR runbook is department [operations, engineering, executive]; support is denied (contrast q099)"
+    },
+    {
+      "id": "q115",
+      "category": "permission",
+      "query": "What does Clause 7.3(b) commit us to?",
+      "principal": "eng_ic",
+      "expected_document_ids": [],
+      "forbidden_document_ids": [
+        "nw_legal_dpa_handbook"
+      ],
+      "note": "DPA handbook is department [legal, sales, finance]; an engineer is denied (contrast q105)"
+    },
+    {
+      "id": "q116",
+      "category": "multi_hop_expanded",
+      "query": "After a SEV-1, when is the postmortem due and how long must its incident records be retained?",
+      "principal": "eng_lead",
+      "expected_document_ids": [
+        "nw_engineering_incident_escalation",
+        "nw_engineering_log_retention"
+      ],
+      "expected_sections": [
+        "SEV-1: Critical Incident",
+        "What Counts as Security Logs"
+      ],
+      "note": "incident response supplies the postmortem deadline; log policy supplies seven-year retention"
+    },
+    {
+      "id": "q117",
+      "category": "multi_hop_expanded",
+      "query": "An employee approved to work abroad is leaving the company. What remote-work condition applies and when must the laptop be returned?",
+      "principal": "eng_ic",
+      "expected_document_ids": [
+        "nw_hr_remote_work",
+        "nw_operations_equipment_return"
+      ],
+      "expected_sections": [
+        "Long-Term Remote and Working Abroad",
+        "Return Windows"
+      ],
+      "note": "remote-work approval and equipment-return timing come from separate policies"
+    },
+    {
+      "id": "q118",
+      "category": "multi_hop_expanded",
+      "query": "An employee wants to use their development budget for an overseas conference. What training approval and travel approval rules both apply?",
+      "principal": "hr_generalist",
+      "expected_document_ids": [
+        "nw_hr_training_budget",
+        "nw_finance_travel_expense"
+      ],
+      "expected_sections": [
+        "Approval Process",
+        "Travel Approval and Safety"
+      ],
+      "note": "the purchase needs training approval and the trip needs travel approval"
+    },
+    {
+      "id": "q119",
+      "category": "multi_hop_expanded",
+      "query": "A customer contract lets a vendor process personal data. When do Legal review and a data processing addendum become required?",
+      "principal": "legal_counsel",
+      "expected_document_ids": [
+        "nw_legal_contract_review",
+        "nw_legal_dpa_handbook"
+      ],
+      "expected_sections": [
+        "When Legal Review Is Required",
+        "When a Data Processing Addendum Is Required"
+      ],
+      "note": "contract approval and data-processing terms are governed by separate legal documents"
+    },
+    {
+      "id": "q120",
+      "category": "multi_hop_expanded",
+      "query": "A P0 response target was missed and the customer demands compensation above the standard SLA credit. What credit and complaint escalation rules apply?",
+      "principal": "support_manager",
+      "expected_document_ids": [
+        "nw_support_sla_policy",
+        "nw_support_complaint_escalation"
+      ],
+      "expected_sections": [
+        "SLA Credits",
+        "Goodwill and Compensation Rules"
+      ],
+      "note": "the SLA defines the credit; extra compensation follows the complaint path"
+    }
+  ]
+}

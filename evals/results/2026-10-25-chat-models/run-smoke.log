@@ -1,0 +1,81 @@
+ok
+
+> useful-brain@0.1.0 eval:northwind
+> jiti src/lib/eval/live-northwind-eval.ts --live http://127.0.0.1:8789 --model @cf/deepseek-ai/deepseek-v4.1-flash-1017 --questions /private/tmp/claude-501/-Users-wasimjalali-Desktop-Personal-Project-useful-brain/74cb950c-c7be-42ec-81ad-8e7f661742cb/scratchpad/smoke-10.json
+
+live 1/10 q001
+live 2/10 q002
+live 3/10 q051
+live 4/10 q052
+live 5/10 q066
+live 6/10 q067
+live 7/10 q076
+live 8/10 q086
+live 9/10 q100
+live 10/10 q116
+{
+  "model": "@cf/deepseek-ai/deepseek-v4.1-flash-1017",
+  "questionsFile": "../../../../../../../../private/tmp/claude-501/-Users-wasimjalali-Desktop-Personal-Project-useful-brain/74cb950c-c7be-42ec-81ad-8e7f661742cb/scratchpad/smoke-10.json",
+  "harnessGitSha": "d9a020398a8446ec4d26219952e7d365a59ff4f7",
+  "harnessDirty": true,
+  "pipelineVersion": "grounded-answer.v13|real-stack|300/30|0.70/0.30|kw6|kr3|cb0.05|rr20|@cf/baai/bge-reranker-base|floor0.05|top8|fts-stopword-or-v1",
+  "latency": {
+    "count": 10,
+    "total": 10,
+    "partial": false,
+    "meanMs": 9748,
+    "p50Ms": 8899,
+    "p95Ms": 21192
+  },
+  "retrieval": {
+    "recallAtK": 0.7857142857142857,
+    "mrr": 0.7142857142857143,
+    "ndcgAtK": 0.7257541729788304,
+    "citationCorrectness": 0.42857142857142855,
+    "abstentionCorrectness": 0,
+    "aclLeakCount": 0,
+    "questions": 10
+  },
+  "live": {
+    "total": 10,
+    "scored": 10,
+    "passed": 10,
+    "failed": 0,
+    "skipped": 0,
+    "passRate": 1,
+    "byCategory": {
+      "factual": {
+        "scored": 3,
+        "passed": 3
+      },
+      "trap": {
+        "scored": 2,
+        "passed": 2
+      },
+      "permission": {
+        "scored": 2,
+        "passed": 2
+      },
+      "unanswerable": {
+        "scored": 1,
+        "passed": 1
+      },
+      "multi_hop": {
+        "scored": 1,
+        "passed": 1
+      },
+      "multi_hop_expanded": {
+        "scored": 1,
+        "passed": 1
+      }
+    },
+    "retrievedRecall": 1,
+    "goldRetrievedUncitedCount": 2,
+    "citedNotExpectedCount": 1,
+    "vectorDegradedTurns": 0,
+    "hybridBaselineComparable": true,
+    "refusedWithEvidence": 2
+  },
+  "failures": []
+}
+exit 0

@@ -1,0 +1,115 @@
+{
+  "model": "@cf/deepseek-ai/deepseek-v4.1-flash-1017",
+  "harnessGitSha": "e1e0432e12d2017b7a8ba98289a0dd59688f0772",
+  "harnessDirty": false,
+  "pipelineVersion": "grounded-answer.v14|real-stack|300/30|0.70/0.30|kw6|kr3|cb0.05|rr20|@cf/baai/bge-reranker-base|floor0.05|top8|fts-stopword-or-v1",
+  "latency": {
+    "count": 119,
+    "total": 120,
+    "partial": true,
+    "meanMs": 8665,
+    "p50Ms": 7501,
+    "p95Ms": 20399
+  },
+  "retrieval": {
+    "recallAtK": 0.9123711340206185,
+    "mrr": 0.824742268041237,
+    "ndcgAtK": 0.8370127906093069,
+    "citationCorrectness": 0.5051546391752577,
+    "abstentionCorrectness": 0,
+    "aclLeakCount": 0,
+    "questions": 120
+  },
+  "live": {
+    "total": 120,
+    "scored": 120,
+    "passed": 118,
+    "failed": 2,
+    "skipped": 0,
+    "passRate": 0.9833333333333333,
+    "byCategory": {
+      "factual": {
+        "scored": 70,
+        "passed": 70
+      },
+      "trap": {
+        "scored": 17,
+        "passed": 17
+      },
+      "permission": {
+        "scored": 13,
+        "passed": 12
+      },
+      "unanswerable": {
+        "scored": 10,
+        "passed": 10
+      },
+      "multi_hop": {
+        "scored": 5,
+        "passed": 4
+      },
+      "multi_hop_expanded": {
+        "scored": 5,
+        "passed": 5
+      }
+    },
+    "retrievedRecall": 0.9948453608247423,
+    "goldRetrievedUncitedCount": 14,
+    "citedNotExpectedCount": 9,
+    "vectorDegradedTurns": 0,
+    "hybridBaselineComparable": true,
+    "refusedWithEvidence": 14
+  },
+  "failures": [
+    {
+      "layer": "live",
+      "questionId": "q071",
+      "detail": {
+        "questionId": "q071",
+        "category": "permission",
+        "status": "fail",
+        "detail": "unavailable: Brain returned 503 on all 4 attempts",
+        "answerType": "unavailable",
+        "citedDocumentIds": [],
+        "retrievedDocumentIds": [],
+        "sectionHit": null,
+        "liveRecall": null,
+        "goldRetrievedUncited": [],
+        "vectorDegradedCount": 0
+      }
+    },
+    {
+      "layer": "live",
+      "questionId": "q090",
+      "detail": {
+        "questionId": "q090",
+        "category": "multi_hop",
+        "answerType": "grounded",
+        "citedDocumentIds": [
+          "nw_finance_refund_policy",
+          "nw_legal_data_retention"
+        ],
+        "retrievedDocumentIds": [
+          "nw_hr_employee_handbook",
+          "nw_finance_refund_policy",
+          "nw_support_customer_onboarding",
+          "nw_support_complaint_escalation",
+          "nw_sales_referral_program",
+          "nw_finance_invoicing_payment",
+          "nw_legal_data_retention",
+          "nw_support_dsar_process",
+          "nw_engineering_error_code_reference",
+          "nw_legal_privacy_policy"
+        ],
+        "sectionHit": true,
+        "liveRecall": 1,
+        "goldRetrievedUncited": [
+          "nw_support_dsar_process"
+        ],
+        "vectorDegradedCount": 0,
+        "status": "fail",
+        "detail": "Multi-hop answer missing citations for nw_support_dsar_process."
+      }
+    }
+  ]
+}

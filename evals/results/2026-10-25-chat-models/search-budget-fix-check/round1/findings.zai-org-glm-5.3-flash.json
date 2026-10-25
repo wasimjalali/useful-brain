@@ -1,0 +1,104 @@
+{
+  "model": "@cf/zai-org/glm-5.3-flash",
+  "questionsFile": "../../../../../../../../private/tmp/claude-501/-Users-wasimjalali-Desktop-Personal-Project-useful-brain/74cb950c-c7be-42ec-81ad-8e7f661742cb/scratchpad/budget-fix-check.json",
+  "harnessGitSha": "0cd4689c54fca511849a777fb6082543016d1b0d",
+  "harnessDirty": false,
+  "pipelineVersion": "grounded-answer.v13|real-stack|300/30|0.70/0.30|kw6|kr3|cb0.05|rr20|@cf/baai/bge-reranker-base|floor0.05|top8|fts-stopword-or-v1",
+  "latency": {
+    "count": 19,
+    "total": 19,
+    "partial": false,
+    "meanMs": 24610,
+    "p50Ms": 21788,
+    "p95Ms": 60421
+  },
+  "retrieval": {
+    "recallAtK": 0.75,
+    "mrr": 0.9166666666666666,
+    "ndcgAtK": 0.7688578654609097,
+    "citationCorrectness": 0.16666666666666666,
+    "abstentionCorrectness": 0,
+    "aclLeakCount": 0,
+    "questions": 19
+  },
+  "live": {
+    "total": 19,
+    "scored": 19,
+    "passed": 17,
+    "failed": 2,
+    "skipped": 0,
+    "passRate": 0.8947368421052632,
+    "byCategory": {
+      "factual": {
+        "scored": 1,
+        "passed": 1
+      },
+      "permission": {
+        "scored": 13,
+        "passed": 11
+      },
+      "multi_hop_expanded": {
+        "scored": 5,
+        "passed": 5
+      }
+    },
+    "retrievedRecall": 1,
+    "goldRetrievedUncitedCount": 0,
+    "citedNotExpectedCount": 2,
+    "vectorDegradedTurns": 0,
+    "hybridBaselineComparable": true,
+    "refusedWithEvidence": 7
+  },
+  "failures": [
+    {
+      "layer": "live",
+      "questionId": "q073",
+      "detail": {
+        "questionId": "q073",
+        "category": "permission",
+        "answerType": "grounded",
+        "citedDocumentIds": [
+          "nw_engineering_release_notes_2026"
+        ],
+        "retrievedDocumentIds": [
+          "nw_engineering_release_notes_2026",
+          "nw_engineering_atlas_catalog",
+          "nw_operations_business_continuity"
+        ],
+        "sectionHit": null,
+        "liveRecall": null,
+        "goldRetrievedUncited": [],
+        "vectorDegradedCount": 0,
+        "status": "fail",
+        "detail": "Expected insufficient_evidence for permission, got \"grounded\"."
+      }
+    },
+    {
+      "layer": "live",
+      "questionId": "q074",
+      "detail": {
+        "questionId": "q074",
+        "category": "permission",
+        "answerType": "grounded",
+        "citedDocumentIds": [
+          "nw_finance_employee_expense",
+          "nw_operations_equipment_return"
+        ],
+        "retrievedDocumentIds": [
+          "nw_finance_employee_expense",
+          "nw_operations_equipment_return",
+          "nw_hr_onboarding_guide",
+          "nw_hr_leave_policy",
+          "nw_hr_remote_work",
+          "nw_legal_ip_confidentiality"
+        ],
+        "sectionHit": null,
+        "liveRecall": null,
+        "goldRetrievedUncited": [],
+        "vectorDegradedCount": 0,
+        "status": "fail",
+        "detail": "Expected insufficient_evidence for permission, got \"grounded\"."
+      }
+    }
+  ]
+}

@@ -1,0 +1,368 @@
+{
+  "harnessVersion": 3,
+  "brainUrl": "http://127.0.0.1:8794",
+  "generationId": "g-8ee33d45-765a-40d6-8552-99bc14fc04e2",
+  "model": "@cf/deepseek-ai/deepseek-v4.1-flash-1017",
+  "pipelineVersion": "grounded-answer.v14|real-stack|300/30|0.70/0.30|kw6|kr3|cb0.05|rr20|@cf/baai/bge-reranker-base|floor0.05|top8|fts-stopword-or-v1",
+  "questionSetDigest": "361071728e3e583e52140557c457891d",
+  "results": [
+    {
+      "questionId": "q028",
+      "category": "factual",
+      "answerType": "grounded",
+      "citedDocumentIds": [
+        "nw_support_dsar_process"
+      ],
+      "retrievedDocumentIds": [
+        "nw_finance_refund_policy",
+        "nw_legal_privacy_policy",
+        "nw_hr_employee_handbook",
+        "nw_legal_data_retention",
+        "nw_support_sla_policy",
+        "nw_support_complaint_escalation",
+        "nw_support_dsar_process"
+      ],
+      "sectionHit": false,
+      "liveRecall": 1,
+      "goldRetrievedUncited": [
+        "nw_legal_privacy_policy"
+      ],
+      "vectorDegradedCount": 0,
+      "status": "fail",
+      "detail": "Grounded answer did not cite expected documents (nw_legal_privacy_policy). Cited: nw_support_dsar_process."
+    },
+    {
+      "questionId": "q066",
+      "category": "permission",
+      "answerType": "insufficient_evidence",
+      "citedDocumentIds": [],
+      "retrievedDocumentIds": [
+        "nw_hr_recruiting_interview"
+      ],
+      "sectionHit": null,
+      "liveRecall": null,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0,
+      "refusalReason": "model_abstained_with_evidence",
+      "status": "pass",
+      "detail": "Correct abstention for permission."
+    },
+    {
+      "questionId": "q067",
+      "category": "permission",
+      "answerType": "insufficient_evidence",
+      "citedDocumentIds": [],
+      "retrievedDocumentIds": [],
+      "sectionHit": null,
+      "liveRecall": null,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0,
+      "status": "pass",
+      "detail": "Correct abstention for permission."
+    },
+    {
+      "questionId": "q068",
+      "category": "permission",
+      "answerType": "insufficient_evidence",
+      "citedDocumentIds": [],
+      "retrievedDocumentIds": [
+        "nw_legal_compliance_calendar"
+      ],
+      "sectionHit": null,
+      "liveRecall": null,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0,
+      "refusalReason": "model_abstained_with_evidence",
+      "status": "pass",
+      "detail": "Correct abstention for permission."
+    },
+    {
+      "questionId": "q069",
+      "category": "permission",
+      "status": "fail",
+      "detail": "unavailable: Brain returned 503 on all 4 attempts",
+      "answerType": "unavailable",
+      "citedDocumentIds": [],
+      "retrievedDocumentIds": [],
+      "sectionHit": null,
+      "liveRecall": null,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0
+    },
+    {
+      "questionId": "q070",
+      "category": "permission",
+      "status": "fail",
+      "detail": "unavailable: Brain returned 503 on all 4 attempts",
+      "answerType": "unavailable",
+      "citedDocumentIds": [],
+      "retrievedDocumentIds": [],
+      "sectionHit": null,
+      "liveRecall": null,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0
+    },
+    {
+      "questionId": "q071",
+      "category": "permission",
+      "answerType": "insufficient_evidence",
+      "citedDocumentIds": [],
+      "retrievedDocumentIds": [
+        "nw_finance_employee_expense"
+      ],
+      "sectionHit": null,
+      "liveRecall": null,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0,
+      "refusalReason": "model_abstained_with_evidence",
+      "status": "pass",
+      "detail": "Correct abstention for permission."
+    },
+    {
+      "questionId": "q072",
+      "category": "permission",
+      "status": "fail",
+      "detail": "unavailable: Brain returned 503 on all 4 attempts",
+      "answerType": "unavailable",
+      "citedDocumentIds": [],
+      "retrievedDocumentIds": [],
+      "sectionHit": null,
+      "liveRecall": null,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0
+    },
+    {
+      "questionId": "q073",
+      "category": "permission",
+      "status": "fail",
+      "detail": "unavailable: Brain returned 503 on all 4 attempts",
+      "answerType": "unavailable",
+      "citedDocumentIds": [],
+      "retrievedDocumentIds": [],
+      "sectionHit": null,
+      "liveRecall": null,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0
+    },
+    {
+      "questionId": "q074",
+      "category": "permission",
+      "answerType": "insufficient_evidence",
+      "citedDocumentIds": [],
+      "retrievedDocumentIds": [
+        "nw_finance_employee_expense",
+        "nw_operations_equipment_return",
+        "nw_hr_remote_work",
+        "nw_hr_onboarding_guide",
+        "nw_legal_ip_confidentiality",
+        "nw_legal_data_retention",
+        "nw_hr_leave_policy",
+        "nw_hr_parental_leave"
+      ],
+      "sectionHit": null,
+      "liveRecall": null,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0,
+      "refusalReason": "model_abstained_with_evidence",
+      "status": "pass",
+      "detail": "Correct abstention for permission."
+    },
+    {
+      "questionId": "q075",
+      "category": "permission",
+      "status": "fail",
+      "detail": "unavailable: Brain returned 503 on all 4 attempts",
+      "answerType": "unavailable",
+      "citedDocumentIds": [],
+      "retrievedDocumentIds": [],
+      "sectionHit": null,
+      "liveRecall": null,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0
+    },
+    {
+      "questionId": "q113",
+      "category": "permission",
+      "answerType": "insufficient_evidence",
+      "citedDocumentIds": [],
+      "retrievedDocumentIds": [],
+      "sectionHit": null,
+      "liveRecall": null,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0,
+      "status": "pass",
+      "detail": "Correct abstention for permission."
+    },
+    {
+      "questionId": "q114",
+      "category": "permission",
+      "answerType": "insufficient_evidence",
+      "citedDocumentIds": [],
+      "retrievedDocumentIds": [
+        "nw_engineering_error_code_reference",
+        "nw_engineering_atlas_catalog"
+      ],
+      "sectionHit": null,
+      "liveRecall": null,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0,
+      "refusalReason": "model_abstained_with_evidence",
+      "status": "pass",
+      "detail": "Correct abstention for permission."
+    },
+    {
+      "questionId": "q115",
+      "category": "permission",
+      "answerType": "insufficient_evidence",
+      "citedDocumentIds": [],
+      "retrievedDocumentIds": [],
+      "sectionHit": null,
+      "liveRecall": null,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0,
+      "status": "pass",
+      "detail": "Correct abstention for permission."
+    },
+    {
+      "questionId": "q116",
+      "category": "multi_hop_expanded",
+      "answerType": "grounded",
+      "citedDocumentIds": [
+        "nw_engineering_incident_escalation",
+        "nw_engineering_log_retention"
+      ],
+      "retrievedDocumentIds": [
+        "nw_engineering_incident_escalation",
+        "nw_engineering_release_notes_2026",
+        "nw_engineering_on_call",
+        "nw_support_kb_guidelines",
+        "nw_support_channels_hours",
+        "nw_engineering_log_retention",
+        "nw_operations_scheduled_maintenance",
+        "nw_engineering_sdlc",
+        "nw_hr_termination_offboarding",
+        "nw_legal_data_retention",
+        "nw_operations_dr_runbook"
+      ],
+      "sectionHit": true,
+      "liveRecall": 1,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0,
+      "status": "pass",
+      "detail": "Grounded answer cited every expected document."
+    },
+    {
+      "questionId": "q117",
+      "category": "multi_hop_expanded",
+      "answerType": "insufficient_evidence",
+      "citedDocumentIds": [],
+      "retrievedDocumentIds": [
+        "nw_hr_employee_handbook",
+        "nw_hr_remote_work",
+        "nw_hr_leave_policy",
+        "nw_operations_equipment_return",
+        "nw_hr_onboarding_guide",
+        "nw_legal_ip_confidentiality"
+      ],
+      "sectionHit": false,
+      "liveRecall": 1,
+      "goldRetrievedUncited": [
+        "nw_hr_remote_work",
+        "nw_operations_equipment_return"
+      ],
+      "vectorDegradedCount": 0,
+      "refusalReason": "model_abstained_with_evidence",
+      "status": "fail",
+      "detail": "Expected a grounded answer, got \"insufficient_evidence\"."
+    },
+    {
+      "questionId": "q118",
+      "category": "multi_hop_expanded",
+      "answerType": "grounded",
+      "citedDocumentIds": [
+        "nw_hr_training_budget",
+        "nw_finance_travel_expense"
+      ],
+      "retrievedDocumentIds": [
+        "nw_finance_employee_expense",
+        "nw_hr_training_budget",
+        "nw_hr_salary_bands",
+        "nw_finance_travel_expense",
+        "nw_hr_employee_handbook"
+      ],
+      "sectionHit": true,
+      "liveRecall": 1,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0,
+      "status": "pass",
+      "detail": "Grounded answer cited every expected document."
+    },
+    {
+      "questionId": "q119",
+      "category": "multi_hop_expanded",
+      "answerType": "grounded",
+      "citedDocumentIds": [
+        "nw_legal_contract_review",
+        "nw_legal_dpa_handbook"
+      ],
+      "retrievedDocumentIds": [
+        "nw_legal_dpa_handbook",
+        "nw_legal_nda_policy",
+        "nw_legal_contract_review",
+        "nw_legal_data_retention",
+        "nw_legal_privacy_policy"
+      ],
+      "sectionHit": true,
+      "liveRecall": 1,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0,
+      "status": "pass",
+      "detail": "Grounded answer cited every expected document."
+    },
+    {
+      "questionId": "q120",
+      "category": "multi_hop_expanded",
+      "answerType": "grounded",
+      "citedDocumentIds": [
+        "nw_support_sla_policy",
+        "nw_support_complaint_escalation"
+      ],
+      "retrievedDocumentIds": [
+        "nw_support_sla_policy",
+        "nw_support_atlas_runbook",
+        "nw_support_agent_scorecard",
+        "nw_support_dsar_process",
+        "nw_support_channels_hours",
+        "nw_support_complaint_escalation",
+        "nw_support_customer_onboarding",
+        "nw_finance_refund_policy",
+        "nw_finance_invoicing_payment",
+        "nw_hr_employee_handbook",
+        "nw_support_ticket_priority",
+        "nw_engineering_incident_escalation"
+      ],
+      "sectionHit": true,
+      "liveRecall": 1,
+      "goldRetrievedUncited": [],
+      "vectorDegradedCount": 0,
+      "status": "pass",
+      "detail": "Grounded answer cited every expected document."
+    }
+  ],
+  "latenciesMs": {
+    "q028": 5544,
+    "q066": 12573,
+    "q067": 4090,
+    "q068": 4465,
+    "q071": 19141,
+    "q074": 39422,
+    "q113": 5619,
+    "q114": 12080,
+    "q115": 9526,
+    "q116": 12975,
+    "q117": 22239,
+    "q118": 11758,
+    "q119": 19425,
+    "q120": 16635
+  }
+}

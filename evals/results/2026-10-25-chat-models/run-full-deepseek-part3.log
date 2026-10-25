@@ -1,0 +1,205 @@
+ok
+
+> useful-brain@0.1.0 eval:northwind
+> jiti src/lib/eval/live-northwind-eval.ts --live http://127.0.0.1:8789 --model @cf/deepseek-ai/deepseek-v4.1-flash-1017 --resume --score-unavailable
+
+live 74/120 q074
+q074: Brain /turns failed after 4 attempts (statuses 503, 503, 503, 503); the question was not scored; scored as a failure (--score-unavailable)
+live 75/120 q075
+live 76/120 q076
+live 77/120 q077
+live 78/120 q078
+live 79/120 q079
+live 80/120 q080
+live 81/120 q081
+live 82/120 q082
+live 83/120 q083
+live 84/120 q084
+live 85/120 q085
+live 86/120 q086
+live 87/120 q087
+live 88/120 q088
+live 89/120 q089
+live 90/120 q090
+live 91/120 q091
+live 92/120 q092
+live 93/120 q093
+live 94/120 q094
+live 95/120 q095
+live 96/120 q096
+live 97/120 q097
+live 98/120 q098
+/Users/wasimjalali/.agents/tools/heavy-lock.sh: child setpgid (11984 to 11984): Operation not permitted
+live 99/120 q099
+live 100/120 q100
+live 101/120 q101
+live 102/120 q102
+live 103/120 q103
+live 104/120 q104
+live 105/120 q105
+live 106/120 q106
+live 107/120 q107
+live 108/120 q108
+live 109/120 q109
+live 110/120 q110
+live 111/120 q111
+live 112/120 q112
+live 113/120 q113
+live 114/120 q114
+live 115/120 q115
+live 116/120 q116
+live 117/120 q117
+q117: Brain /turns failed after 4 attempts (statuses 503, 503, 503, 503); the question was not scored; scored as a failure (--score-unavailable)
+live 118/120 q118
+live 119/120 q119
+live 120/120 q120
+{
+  "model": "@cf/deepseek-ai/deepseek-v4.1-flash-1017",
+  "harnessGitSha": "d9a020398a8446ec4d26219952e7d365a59ff4f7",
+  "harnessDirty": true,
+  "pipelineVersion": "grounded-answer.v13|real-stack|300/30|0.70/0.30|kw6|kr3|cb0.05|rr20|@cf/baai/bge-reranker-base|floor0.05|top8|fts-stopword-or-v1",
+  "latency": {
+    "count": 118,
+    "total": 120,
+    "partial": true,
+    "meanMs": 9221,
+    "p50Ms": 6908,
+    "p95Ms": 25249
+  },
+  "retrieval": {
+    "recallAtK": 0.9123711340206185,
+    "mrr": 0.824742268041237,
+    "ndcgAtK": 0.8370127906093069,
+    "citationCorrectness": 0.5051546391752577,
+    "abstentionCorrectness": 0,
+    "aclLeakCount": 0,
+    "questions": 120
+  },
+  "live": {
+    "total": 120,
+    "scored": 120,
+    "passed": 116,
+    "failed": 4,
+    "skipped": 0,
+    "passRate": 0.9666666666666667,
+    "byCategory": {
+      "factual": {
+        "scored": 70,
+        "passed": 69
+      },
+      "trap": {
+        "scored": 17,
+        "passed": 17
+      },
+      "permission": {
+        "scored": 13,
+        "passed": 11
+      },
+      "unanswerable": {
+        "scored": 10,
+        "passed": 10
+      },
+      "multi_hop": {
+        "scored": 5,
+        "passed": 5
+      },
+      "multi_hop_expanded": {
+        "scored": 5,
+        "passed": 4
+      }
+    },
+    "retrievedRecall": 0.9845360824742269,
+    "goldRetrievedUncitedCount": 13,
+    "citedNotExpectedCount": 12,
+    "vectorDegradedTurns": 0,
+    "hybridBaselineComparable": true,
+    "refusedWithEvidence": 14
+  },
+  "failures": [
+    {
+      "layer": "live",
+      "questionId": "q028",
+      "detail": {
+        "questionId": "q028",
+        "category": "factual",
+        "answerType": "grounded",
+        "citedDocumentIds": [
+          "nw_support_dsar_process"
+        ],
+        "retrievedDocumentIds": [
+          "nw_finance_refund_policy",
+          "nw_legal_privacy_policy",
+          "nw_hr_employee_handbook",
+          "nw_legal_data_retention",
+          "nw_support_sla_policy",
+          "nw_support_complaint_escalation",
+          "nw_support_dsar_process"
+        ],
+        "sectionHit": false,
+        "liveRecall": 1,
+        "goldRetrievedUncited": [
+          "nw_legal_privacy_policy"
+        ],
+        "vectorDegradedCount": 0,
+        "status": "fail",
+        "detail": "Grounded answer did not cite expected documents (nw_legal_privacy_policy). Cited: nw_support_dsar_process."
+      }
+    },
+    {
+      "layer": "live",
+      "questionId": "q073",
+      "detail": {
+        "questionId": "q073",
+        "category": "permission",
+        "answerType": "grounded",
+        "citedDocumentIds": [
+          "nw_engineering_release_notes_2026"
+        ],
+        "retrievedDocumentIds": [
+          "nw_engineering_release_notes_2026"
+        ],
+        "sectionHit": null,
+        "liveRecall": null,
+        "goldRetrievedUncited": [],
+        "vectorDegradedCount": 0,
+        "status": "fail",
+        "detail": "Expected insufficient_evidence for permission, got \"grounded\"."
+      }
+    },
+    {
+      "layer": "live",
+      "questionId": "q074",
+      "detail": {
+        "questionId": "q074",
+        "category": "permission",
+        "status": "fail",
+        "detail": "unavailable: Brain returned 503 on all 4 attempts",
+        "answerType": "unavailable",
+        "citedDocumentIds": [],
+        "retrievedDocumentIds": [],
+        "sectionHit": null,
+        "liveRecall": null,
+        "goldRetrievedUncited": [],
+        "vectorDegradedCount": 0
+      }
+    },
+    {
+      "layer": "live",
+      "questionId": "q117",
+      "detail": {
+        "questionId": "q117",
+        "category": "multi_hop_expanded",
+        "status": "fail",
+        "detail": "unavailable: Brain returned 503 on all 4 attempts",
+        "answerType": "unavailable",
+        "citedDocumentIds": [],
+        "retrievedDocumentIds": [],
+        "sectionHit": null,
+        "liveRecall": 0,
+        "goldRetrievedUncited": [],
+        "vectorDegradedCount": 0
+      }
+    }
+  ]
+}
+exit 0

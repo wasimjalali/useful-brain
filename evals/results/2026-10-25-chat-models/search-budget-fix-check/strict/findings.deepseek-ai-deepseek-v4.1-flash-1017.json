@@ -1,0 +1,196 @@
+{
+  "model": "@cf/deepseek-ai/deepseek-v4.1-flash-1017",
+  "questionsFile": "../../../../../../../../private/tmp/claude-501/-Users-wasimjalali-Desktop-Personal-Project-useful-brain/74cb950c-c7be-42ec-81ad-8e7f661742cb/scratchpad/budget-fix-check.json",
+  "harnessGitSha": "5c61beae9773fceaaa76612ece77e380d797f4e7",
+  "harnessDirty": false,
+  "pipelineVersion": "grounded-answer.v14|real-stack|300/30|0.70/0.30|kw6|kr3|cb0.05|rr20|@cf/baai/bge-reranker-base|floor0.05|top8|fts-stopword-or-v1",
+  "latency": {
+    "count": 14,
+    "total": 19,
+    "partial": true,
+    "meanMs": 13964,
+    "p50Ms": 12573,
+    "p95Ms": 39422
+  },
+  "retrieval": {
+    "recallAtK": 0.75,
+    "mrr": 0.9166666666666666,
+    "ndcgAtK": 0.7688578654609097,
+    "citationCorrectness": 0.16666666666666666,
+    "abstentionCorrectness": 0,
+    "aclLeakCount": 0,
+    "questions": 19
+  },
+  "live": {
+    "total": 19,
+    "scored": 19,
+    "passed": 12,
+    "failed": 7,
+    "skipped": 0,
+    "passRate": 0.631578947368421,
+    "byCategory": {
+      "factual": {
+        "scored": 1,
+        "passed": 0
+      },
+      "permission": {
+        "scored": 13,
+        "passed": 8
+      },
+      "multi_hop_expanded": {
+        "scored": 5,
+        "passed": 4
+      }
+    },
+    "retrievedRecall": 1,
+    "goldRetrievedUncitedCount": 2,
+    "citedNotExpectedCount": 1,
+    "vectorDegradedTurns": 0,
+    "hybridBaselineComparable": true,
+    "refusedWithEvidence": 6
+  },
+  "failures": [
+    {
+      "layer": "live",
+      "questionId": "q028",
+      "detail": {
+        "questionId": "q028",
+        "category": "factual",
+        "answerType": "grounded",
+        "citedDocumentIds": [
+          "nw_support_dsar_process"
+        ],
+        "retrievedDocumentIds": [
+          "nw_finance_refund_policy",
+          "nw_legal_privacy_policy",
+          "nw_hr_employee_handbook",
+          "nw_legal_data_retention",
+          "nw_support_sla_policy",
+          "nw_support_complaint_escalation",
+          "nw_support_dsar_process"
+        ],
+        "sectionHit": false,
+        "liveRecall": 1,
+        "goldRetrievedUncited": [
+          "nw_legal_privacy_policy"
+        ],
+        "vectorDegradedCount": 0,
+        "status": "fail",
+        "detail": "Grounded answer did not cite expected documents (nw_legal_privacy_policy). Cited: nw_support_dsar_process."
+      }
+    },
+    {
+      "layer": "live",
+      "questionId": "q069",
+      "detail": {
+        "questionId": "q069",
+        "category": "permission",
+        "status": "fail",
+        "detail": "unavailable: Brain returned 503 on all 4 attempts",
+        "answerType": "unavailable",
+        "citedDocumentIds": [],
+        "retrievedDocumentIds": [],
+        "sectionHit": null,
+        "liveRecall": null,
+        "goldRetrievedUncited": [],
+        "vectorDegradedCount": 0
+      }
+    },
+    {
+      "layer": "live",
+      "questionId": "q070",
+      "detail": {
+        "questionId": "q070",
+        "category": "permission",
+        "status": "fail",
+        "detail": "unavailable: Brain returned 503 on all 4 attempts",
+        "answerType": "unavailable",
+        "citedDocumentIds": [],
+        "retrievedDocumentIds": [],
+        "sectionHit": null,
+        "liveRecall": null,
+        "goldRetrievedUncited": [],
+        "vectorDegradedCount": 0
+      }
+    },
+    {
+      "layer": "live",
+      "questionId": "q072",
+      "detail": {
+        "questionId": "q072",
+        "category": "permission",
+        "status": "fail",
+        "detail": "unavailable: Brain returned 503 on all 4 attempts",
+        "answerType": "unavailable",
+        "citedDocumentIds": [],
+        "retrievedDocumentIds": [],
+        "sectionHit": null,
+        "liveRecall": null,
+        "goldRetrievedUncited": [],
+        "vectorDegradedCount": 0
+      }
+    },
+    {
+      "layer": "live",
+      "questionId": "q073",
+      "detail": {
+        "questionId": "q073",
+        "category": "permission",
+        "status": "fail",
+        "detail": "unavailable: Brain returned 503 on all 4 attempts",
+        "answerType": "unavailable",
+        "citedDocumentIds": [],
+        "retrievedDocumentIds": [],
+        "sectionHit": null,
+        "liveRecall": null,
+        "goldRetrievedUncited": [],
+        "vectorDegradedCount": 0
+      }
+    },
+    {
+      "layer": "live",
+      "questionId": "q075",
+      "detail": {
+        "questionId": "q075",
+        "category": "permission",
+        "status": "fail",
+        "detail": "unavailable: Brain returned 503 on all 4 attempts",
+        "answerType": "unavailable",
+        "citedDocumentIds": [],
+        "retrievedDocumentIds": [],
+        "sectionHit": null,
+        "liveRecall": null,
+        "goldRetrievedUncited": [],
+        "vectorDegradedCount": 0
+      }
+    },
+    {
+      "layer": "live",
+      "questionId": "q117",
+      "detail": {
+        "questionId": "q117",
+        "category": "multi_hop_expanded",
+        "answerType": "insufficient_evidence",
+        "citedDocumentIds": [],
+        "retrievedDocumentIds": [
+          "nw_hr_employee_handbook",
+          "nw_hr_remote_work",
+          "nw_hr_leave_policy",
+          "nw_operations_equipment_return",
+          "nw_hr_onboarding_guide",
+          "nw_legal_ip_confidentiality"
+        ],
+        "sectionHit": false,
+        "liveRecall": 1,
+        "goldRetrievedUncited": [
+          "nw_hr_remote_work",
+          "nw_operations_equipment_return"
+        ],
+        "vectorDegradedCount": 0,
+        "refusalReason": "model_abstained_with_evidence",
+        "status": "fail",
+        "detail": "Expected a grounded answer, got \"insufficient_evidence\"."
+      }
+    }
+  ]
+}
