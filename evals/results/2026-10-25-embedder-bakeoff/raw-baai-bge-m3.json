@@ -1,0 +1,3019 @@
+{
+  "summary": {
+    "model": "@cf/baai/bge-m3",
+    "scoredQuestions": 97,
+    "recallAt3": 0.9896907216494846,
+    "recallAt8": 0.9948453608247423,
+    "mrr": 0.9570446735395188,
+    "ndcgAt10": 0.9616694701200268,
+    "byCategory": {
+      "factual": {
+        "n": 70,
+        "recallAt3": 1,
+        "mrr": 0.9476190476190476
+      },
+      "trap": {
+        "n": 17,
+        "recallAt3": 1,
+        "mrr": 1
+      },
+      "multi_hop": {
+        "n": 5,
+        "recallAt3": 0.9,
+        "mrr": 1
+      },
+      "multi_hop_expanded": {
+        "n": 5,
+        "recallAt3": 0.9,
+        "mrr": 0.9
+      }
+    },
+    "leakedDocuments": 0,
+    "queryLatencyMs": {
+      "p50": 105,
+      "p95": 133
+    },
+    "indexMs": 14708,
+    "chunks": 808
+  },
+  "rows": [
+    {
+      "questionId": "q001",
+      "category": "factual",
+      "expected": [
+        "nw_hr_employee_handbook"
+      ],
+      "top10": [
+        "nw_operations_office_facilities",
+        "nw_hr_employee_handbook",
+        "nw_hr_remote_work",
+        "nw_legal_privacy_policy",
+        "nw_legal_ip_confidentiality",
+        "nw_hr_onboarding_guide",
+        "nw_finance_tax_withholding",
+        "nw_hr_recruiting_interview",
+        "nw_sales_referral_program",
+        "nw_engineering_change_management"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 0.5,
+      "ndcgAt10": 0.6309297535714575,
+      "queryMs": 123
+    },
+    {
+      "questionId": "q002",
+      "category": "factual",
+      "expected": [
+        "nw_hr_leave_policy",
+        "nw_hr_employee_handbook"
+      ],
+      "top10": [
+        "nw_finance_tax_withholding",
+        "nw_hr_leave_policy",
+        "nw_hr_employee_handbook",
+        "nw_hr_parental_leave",
+        "nw_hr_remote_work",
+        "nw_finance_travel_expense",
+        "nw_support_channels_hours",
+        "nw_sales_referral_program",
+        "nw_engineering_on_call",
+        "nw_hr_onboarding_guide"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 0.5,
+      "ndcgAt10": 0.6309297535714575,
+      "queryMs": 132
+    },
+    {
+      "questionId": "q003",
+      "category": "factual",
+      "expected": [
+        "nw_hr_leave_policy",
+        "nw_hr_employee_handbook"
+      ],
+      "top10": [
+        "nw_hr_leave_policy",
+        "nw_hr_parental_leave",
+        "nw_hr_employee_handbook",
+        "nw_finance_employee_expense",
+        "nw_hr_remote_work",
+        "nw_sales_referral_program",
+        "nw_finance_travel_expense",
+        "nw_support_channels_hours",
+        "nw_operations_equipment_return",
+        "nw_hr_onboarding_guide"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 128
+    },
+    {
+      "questionId": "q004",
+      "category": "factual",
+      "expected": [
+        "nw_hr_leave_policy"
+      ],
+      "top10": [
+        "nw_hr_leave_policy",
+        "nw_hr_employee_handbook",
+        "nw_hr_parental_leave",
+        "nw_finance_employee_expense",
+        "nw_hr_remote_work",
+        "nw_finance_tax_withholding",
+        "nw_sales_referral_program",
+        "nw_hr_onboarding_guide",
+        "nw_finance_invoicing_payment",
+        "nw_support_channels_hours"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 133
+    },
+    {
+      "questionId": "q005",
+      "category": "factual",
+      "expected": [
+        "nw_hr_parental_leave"
+      ],
+      "top10": [
+        "nw_hr_parental_leave",
+        "nw_hr_leave_policy",
+        "nw_hr_remote_work",
+        "nw_hr_employee_handbook",
+        "nw_hr_onboarding_guide",
+        "nw_operations_office_facilities",
+        "nw_finance_travel_expense",
+        "nw_hr_anti_harassment",
+        "nw_finance_employee_expense",
+        "nw_operations_equipment_return"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 110
+    },
+    {
+      "questionId": "q006",
+      "category": "factual",
+      "expected": [
+        "nw_hr_parental_leave",
+        "nw_hr_employee_handbook"
+      ],
+      "top10": [
+        "nw_hr_parental_leave",
+        "nw_hr_leave_policy",
+        "nw_hr_employee_handbook",
+        "nw_hr_remote_work",
+        "nw_finance_tax_withholding",
+        "nw_hr_training_budget",
+        "nw_operations_office_facilities",
+        "nw_finance_travel_expense",
+        "nw_engineering_release_notes_2026",
+        "nw_hr_onboarding_guide"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 101
+    },
+    {
+      "questionId": "q007",
+      "category": "factual",
+      "expected": [
+        "nw_hr_remote_work"
+      ],
+      "top10": [
+        "nw_hr_remote_work",
+        "nw_hr_employee_handbook",
+        "nw_hr_parental_leave",
+        "nw_hr_leave_policy",
+        "nw_engineering_on_call",
+        "nw_operations_business_continuity",
+        "nw_engineering_change_management",
+        "nw_engineering_sdlc",
+        "nw_operations_office_facilities",
+        "nw_hr_onboarding_guide"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 112
+    },
+    {
+      "questionId": "q008",
+      "category": "factual",
+      "expected": [
+        "nw_hr_anti_harassment"
+      ],
+      "top10": [
+        "nw_hr_anti_harassment",
+        "nw_hr_employee_handbook",
+        "nw_support_channels_hours",
+        "nw_support_dsar_process",
+        "nw_hr_onboarding_guide",
+        "nw_support_atlas_runbook",
+        "nw_engineering_incident_escalation",
+        "nw_support_complaint_escalation",
+        "nw_legal_ip_confidentiality",
+        "nw_operations_office_facilities"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 99
+    },
+    {
+      "questionId": "q009",
+      "category": "factual",
+      "expected": [
+        "nw_hr_termination_offboarding"
+      ],
+      "top10": [
+        "nw_hr_termination_offboarding",
+        "nw_hr_onboarding_guide",
+        "nw_finance_employee_expense",
+        "nw_hr_remote_work",
+        "nw_hr_leave_policy",
+        "nw_sales_referral_program",
+        "nw_hr_parental_leave",
+        "nw_operations_equipment_return",
+        "nw_finance_tax_withholding",
+        "nw_hr_employee_handbook"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 120
+    },
+    {
+      "questionId": "q010",
+      "category": "factual",
+      "expected": [
+        "nw_hr_termination_offboarding"
+      ],
+      "top10": [
+        "nw_hr_termination_offboarding",
+        "nw_legal_ip_confidentiality",
+        "nw_legal_data_retention",
+        "nw_hr_leave_policy",
+        "nw_hr_training_budget",
+        "nw_legal_privacy_policy",
+        "nw_hr_onboarding_guide",
+        "nw_hr_parental_leave",
+        "nw_hr_performance_review",
+        "nw_finance_travel_expense"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 115
+    },
+    {
+      "questionId": "q011",
+      "category": "factual",
+      "expected": [
+        "nw_hr_recruiting_interview"
+      ],
+      "top10": [
+        "nw_hr_recruiting_interview",
+        "nw_sales_referral_program",
+        "nw_hr_onboarding_guide",
+        "nw_hr_salary_bands",
+        "nw_hr_training_budget",
+        "nw_finance_travel_expense",
+        "nw_support_sla_policy",
+        "nw_hr_employee_handbook",
+        "nw_engineering_on_call",
+        "nw_finance_employee_expense"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 121
+    },
+    {
+      "questionId": "q012",
+      "category": "factual",
+      "expected": [
+        "nw_hr_training_budget"
+      ],
+      "top10": [
+        "nw_hr_training_budget",
+        "nw_hr_recruiting_interview",
+        "nw_sales_referral_program",
+        "nw_finance_employee_expense",
+        "nw_hr_parental_leave",
+        "nw_hr_leave_policy",
+        "nw_engineering_on_call",
+        "nw_hr_salary_bands",
+        "nw_finance_tax_withholding",
+        "nw_finance_travel_expense"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 107
+    },
+    {
+      "questionId": "q013",
+      "category": "factual",
+      "expected": [
+        "nw_finance_budget_planning"
+      ],
+      "top10": [
+        "nw_finance_budget_planning",
+        "nw_finance_employee_expense",
+        "nw_legal_compliance_calendar",
+        "nw_legal_data_retention",
+        "nw_engineering_on_call",
+        "nw_finance_procurement_forms",
+        "nw_hr_onboarding_guide",
+        "nw_operations_procurement",
+        "nw_hr_employee_handbook",
+        "nw_hr_leave_policy"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 124
+    },
+    {
+      "questionId": "q014",
+      "category": "factual",
+      "expected": [
+        "nw_finance_travel_expense",
+        "nw_hr_employee_handbook"
+      ],
+      "top10": [
+        "nw_finance_travel_expense",
+        "nw_hr_employee_handbook",
+        "nw_finance_employee_expense",
+        "nw_engineering_release_notes_2026",
+        "nw_finance_tax_withholding",
+        "nw_support_channels_hours",
+        "nw_hr_leave_policy",
+        "nw_support_sla_policy",
+        "nw_legal_privacy_policy",
+        "nw_hr_recruiting_interview"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 125
+    },
+    {
+      "questionId": "q015",
+      "category": "factual",
+      "expected": [
+        "nw_finance_travel_expense",
+        "nw_hr_employee_handbook"
+      ],
+      "top10": [
+        "nw_finance_travel_expense",
+        "nw_finance_employee_expense",
+        "nw_hr_employee_handbook",
+        "nw_sales_referral_program",
+        "nw_hr_recruiting_interview",
+        "nw_hr_parental_leave",
+        "nw_finance_tax_withholding",
+        "nw_engineering_on_call",
+        "nw_hr_remote_work",
+        "nw_hr_leave_policy"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 111
+    },
+    {
+      "questionId": "q016",
+      "category": "factual",
+      "expected": [
+        "nw_finance_employee_expense",
+        "nw_hr_employee_handbook"
+      ],
+      "top10": [
+        "nw_finance_employee_expense",
+        "nw_finance_travel_expense",
+        "nw_hr_employee_handbook",
+        "nw_operations_equipment_return",
+        "nw_finance_invoicing_payment",
+        "nw_sales_referral_program",
+        "nw_engineering_error_code_reference",
+        "nw_finance_tax_withholding",
+        "nw_legal_data_retention",
+        "nw_support_sla_policy"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 100
+    },
+    {
+      "questionId": "q017",
+      "category": "factual",
+      "expected": [
+        "nw_finance_employee_expense",
+        "nw_hr_employee_handbook"
+      ],
+      "top10": [
+        "nw_finance_employee_expense",
+        "nw_finance_travel_expense",
+        "nw_finance_invoicing_payment",
+        "nw_legal_data_retention",
+        "nw_hr_employee_handbook",
+        "nw_sales_referral_program",
+        "nw_finance_refund_policy",
+        "nw_operations_equipment_return",
+        "nw_hr_onboarding_guide",
+        "nw_operations_office_facilities"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 115
+    },
+    {
+      "questionId": "q018",
+      "category": "factual",
+      "expected": [
+        "nw_finance_contractor_expense",
+        "nw_hr_employee_handbook"
+      ],
+      "top10": [
+        "nw_finance_contractor_expense",
+        "nw_finance_employee_expense",
+        "nw_finance_travel_expense",
+        "nw_finance_tax_withholding",
+        "nw_operations_procurement",
+        "nw_hr_employee_handbook",
+        "nw_finance_procurement_forms",
+        "nw_sales_referral_program",
+        "nw_engineering_on_call",
+        "nw_legal_data_retention"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 138
+    },
+    {
+      "questionId": "q019",
+      "category": "factual",
+      "expected": [
+        "nw_finance_refund_policy"
+      ],
+      "top10": [
+        "nw_finance_refund_policy",
+        "nw_hr_employee_handbook",
+        "nw_sales_referral_program",
+        "nw_support_complaint_escalation",
+        "nw_support_customer_onboarding",
+        "nw_finance_invoicing_payment",
+        "nw_support_dsar_process",
+        "nw_finance_employee_expense",
+        "nw_finance_tax_withholding",
+        "nw_hr_leave_policy"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 125
+    },
+    {
+      "questionId": "q020",
+      "category": "factual",
+      "expected": [
+        "nw_finance_refund_policy"
+      ],
+      "top10": [
+        "nw_finance_refund_policy",
+        "nw_operations_procurement",
+        "nw_finance_procurement_forms",
+        "nw_sales_discount_approval",
+        "nw_sales_proposal_quote",
+        "nw_operations_equipment_return",
+        "nw_finance_corporate_card",
+        "nw_finance_employee_expense",
+        "nw_finance_travel_expense",
+        "nw_finance_invoicing_payment"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 88
+    },
+    {
+      "questionId": "q021",
+      "category": "factual",
+      "expected": [
+        "nw_finance_invoicing_payment"
+      ],
+      "top10": [
+        "nw_finance_invoicing_payment",
+        "nw_finance_tax_withholding",
+        "nw_finance_employee_expense",
+        "nw_finance_travel_expense",
+        "nw_support_customer_onboarding",
+        "nw_hr_leave_policy",
+        "nw_legal_ip_confidentiality",
+        "nw_sales_referral_program",
+        "nw_hr_onboarding_guide",
+        "nw_finance_refund_policy"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 93
+    },
+    {
+      "questionId": "q022",
+      "category": "factual",
+      "expected": [
+        "nw_finance_invoicing_payment"
+      ],
+      "top10": [
+        "nw_finance_invoicing_payment",
+        "nw_engineering_error_code_reference",
+        "nw_support_customer_onboarding",
+        "nw_sales_referral_program",
+        "nw_finance_refund_policy",
+        "nw_legal_data_retention",
+        "nw_support_ticket_priority",
+        "nw_operations_equipment_return",
+        "nw_support_sla_policy",
+        "nw_legal_privacy_policy"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 126
+    },
+    {
+      "questionId": "q023",
+      "category": "factual",
+      "expected": [
+        "nw_finance_corporate_card"
+      ],
+      "top10": [
+        "nw_finance_corporate_card",
+        "nw_finance_employee_expense",
+        "nw_engineering_release_notes_2026",
+        "nw_support_sla_policy",
+        "nw_hr_recruiting_interview",
+        "nw_hr_employee_handbook",
+        "nw_sales_referral_program",
+        "nw_sales_commission_plan",
+        "nw_finance_travel_expense",
+        "nw_hr_performance_review"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 129
+    },
+    {
+      "questionId": "q024",
+      "category": "factual",
+      "expected": [
+        "nw_legal_data_retention"
+      ],
+      "top10": [
+        "nw_legal_contract_review",
+        "nw_legal_data_retention",
+        "nw_legal_nda_policy",
+        "nw_legal_ip_confidentiality",
+        "nw_legal_dpa_handbook",
+        "nw_hr_onboarding_guide",
+        "nw_engineering_release_notes_2026",
+        "nw_hr_leave_policy",
+        "nw_legal_dispute_resolution",
+        "nw_legal_privacy_policy"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 0.5,
+      "ndcgAt10": 0.6309297535714575,
+      "queryMs": 118
+    },
+    {
+      "questionId": "q025",
+      "category": "factual",
+      "expected": [
+        "nw_legal_data_retention"
+      ],
+      "top10": [
+        "nw_legal_data_retention",
+        "nw_hr_training_budget",
+        "nw_operations_equipment_return",
+        "nw_hr_onboarding_guide",
+        "nw_engineering_change_management",
+        "nw_hr_anti_harassment",
+        "nw_finance_tax_withholding",
+        "nw_legal_ip_confidentiality",
+        "nw_operations_office_facilities",
+        "nw_hr_leave_policy"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 87
+    },
+    {
+      "questionId": "q026",
+      "category": "factual",
+      "expected": [
+        "nw_legal_contract_review"
+      ],
+      "top10": [
+        "nw_legal_contract_review",
+        "nw_sales_deal_desk",
+        "nw_legal_nda_policy",
+        "nw_sales_proposal_quote",
+        "nw_legal_dispute_resolution",
+        "nw_sales_discount_approval",
+        "nw_hr_recruiting_interview",
+        "nw_sales_referral_program",
+        "nw_engineering_release_notes_2026",
+        "nw_sales_partner_program"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 83
+    },
+    {
+      "questionId": "q027",
+      "category": "factual",
+      "expected": [
+        "nw_legal_ip_confidentiality"
+      ],
+      "top10": [
+        "nw_legal_ip_confidentiality",
+        "nw_hr_onboarding_guide",
+        "nw_engineering_release_notes_2026",
+        "nw_operations_office_facilities",
+        "nw_hr_recruiting_interview",
+        "nw_finance_travel_expense",
+        "nw_hr_remote_work",
+        "nw_hr_employee_handbook",
+        "nw_engineering_api_standards",
+        "nw_engineering_error_code_reference"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 122
+    },
+    {
+      "questionId": "q028",
+      "category": "factual",
+      "expected": [
+        "nw_legal_privacy_policy"
+      ],
+      "top10": [
+        "nw_support_dsar_process",
+        "nw_support_channels_hours",
+        "nw_legal_privacy_policy",
+        "nw_legal_data_retention",
+        "nw_hr_employee_handbook",
+        "nw_engineering_incident_escalation",
+        "nw_support_atlas_runbook",
+        "nw_support_sla_policy",
+        "nw_finance_refund_policy",
+        "nw_engineering_release_notes_2026"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 0.3333333333333333,
+      "ndcgAt10": 0.5,
+      "queryMs": 105
+    },
+    {
+      "questionId": "q029",
+      "category": "factual",
+      "expected": [
+        "nw_legal_nda_policy"
+      ],
+      "top10": [
+        "nw_legal_nda_policy",
+        "nw_legal_contract_review",
+        "nw_sales_deal_desk",
+        "nw_legal_dpa_handbook",
+        "nw_hr_employee_handbook",
+        "nw_legal_ip_confidentiality",
+        "nw_hr_onboarding_guide",
+        "nw_hr_recruiting_interview",
+        "nw_legal_dispute_resolution",
+        "nw_legal_privacy_policy"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 120
+    },
+    {
+      "questionId": "q030",
+      "category": "factual",
+      "expected": [
+        "nw_legal_compliance_calendar"
+      ],
+      "top10": [
+        "nw_legal_compliance_calendar",
+        "nw_finance_employee_expense",
+        "nw_finance_budget_planning",
+        "nw_finance_tax_withholding",
+        "nw_operations_office_facilities",
+        "nw_sales_referral_program",
+        "nw_finance_invoicing_payment",
+        "nw_legal_data_retention",
+        "nw_hr_leave_policy",
+        "nw_hr_employee_handbook"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 114
+    },
+    {
+      "questionId": "q031",
+      "category": "factual",
+      "expected": [
+        "nw_support_complaint_escalation"
+      ],
+      "top10": [
+        "nw_support_complaint_escalation",
+        "nw_finance_employee_expense",
+        "nw_finance_refund_policy",
+        "nw_engineering_error_code_reference",
+        "nw_support_sla_policy",
+        "nw_sales_referral_program",
+        "nw_hr_onboarding_guide",
+        "nw_support_ticket_priority",
+        "nw_support_agent_scorecard",
+        "nw_finance_travel_expense"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 102
+    },
+    {
+      "questionId": "q032",
+      "category": "factual",
+      "expected": [
+        "nw_support_sla_policy"
+      ],
+      "top10": [
+        "nw_support_sla_policy",
+        "nw_support_ticket_priority",
+        "nw_hr_onboarding_guide",
+        "nw_support_atlas_runbook",
+        "nw_support_channels_hours",
+        "nw_support_complaint_escalation",
+        "nw_engineering_release_notes_2026",
+        "nw_engineering_api_standards",
+        "nw_engineering_incident_escalation",
+        "nw_engineering_on_call"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 114
+    },
+    {
+      "questionId": "q033",
+      "category": "factual",
+      "expected": [
+        "nw_support_ticket_priority"
+      ],
+      "top10": [
+        "nw_support_sla_policy",
+        "nw_support_ticket_priority",
+        "nw_support_atlas_runbook",
+        "nw_support_complaint_escalation",
+        "nw_hr_onboarding_guide",
+        "nw_engineering_incident_escalation",
+        "nw_support_channels_hours",
+        "nw_engineering_api_standards",
+        "nw_engineering_release_notes_2026",
+        "nw_support_customer_onboarding"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 0.5,
+      "ndcgAt10": 0.6309297535714575,
+      "queryMs": 132
+    },
+    {
+      "questionId": "q034",
+      "category": "factual",
+      "expected": [
+        "nw_support_channels_hours"
+      ],
+      "top10": [
+        "nw_support_channels_hours",
+        "nw_engineering_release_notes_2026",
+        "nw_hr_remote_work",
+        "nw_engineering_on_call",
+        "nw_support_atlas_runbook",
+        "nw_hr_employee_handbook",
+        "nw_support_sla_policy",
+        "nw_support_customer_onboarding",
+        "nw_operations_office_facilities",
+        "nw_engineering_change_management"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 92
+    },
+    {
+      "questionId": "q035",
+      "category": "factual",
+      "expected": [
+        "nw_support_dsar_process"
+      ],
+      "top10": [
+        "nw_support_dsar_process",
+        "nw_legal_privacy_policy",
+        "nw_hr_onboarding_guide",
+        "nw_support_channels_hours",
+        "nw_engineering_release_notes_2026",
+        "nw_legal_data_retention",
+        "nw_finance_refund_policy",
+        "nw_support_complaint_escalation",
+        "nw_hr_leave_policy",
+        "nw_hr_employee_handbook"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 114
+    },
+    {
+      "questionId": "q036",
+      "category": "factual",
+      "expected": [
+        "nw_support_customer_onboarding"
+      ],
+      "top10": [
+        "nw_support_customer_onboarding",
+        "nw_hr_onboarding_guide",
+        "nw_support_channels_hours",
+        "nw_support_atlas_runbook",
+        "nw_hr_employee_handbook",
+        "nw_sales_referral_program",
+        "nw_engineering_change_management",
+        "nw_engineering_on_call",
+        "nw_engineering_release_notes_2026",
+        "nw_legal_data_retention"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 126
+    },
+    {
+      "questionId": "q037",
+      "category": "factual",
+      "expected": [
+        "nw_engineering_incident_escalation"
+      ],
+      "top10": [
+        "nw_engineering_incident_escalation",
+        "nw_engineering_sdlc",
+        "nw_engineering_release_notes_2026",
+        "nw_engineering_on_call",
+        "nw_support_atlas_runbook",
+        "nw_support_channels_hours",
+        "nw_engineering_atlas_catalog",
+        "nw_support_ticket_priority",
+        "nw_engineering_error_code_reference",
+        "nw_support_sla_policy"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 84
+    },
+    {
+      "questionId": "q038",
+      "category": "factual",
+      "expected": [
+        "nw_engineering_log_retention"
+      ],
+      "top10": [
+        "nw_engineering_log_retention",
+        "nw_legal_data_retention",
+        "nw_engineering_release_notes_2026",
+        "nw_operations_equipment_return",
+        "nw_support_meridian_admin",
+        "nw_engineering_change_management",
+        "nw_operations_scheduled_maintenance",
+        "nw_support_kb_guidelines",
+        "nw_operations_dr_runbook",
+        "nw_engineering_incident_escalation"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 84
+    },
+    {
+      "questionId": "q039",
+      "category": "factual",
+      "expected": [
+        "nw_engineering_deployment"
+      ],
+      "top10": [
+        "nw_engineering_release_notes_2026",
+        "nw_engineering_deployment",
+        "nw_hr_employee_handbook",
+        "nw_engineering_change_management",
+        "nw_operations_dr_runbook",
+        "nw_hr_leave_policy",
+        "nw_hr_parental_leave",
+        "nw_engineering_on_call",
+        "nw_engineering_error_code_reference",
+        "nw_legal_privacy_policy"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 0.5,
+      "ndcgAt10": 0.6309297535714575,
+      "queryMs": 90
+    },
+    {
+      "questionId": "q040",
+      "category": "factual",
+      "expected": [
+        "nw_engineering_change_management"
+      ],
+      "top10": [
+        "nw_engineering_change_management",
+        "nw_engineering_sdlc",
+        "nw_engineering_release_notes_2026",
+        "nw_operations_scheduled_maintenance",
+        "nw_hr_employee_handbook",
+        "nw_hr_remote_work",
+        "nw_engineering_on_call",
+        "nw_engineering_error_code_reference",
+        "nw_support_atlas_runbook",
+        "nw_hr_onboarding_guide"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 99
+    },
+    {
+      "questionId": "q041",
+      "category": "factual",
+      "expected": [
+        "nw_engineering_on_call"
+      ],
+      "top10": [
+        "nw_engineering_on_call",
+        "nw_support_atlas_runbook",
+        "nw_hr_onboarding_guide",
+        "nw_support_channels_hours",
+        "nw_hr_leave_policy",
+        "nw_hr_parental_leave",
+        "nw_hr_employee_handbook",
+        "nw_engineering_incident_escalation",
+        "nw_support_ticket_priority",
+        "nw_finance_tax_withholding"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 105
+    },
+    {
+      "questionId": "q042",
+      "category": "factual",
+      "expected": [
+        "nw_engineering_api_standards"
+      ],
+      "top10": [
+        "nw_support_atlas_runbook",
+        "nw_engineering_api_standards",
+        "nw_engineering_release_notes_2026",
+        "nw_engineering_error_code_reference",
+        "nw_engineering_atlas_catalog",
+        "nw_support_meridian_admin",
+        "nw_engineering_sdlc",
+        "nw_engineering_on_call",
+        "nw_support_ticket_priority",
+        "nw_engineering_change_management"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 0.5,
+      "ndcgAt10": 0.6309297535714575,
+      "queryMs": 110
+    },
+    {
+      "questionId": "q043",
+      "category": "factual",
+      "expected": [
+        "nw_engineering_sdlc"
+      ],
+      "top10": [
+        "nw_engineering_sdlc",
+        "nw_engineering_release_notes_2026",
+        "nw_engineering_change_management",
+        "nw_hr_onboarding_guide",
+        "nw_operations_scheduled_maintenance",
+        "nw_engineering_error_code_reference",
+        "nw_operations_dr_runbook",
+        "nw_support_atlas_runbook",
+        "nw_operations_business_continuity",
+        "nw_engineering_incident_escalation"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 109
+    },
+    {
+      "questionId": "q044",
+      "category": "factual",
+      "expected": [
+        "nw_engineering_security_vulnerability"
+      ],
+      "top10": [
+        "nw_engineering_security_vulnerability",
+        "nw_engineering_release_notes_2026",
+        "nw_engineering_deployment",
+        "nw_engineering_atlas_catalog",
+        "nw_operations_scheduled_maintenance",
+        "nw_support_atlas_runbook",
+        "nw_engineering_error_code_reference",
+        "nw_operations_dr_runbook",
+        "nw_engineering_incident_escalation",
+        "nw_engineering_sdlc"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 113
+    },
+    {
+      "questionId": "q045",
+      "category": "factual",
+      "expected": [
+        "nw_sales_discount_approval"
+      ],
+      "top10": [
+        "nw_sales_discount_approval",
+        "nw_legal_contract_review",
+        "nw_sales_proposal_quote",
+        "nw_sales_deal_desk",
+        "nw_sales_commission_plan",
+        "nw_sales_partner_program",
+        "nw_finance_refund_policy",
+        "nw_legal_dispute_resolution",
+        "nw_hr_recruiting_interview",
+        "nw_finance_invoicing_payment"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 93
+    },
+    {
+      "questionId": "q046",
+      "category": "factual",
+      "expected": [
+        "nw_sales_partner_program"
+      ],
+      "top10": [
+        "nw_sales_partner_program",
+        "nw_sales_referral_program",
+        "nw_sales_deal_desk",
+        "nw_sales_commission_plan",
+        "nw_sales_proposal_quote",
+        "nw_hr_recruiting_interview",
+        "nw_sales_discount_approval",
+        "nw_finance_invoicing_payment",
+        "nw_legal_contract_review",
+        "nw_hr_onboarding_guide"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 129
+    },
+    {
+      "questionId": "q047",
+      "category": "factual",
+      "expected": [
+        "nw_sales_proposal_quote"
+      ],
+      "top10": [
+        "nw_sales_proposal_quote",
+        "nw_sales_deal_desk",
+        "nw_legal_data_retention",
+        "nw_sales_discount_approval",
+        "nw_legal_contract_review",
+        "nw_hr_onboarding_guide",
+        "nw_hr_recruiting_interview",
+        "nw_hr_employee_handbook",
+        "nw_legal_dispute_resolution",
+        "nw_sales_referral_program"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 96
+    },
+    {
+      "questionId": "q048",
+      "category": "factual",
+      "expected": [
+        "nw_operations_equipment_return"
+      ],
+      "top10": [
+        "nw_operations_equipment_return",
+        "nw_hr_employee_handbook",
+        "nw_operations_office_facilities",
+        "nw_hr_onboarding_guide",
+        "nw_hr_parental_leave",
+        "nw_hr_leave_policy",
+        "nw_hr_remote_work",
+        "nw_operations_business_continuity",
+        "nw_hr_recruiting_interview",
+        "nw_legal_data_retention"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 68
+    },
+    {
+      "questionId": "q049",
+      "category": "factual",
+      "expected": [
+        "nw_operations_scheduled_maintenance"
+      ],
+      "top10": [
+        "nw_operations_scheduled_maintenance",
+        "nw_support_channels_hours",
+        "nw_operations_dr_runbook",
+        "nw_engineering_release_notes_2026",
+        "nw_engineering_change_management",
+        "nw_hr_onboarding_guide",
+        "nw_hr_employee_handbook",
+        "nw_engineering_api_standards",
+        "nw_engineering_on_call",
+        "nw_engineering_incident_escalation"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 64
+    },
+    {
+      "questionId": "q050",
+      "category": "factual",
+      "expected": [
+        "nw_executive_board_calendar",
+        "nw_legal_compliance_calendar"
+      ],
+      "top10": [
+        "nw_executive_board_calendar",
+        "nw_legal_compliance_calendar",
+        "nw_executive_ma_approval",
+        "nw_sales_deal_desk",
+        "nw_finance_budget_planning",
+        "nw_finance_employee_expense",
+        "nw_hr_onboarding_guide",
+        "nw_finance_procurement_forms",
+        "nw_executive_severance",
+        "nw_operations_dr_runbook"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 96
+    },
+    {
+      "questionId": "q051",
+      "category": "trap",
+      "expected": [
+        "nw_finance_refund_policy"
+      ],
+      "top10": [
+        "nw_finance_refund_policy",
+        "nw_hr_employee_handbook",
+        "nw_support_customer_onboarding",
+        "nw_legal_data_retention",
+        "nw_support_dsar_process",
+        "nw_operations_equipment_return",
+        "nw_support_complaint_escalation",
+        "nw_sales_referral_program",
+        "nw_finance_invoicing_payment",
+        "nw_hr_onboarding_guide"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 94
+    },
+    {
+      "questionId": "q052",
+      "category": "trap",
+      "expected": [
+        "nw_finance_contractor_expense",
+        "nw_hr_employee_handbook"
+      ],
+      "top10": [
+        "nw_finance_contractor_expense",
+        "nw_finance_employee_expense",
+        "nw_finance_tax_withholding",
+        "nw_finance_procurement_forms",
+        "nw_finance_travel_expense",
+        "nw_hr_employee_handbook",
+        "nw_sales_referral_program",
+        "nw_engineering_on_call",
+        "nw_hr_onboarding_guide",
+        "nw_operations_procurement"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 101
+    },
+    {
+      "questionId": "q053",
+      "category": "trap",
+      "expected": [
+        "nw_finance_employee_expense",
+        "nw_hr_employee_handbook"
+      ],
+      "top10": [
+        "nw_finance_employee_expense",
+        "nw_finance_contractor_expense",
+        "nw_finance_travel_expense",
+        "nw_hr_onboarding_guide",
+        "nw_finance_procurement_forms",
+        "nw_sales_referral_program",
+        "nw_hr_employee_handbook",
+        "nw_finance_tax_withholding",
+        "nw_engineering_on_call",
+        "nw_hr_leave_policy"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 149
+    },
+    {
+      "questionId": "q054",
+      "category": "trap",
+      "expected": [
+        "nw_support_complaint_escalation"
+      ],
+      "top10": [
+        "nw_support_complaint_escalation",
+        "nw_support_channels_hours",
+        "nw_engineering_incident_escalation",
+        "nw_hr_onboarding_guide",
+        "nw_support_dsar_process",
+        "nw_hr_leave_policy",
+        "nw_support_atlas_runbook",
+        "nw_finance_refund_policy",
+        "nw_engineering_change_management",
+        "nw_hr_anti_harassment"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 186
+    },
+    {
+      "questionId": "q055",
+      "category": "trap",
+      "expected": [
+        "nw_engineering_incident_escalation"
+      ],
+      "top10": [
+        "nw_engineering_incident_escalation",
+        "nw_engineering_on_call",
+        "nw_support_channels_hours",
+        "nw_support_atlas_runbook",
+        "nw_engineering_error_code_reference",
+        "nw_engineering_release_notes_2026",
+        "nw_support_ticket_priority",
+        "nw_hr_employee_handbook",
+        "nw_engineering_atlas_catalog",
+        "nw_engineering_change_management"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 115
+    },
+    {
+      "questionId": "q056",
+      "category": "trap",
+      "expected": [
+        "nw_finance_travel_expense",
+        "nw_hr_employee_handbook"
+      ],
+      "top10": [
+        "nw_finance_travel_expense",
+        "nw_hr_employee_handbook",
+        "nw_finance_employee_expense",
+        "nw_finance_tax_withholding",
+        "nw_support_channels_hours",
+        "nw_operations_scheduled_maintenance",
+        "nw_hr_leave_policy",
+        "nw_hr_onboarding_guide",
+        "nw_hr_recruiting_interview",
+        "nw_engineering_on_call"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 104
+    },
+    {
+      "questionId": "q057",
+      "category": "trap",
+      "expected": [
+        "nw_hr_parental_leave",
+        "nw_hr_employee_handbook"
+      ],
+      "top10": [
+        "nw_hr_parental_leave",
+        "nw_hr_employee_handbook",
+        "nw_hr_leave_policy",
+        "nw_hr_remote_work",
+        "nw_sales_referral_program",
+        "nw_hr_onboarding_guide",
+        "nw_engineering_on_call",
+        "nw_finance_travel_expense",
+        "nw_operations_equipment_return",
+        "nw_finance_tax_withholding"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 113
+    },
+    {
+      "questionId": "q058",
+      "category": "trap",
+      "expected": [
+        "nw_hr_leave_policy",
+        "nw_hr_employee_handbook"
+      ],
+      "top10": [
+        "nw_hr_leave_policy",
+        "nw_hr_employee_handbook",
+        "nw_hr_remote_work",
+        "nw_finance_employee_expense",
+        "nw_hr_parental_leave",
+        "nw_sales_referral_program",
+        "nw_finance_travel_expense",
+        "nw_operations_equipment_return",
+        "nw_hr_onboarding_guide",
+        "nw_support_channels_hours"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 128
+    },
+    {
+      "questionId": "q059",
+      "category": "trap",
+      "expected": [
+        "nw_sales_partner_program"
+      ],
+      "top10": [
+        "nw_sales_partner_program",
+        "nw_finance_invoicing_payment",
+        "nw_sales_referral_program",
+        "nw_sales_commission_plan",
+        "nw_sales_proposal_quote",
+        "nw_sales_territory_assignment",
+        "nw_sales_deal_desk",
+        "nw_support_sla_policy",
+        "nw_hr_recruiting_interview",
+        "nw_sales_discount_approval"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 89
+    },
+    {
+      "questionId": "q060",
+      "category": "trap",
+      "expected": [
+        "nw_sales_referral_program"
+      ],
+      "top10": [
+        "nw_sales_referral_program",
+        "nw_hr_recruiting_interview",
+        "nw_hr_onboarding_guide",
+        "nw_sales_partner_program",
+        "nw_sales_proposal_quote",
+        "nw_sales_deal_desk",
+        "nw_sales_territory_assignment",
+        "nw_finance_employee_expense",
+        "nw_finance_travel_expense",
+        "nw_sales_discount_approval"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 120
+    },
+    {
+      "questionId": "q061",
+      "category": "trap",
+      "expected": [
+        "nw_engineering_log_retention"
+      ],
+      "top10": [
+        "nw_engineering_log_retention",
+        "nw_legal_data_retention",
+        "nw_engineering_release_notes_2026",
+        "nw_support_meridian_admin",
+        "nw_engineering_incident_escalation",
+        "nw_operations_office_facilities",
+        "nw_operations_equipment_return",
+        "nw_operations_scheduled_maintenance",
+        "nw_engineering_change_management",
+        "nw_legal_ip_confidentiality"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 82
+    },
+    {
+      "questionId": "q062",
+      "category": "trap",
+      "expected": [
+        "nw_operations_scheduled_maintenance"
+      ],
+      "top10": [
+        "nw_operations_scheduled_maintenance",
+        "nw_engineering_release_notes_2026",
+        "nw_engineering_change_management",
+        "nw_operations_dr_runbook",
+        "nw_hr_employee_handbook",
+        "nw_legal_data_retention",
+        "nw_operations_business_continuity",
+        "nw_hr_remote_work",
+        "nw_engineering_api_standards",
+        "nw_hr_leave_policy"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 108
+    },
+    {
+      "questionId": "q063",
+      "category": "trap",
+      "expected": [
+        "nw_support_sla_policy"
+      ],
+      "top10": [
+        "nw_support_sla_policy",
+        "nw_support_ticket_priority",
+        "nw_support_atlas_runbook",
+        "nw_hr_onboarding_guide",
+        "nw_engineering_api_standards",
+        "nw_engineering_release_notes_2026",
+        "nw_support_channels_hours",
+        "nw_support_complaint_escalation",
+        "nw_hr_employee_handbook",
+        "nw_engineering_incident_escalation"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 100
+    },
+    {
+      "questionId": "q064",
+      "category": "trap",
+      "expected": [
+        "nw_sales_discount_approval"
+      ],
+      "top10": [
+        "nw_sales_discount_approval",
+        "nw_legal_contract_review",
+        "nw_sales_proposal_quote",
+        "nw_sales_deal_desk",
+        "nw_sales_commission_plan",
+        "nw_sales_partner_program",
+        "nw_finance_invoicing_payment",
+        "nw_legal_nda_policy",
+        "nw_hr_recruiting_interview",
+        "nw_finance_refund_policy"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 107
+    },
+    {
+      "questionId": "q065",
+      "category": "trap",
+      "expected": [
+        "nw_legal_dispute_resolution"
+      ],
+      "top10": [
+        "nw_legal_dispute_resolution",
+        "nw_finance_invoicing_payment",
+        "nw_sales_deal_desk",
+        "nw_sales_proposal_quote",
+        "nw_legal_contract_review",
+        "nw_sales_commission_plan",
+        "nw_support_complaint_escalation",
+        "nw_sales_territory_assignment",
+        "nw_legal_data_retention",
+        "nw_hr_anti_harassment"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 99
+    },
+    {
+      "questionId": "q066",
+      "category": "permission",
+      "expected": [],
+      "top10": [
+        "nw_hr_recruiting_interview",
+        "nw_finance_tax_withholding",
+        "nw_hr_employee_handbook",
+        "nw_engineering_release_notes_2026",
+        "nw_finance_travel_expense",
+        "nw_support_sla_policy",
+        "nw_finance_employee_expense",
+        "nw_hr_leave_policy",
+        "nw_engineering_on_call",
+        "nw_operations_equipment_return"
+      ],
+      "leaked": 0,
+      "recallAt3": 0,
+      "recallAt8": 0,
+      "mrr": 0,
+      "ndcgAt10": 0,
+      "queryMs": 109
+    },
+    {
+      "questionId": "q067",
+      "category": "permission",
+      "expected": [],
+      "top10": [
+        "nw_hr_termination_offboarding",
+        "nw_hr_leave_policy",
+        "nw_engineering_on_call",
+        "nw_hr_performance_review",
+        "nw_hr_anti_harassment",
+        "nw_hr_remote_work",
+        "nw_finance_employee_expense",
+        "nw_operations_equipment_return",
+        "nw_hr_training_budget",
+        "nw_finance_travel_expense"
+      ],
+      "leaked": 0,
+      "recallAt3": 0,
+      "recallAt8": 0,
+      "mrr": 0,
+      "ndcgAt10": 0,
+      "queryMs": 96
+    },
+    {
+      "questionId": "q068",
+      "category": "permission",
+      "expected": [],
+      "top10": [
+        "nw_sales_deal_desk",
+        "nw_finance_contractor_expense",
+        "nw_finance_travel_expense",
+        "nw_finance_budget_planning",
+        "nw_legal_compliance_calendar",
+        "nw_sales_referral_program",
+        "nw_finance_tax_withholding",
+        "nw_hr_onboarding_guide",
+        "nw_operations_procurement",
+        "nw_finance_employee_expense"
+      ],
+      "leaked": 0,
+      "recallAt3": 0,
+      "recallAt8": 0,
+      "mrr": 0,
+      "ndcgAt10": 0,
+      "queryMs": 88
+    },
+    {
+      "questionId": "q069",
+      "category": "permission",
+      "expected": [],
+      "top10": [
+        "nw_legal_contract_review",
+        "nw_sales_deal_desk",
+        "nw_sales_proposal_quote",
+        "nw_finance_employee_expense",
+        "nw_engineering_change_management",
+        "nw_sales_discount_approval",
+        "nw_hr_recruiting_interview",
+        "nw_legal_nda_policy",
+        "nw_support_complaint_escalation",
+        "nw_legal_dispute_resolution"
+      ],
+      "leaked": 0,
+      "recallAt3": 0,
+      "recallAt8": 0,
+      "mrr": 0,
+      "ndcgAt10": 0,
+      "queryMs": 92
+    },
+    {
+      "questionId": "q070",
+      "category": "permission",
+      "expected": [],
+      "top10": [
+        "nw_sales_referral_program",
+        "nw_hr_onboarding_guide",
+        "nw_finance_employee_expense",
+        "nw_hr_employee_handbook",
+        "nw_support_sla_policy",
+        "nw_finance_invoicing_payment",
+        "nw_finance_travel_expense",
+        "nw_engineering_release_notes_2026",
+        "nw_finance_tax_withholding",
+        "nw_finance_refund_policy"
+      ],
+      "leaked": 0,
+      "recallAt3": 0,
+      "recallAt8": 0,
+      "mrr": 0,
+      "ndcgAt10": 0,
+      "queryMs": 110
+    },
+    {
+      "questionId": "q071",
+      "category": "permission",
+      "expected": [],
+      "top10": [
+        "nw_finance_employee_expense",
+        "nw_hr_employee_handbook",
+        "nw_hr_training_budget",
+        "nw_engineering_release_notes_2026",
+        "nw_finance_travel_expense",
+        "nw_hr_recruiting_interview",
+        "nw_sales_referral_program",
+        "nw_support_sla_policy",
+        "nw_operations_office_facilities",
+        "nw_hr_onboarding_guide"
+      ],
+      "leaked": 0,
+      "recallAt3": 0,
+      "recallAt8": 0,
+      "mrr": 0,
+      "ndcgAt10": 0,
+      "queryMs": 138
+    },
+    {
+      "questionId": "q072",
+      "category": "permission",
+      "expected": [],
+      "top10": [
+        "nw_support_kb_guidelines",
+        "nw_support_sla_policy",
+        "nw_support_meridian_admin",
+        "nw_support_atlas_runbook",
+        "nw_support_ticket_priority",
+        "nw_hr_onboarding_guide",
+        "nw_support_complaint_escalation",
+        "nw_support_dsar_process",
+        "nw_engineering_atlas_catalog",
+        "nw_support_customer_onboarding"
+      ],
+      "leaked": 0,
+      "recallAt3": 0,
+      "recallAt8": 0,
+      "mrr": 0,
+      "ndcgAt10": 0,
+      "queryMs": 103
+    },
+    {
+      "questionId": "q073",
+      "category": "permission",
+      "expected": [],
+      "top10": [
+        "nw_engineering_release_notes_2026",
+        "nw_engineering_atlas_catalog",
+        "nw_operations_scheduled_maintenance",
+        "nw_operations_dr_runbook",
+        "nw_engineering_incident_escalation",
+        "nw_engineering_error_code_reference",
+        "nw_support_atlas_runbook",
+        "nw_engineering_sdlc",
+        "nw_engineering_on_call",
+        "nw_operations_business_continuity"
+      ],
+      "leaked": 0,
+      "recallAt3": 0,
+      "recallAt8": 0,
+      "mrr": 0,
+      "ndcgAt10": 0,
+      "queryMs": 103
+    },
+    {
+      "questionId": "q074",
+      "category": "permission",
+      "expected": [],
+      "top10": [
+        "nw_finance_employee_expense",
+        "nw_hr_leave_policy",
+        "nw_finance_tax_withholding",
+        "nw_hr_employee_handbook",
+        "nw_hr_onboarding_guide",
+        "nw_hr_parental_leave",
+        "nw_legal_ip_confidentiality",
+        "nw_legal_data_retention",
+        "nw_hr_remote_work",
+        "nw_sales_referral_program"
+      ],
+      "leaked": 0,
+      "recallAt3": 0,
+      "recallAt8": 0,
+      "mrr": 0,
+      "ndcgAt10": 0,
+      "queryMs": 94
+    },
+    {
+      "questionId": "q075",
+      "category": "permission",
+      "expected": [],
+      "top10": [
+        "nw_hr_onboarding_guide",
+        "nw_hr_anti_harassment",
+        "nw_support_sla_policy",
+        "nw_support_ticket_priority",
+        "nw_support_kb_guidelines",
+        "nw_engineering_release_notes_2026",
+        "nw_engineering_atlas_catalog",
+        "nw_support_atlas_runbook",
+        "nw_engineering_error_code_reference",
+        "nw_engineering_on_call"
+      ],
+      "leaked": 0,
+      "recallAt3": 0,
+      "recallAt8": 0,
+      "mrr": 0,
+      "ndcgAt10": 0,
+      "queryMs": 99
+    },
+    {
+      "questionId": "q076",
+      "category": "unanswerable",
+      "expected": [],
+      "top10": [
+        "nw_hr_onboarding_guide",
+        "nw_support_kb_guidelines",
+        "nw_engineering_error_code_reference",
+        "nw_sales_referral_program",
+        "nw_hr_employee_handbook",
+        "nw_operations_business_continuity",
+        "nw_hr_recruiting_interview",
+        "nw_support_atlas_runbook",
+        "nw_support_meridian_admin",
+        "nw_support_sla_policy"
+      ],
+      "leaked": 0,
+      "recallAt3": 0,
+      "recallAt8": 0,
+      "mrr": 0,
+      "ndcgAt10": 0,
+      "queryMs": 125
+    },
+    {
+      "questionId": "q077",
+      "category": "unanswerable",
+      "expected": [],
+      "top10": [
+        "nw_finance_employee_expense",
+        "nw_finance_travel_expense",
+        "nw_hr_leave_policy",
+        "nw_sales_referral_program",
+        "nw_hr_employee_handbook",
+        "nw_support_channels_hours",
+        "nw_operations_office_facilities",
+        "nw_finance_tax_withholding",
+        "nw_hr_parental_leave",
+        "nw_finance_invoicing_payment"
+      ],
+      "leaked": 0,
+      "recallAt3": 0,
+      "recallAt8": 0,
+      "mrr": 0,
+      "ndcgAt10": 0,
+      "queryMs": 128
+    },
+    {
+      "questionId": "q078",
+      "category": "unanswerable",
+      "expected": [],
+      "top10": [
+        "nw_operations_office_facilities",
+        "nw_hr_remote_work",
+        "nw_hr_anti_harassment",
+        "nw_hr_parental_leave",
+        "nw_hr_onboarding_guide",
+        "nw_hr_employee_handbook",
+        "nw_finance_tax_withholding",
+        "nw_legal_privacy_policy",
+        "nw_legal_ip_confidentiality",
+        "nw_finance_employee_expense"
+      ],
+      "leaked": 0,
+      "recallAt3": 0,
+      "recallAt8": 0,
+      "mrr": 0,
+      "ndcgAt10": 0,
+      "queryMs": 100
+    },
+    {
+      "questionId": "q079",
+      "category": "unanswerable",
+      "expected": [],
+      "top10": [
+        "nw_operations_office_facilities",
+        "nw_hr_remote_work",
+        "nw_engineering_error_code_reference",
+        "nw_hr_leave_policy",
+        "nw_operations_equipment_return",
+        "nw_operations_dr_runbook",
+        "nw_hr_onboarding_guide",
+        "nw_support_atlas_runbook",
+        "nw_engineering_change_management",
+        "nw_finance_employee_expense"
+      ],
+      "leaked": 0,
+      "recallAt3": 0,
+      "recallAt8": 0,
+      "mrr": 0,
+      "ndcgAt10": 0,
+      "queryMs": 105
+    },
+    {
+      "questionId": "q080",
+      "category": "unanswerable",
+      "expected": [],
+      "top10": [
+        "nw_operations_office_facilities",
+        "nw_hr_employee_handbook",
+        "nw_hr_remote_work",
+        "nw_sales_deal_desk",
+        "nw_hr_onboarding_guide",
+        "nw_legal_dpa_handbook",
+        "nw_support_customer_onboarding",
+        "nw_legal_contract_review",
+        "nw_support_meridian_admin",
+        "nw_engineering_change_management"
+      ],
+      "leaked": 0,
+      "recallAt3": 0,
+      "recallAt8": 0,
+      "mrr": 0,
+      "ndcgAt10": 0,
+      "queryMs": 91
+    },
+    {
+      "questionId": "q081",
+      "category": "unanswerable",
+      "expected": [],
+      "top10": [
+        "nw_hr_employee_handbook",
+        "nw_sales_partner_program",
+        "nw_operations_procurement",
+        "nw_hr_leave_policy",
+        "nw_finance_employee_expense",
+        "nw_sales_referral_program",
+        "nw_finance_budget_planning",
+        "nw_hr_parental_leave",
+        "nw_legal_ip_confidentiality",
+        "nw_finance_contractor_expense"
+      ],
+      "leaked": 0,
+      "recallAt3": 0,
+      "recallAt8": 0,
+      "mrr": 0,
+      "ndcgAt10": 0,
+      "queryMs": 120
+    },
+    {
+      "questionId": "q082",
+      "category": "unanswerable",
+      "expected": [],
+      "top10": [
+        "nw_hr_parental_leave",
+        "nw_hr_leave_policy",
+        "nw_hr_employee_handbook",
+        "nw_sales_referral_program",
+        "nw_hr_onboarding_guide",
+        "nw_operations_office_facilities",
+        "nw_finance_employee_expense",
+        "nw_finance_tax_withholding",
+        "nw_hr_remote_work",
+        "nw_legal_ip_confidentiality"
+      ],
+      "leaked": 0,
+      "recallAt3": 0,
+      "recallAt8": 0,
+      "mrr": 0,
+      "ndcgAt10": 0,
+      "queryMs": 119
+    },
+    {
+      "questionId": "q083",
+      "category": "unanswerable",
+      "expected": [],
+      "top10": [
+        "nw_hr_onboarding_guide",
+        "nw_hr_salary_bands",
+        "nw_hr_parental_leave",
+        "nw_finance_tax_withholding",
+        "nw_hr_employee_handbook",
+        "nw_hr_leave_policy",
+        "nw_legal_ip_confidentiality",
+        "nw_sales_referral_program",
+        "nw_hr_anti_harassment",
+        "nw_hr_termination_offboarding"
+      ],
+      "leaked": 0,
+      "recallAt3": 0,
+      "recallAt8": 0,
+      "mrr": 0,
+      "ndcgAt10": 0,
+      "queryMs": 104
+    },
+    {
+      "questionId": "q084",
+      "category": "unanswerable",
+      "expected": [],
+      "top10": [
+        "nw_operations_office_facilities",
+        "nw_legal_nda_policy",
+        "nw_legal_dpa_handbook",
+        "nw_support_dsar_process",
+        "nw_hr_onboarding_guide",
+        "nw_hr_employee_handbook",
+        "nw_hr_remote_work",
+        "nw_operations_equipment_return",
+        "nw_legal_ip_confidentiality",
+        "nw_finance_tax_withholding"
+      ],
+      "leaked": 0,
+      "recallAt3": 0,
+      "recallAt8": 0,
+      "mrr": 0,
+      "ndcgAt10": 0,
+      "queryMs": 97
+    },
+    {
+      "questionId": "q085",
+      "category": "unanswerable",
+      "expected": [],
+      "top10": [
+        "nw_hr_employee_handbook",
+        "nw_hr_leave_policy",
+        "nw_hr_onboarding_guide",
+        "nw_finance_tax_withholding",
+        "nw_support_channels_hours",
+        "nw_hr_parental_leave",
+        "nw_operations_office_facilities",
+        "nw_hr_remote_work",
+        "nw_support_customer_onboarding",
+        "nw_finance_travel_expense"
+      ],
+      "leaked": 0,
+      "recallAt3": 0,
+      "recallAt8": 0,
+      "mrr": 0,
+      "ndcgAt10": 0,
+      "queryMs": 85
+    },
+    {
+      "questionId": "q086",
+      "category": "multi_hop",
+      "expected": [
+        "nw_engineering_change_management",
+        "nw_engineering_deployment"
+      ],
+      "top10": [
+        "nw_engineering_change_management",
+        "nw_engineering_deployment",
+        "nw_engineering_release_notes_2026",
+        "nw_operations_dr_runbook",
+        "nw_engineering_sdlc",
+        "nw_support_atlas_runbook",
+        "nw_operations_scheduled_maintenance",
+        "nw_engineering_error_code_reference",
+        "nw_hr_employee_handbook",
+        "nw_support_channels_hours"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 103
+    },
+    {
+      "questionId": "q087",
+      "category": "multi_hop",
+      "expected": [
+        "nw_finance_invoicing_payment",
+        "nw_support_complaint_escalation"
+      ],
+      "top10": [
+        "nw_finance_invoicing_payment",
+        "nw_support_complaint_escalation",
+        "nw_engineering_error_code_reference",
+        "nw_support_dsar_process",
+        "nw_hr_onboarding_guide",
+        "nw_finance_refund_policy",
+        "nw_support_customer_onboarding",
+        "nw_engineering_api_standards",
+        "nw_support_channels_hours",
+        "nw_support_ticket_priority"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 100
+    },
+    {
+      "questionId": "q088",
+      "category": "multi_hop",
+      "expected": [
+        "nw_sales_referral_program",
+        "nw_sales_commission_plan"
+      ],
+      "top10": [
+        "nw_sales_referral_program",
+        "nw_sales_commission_plan",
+        "nw_hr_recruiting_interview",
+        "nw_sales_territory_assignment",
+        "nw_sales_partner_program",
+        "nw_sales_proposal_quote",
+        "nw_hr_onboarding_guide",
+        "nw_sales_discount_approval",
+        "nw_finance_invoicing_payment",
+        "nw_legal_contract_review"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 65
+    },
+    {
+      "questionId": "q089",
+      "category": "multi_hop",
+      "expected": [
+        "nw_hr_termination_offboarding",
+        "nw_operations_equipment_return"
+      ],
+      "top10": [
+        "nw_hr_termination_offboarding",
+        "nw_operations_equipment_return",
+        "nw_hr_onboarding_guide",
+        "nw_finance_employee_expense",
+        "nw_hr_employee_handbook",
+        "nw_hr_leave_policy",
+        "nw_finance_tax_withholding",
+        "nw_hr_remote_work",
+        "nw_hr_training_budget",
+        "nw_hr_parental_leave"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 68
+    },
+    {
+      "questionId": "q090",
+      "category": "multi_hop",
+      "expected": [
+        "nw_finance_refund_policy",
+        "nw_support_dsar_process"
+      ],
+      "top10": [
+        "nw_finance_refund_policy",
+        "nw_legal_data_retention",
+        "nw_hr_employee_handbook",
+        "nw_engineering_error_code_reference",
+        "nw_support_dsar_process",
+        "nw_support_complaint_escalation",
+        "nw_support_customer_onboarding",
+        "nw_sales_referral_program",
+        "nw_legal_privacy_policy",
+        "nw_support_kb_guidelines"
+      ],
+      "leaked": 0,
+      "recallAt3": 0.5,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 0.8503449055347546,
+      "queryMs": 91
+    },
+    {
+      "questionId": "q091",
+      "category": "factual",
+      "expected": [
+        "nw_engineering_error_code_reference"
+      ],
+      "top10": [
+        "nw_engineering_error_code_reference",
+        "nw_engineering_release_notes_2026",
+        "nw_support_atlas_runbook",
+        "nw_engineering_atlas_catalog",
+        "nw_engineering_incident_escalation",
+        "nw_support_meridian_admin",
+        "nw_support_ticket_priority",
+        "nw_support_channels_hours",
+        "nw_legal_ip_confidentiality",
+        "nw_hr_onboarding_guide"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 131
+    },
+    {
+      "questionId": "q092",
+      "category": "factual",
+      "expected": [
+        "nw_engineering_error_code_reference"
+      ],
+      "top10": [
+        "nw_engineering_error_code_reference",
+        "nw_support_atlas_runbook",
+        "nw_engineering_incident_escalation",
+        "nw_support_meridian_admin",
+        "nw_operations_dr_runbook",
+        "nw_operations_scheduled_maintenance",
+        "nw_engineering_release_notes_2026",
+        "nw_support_ticket_priority",
+        "nw_support_channels_hours",
+        "nw_engineering_atlas_catalog"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 88
+    },
+    {
+      "questionId": "q093",
+      "category": "factual",
+      "expected": [
+        "nw_engineering_error_code_reference"
+      ],
+      "top10": [
+        "nw_engineering_error_code_reference",
+        "nw_support_atlas_runbook",
+        "nw_hr_onboarding_guide",
+        "nw_support_meridian_admin",
+        "nw_hr_anti_harassment",
+        "nw_operations_equipment_return",
+        "nw_finance_refund_policy",
+        "nw_support_complaint_escalation",
+        "nw_engineering_on_call",
+        "nw_support_ticket_priority"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 126
+    },
+    {
+      "questionId": "q094",
+      "category": "factual",
+      "expected": [
+        "nw_engineering_error_code_reference"
+      ],
+      "top10": [
+        "nw_engineering_error_code_reference",
+        "nw_engineering_release_notes_2026",
+        "nw_engineering_atlas_catalog",
+        "nw_support_atlas_runbook",
+        "nw_hr_onboarding_guide",
+        "nw_engineering_deployment",
+        "nw_engineering_sdlc",
+        "nw_operations_dr_runbook",
+        "nw_support_ticket_priority",
+        "nw_engineering_incident_escalation"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 97
+    },
+    {
+      "questionId": "q095",
+      "category": "factual",
+      "expected": [
+        "nw_support_atlas_runbook"
+      ],
+      "top10": [
+        "nw_support_atlas_runbook",
+        "nw_engineering_atlas_catalog",
+        "nw_engineering_error_code_reference",
+        "nw_engineering_release_notes_2026",
+        "nw_hr_onboarding_guide",
+        "nw_support_customer_onboarding",
+        "nw_operations_equipment_return",
+        "nw_engineering_change_management",
+        "nw_support_complaint_escalation",
+        "nw_support_ticket_priority"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 113
+    },
+    {
+      "questionId": "q096",
+      "category": "factual",
+      "expected": [
+        "nw_support_atlas_runbook"
+      ],
+      "top10": [
+        "nw_support_atlas_runbook",
+        "nw_engineering_error_code_reference",
+        "nw_engineering_release_notes_2026",
+        "nw_engineering_atlas_catalog",
+        "nw_engineering_api_standards",
+        "nw_support_meridian_admin",
+        "nw_support_agent_scorecard",
+        "nw_hr_onboarding_guide",
+        "nw_engineering_incident_escalation",
+        "nw_finance_travel_expense"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 124
+    },
+    {
+      "questionId": "q097",
+      "category": "factual",
+      "expected": [
+        "nw_support_atlas_runbook"
+      ],
+      "top10": [
+        "nw_support_atlas_runbook",
+        "nw_engineering_error_code_reference",
+        "nw_engineering_release_notes_2026",
+        "nw_operations_dr_runbook",
+        "nw_engineering_atlas_catalog",
+        "nw_operations_scheduled_maintenance",
+        "nw_engineering_change_management",
+        "nw_engineering_sdlc",
+        "nw_support_meridian_admin",
+        "nw_support_channels_hours"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 98
+    },
+    {
+      "questionId": "q098",
+      "category": "factual",
+      "expected": [
+        "nw_engineering_release_notes_2026"
+      ],
+      "top10": [
+        "nw_engineering_release_notes_2026",
+        "nw_engineering_change_management",
+        "nw_support_ticket_priority",
+        "nw_support_sla_policy",
+        "nw_engineering_atlas_catalog",
+        "nw_legal_dpa_handbook",
+        "nw_support_complaint_escalation",
+        "nw_hr_onboarding_guide",
+        "nw_engineering_api_standards",
+        "nw_hr_remote_work"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 103
+    },
+    {
+      "questionId": "q099",
+      "category": "factual",
+      "expected": [
+        "nw_operations_dr_runbook"
+      ],
+      "top10": [
+        "nw_operations_dr_runbook",
+        "nw_operations_business_continuity",
+        "nw_support_meridian_admin",
+        "nw_finance_procurement_forms",
+        "nw_hr_onboarding_guide",
+        "nw_engineering_release_notes_2026",
+        "nw_engineering_change_management",
+        "nw_legal_privacy_policy",
+        "nw_engineering_on_call",
+        "nw_engineering_incident_escalation"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 114
+    },
+    {
+      "questionId": "q100",
+      "category": "factual",
+      "expected": [
+        "nw_operations_dr_runbook"
+      ],
+      "top10": [
+        "nw_operations_dr_runbook",
+        "nw_operations_business_continuity",
+        "nw_finance_procurement_forms",
+        "nw_engineering_change_management",
+        "nw_engineering_incident_escalation",
+        "nw_engineering_deployment",
+        "nw_hr_performance_review",
+        "nw_hr_onboarding_guide",
+        "nw_engineering_api_standards",
+        "nw_engineering_release_notes_2026"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 104
+    },
+    {
+      "questionId": "q101",
+      "category": "factual",
+      "expected": [
+        "nw_hr_onboarding_guide"
+      ],
+      "top10": [
+        "nw_hr_onboarding_guide",
+        "nw_hr_parental_leave",
+        "nw_hr_anti_harassment",
+        "nw_sales_referral_program",
+        "nw_hr_leave_policy",
+        "nw_hr_recruiting_interview",
+        "nw_hr_employee_handbook",
+        "nw_finance_tax_withholding",
+        "nw_support_channels_hours",
+        "nw_engineering_log_retention"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 118
+    },
+    {
+      "questionId": "q102",
+      "category": "factual",
+      "expected": [
+        "nw_hr_onboarding_guide"
+      ],
+      "top10": [
+        "nw_hr_onboarding_guide",
+        "nw_support_customer_onboarding",
+        "nw_finance_invoicing_payment",
+        "nw_hr_employee_handbook",
+        "nw_legal_privacy_policy",
+        "nw_engineering_error_code_reference",
+        "nw_engineering_release_notes_2026",
+        "nw_support_atlas_runbook",
+        "nw_legal_data_retention",
+        "nw_engineering_atlas_catalog"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 95
+    },
+    {
+      "questionId": "q103",
+      "category": "factual",
+      "expected": [
+        "nw_hr_onboarding_guide"
+      ],
+      "top10": [
+        "nw_hr_onboarding_guide",
+        "nw_hr_parental_leave",
+        "nw_hr_anti_harassment",
+        "nw_legal_ip_confidentiality",
+        "nw_support_kb_guidelines",
+        "nw_engineering_change_management",
+        "nw_legal_data_retention",
+        "nw_engineering_release_notes_2026",
+        "nw_hr_recruiting_interview",
+        "nw_support_meridian_admin"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 88
+    },
+    {
+      "questionId": "q104",
+      "category": "factual",
+      "expected": [
+        "nw_finance_procurement_forms"
+      ],
+      "top10": [
+        "nw_finance_procurement_forms",
+        "nw_engineering_release_notes_2026",
+        "nw_hr_onboarding_guide",
+        "nw_legal_dpa_handbook",
+        "nw_support_meridian_admin",
+        "nw_support_sla_policy",
+        "nw_sales_deal_desk",
+        "nw_legal_compliance_calendar",
+        "nw_operations_procurement",
+        "nw_hr_parental_leave"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 97
+    },
+    {
+      "questionId": "q105",
+      "category": "factual",
+      "expected": [
+        "nw_legal_dpa_handbook"
+      ],
+      "top10": [
+        "nw_legal_dpa_handbook",
+        "nw_engineering_release_notes_2026",
+        "nw_legal_ip_confidentiality",
+        "nw_hr_onboarding_guide",
+        "nw_engineering_change_management",
+        "nw_operations_equipment_return",
+        "nw_support_sla_policy",
+        "nw_support_kb_guidelines",
+        "nw_legal_data_retention",
+        "nw_legal_compliance_calendar"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 96
+    },
+    {
+      "questionId": "q106",
+      "category": "factual",
+      "expected": [
+        "nw_legal_dpa_handbook"
+      ],
+      "top10": [
+        "nw_legal_dpa_handbook",
+        "nw_engineering_release_notes_2026",
+        "nw_engineering_atlas_catalog",
+        "nw_support_channels_hours",
+        "nw_engineering_change_management",
+        "nw_hr_parental_leave",
+        "nw_support_meridian_admin",
+        "nw_support_kb_guidelines",
+        "nw_hr_onboarding_guide",
+        "nw_sales_deal_desk"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 98
+    },
+    {
+      "questionId": "q107",
+      "category": "factual",
+      "expected": [
+        "nw_legal_dpa_handbook"
+      ],
+      "top10": [
+        "nw_legal_dpa_handbook",
+        "nw_hr_onboarding_guide",
+        "nw_legal_dispute_resolution",
+        "nw_support_meridian_admin",
+        "nw_legal_ip_confidentiality",
+        "nw_legal_contract_review",
+        "nw_support_dsar_process",
+        "nw_engineering_release_notes_2026",
+        "nw_legal_nda_policy",
+        "nw_hr_parental_leave"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 91
+    },
+    {
+      "questionId": "q108",
+      "category": "factual",
+      "expected": [
+        "nw_sales_deal_desk"
+      ],
+      "top10": [
+        "nw_sales_deal_desk",
+        "nw_engineering_release_notes_2026",
+        "nw_support_complaint_escalation",
+        "nw_hr_onboarding_guide",
+        "nw_engineering_atlas_catalog",
+        "nw_support_kb_guidelines",
+        "nw_finance_refund_policy",
+        "nw_sales_proposal_quote",
+        "nw_legal_dpa_handbook",
+        "nw_hr_remote_work"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 115
+    },
+    {
+      "questionId": "q109",
+      "category": "factual",
+      "expected": [
+        "nw_support_meridian_admin"
+      ],
+      "top10": [
+        "nw_support_meridian_admin",
+        "nw_engineering_error_code_reference",
+        "nw_engineering_release_notes_2026",
+        "nw_support_atlas_runbook",
+        "nw_engineering_incident_escalation",
+        "nw_engineering_atlas_catalog",
+        "nw_engineering_on_call",
+        "nw_engineering_change_management",
+        "nw_support_sla_policy",
+        "nw_support_complaint_escalation"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 105
+    },
+    {
+      "questionId": "q110",
+      "category": "factual",
+      "expected": [
+        "nw_engineering_atlas_catalog"
+      ],
+      "top10": [
+        "nw_engineering_atlas_catalog",
+        "nw_engineering_incident_escalation",
+        "nw_engineering_release_notes_2026",
+        "nw_support_sla_policy",
+        "nw_support_atlas_runbook",
+        "nw_engineering_error_code_reference",
+        "nw_support_meridian_admin",
+        "nw_support_channels_hours",
+        "nw_hr_onboarding_guide",
+        "nw_support_ticket_priority"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 125
+    },
+    {
+      "questionId": "q111",
+      "category": "trap",
+      "expected": [
+        "nw_support_atlas_runbook"
+      ],
+      "top10": [
+        "nw_support_atlas_runbook",
+        "nw_engineering_incident_escalation",
+        "nw_engineering_release_notes_2026",
+        "nw_hr_employee_handbook",
+        "nw_engineering_error_code_reference",
+        "nw_support_complaint_escalation",
+        "nw_engineering_on_call",
+        "nw_hr_onboarding_guide",
+        "nw_operations_equipment_return",
+        "nw_hr_anti_harassment"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 99
+    },
+    {
+      "questionId": "q112",
+      "category": "trap",
+      "expected": [
+        "nw_engineering_release_notes_2026"
+      ],
+      "top10": [
+        "nw_engineering_release_notes_2026",
+        "nw_engineering_change_management",
+        "nw_operations_scheduled_maintenance",
+        "nw_hr_onboarding_guide",
+        "nw_support_atlas_runbook",
+        "nw_engineering_log_retention",
+        "nw_operations_dr_runbook",
+        "nw_engineering_incident_escalation",
+        "nw_engineering_error_code_reference",
+        "nw_hr_recruiting_interview"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 158
+    },
+    {
+      "questionId": "q113",
+      "category": "permission",
+      "expected": [],
+      "top10": [
+        "nw_legal_dpa_handbook",
+        "nw_sales_deal_desk",
+        "nw_support_ticket_priority",
+        "nw_engineering_release_notes_2026",
+        "nw_engineering_atlas_catalog",
+        "nw_legal_contract_review",
+        "nw_hr_onboarding_guide",
+        "nw_legal_nda_policy",
+        "nw_support_sla_policy",
+        "nw_finance_employee_expense"
+      ],
+      "leaked": 0,
+      "recallAt3": 0,
+      "recallAt8": 0,
+      "mrr": 0,
+      "ndcgAt10": 0,
+      "queryMs": 125
+    },
+    {
+      "questionId": "q114",
+      "category": "permission",
+      "expected": [],
+      "top10": [
+        "nw_engineering_error_code_reference",
+        "nw_support_meridian_admin",
+        "nw_hr_onboarding_guide",
+        "nw_engineering_release_notes_2026",
+        "nw_engineering_change_management",
+        "nw_legal_privacy_policy",
+        "nw_engineering_on_call",
+        "nw_support_atlas_runbook",
+        "nw_engineering_incident_escalation",
+        "nw_support_dsar_process"
+      ],
+      "leaked": 0,
+      "recallAt3": 0,
+      "recallAt8": 0,
+      "mrr": 0,
+      "ndcgAt10": 0,
+      "queryMs": 121
+    },
+    {
+      "questionId": "q115",
+      "category": "permission",
+      "expected": [],
+      "top10": [
+        "nw_operations_dr_runbook",
+        "nw_engineering_error_code_reference",
+        "nw_engineering_release_notes_2026",
+        "nw_legal_ip_confidentiality",
+        "nw_hr_onboarding_guide",
+        "nw_engineering_atlas_catalog",
+        "nw_engineering_change_management",
+        "nw_engineering_sdlc",
+        "nw_engineering_log_retention",
+        "nw_operations_business_continuity"
+      ],
+      "leaked": 0,
+      "recallAt3": 0,
+      "recallAt8": 0,
+      "mrr": 0,
+      "ndcgAt10": 0,
+      "queryMs": 102
+    },
+    {
+      "questionId": "q116",
+      "category": "multi_hop_expanded",
+      "expected": [
+        "nw_engineering_incident_escalation",
+        "nw_engineering_log_retention"
+      ],
+      "top10": [
+        "nw_engineering_incident_escalation",
+        "nw_engineering_on_call",
+        "nw_support_channels_hours",
+        "nw_support_atlas_runbook",
+        "nw_engineering_release_notes_2026",
+        "nw_engineering_deployment",
+        "nw_support_kb_guidelines",
+        "nw_operations_equipment_return",
+        "nw_operations_scheduled_maintenance",
+        "nw_support_ticket_priority"
+      ],
+      "leaked": 0,
+      "recallAt3": 0.5,
+      "recallAt8": 0.5,
+      "mrr": 1,
+      "ndcgAt10": 0.6131471927654584,
+      "queryMs": 120
+    },
+    {
+      "questionId": "q117",
+      "category": "multi_hop_expanded",
+      "expected": [
+        "nw_hr_remote_work",
+        "nw_operations_equipment_return"
+      ],
+      "top10": [
+        "nw_hr_remote_work",
+        "nw_operations_equipment_return",
+        "nw_hr_onboarding_guide",
+        "nw_operations_business_continuity",
+        "nw_legal_ip_confidentiality",
+        "nw_hr_parental_leave",
+        "nw_hr_leave_policy",
+        "nw_hr_employee_handbook",
+        "nw_finance_travel_expense",
+        "nw_operations_office_facilities"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 1,
+      "queryMs": 110
+    },
+    {
+      "questionId": "q118",
+      "category": "multi_hop_expanded",
+      "expected": [
+        "nw_hr_training_budget",
+        "nw_finance_travel_expense"
+      ],
+      "top10": [
+        "nw_finance_employee_expense",
+        "nw_finance_travel_expense",
+        "nw_hr_training_budget",
+        "nw_hr_remote_work",
+        "nw_hr_onboarding_guide",
+        "nw_hr_leave_policy",
+        "nw_hr_employee_handbook",
+        "nw_hr_salary_bands",
+        "nw_legal_ip_confidentiality",
+        "nw_hr_recruiting_interview"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 0.5,
+      "ndcgAt10": 0.6934264036172708,
+      "queryMs": 95
+    },
+    {
+      "questionId": "q119",
+      "category": "multi_hop_expanded",
+      "expected": [
+        "nw_legal_contract_review",
+        "nw_legal_dpa_handbook"
+      ],
+      "top10": [
+        "nw_legal_dpa_handbook",
+        "nw_legal_privacy_policy",
+        "nw_legal_contract_review",
+        "nw_legal_nda_policy",
+        "nw_engineering_release_notes_2026",
+        "nw_legal_data_retention",
+        "nw_engineering_api_standards",
+        "nw_support_dsar_process",
+        "nw_sales_referral_program",
+        "nw_legal_dispute_resolution"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 0.9197207891481876,
+      "queryMs": 133
+    },
+    {
+      "questionId": "q120",
+      "category": "multi_hop_expanded",
+      "expected": [
+        "nw_support_sla_policy",
+        "nw_support_complaint_escalation"
+      ],
+      "top10": [
+        "nw_support_sla_policy",
+        "nw_support_atlas_runbook",
+        "nw_support_complaint_escalation",
+        "nw_support_channels_hours",
+        "nw_hr_employee_handbook",
+        "nw_support_dsar_process",
+        "nw_support_agent_scorecard",
+        "nw_support_ticket_priority",
+        "nw_engineering_error_code_reference",
+        "nw_support_customer_onboarding"
+      ],
+      "leaked": 0,
+      "recallAt3": 1,
+      "recallAt8": 1,
+      "mrr": 1,
+      "ndcgAt10": 0.9197207891481876,
+      "queryMs": 141
+    }
+  ]
+}

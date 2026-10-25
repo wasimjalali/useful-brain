@@ -1,0 +1,76 @@
+{
+  "@cf/qwen/qwen3-embedding-0.6b": {
+    "model": "@cf/qwen/qwen3-embedding-0.6b",
+    "scoredQuestions": 97,
+    "recallAt3": 0.9690721649484536,
+    "recallAt8": 1,
+    "mrr": 0.945017182130584,
+    "ndcgAt10": 0.9531123728740344,
+    "byCategory": {
+      "factual": {
+        "n": 70,
+        "recallAt3": 0.9857142857142858,
+        "mrr": 0.9452380952380951
+      },
+      "trap": {
+        "n": 17,
+        "recallAt3": 0.9411764705882353,
+        "mrr": 0.911764705882353
+      },
+      "multi_hop": {
+        "n": 5,
+        "recallAt3": 1,
+        "mrr": 1
+      },
+      "multi_hop_expanded": {
+        "n": 5,
+        "recallAt3": 0.8,
+        "mrr": 1
+      }
+    },
+    "leakedDocuments": 0,
+    "queryLatencyMs": {
+      "p50": 400,
+      "p95": 4042
+    },
+    "indexMs": 193495,
+    "chunks": 808
+  },
+  "@cf/baai/bge-m3": {
+    "model": "@cf/baai/bge-m3",
+    "scoredQuestions": 97,
+    "recallAt3": 0.9896907216494846,
+    "recallAt8": 0.9948453608247423,
+    "mrr": 0.9570446735395188,
+    "ndcgAt10": 0.9616694701200268,
+    "byCategory": {
+      "factual": {
+        "n": 70,
+        "recallAt3": 1,
+        "mrr": 0.9476190476190476
+      },
+      "trap": {
+        "n": 17,
+        "recallAt3": 1,
+        "mrr": 1
+      },
+      "multi_hop": {
+        "n": 5,
+        "recallAt3": 0.9,
+        "mrr": 1
+      },
+      "multi_hop_expanded": {
+        "n": 5,
+        "recallAt3": 0.9,
+        "mrr": 0.9
+      }
+    },
+    "leakedDocuments": 0,
+    "queryLatencyMs": {
+      "p50": 105,
+      "p95": 133
+    },
+    "indexMs": 14708,
+    "chunks": 808
+  }
+}

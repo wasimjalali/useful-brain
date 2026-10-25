@@ -31,6 +31,7 @@ export const EVAL_CHAT_MODELS = [
   "@cf/zai-org/glm-5.3",
   "@cf/deepseek-ai/deepseek-v4-pro-0813",
   "@cf/moonshotai/kimi-k2.6",
+  "@cf/deepseek-ai/deepseek-v4.1-flash-1017",
 ] as const;
 
 /** Models whose Workers AI schema does not accept `chat_template_kwargs`. */
