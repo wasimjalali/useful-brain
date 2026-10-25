@@ -60,6 +60,8 @@ export type EvalFailureView = {
   askedAs: string;
   expected: { document: string; section: string }[];
   note: string;
+  /** The turn never got an answer (the Brain stayed unavailable); not a wrong answer. */
+  unavailable?: boolean;
 };
 
 export type ActivityOutcome = "answered" | "no_evidence" | "approved" | "denied" | "error";

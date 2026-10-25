@@ -7,7 +7,7 @@
 │ OpenNext — Cloudflare build │
 └─────────────────────────────┘
 
-App directory: /Users/wasimjalali/Desktop/Personal Project/useful-brain
+App directory: <repo>
 Next.js version : 16.3.3
 @opennextjs/cloudflare version: 1.20.3
 @opennextjs/aws version: 4.1.1
@@ -287,10 +287,10 @@ env.NEXTJS_ENV ("(hidden)")                         Environment Variable      lo
 ⎔ Reloading local server...
 [31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mBuild failed with 1 error:[0m
 
-  [31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mCould not resolve "/Users/wasimjalali/Desktop/Personal Project/useful-brain/.open-next/worker.js"[0m
+  [31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mCould not resolve ".open-next/worker.js"[0m
   
       .wrangler/tmp/bundle-u7DyQV/middleware-insertion-facade.js:1:43:
-  [37m      1 │ ...PORTS from [32m"/Users/wasimjalali/Desktop/Personal Project/useful-b[37m...
+  [37m      1 │ ...PORTS from [32m"<repo>/useful-b[37m...
           ╵               [32m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
   
   
@@ -396,26 +396,26 @@ env.NEXTJS_ENV ("(hidden)")                         Environment Variable      lo
 
 ⎔ Local server updated and ready
 [wrangler:error] Error: Dynamic require of "fs" is not supported
-    at .open-next/server-functions/default/node_modules/next/dist/server/dev/browser-logs/file-logger.js (file:///Users/wasimjalali/Desktop/Personal%20Project/useful-brain/.open-next/server-functions/default/handler.mjs:2:5133)
-    at null.<anonymous> (file:///Users/wasimjalali/Desktop/Personal%20Project/useful-brain/.open-next/server-functions/default/handler.mjs:2:679)
-    at .open-next/server-functions/default/node_modules/next/dist/server/node-environment-extensions/console-file.js (file:///Users/wasimjalali/Desktop/Personal%20Project/useful-brain/.open-next/server-functions/default/handler.mjs:3:6739)
-    at null.<anonymous> (file:///Users/wasimjalali/Desktop/Personal%20Project/useful-brain/.open-next/server-functions/default/handler.mjs:2:679)
-    at .open-next/server-functions/default/node_modules/next/dist/server/node-environment.js (file:///Users/wasimjalali/Desktop/Personal%20Project/useful-brain/.open-next/server-functions/default/handler.mjs:172:338)
-    at null.<anonymous> (file:///Users/wasimjalali/Desktop/Personal%20Project/useful-brain/.open-next/server-functions/default/handler.mjs:2:679)
-    at .open-next/server-functions/default/node_modules/next/dist/server/next-server.js (file:///Users/wasimjalali/Desktop/Personal%20Project/useful-brain/.open-next/server-functions/default/handler.mjs:1640:4391)
-    at null.<anonymous> (file:///Users/wasimjalali/Desktop/Personal%20Project/useful-brain/.open-next/server-functions/default/handler.mjs:2:679)
-    at .open-next/server-functions/default/handler.mjs (file:///Users/wasimjalali/Desktop/Personal%20Project/useful-brain/.open-next/server-functions/default/handler.mjs:1656:721)
+    at .open-next/server-functions/default/node_modules/next/dist/server/dev/browser-logs/file-logger.js (file://.open-next/server-functions/default/handler.mjs:2:5133)
+    at null.<anonymous> (file://.open-next/server-functions/default/handler.mjs:2:679)
+    at .open-next/server-functions/default/node_modules/next/dist/server/node-environment-extensions/console-file.js (file://.open-next/server-functions/default/handler.mjs:3:6739)
+    at null.<anonymous> (file://.open-next/server-functions/default/handler.mjs:2:679)
+    at .open-next/server-functions/default/node_modules/next/dist/server/node-environment.js (file://.open-next/server-functions/default/handler.mjs:172:338)
+    at null.<anonymous> (file://.open-next/server-functions/default/handler.mjs:2:679)
+    at .open-next/server-functions/default/node_modules/next/dist/server/next-server.js (file://.open-next/server-functions/default/handler.mjs:1640:4391)
+    at null.<anonymous> (file://.open-next/server-functions/default/handler.mjs:2:679)
+    at .open-next/server-functions/default/handler.mjs (file://.open-next/server-functions/default/handler.mjs:1656:721)
 [wrangler:info] POST /chat 500 Internal Server Error (1032ms)
 [wrangler:error] Error: Dynamic require of "fs" is not supported
-    at .open-next/server-functions/default/node_modules/next/dist/server/dev/browser-logs/file-logger.js (file:///Users/wasimjalali/Desktop/Personal%20Project/useful-brain/.open-next/server-functions/default/handler.mjs:2:5133)
-    at null.<anonymous> (file:///Users/wasimjalali/Desktop/Personal%20Project/useful-brain/.open-next/server-functions/default/handler.mjs:2:679)
-    at .open-next/server-functions/default/node_modules/next/dist/server/node-environment-extensions/console-file.js (file:///Users/wasimjalali/Desktop/Personal%20Project/useful-brain/.open-next/server-functions/default/handler.mjs:3:6739)
-    at null.<anonymous> (file:///Users/wasimjalali/Desktop/Personal%20Project/useful-brain/.open-next/server-functions/default/handler.mjs:2:679)
-    at .open-next/server-functions/default/node_modules/next/dist/server/node-environment.js (file:///Users/wasimjalali/Desktop/Personal%20Project/useful-brain/.open-next/server-functions/default/handler.mjs:172:338)
-    at null.<anonymous> (file:///Users/wasimjalali/Desktop/Personal%20Project/useful-brain/.open-next/server-functions/default/handler.mjs:2:679)
-    at .open-next/server-functions/default/node_modules/next/dist/server/next-server.js (file:///Users/wasimjalali/Desktop/Personal%20Project/useful-brain/.open-next/server-functions/default/handler.mjs:1640:4391)
-    at null.<anonymous> (file:///Users/wasimjalali/Desktop/Personal%20Project/useful-brain/.open-next/server-functions/default/handler.mjs:2:679)
-    at .open-next/server-functions/default/handler.mjs (file:///Users/wasimjalali/Desktop/Personal%20Project/useful-brain/.open-next/server-functions/default/handler.mjs:1656:721)
+    at .open-next/server-functions/default/node_modules/next/dist/server/dev/browser-logs/file-logger.js (file://.open-next/server-functions/default/handler.mjs:2:5133)
+    at null.<anonymous> (file://.open-next/server-functions/default/handler.mjs:2:679)
+    at .open-next/server-functions/default/node_modules/next/dist/server/node-environment-extensions/console-file.js (file://.open-next/server-functions/default/handler.mjs:3:6739)
+    at null.<anonymous> (file://.open-next/server-functions/default/handler.mjs:2:679)
+    at .open-next/server-functions/default/node_modules/next/dist/server/node-environment.js (file://.open-next/server-functions/default/handler.mjs:172:338)
+    at null.<anonymous> (file://.open-next/server-functions/default/handler.mjs:2:679)
+    at .open-next/server-functions/default/node_modules/next/dist/server/next-server.js (file://.open-next/server-functions/default/handler.mjs:1640:4391)
+    at null.<anonymous> (file://.open-next/server-functions/default/handler.mjs:2:679)
+    at .open-next/server-functions/default/handler.mjs (file://.open-next/server-functions/default/handler.mjs:1656:721)
 [wrangler:info] POST /chat 500 Internal Server Error (202ms)
 ⎔ Reloading local server...
 [wrangler:info] ✨ Parsed 1 valid header rule.
@@ -432,4 +432,4 @@ env.LOOPBACK_RUNTIME ("true")                       Environment Variable      lo
 env.NEXTJS_ENV ("(hidden)")                         Environment Variable      local
 
 ⎔ Local server updated and ready
-🪵  Logs were written to "/Users/wasimjalali/Library/Preferences/.wrangler/logs/wrangler-2026-09-26_14-01-35_869.log"
+🪵  Logs were written to "<home>/Library/Preferences/.wrangler/logs/wrangler-2026-09-26_14-01-35_869.log"

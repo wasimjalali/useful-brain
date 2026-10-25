@@ -76,7 +76,7 @@ export function harnessProvenance(
 
 // Bumped when scoring semantics change so a resume never mixes rows scored
 // under different identity or metric rules.
-const HARNESS_VERSION = 3;
+const HARNESS_VERSION = 4;
 
 type LiveCheckpoint = {
   harnessVersion?: number;
