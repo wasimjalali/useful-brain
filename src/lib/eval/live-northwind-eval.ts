@@ -76,7 +76,7 @@ export function harnessProvenance(
 
 // Bumped when scoring semantics change so a resume never mixes rows scored
 // under different identity or metric rules.
-const HARNESS_VERSION = 3;
+const HARNESS_VERSION = 4;
 
 type LiveCheckpoint = {
   harnessVersion?: number;
@@ -87,6 +87,8 @@ type LiveCheckpoint = {
   pipelineVersion?: string;
   /** Digest of the loaded question set the rows were scored against. */
   questionSetDigest?: string;
+  /** Whether unavailable turns were scored as failures; a resume must use the same setting. */
+  scoreUnavailable?: boolean;
   results: NorthwindAnswerScore[];
   latenciesMs?: Record<string, number>;
 };
@@ -157,6 +159,7 @@ export function parseArgs(argv: string[]) {
     live: Boolean(brainUrl),
     brainUrl: brainUrl.replace(/\/$/, ""),
     resume: argv.includes("--resume") || process.env.NORTHWIND_EVAL_RESUME === "1",
+    scoreUnavailable: argv.includes("--score-unavailable"),
     model,
     questionsFile,
   };
@@ -191,14 +194,38 @@ async function runRetrievalLayer(
 
 const BRAIN_ATTEMPTS = 4;
 
+/** A turn that returned 503 on every attempt. */
+export class BrainTurnUnavailable extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "BrainTurnUnavailable";
+  }
+}
+
+/**
+ * True when a 503 body is the Brain's own unavailable error. A platform or
+ * proxy 503 (an HTML page, an empty body) is not the Brain reporting an
+ * unavailable turn and must keep stopping the run.
+ */
+async function isBrainUnavailableBody(response: Response): Promise<boolean> {
+  try {
+    const body = (await response.json()) as { code?: unknown };
+    return body?.code === "UNAVAILABLE";
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Retries 429 and 5xx with backoff, then throws with every attempt's status.
  * A turn the Brain reports as unavailable (503 UNAVAILABLE: a retrieval
- * backend or the model failed) is never scored: the run stops loudly and can
- * resume with --resume once the Brain is healthy.
+ * backend or the model failed, or the agent hit its search budget) is never
+ * scored by default: the run stops loudly and can resume with --resume once
+ * the Brain is healthy. With --score-unavailable it is scored as a failure.
  */
 export async function brainJson<T>(brainUrl: string, pathName: string, init: RequestInit = {}): Promise<T> {
   const statuses: number[] = [];
+  let lastUnavailableBody = false;
   for (let attempt = 0; attempt < BRAIN_ATTEMPTS; attempt += 1) {
     const response = await fetch(`${brainUrl}${pathName}`, {
       ...init,
@@ -209,6 +236,7 @@ export async function brainJson<T>(brainUrl: string, pathName: string, init: Req
     });
     if (response.status === 429 || response.status >= 500) {
       statuses.push(response.status);
+      lastUnavailableBody = response.status === 503 && (await isBrainUnavailableBody(response));
       if (attempt < BRAIN_ATTEMPTS - 1) {
         await sleep(1000 * 2 ** attempt);
       }
@@ -220,11 +248,13 @@ export async function brainJson<T>(brainUrl: string, pathName: string, init: Req
     }
     return payload;
   }
-  throw new Error(
-    `Brain ${pathName} failed after ${BRAIN_ATTEMPTS} attempts (statuses ${statuses.join(", ")})${
-      pathName === "/turns" ? "; the question was not scored" : ""
-    }`,
-  );
+  const message = `Brain ${pathName} failed after ${BRAIN_ATTEMPTS} attempts (statuses ${statuses.join(", ")})${
+    pathName === "/turns" ? "; the question was not scored" : ""
+  }`;
+  if (pathName === "/turns" && lastUnavailableBody && statuses.every((status) => status === 503)) {
+    throw new BrainTurnUnavailable(message);
+  }
+  throw new Error(message);
 }
 
 /** One live turn; any failure names the question it stopped the run on. */
@@ -236,8 +266,27 @@ export async function liveTurn(
   try {
     return await brainJson<GroundedAnswerResponse>(brainUrl, "/turns", init);
   } catch (error) {
-    throw new Error(`${questionId}: ${error instanceof Error ? error.message : String(error)}`);
+    const message = `${questionId}: ${error instanceof Error ? error.message : String(error)}`;
+    throw error instanceof BrainTurnUnavailable ? new BrainTurnUnavailable(message) : new Error(message);
   }
+}
+
+/** The failed row for a turn that stayed unavailable through every retry. */
+export function unavailableScore(question: EvalQuestion): NorthwindAnswerScore {
+  return {
+    questionId: question.questionId,
+    category: question.category,
+    status: "fail",
+    detail: `unavailable: Brain returned 503 on all ${BRAIN_ATTEMPTS} attempts`,
+    answerType: "unavailable",
+    citedDocumentIds: [],
+    retrievedDocumentIds: [],
+    sectionHit: null,
+    liveRecall:
+      ABSTENTION_CATEGORIES.has(question.category) || question.expectedDocumentIds.length === 0 ? null : 0,
+    goldRetrievedUncited: [],
+    vectorDegradedCount: 0,
+  };
 }
 
 function sleep(ms: number) {
@@ -330,12 +379,13 @@ async function ensureSeeded(brainUrl: string): Promise<string> {
   throw new Error("seed did not produce a ready generation before the polling deadline");
 }
 
-async function runLiveLayer(
+export async function runLiveLayer(
   questions: EvalQuestion[],
   brainUrl: string,
   resume: boolean,
   model: string | undefined,
   questionsFile: string | undefined,
+  scoreUnavailable: boolean,
 ): Promise<{
   generationId: string;
   results: NorthwindAnswerScore[];
@@ -352,16 +402,20 @@ async function runLiveLayer(
   if (resume) {
     try {
       const previous = JSON.parse(readFileSync(paths.checkpoint, "utf8")) as LiveCheckpoint;
-      if (
-        previous.brainUrl === brainUrl &&
-        previous.harnessVersion === HARNESS_VERSION &&
-        previous.generationId === generationId &&
+      const differs = [
+        previous.brainUrl !== brainUrl && "brainUrl",
+        previous.harnessVersion !== HARNESS_VERSION && "harnessVersion",
+        previous.generationId !== generationId && "generationId",
         // A checkpoint without a model field predates model tagging; fail closed.
-        previous.model !== undefined &&
-        previous.model === expectedModel &&
-        previous.questionSetDigest === digest
-      ) {
-        results = previous.results;
+        previous.model !== expectedModel && "model",
+        previous.questionSetDigest !== digest && "questionSetDigest",
+        (previous.scoreUnavailable ?? false) !== scoreUnavailable && "scoreUnavailable",
+      ].filter(Boolean);
+      if (differs.length > 0) {
+        process.stderr.write(`--resume: checkpoint differs in ${differs.join(", ")}; starting over\n`);
+      } else {
+        // Unavailable rows are not answers: drop them so those questions are asked again.
+        results = previous.results.filter((result) => result.answerType !== "unavailable");
         latenciesMs = previous.latenciesMs ?? {};
         pipelineVersion = previous.pipelineVersion;
       }
@@ -377,20 +431,41 @@ async function runLiveLayer(
     process.stderr.write(`live ${index + 1}/${questions.length} ${question.questionId}\n`);
     const requestId = `eval-live-${question.questionId}-${Date.now()}`;
     const startedAt = Date.now();
-    const response = await liveTurn(brainUrl, question.questionId, {
-      method: "POST",
-      body: JSON.stringify({
-        question: question.query,
-        requestId,
-        persistConversation: false,
-        assumePrincipal: {
-          userId: question.principal.userId,
-          roles: question.principal.roles,
-          departments: question.principal.departments,
-        },
-        ...(model ? { evalModel: model } : {}),
-      }),
-    });
+    let response: GroundedAnswerResponse;
+    try {
+      response = await liveTurn(brainUrl, question.questionId, {
+        method: "POST",
+        body: JSON.stringify({
+          question: question.query,
+          requestId,
+          persistConversation: false,
+          assumePrincipal: {
+            userId: question.principal.userId,
+            roles: question.principal.roles,
+            departments: question.principal.departments,
+          },
+          ...(model ? { evalModel: model } : {}),
+        }),
+      });
+    } catch (error) {
+      if (!scoreUnavailable || !(error instanceof BrainTurnUnavailable)) {
+        throw error;
+      }
+      process.stderr.write(`${error.message}; scored as a failure (--score-unavailable)\n`);
+      results.push(unavailableScore(question));
+      writeJson(paths.checkpoint, {
+        harnessVersion: HARNESS_VERSION,
+        brainUrl,
+        generationId,
+        model: expectedModel,
+        pipelineVersion,
+        questionSetDigest: digest,
+        scoreUnavailable,
+        results,
+        latenciesMs,
+      } satisfies LiveCheckpoint);
+      continue;
+    }
     latenciesMs[question.questionId] = Date.now() - startedAt;
     if (response.assumedPrincipal?.userId !== question.principal.userId) {
       // Fail closed: never score a turn whose retrieval identity was not
@@ -434,6 +509,7 @@ async function runLiveLayer(
       model: expectedModel,
       pipelineVersion,
       questionSetDigest: digest,
+      scoreUnavailable,
       results,
       latenciesMs,
     } satisfies LiveCheckpoint);
@@ -442,7 +518,7 @@ async function runLiveLayer(
   return { generationId, results, latenciesMs, pipelineVersion };
 }
 
-function latencySummary(latenciesMs: Record<string, number>, total: number) {
+function latencySummary(latenciesMs: Record<string, number>, total: number, unavailable: number) {
   const values = Object.values(latenciesMs).sort((a, b) => a - b);
   if (values.length === 0) {
     return null;
@@ -451,13 +527,29 @@ function latencySummary(latenciesMs: Record<string, number>, total: number) {
   return {
     count: values.length,
     total,
-    // A resumed run only measures the questions it re-asked; a partial
-    // latency sample must never be read as run-level coverage.
+    // Turns scored as unavailable have no latency, so they are left out of
+    // the percentiles (which slightly flatters them).
+    unavailable,
+    // Not every turn has a latency: a resumed run only measures the
+    // questions it re-asked, and unavailable turns have none. A partial
+    // sample must never be read as run-level coverage.
     partial: values.length < total,
     meanMs: Math.round(values.reduce((sum, value) => sum + value, 0) / values.length),
     p50Ms: at(0.5),
     p95Ms: at(0.95),
   };
+}
+
+/** One line for the end of a run that scored unavailable turns as failures, or null when none were. */
+export function unavailableNotice(results: NorthwindAnswerScore[]): string | null {
+  const ids = results.filter((result) => result.answerType === "unavailable").map((result) => result.questionId);
+  return ids.length === 0
+    ? null
+    : `warning: ${ids.length} unavailable turn(s) scored as failures (--score-unavailable): ${ids.join(", ")}\n`;
+}
+
+function countUnavailable(results: NorthwindAnswerScore[]): number {
+  return results.filter((result) => result.answerType === "unavailable").length;
 }
 
 function summarize(
@@ -476,7 +568,11 @@ function summarize(
       bucket.passed += 1;
     }
   }
-  const recallRows = liveCounted.filter((result) => result.liveRecall !== null);
+  // An unavailable turn retrieved nothing by construction; counting its 0
+  // would read as a retrieval miss, so it is reported beside the recall.
+  const recallRows = liveCounted.filter(
+    (result) => result.liveRecall !== null && result.answerType !== "unavailable",
+  );
   const vectorDegradedTurns = liveCounted.filter(
     (result) => result.vectorDegradedCount > 0,
   ).length;
@@ -509,6 +605,7 @@ function summarize(
               ? null
               : recallRows.reduce((sum, result) => sum + (result.liveRecall ?? 0), 0) /
                 recallRows.length,
+          unavailable: countUnavailable(liveCounted),
           goldRetrievedUncitedCount: liveCounted.filter(
             (result) => result.goldRetrievedUncited.length > 0,
           ).length,
@@ -570,15 +667,27 @@ async function main() {
   const provenance = {
     ...(args.questionsFile ? { questionsFile: path.relative(process.cwd(), args.questionsFile) } : {}),
     ...harnessProvenance(),
+    ...(args.live ? { scoreUnavailable: args.scoreUnavailable } : {}),
   };
   if (args.live) {
-    live = await runLiveLayer(questions, args.brainUrl, args.resume, args.model, args.questionsFile);
+    live = await runLiveLayer(
+      questions,
+      args.brainUrl,
+      args.resume,
+      args.model,
+      args.questionsFile,
+      args.scoreUnavailable,
+    );
+    const notice = unavailableNotice(live.results);
+    if (notice) {
+      process.stderr.write(notice);
+    }
     writeJson(paths.summary, {
       model: args.model ?? CHAT_MODEL_ID,
       ...provenance,
       pipelineVersion: live.pipelineVersion ?? null,
       generationId: live.generationId,
-      latency: latencySummary(live.latenciesMs, live.results.length),
+      latency: latencySummary(live.latenciesMs, live.results.length, countUnavailable(live.results)),
       results: live.results,
     });
   }
@@ -586,7 +695,7 @@ async function main() {
     model: args.model ?? CHAT_MODEL_ID,
     ...provenance,
     ...(live ? { pipelineVersion: live.pipelineVersion ?? null } : {}),
-    ...(live ? { latency: latencySummary(live.latenciesMs, live.results.length) } : {}),
+    ...(live ? { latency: latencySummary(live.latenciesMs, live.results.length, countUnavailable(live.results)) } : {}),
     ...summarize(retrieval, live?.results ?? null, questions),
   };
   writeJson(paths.findings, findings);

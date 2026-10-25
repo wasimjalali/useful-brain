@@ -7,29 +7,38 @@ import {
 } from "./campaign-snapshot";
 
 describe("NORTHWIND_CAMPAIGN", () => {
-  it("records the latest 117/120 run of 8 Oct 2026", () => {
+  it("records the latest 118/120 DeepSeek V4.1 Flash run of 25 Oct 2026", () => {
     const latest = campaignRun(NORTHWIND_CAMPAIGN.latestKey);
 
-    expect(latest.date).toBe("2026-10-08");
-    expect(latest.passed).toBe(117);
+    expect(NORTHWIND_CAMPAIGN.model).toBe("@cf/deepseek-ai/deepseek-v4.1-flash-1017");
+    expect(latest.date).toBe("2026-10-25");
+    expect(latest.passed).toBe(118);
     expect(latest.scored).toBe(120);
-    expect(latest.failures.map((f) => f.id)).toEqual(["q073", "q086", "q090"]);
+    expect(latest.failures.map((f) => f.id)).toEqual(["q071", "q090"]);
     expect(latest.categories.map((c) => [c.id, c.passed, c.scored])).toEqual([
       ["factual", 70, 70],
       ["trap", 17, 17],
       ["permission", 12, 13],
       ["unanswerable", 10, 10],
-      ["multi_hop", 8, 10],
+      ["multi_hop", 9, 10],
     ]);
     expect(NORTHWIND_CAMPAIGN.retrieval.aclLeaks).toBe(0);
     expect(formatPassRate(latest.passRate)).toBe("98%");
+  });
+
+  it("keeps the 117/120 GLM redesign-fix run of 8 Oct 2026 as history", () => {
+    const earlier = campaignRun("redesignFix");
+
+    expect(earlier.date).toBe("2026-10-08");
+    expect(earlier.passed).toBe(117);
+    expect(earlier.failures.map((f) => f.id)).toEqual(["q073", "q086", "q090"]);
   });
 
   it("keeps the 118/120 coverage run and the 115/120 redesign build", () => {
     expect(campaignRun("coverage").passed).toBe(118);
     expect(campaignRun("redesign").passed).toBe(115);
     expect(NORTHWIND_CAMPAIGN.runs.map((r) => r.key)).toEqual([
-      "baseline", "pass1", "final", "coverage", "redesign", "latest",
+      "baseline", "pass1", "final", "coverage", "redesign", "redesignFix", "latest",
     ]);
   });
 

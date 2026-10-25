@@ -88,6 +88,15 @@ describe("FailuresList", () => {
   });
 });
 
+describe("FailuresList unavailable tag", () => {
+  it("tags only the row whose turn was unavailable", () => {
+    render(<FailuresList failures={[{ ...failure("q071"), unavailable: true }, failure("q093")]} />);
+    expect(screen.getAllByText("Unavailable")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: /q071/ })).toHaveTextContent("Unavailable");
+    expect(screen.getByRole("button", { name: /q093/ })).not.toHaveTextContent("Unavailable");
+  });
+});
+
 describe("footer and chip", () => {
   it("shows the read-only note and command", () => {
     render(<><ModelChip model="@cf/deepseek-ai/deepseek-v4.1-flash-1017" /><EvalsFooter /></>);

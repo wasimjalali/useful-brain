@@ -71,6 +71,7 @@ export function mapEvals(view: EvalsAdminView): EvalsPageView {
         askedAs: f.askedAs,
         expected: f.expected.map((e) => ({ document: e.title, section: e.section ?? "Whole document" })),
         note: f.note,
+        ...(/^unavailable/i.test(f.detail) ? { unavailable: true } : {}),
       };
     }),
     failureCount: view.failures.length,

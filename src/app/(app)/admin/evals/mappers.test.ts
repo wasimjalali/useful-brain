@@ -26,6 +26,15 @@ const view = (over: Partial<EvalsAdminView> = {}): EvalsAdminView => ({
 });
 
 describe("mapEvals", () => {
+  it("flags a failure whose detail starts with unavailable", () => {
+    const base = view().failures[0];
+    const m = mapEvals(
+      view({ failures: [{ ...base, id: "q071", detail: "Unavailable. The Brain returned 503." }, base] }),
+    );
+    expect(m.failures[0].unavailable).toBe(true);
+    expect(m.failures[1].unavailable).toBeUndefined();
+  });
+
   it("maps runs, categories, metrics and failures", () => {
     const m = mapEvals(view());
     expect(m.subtitle).toBe("120 questions across 2 categories, run against the active generation");

@@ -1,4 +1,4 @@
-export type CampaignKey = "baseline" | "pass1" | "final" | "coverage" | "redesign" | "latest";
+export type CampaignKey = "baseline" | "pass1" | "final" | "coverage" | "redesign" | "redesignFix" | "latest";
 
 export type CampaignCategoryId =
   | "factual"
@@ -171,8 +171,8 @@ export const NORTHWIND_CAMPAIGN_RUNS: CampaignRun[] = [
     failures: [],
   },
   {
-    key: "latest",
-    label: "Latest",
+    key: "redesignFix",
+    label: "Redesign fix",
     date: "2026-10-08",
     passed: 117,
     scored: 120,
@@ -206,11 +206,41 @@ export const NORTHWIND_CAMPAIGN_RUNS: CampaignRun[] = [
       },
     ],
   },
+  {
+    key: "latest",
+    label: "Latest",
+    date: "2026-10-25",
+    passed: 118,
+    scored: 120,
+    passRate: 118 / 120,
+    note: "Production model DeepSeek V4.1 Flash on the search-budget fix build. One turn stayed unavailable, one multi-hop miss.",
+    categories: [
+      category("factual", 70, 70),
+      category("trap", 17, 17),
+      category("permission", 12, 13),
+      category("unanswerable", 10, 10),
+      category("multi_hop", 9, 10),
+    ],
+    failures: [
+      {
+        id: "q071",
+        category: "permission",
+        detail:
+          "Unavailable. The Brain returned 503 on all four attempts, scored as a failure.",
+      },
+      {
+        id: "q090",
+        category: "multi_hop",
+        detail:
+          "Missing the second-hop citation for nw_support_dsar_process.",
+      },
+    ],
+  },
 ];
 
 export const NORTHWIND_CAMPAIGN = {
   title: "Northwind live battery",
-  model: "@cf/zai-org/glm-5.3-flash",
+  model: "@cf/deepseek-ai/deepseek-v4.1-flash-1017",
   questions: 120,
   documents: 65,
   latestKey: "latest" as const,

@@ -1,0 +1,146 @@
+{
+  "model": "@cf/deepseek-ai/deepseek-v4.1-flash-1017",
+  "questionsFile": "<scratchpad>/budget-fix-check.json",
+  "harnessGitSha": "f050672a9be9c9b2a93e06f366fcef70fc4b66d2",
+  "harnessDirty": false,
+  "pipelineVersion": "grounded-answer.v14|real-stack|300/30|0.70/0.30|kw6|kr3|cb0.05|rr20|@cf/baai/bge-reranker-base|floor0.05|top8|fts-stopword-or-v1",
+  "latency": {
+    "count": 19,
+    "total": 19,
+    "partial": false,
+    "meanMs": 11559,
+    "p50Ms": 10635,
+    "p95Ms": 24542
+  },
+  "retrieval": {
+    "recallAtK": 0.75,
+    "mrr": 0.9166666666666666,
+    "ndcgAtK": 0.7688578654609097,
+    "citationCorrectness": 0.16666666666666666,
+    "abstentionCorrectness": 0,
+    "aclLeakCount": 0,
+    "questions": 19
+  },
+  "live": {
+    "total": 19,
+    "scored": 19,
+    "passed": 16,
+    "failed": 3,
+    "skipped": 0,
+    "passRate": 0.8421052631578947,
+    "byCategory": {
+      "factual": {
+        "scored": 1,
+        "passed": 0
+      },
+      "permission": {
+        "scored": 13,
+        "passed": 13
+      },
+      "multi_hop_expanded": {
+        "scored": 5,
+        "passed": 3
+      }
+    },
+    "retrievedRecall": 1,
+    "goldRetrievedUncitedCount": 3,
+    "citedNotExpectedCount": 1,
+    "vectorDegradedTurns": 0,
+    "hybridBaselineComparable": true,
+    "refusedWithEvidence": 10
+  },
+  "failures": [
+    {
+      "layer": "live",
+      "questionId": "q028",
+      "detail": {
+        "questionId": "q028",
+        "category": "factual",
+        "answerType": "grounded",
+        "citedDocumentIds": [
+          "nw_support_dsar_process"
+        ],
+        "retrievedDocumentIds": [
+          "nw_finance_refund_policy",
+          "nw_legal_privacy_policy",
+          "nw_hr_employee_handbook",
+          "nw_legal_data_retention",
+          "nw_support_sla_policy",
+          "nw_support_complaint_escalation",
+          "nw_support_dsar_process"
+        ],
+        "sectionHit": false,
+        "liveRecall": 1,
+        "goldRetrievedUncited": [
+          "nw_legal_privacy_policy"
+        ],
+        "vectorDegradedCount": 0,
+        "status": "fail",
+        "detail": "Grounded answer did not cite expected documents (nw_legal_privacy_policy). Cited: nw_support_dsar_process."
+      }
+    },
+    {
+      "layer": "live",
+      "questionId": "q116",
+      "detail": {
+        "questionId": "q116",
+        "category": "multi_hop_expanded",
+        "answerType": "grounded",
+        "citedDocumentIds": [
+          "nw_engineering_incident_escalation"
+        ],
+        "retrievedDocumentIds": [
+          "nw_engineering_incident_escalation",
+          "nw_engineering_release_notes_2026",
+          "nw_engineering_on_call",
+          "nw_support_kb_guidelines",
+          "nw_support_channels_hours",
+          "nw_engineering_log_retention",
+          "nw_operations_scheduled_maintenance",
+          "nw_engineering_sdlc",
+          "nw_hr_termination_offboarding",
+          "nw_legal_data_retention",
+          "nw_operations_dr_runbook"
+        ],
+        "sectionHit": true,
+        "liveRecall": 1,
+        "goldRetrievedUncited": [
+          "nw_engineering_log_retention"
+        ],
+        "vectorDegradedCount": 0,
+        "status": "fail",
+        "detail": "Multi-hop answer missing citations for nw_engineering_log_retention."
+      }
+    },
+    {
+      "layer": "live",
+      "questionId": "q117",
+      "detail": {
+        "questionId": "q117",
+        "category": "multi_hop_expanded",
+        "answerType": "insufficient_evidence",
+        "citedDocumentIds": [],
+        "retrievedDocumentIds": [
+          "nw_hr_employee_handbook",
+          "nw_hr_remote_work",
+          "nw_hr_leave_policy",
+          "nw_operations_equipment_return",
+          "nw_hr_onboarding_guide",
+          "nw_legal_ip_confidentiality",
+          "nw_operations_office_facilities",
+          "nw_hr_parental_leave"
+        ],
+        "sectionHit": false,
+        "liveRecall": 1,
+        "goldRetrievedUncited": [
+          "nw_hr_remote_work",
+          "nw_operations_equipment_return"
+        ],
+        "vectorDegradedCount": 0,
+        "refusalReason": "search_cap_invalid_draft",
+        "status": "fail",
+        "detail": "Expected a grounded answer, got \"insufficient_evidence\"."
+      }
+    }
+  ]
+}

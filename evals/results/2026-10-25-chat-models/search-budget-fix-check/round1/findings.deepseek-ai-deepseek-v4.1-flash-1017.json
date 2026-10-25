@@ -1,0 +1,137 @@
+{
+  "model": "@cf/deepseek-ai/deepseek-v4.1-flash-1017",
+  "questionsFile": "<scratchpad>/budget-fix-check.json",
+  "harnessGitSha": "0cd4689c54fca511849a777fb6082543016d1b0d",
+  "harnessDirty": false,
+  "pipelineVersion": "grounded-answer.v13|real-stack|300/30|0.70/0.30|kw6|kr3|cb0.05|rr20|@cf/baai/bge-reranker-base|floor0.05|top8|fts-stopword-or-v1",
+  "latency": {
+    "count": 19,
+    "total": 19,
+    "partial": false,
+    "meanMs": 11845,
+    "p50Ms": 10654,
+    "p95Ms": 27664
+  },
+  "retrieval": {
+    "recallAtK": 0.75,
+    "mrr": 0.9166666666666666,
+    "ndcgAtK": 0.7688578654609097,
+    "citationCorrectness": 0.16666666666666666,
+    "abstentionCorrectness": 0,
+    "aclLeakCount": 0,
+    "questions": 19
+  },
+  "live": {
+    "total": 19,
+    "scored": 19,
+    "passed": 16,
+    "failed": 3,
+    "skipped": 0,
+    "passRate": 0.8421052631578947,
+    "byCategory": {
+      "factual": {
+        "scored": 1,
+        "passed": 0
+      },
+      "permission": {
+        "scored": 13,
+        "passed": 11
+      },
+      "multi_hop_expanded": {
+        "scored": 5,
+        "passed": 5
+      }
+    },
+    "retrievedRecall": 1,
+    "goldRetrievedUncitedCount": 1,
+    "citedNotExpectedCount": 1,
+    "vectorDegradedTurns": 0,
+    "hybridBaselineComparable": true,
+    "refusedWithEvidence": 9
+  },
+  "failures": [
+    {
+      "layer": "live",
+      "questionId": "q028",
+      "detail": {
+        "questionId": "q028",
+        "category": "factual",
+        "answerType": "grounded",
+        "citedDocumentIds": [
+          "nw_support_dsar_process"
+        ],
+        "retrievedDocumentIds": [
+          "nw_finance_refund_policy",
+          "nw_legal_privacy_policy",
+          "nw_hr_employee_handbook",
+          "nw_legal_data_retention",
+          "nw_support_sla_policy",
+          "nw_support_complaint_escalation",
+          "nw_support_dsar_process"
+        ],
+        "sectionHit": false,
+        "liveRecall": 1,
+        "goldRetrievedUncited": [
+          "nw_legal_privacy_policy"
+        ],
+        "vectorDegradedCount": 0,
+        "status": "fail",
+        "detail": "Grounded answer did not cite expected documents (nw_legal_privacy_policy). Cited: nw_support_dsar_process."
+      }
+    },
+    {
+      "layer": "live",
+      "questionId": "q073",
+      "detail": {
+        "questionId": "q073",
+        "category": "permission",
+        "answerType": "grounded",
+        "citedDocumentIds": [
+          "nw_engineering_release_notes_2026"
+        ],
+        "retrievedDocumentIds": [
+          "nw_engineering_release_notes_2026",
+          "nw_engineering_incident_escalation",
+          "nw_engineering_change_management",
+          "nw_engineering_error_code_reference",
+          "nw_support_sla_policy",
+          "nw_support_atlas_runbook"
+        ],
+        "sectionHit": null,
+        "liveRecall": null,
+        "goldRetrievedUncited": [],
+        "vectorDegradedCount": 0,
+        "status": "fail",
+        "detail": "Expected insufficient_evidence for permission, got \"grounded\"."
+      }
+    },
+    {
+      "layer": "live",
+      "questionId": "q074",
+      "detail": {
+        "questionId": "q074",
+        "category": "permission",
+        "answerType": "grounded",
+        "citedDocumentIds": [
+          "nw_finance_employee_expense",
+          "nw_operations_equipment_return"
+        ],
+        "retrievedDocumentIds": [
+          "nw_finance_employee_expense",
+          "nw_hr_onboarding_guide",
+          "nw_operations_equipment_return",
+          "nw_legal_ip_confidentiality",
+          "nw_hr_remote_work",
+          "nw_hr_leave_policy",
+          "nw_hr_parental_leave"
+        ],
+        "sectionHit": null,
+        "liveRecall": null,
+        "goldRetrievedUncited": [],
+        "vectorDegradedCount": 0,
+        "status": "fail",
+        "detail": "Expected insufficient_evidence for permission, got \"grounded\"."
+      }
+    }
+  ]
+}

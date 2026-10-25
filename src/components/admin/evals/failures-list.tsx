@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { ChevronRightIcon } from "@/components/icons";
+import { StatusLabel } from "@/components/ui/status-label";
 import type { EvalFailureView } from "@/lib/contracts/admin-insights-view";
 
 function askedAsLabel(role: string): string {
@@ -50,7 +51,14 @@ export function FailuresList({
               </span>
               <span className="font-mono text-xs">{f.id}</span>
               <span className="justify-self-start rounded-md bg-sunken px-[7px] py-px text-xs text-ink-muted">{f.category}</span>
-              <span className="truncate text-[13px] leading-5">{f.question}</span>
+              {f.unavailable ? (
+                <span className="flex min-w-0 items-center gap-2">
+                  <StatusLabel tone="warning">Unavailable</StatusLabel>
+                  <span className="truncate text-[13px] leading-5">{f.question}</span>
+                </span>
+              ) : (
+                <span className="truncate text-[13px] leading-5">{f.question}</span>
+              )}
             </button>
             {isOpen ? (
               <dl

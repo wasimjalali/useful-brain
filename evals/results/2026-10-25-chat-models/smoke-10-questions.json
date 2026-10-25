@@ -1,0 +1,272 @@
+{
+  "principals": {
+    "eng_ic": {
+      "user_id": "eng_ic",
+      "roles": [
+        "standard"
+      ],
+      "departments": [
+        "engineering"
+      ]
+    },
+    "eng_lead": {
+      "user_id": "eng_lead",
+      "roles": [
+        "manager"
+      ],
+      "departments": [
+        "engineering"
+      ]
+    },
+    "eng_dir": {
+      "user_id": "eng_dir",
+      "roles": [
+        "director"
+      ],
+      "departments": [
+        "engineering"
+      ]
+    },
+    "hr_generalist": {
+      "user_id": "hr_generalist",
+      "roles": [
+        "standard"
+      ],
+      "departments": [
+        "hr"
+      ]
+    },
+    "hr_manager": {
+      "user_id": "hr_manager",
+      "roles": [
+        "hr_manager"
+      ],
+      "departments": [
+        "hr"
+      ]
+    },
+    "fin_analyst": {
+      "user_id": "fin_analyst",
+      "roles": [
+        "standard"
+      ],
+      "departments": [
+        "finance"
+      ]
+    },
+    "fin_manager": {
+      "user_id": "fin_manager",
+      "roles": [
+        "finance_manager"
+      ],
+      "departments": [
+        "finance"
+      ]
+    },
+    "cfo": {
+      "user_id": "cfo",
+      "roles": [
+        "executive"
+      ],
+      "departments": [
+        "executive",
+        "finance"
+      ]
+    },
+    "sales_rep": {
+      "user_id": "sales_rep",
+      "roles": [
+        "standard"
+      ],
+      "departments": [
+        "sales"
+      ]
+    },
+    "sales_manager": {
+      "user_id": "sales_manager",
+      "roles": [
+        "sales_manager"
+      ],
+      "departments": [
+        "sales"
+      ]
+    },
+    "support_agent": {
+      "user_id": "support_agent",
+      "roles": [
+        "standard"
+      ],
+      "departments": [
+        "support"
+      ]
+    },
+    "support_manager": {
+      "user_id": "support_manager",
+      "roles": [
+        "support_manager"
+      ],
+      "departments": [
+        "support"
+      ]
+    },
+    "legal_counsel": {
+      "user_id": "legal_counsel",
+      "roles": [
+        "standard"
+      ],
+      "departments": [
+        "legal"
+      ]
+    },
+    "ops_coord": {
+      "user_id": "ops_coord",
+      "roles": [
+        "standard"
+      ],
+      "departments": [
+        "operations"
+      ]
+    },
+    "ops_manager": {
+      "user_id": "ops_manager",
+      "roles": [
+        "manager"
+      ],
+      "departments": [
+        "operations"
+      ]
+    }
+  },
+  "description": "10-question smoke for the 2026-10-25 DeepSeek V4.1 Flash eval, drawn from the locked battery (factual, trap, permission, unanswerable, multi-hop, identifier). Not a baseline.",
+  "questions": [
+    {
+      "id": "q001",
+      "category": "factual",
+      "query": "Which offices does Northwind have and roughly how many people work here?",
+      "principal": "eng_ic",
+      "expected_document_ids": [
+        "nw_hr_employee_handbook"
+      ],
+      "expected_sections": [
+        "Welcome to Northwind Systems"
+      ],
+      "note": "basic company facts; handbook is the umbrella doc"
+    },
+    {
+      "id": "q002",
+      "category": "factual",
+      "query": "How many vacation days do employees hired in London get per year?",
+      "principal": "eng_ic",
+      "expected_document_ids": [
+        "nw_hr_leave_policy",
+        "nw_hr_employee_handbook"
+      ],
+      "expected_sections": [
+        "Annual Leave Entitlements",
+        "Leave and Time Off"
+      ],
+      "note": "regional entitlement table; London is 25, differs from Austin 20"
+    },
+    {
+      "id": "q051",
+      "category": "trap",
+      "query": "A customer paid for a full year of Core upfront and now wants their money back. They insist we have a 30-day return window. What is the actual window?",
+      "principal": "support_agent",
+      "expected_document_ids": [
+        "nw_finance_refund_policy"
+      ],
+      "expected_sections": [
+        "Refund Windows"
+      ],
+      "note": "P1 refund vs equipment return: 14 calendar days for annual plans, not the 30-day equipment window"
+    },
+    {
+      "id": "q052",
+      "category": "trap",
+      "query": "A contractor just told me their approved expense claim has been waiting over two weeks. When should they actually be paid?",
+      "principal": "ops_coord",
+      "expected_document_ids": [
+        "nw_finance_contractor_expense",
+        "nw_hr_employee_handbook"
+      ],
+      "expected_sections": [
+        "Submission and Payment Timing",
+        "Expenses and Travel"
+      ],
+      "note": "P2 contractor vs employee: 30 business days for contractors, employees get 10"
+    },
+    {
+      "id": "q066",
+      "category": "permission",
+      "query": "What is the band minimum and maximum annual base salary for level L5?",
+      "principal": "eng_ic",
+      "expected_document_ids": [],
+      "forbidden_document_ids": [
+        "nw_hr_salary_bands"
+      ],
+      "note": "salary bands live in hr/salary-bands.md (dept [hr]); engineer must get zero hits. Query wording matches the band table so the document would rank if the asker were allowed, which is what makes this a live ACL test"
+    },
+    {
+      "id": "q067",
+      "category": "permission",
+      "query": "How much severance does the CEO get if terminated without cause?",
+      "principal": "hr_manager",
+      "expected_document_ids": [],
+      "forbidden_document_ids": [
+        "nw_executive_severance"
+      ],
+      "note": "executive/severance-policy.md is private [executive]; HR is denied"
+    },
+    {
+      "id": "q076",
+      "category": "unanswerable",
+      "query": "What is the company match on the 401(k) plan?",
+      "principal": "eng_ic",
+      "expected_document_ids": [],
+      "note": "retirement benefits are never mentioned anywhere in the corpus"
+    },
+    {
+      "id": "q086",
+      "category": "multi_hop",
+      "query": "An incident happens during the December freeze and we need to deploy a fix to production. What process applies and who approves it?",
+      "principal": "eng_lead",
+      "expected_document_ids": [
+        "nw_engineering_change_management",
+        "nw_engineering_deployment"
+      ],
+      "expected_sections": [
+        "Change Freeze",
+        "Emergency Changes"
+      ],
+      "note": "freeze exception in change management + emergency change rules in deployment; both needed"
+    },
+    {
+      "id": "q100",
+      "category": "factual",
+      "query": "What is Yusuf Delacroix responsible for?",
+      "principal": "ops_manager",
+      "expected_document_ids": [
+        "nw_operations_dr_runbook"
+      ],
+      "expected_sections": [
+        "Communication, Stand-Down and Post-Event Review"
+      ],
+      "note": "exact token: a person named exactly once in the whole corpus"
+    },
+    {
+      "id": "q116",
+      "category": "multi_hop_expanded",
+      "query": "After a SEV-1, when is the postmortem due and how long must its incident records be retained?",
+      "principal": "eng_lead",
+      "expected_document_ids": [
+        "nw_engineering_incident_escalation",
+        "nw_engineering_log_retention"
+      ],
+      "expected_sections": [
+        "SEV-1: Critical Incident",
+        "What Counts as Security Logs"
+      ],
+      "note": "incident response supplies the postmortem deadline; log policy supplies seven-year retention"
+    }
+  ]
+}

@@ -1,0 +1,242 @@
+ok
+
+> useful-brain@0.1.0 eval:northwind
+> jiti src/lib/eval/live-northwind-eval.ts --live http://127.0.0.1:8794 --score-unavailable --model @cf/deepseek-ai/deepseek-v4.1-flash-1017
+
+live 1/120 q001
+live 2/120 q002
+live 3/120 q003
+live 4/120 q004
+live 5/120 q005
+live 6/120 q006
+live 7/120 q007
+live 8/120 q008
+live 9/120 q009
+live 10/120 q010
+live 11/120 q011
+live 12/120 q012
+live 13/120 q013
+live 14/120 q014
+live 15/120 q015
+live 16/120 q016
+live 17/120 q017
+live 18/120 q018
+live 19/120 q019
+live 20/120 q020
+live 21/120 q021
+live 22/120 q022
+live 23/120 q023
+live 24/120 q024
+live 25/120 q025
+live 26/120 q026
+live 27/120 q027
+live 28/120 q028
+live 29/120 q029
+live 30/120 q030
+live 31/120 q031
+live 32/120 q032
+live 33/120 q033
+live 34/120 q034
+live 35/120 q035
+live 36/120 q036
+live 37/120 q037
+live 38/120 q038
+live 39/120 q039
+live 40/120 q040
+live 41/120 q041
+live 42/120 q042
+live 43/120 q043
+live 44/120 q044
+live 45/120 q045
+live 46/120 q046
+live 47/120 q047
+live 48/120 q048
+live 49/120 q049
+live 50/120 q050
+live 51/120 q051
+live 52/120 q052
+live 53/120 q053
+live 54/120 q054
+live 55/120 q055
+live 56/120 q056
+live 57/120 q057
+live 58/120 q058
+live 59/120 q059
+live 60/120 q060
+live 61/120 q061
+live 62/120 q062
+live 63/120 q063
+live 64/120 q064
+live 65/120 q065
+live 66/120 q066
+live 67/120 q067
+live 68/120 q068
+live 69/120 q069
+live 70/120 q070
+live 71/120 q071
+q071: Brain /turns failed after 4 attempts (statuses 503, 503, 503, 503); the question was not scored; scored as a failure (--score-unavailable)
+live 72/120 q072
+live 73/120 q073
+live 74/120 q074
+live 75/120 q075
+live 76/120 q076
+live 77/120 q077
+live 78/120 q078
+live 79/120 q079
+live 80/120 q080
+live 81/120 q081
+live 82/120 q082
+live 83/120 q083
+live 84/120 q084
+live 85/120 q085
+live 86/120 q086
+live 87/120 q087
+live 88/120 q088
+live 89/120 q089
+live 90/120 q090
+live 91/120 q091
+live 92/120 q092
+live 93/120 q093
+live 94/120 q094
+live 95/120 q095
+live 96/120 q096
+live 97/120 q097
+live 98/120 q098
+live 99/120 q099
+live 100/120 q100
+live 101/120 q101
+live 102/120 q102
+live 103/120 q103
+live 104/120 q104
+live 105/120 q105
+live 106/120 q106
+live 107/120 q107
+live 108/120 q108
+live 109/120 q109
+live 110/120 q110
+live 111/120 q111
+live 112/120 q112
+live 113/120 q113
+live 114/120 q114
+live 115/120 q115
+live 116/120 q116
+live 117/120 q117
+live 118/120 q118
+live 119/120 q119
+live 120/120 q120
+{
+  "model": "@cf/deepseek-ai/deepseek-v4.1-flash-1017",
+  "harnessGitSha": "e1e0432e12d2017b7a8ba98289a0dd59688f0772",
+  "harnessDirty": false,
+  "pipelineVersion": "grounded-answer.v14|real-stack|300/30|0.70/0.30|kw6|kr3|cb0.05|rr20|@cf/baai/bge-reranker-base|floor0.05|top8|fts-stopword-or-v1",
+  "latency": {
+    "count": 119,
+    "total": 120,
+    "partial": true,
+    "meanMs": 8665,
+    "p50Ms": 7501,
+    "p95Ms": 20399
+  },
+  "retrieval": {
+    "recallAtK": 0.9123711340206185,
+    "mrr": 0.824742268041237,
+    "ndcgAtK": 0.8370127906093069,
+    "citationCorrectness": 0.5051546391752577,
+    "abstentionCorrectness": 0,
+    "aclLeakCount": 0,
+    "questions": 120
+  },
+  "live": {
+    "total": 120,
+    "scored": 120,
+    "passed": 118,
+    "failed": 2,
+    "skipped": 0,
+    "passRate": 0.9833333333333333,
+    "byCategory": {
+      "factual": {
+        "scored": 70,
+        "passed": 70
+      },
+      "trap": {
+        "scored": 17,
+        "passed": 17
+      },
+      "permission": {
+        "scored": 13,
+        "passed": 12
+      },
+      "unanswerable": {
+        "scored": 10,
+        "passed": 10
+      },
+      "multi_hop": {
+        "scored": 5,
+        "passed": 4
+      },
+      "multi_hop_expanded": {
+        "scored": 5,
+        "passed": 5
+      }
+    },
+    "retrievedRecall": 0.9948453608247423,
+    "goldRetrievedUncitedCount": 14,
+    "citedNotExpectedCount": 9,
+    "vectorDegradedTurns": 0,
+    "hybridBaselineComparable": true,
+    "refusedWithEvidence": 14
+  },
+  "failures": [
+    {
+      "layer": "live",
+      "questionId": "q071",
+      "detail": {
+        "questionId": "q071",
+        "category": "permission",
+        "status": "fail",
+        "detail": "unavailable: Brain returned 503 on all 4 attempts",
+        "answerType": "unavailable",
+        "citedDocumentIds": [],
+        "retrievedDocumentIds": [],
+        "sectionHit": null,
+        "liveRecall": null,
+        "goldRetrievedUncited": [],
+        "vectorDegradedCount": 0
+      }
+    },
+    {
+      "layer": "live",
+      "questionId": "q090",
+      "detail": {
+        "questionId": "q090",
+        "category": "multi_hop",
+        "answerType": "grounded",
+        "citedDocumentIds": [
+          "nw_finance_refund_policy",
+          "nw_legal_data_retention"
+        ],
+        "retrievedDocumentIds": [
+          "nw_hr_employee_handbook",
+          "nw_finance_refund_policy",
+          "nw_support_customer_onboarding",
+          "nw_support_complaint_escalation",
+          "nw_sales_referral_program",
+          "nw_finance_invoicing_payment",
+          "nw_legal_data_retention",
+          "nw_support_dsar_process",
+          "nw_engineering_error_code_reference",
+          "nw_legal_privacy_policy"
+        ],
+        "sectionHit": true,
+        "liveRecall": 1,
+        "goldRetrievedUncited": [
+          "nw_support_dsar_process"
+        ],
+        "vectorDegradedCount": 0,
+        "status": "fail",
+        "detail": "Multi-hop answer missing citations for nw_support_dsar_process."
+      }
+    }
+  ]
+}
+exit 0

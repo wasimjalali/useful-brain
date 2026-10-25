@@ -1,0 +1,13 @@
+ok
+
+> useful-brain@0.1.0 eval:northwind
+> jiti src/lib/eval/live-northwind-eval.ts --live http://127.0.0.1:8789 --model @cf/deepseek-ai/deepseek-v4.1-flash-1017 --resume
+
+live 69/120 q069
+live 70/120 q070
+live 71/120 q071
+live 72/120 q072
+live 73/120 q073
+live 74/120 q074
+q074: Brain /turns failed after 4 attempts (statuses 503, 503, 503, 503); the question was not scored
+exit 1
