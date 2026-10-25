@@ -6,11 +6,11 @@ Date: 2026-10-25. Repo: Useful Brain. Eval: the 120-question Northwind live batt
 
 Cloudflare added new chat models since our [August bake-off](2026-08-31-chat-model-bakeoff.md). The strongest candidate was DeepSeek V4.1 Flash (released 2026-10-17): cheaper than V4 Flash, the fastest model in August, with tool calling and a reasoning switch. On the first run it lost two questions to HTTP 503s that GLM 5.3 Flash, our production model, almost never hit.
 
-The cause was our own agent, not the model: a model that wanted a fifth search hit the per-turn search cap, and the host counted the blocked call as a failed backend search. That is fixed and merged ([PR #72](https://github.com/wasimjalali/useful-brain/pull/72)). On the fixed build DeepSeek scored 118/120 against GLM's 117/120 and answered in half the time, at about 2.4 times the token price. DeepSeek V4.1 Flash is now the production chat model ([PR #74](https://github.com/wasimjalali/useful-brain/pull/74)).
+The cause was our own agent, not the model: a model that wanted a fifth search hit the per-turn search cap, and the host counted the blocked call as a failed backend search. That is fixed and merged ([PR #72](https://github.com/wasimjalali/useful-brain/pull/72)). On the fixed build DeepSeek scored 118/120 against GLM's 117/120 and answered in half the time, at 2 to 2.4 times the token price. DeepSeek V4.1 Flash is now the production chat model ([PR #74](https://github.com/wasimjalali/useful-brain/pull/74)).
 
 | | GLM 5.3 Flash | DeepSeek V4.1 Flash | Build and folder |
 | --- | --- | --- | --- |
-| Full battery, before the fix | **118/120** | 116/120 (2 of the misses were 503s) | pre-fix: d9a0203, prompt v13, tree dirty; top-level files of `results/2026-10-25-chat-models/` |
+| Full battery, before the fix | **118/120** | 116/120 (2 of the misses were 503s; three questions failed all four retries, q069, q074 and q117, and q069 passed when re-asked on resume, so with `--score-unavailable` from the start it would have read 115/120) | pre-fix: d9a0203, prompt v13, tree dirty; top-level files of `results/2026-10-25-chat-models/` |
 | Full battery, on the fix | 117/120 | **118/120** | fix: e1e0432, prompt v14; `fix-build-full/` |
 | Latency p50 / p95, before the fix | 12.0 s / 37.3 s | **6.9 s / 25.2 s** | pre-fix (as above) |
 | Latency p50 / p95, on the fix | 14.3 s / 41.4 s | **7.5 s / 20.4 s** | fix (as above) |
@@ -32,7 +32,7 @@ Same harness as August: the loopback-only `evalModel` override, identical prompt
 
 The pre-fix runs (and the BGE-M3 battery in the [embedder write-up](2026-10-25-embedder-bge-m3.md)) are recorded at commit d9a0203 with `harnessDirty: true`. The uncommitted changes were the DeepSeek allowlist line and the `--score-unavailable` flag, committed afterwards in 9efc7ab on the eval branch, so the harness behind those numbers is recoverable. Every later run is on a clean commit.
 
-DeepSeek first ran a 10-question smoke (factual, trap, permission, unanswerable, both multi-hop slices and q100, an identifier lookup every model failed in August). It passed 10/10 with p50 8.9 s, so it ran the full battery.
+DeepSeek first ran a 10-question smoke (factual, trap, permission, unanswerable, both multi-hop slices and q100, an identifier lookup every model failed in August). It passed 10/10 with p50 8.9 s (questions in [`smoke-10-questions.json`](../results/2026-10-25-chat-models/smoke-10-questions.json)), so it ran the full battery.
 
 ## The bug DeepSeek found
 
@@ -59,7 +59,7 @@ The strict version is the instructive row. Treating a second capped search as a 
 
 ## Decision
 
-On the fixed build the accuracy gap closed: DeepSeek 118/120 (misses q071, one turn still unavailable, and q090) against GLM 117/120 (q028, q073, q075). One question either way is inside run-to-run noise. DeepSeek's one real miss, q090 (a refund triggers a 30-day deletion, the data-access process defines that window), retrieved both gold documents but cited the refund and data-retention policies instead of the data-access one: a grounded answer that missed the second hop's citation. Speed is not noise: DeepSeek answered 1.5 to 2 times as fast in every run today. Before the fix p50 was 6.9 against 12.0 s (1.7 times) and p95 25.2 against 37.3 s (1.5 times); on the fix build, about 2 times (p50 7.5 against 14.3 s, p95 20.4 against 41.4 s). Price goes the other way, about 2 to 2.4 times per token, which is cents at portfolio volume.
+On the fixed build the accuracy gap closed: DeepSeek 118/120 (misses q071, one turn still unavailable, and q090) against GLM 117/120 (q028, q073, q075). One question either way is inside run-to-run noise. DeepSeek's one real miss, q090 (a refund triggers a 30-day deletion, the data-access process defines that window), retrieved both gold documents but cited the refund and data-retention policies instead of the data-access one: a grounded answer that missed the second hop's citation. Speed is not noise: DeepSeek answered 1.5 to 2 times as fast in every full battery today (the 19-question checks show 2 to 3 times at p50, and GLM's p95 reached 200+ s in softcap and strict). Before the fix p50 was 6.9 against 12.0 s (1.7 times) and p95 25.2 against 37.3 s (1.5 times); on the fix build, about 2 times (p50 7.5 against 14.3 s, p95 20.4 against 41.4 s). Price goes the other way, about 2 to 2.4 times per token, which is cents at portfolio volume.
 
 Production was switched to DeepSeek V4.1 Flash in PR #74 (https://github.com/wasimjalali/useful-brain/pull/74). The answer time a visitor feels is the product's weakest point, and this halves it without giving up accuracy. GLM 5.3 Flash stays on the eval allowlist as the comparison point. The switch sends exactly the request the eval measured: GLM's Workers AI chat descriptor with the model id swapped, and thinking off on extraction calls.
 

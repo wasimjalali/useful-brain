@@ -25,6 +25,8 @@ evals/
   results/<date>/      frozen findings JSON backing each report
 ```
 
+In the 2026-10-25 findings, a `questionsFile` of `<scratchpad>/...` means the repo copy: `search-budget-fix-check/questions.json` or `smoke-10-questions.json`.
+
 The 2026-10-25 results are split by build:
 
 ```
@@ -55,4 +57,4 @@ npm run eval:northwind -- --live http://127.0.0.1:8789 --model <id> --score-unav
 npm run eval:northwind -- --live http://127.0.0.1:8789 --questions content/northwind/tuning-questions.json   # tuning set, not the locked 120
 ```
 
-Results land in `eval-output/findings*.json`. `--score-unavailable` is recorded in the checkpoint and the findings; `--resume` only continues a run that used the same setting and asks the unavailable questions again. A `--questions` run lands in `eval-output/tuning/<file>/` so it can never be mistaken for, or resumed into, the locked run.
+Results land in `eval-output/findings*.json`. `--score-unavailable` is recorded in the checkpoint and the findings; `--resume` only continues a run that used the same setting (any other mismatch starts over, with a stderr notice naming the differing fields) and asks the unavailable questions again. The 2026-10-25 frozen snapshots predate the `scoreUnavailable` and `latency.unavailable` fields; the pre-fix DeepSeek run and the BGE-M3 battery used the flag ("scored as a failure (--score-unavailable)" appears in their run logs). A `--questions` run lands in `eval-output/tuning/<file>/` so it can never be mistaken for, or resumed into, the locked run.

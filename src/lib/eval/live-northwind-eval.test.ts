@@ -391,13 +391,15 @@ describe("runLiveLayer with unavailable turns", () => {
     expect(checkpoint.results).toHaveLength(2);
   });
 
-  it("refuses to resume a checkpoint written with a different flag value", async () => {
+  it("starts over with a notice when the checkpoint was written with a different flag value", async () => {
     unavailableFor = new Set([questions[0].questionId]);
     vi.stubGlobal("fetch", brainMock());
     await run(true, false);
     turnLog.length = 0;
     unavailableFor = new Set();
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     const { results } = await run(false, true);
+    expect(stderr).toHaveBeenCalledWith(expect.stringContaining("checkpoint differs in scoreUnavailable"));
     // Nothing was reused: both questions were asked again.
     expect(turnLog).toEqual(questions.map((question) => question.questionId));
     expect(results.every((result) => result.answerType === "insufficient_evidence")).toBe(true);

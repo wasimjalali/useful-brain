@@ -1,4 +1,4 @@
-// Embedder bake-off: Qwen3 Embedding 0.6B (production) vs BGE-M3 on the
+// Embedder bake-off: Qwen3 Embedding 0.6B (former production embedder) vs BGE-M3 on the
 // Northwind corpus, dense retrieval only. Chunks come from the production
 // chunker (300/30), each question's principal filters chunks before ranking,
 // and documents are scored against the locked 120-question gold set.

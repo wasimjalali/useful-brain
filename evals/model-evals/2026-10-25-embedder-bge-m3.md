@@ -54,6 +54,8 @@ Wasim's rule: replace it if it wins on the benchmarks and brings a positive retu
 - The embedder's retrieval win (about two questions of 97 at recall@3) did not show up as a pass-rate win because the hybrid pipeline (keyword channel, keyword rescue, reranker) already recovered those documents for Qwen3.
 - Pass and latency numbers for the Qwen3 baseline come from the same day's GLM 5.3 Flash run, documented in the [Workers AI chat model report](2026-10-25-workers-ai-chat-models.md).
 
+Not every figure here has a frozen snapshot. The 73-model catalog count, the $0.0118 price, the release dates, the context windows and the claim that every chat model failed q100 in August are recorded in this write-up only.
+
 ## Cost
 
 Stage 1 embedded about 808 chunks and 120 questions twice: under one cent. Stage 2 is one full battery (GLM 5.3 Flash) plus one BGE-M3 seed: well under a dollar against Workers AI list prices.

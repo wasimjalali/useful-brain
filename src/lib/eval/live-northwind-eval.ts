@@ -402,14 +402,17 @@ export async function runLiveLayer(
   if (resume) {
     try {
       const previous = JSON.parse(readFileSync(paths.checkpoint, "utf8")) as LiveCheckpoint;
-      if (
-        previous.brainUrl === brainUrl &&
-        previous.harnessVersion === HARNESS_VERSION &&
-        previous.generationId === generationId &&
-        (previous.model ?? CHAT_MODEL_ID) === expectedModel &&
-        previous.questionSetDigest === digest &&
-        (previous.scoreUnavailable ?? false) === scoreUnavailable
-      ) {
+      const differs = [
+        previous.brainUrl !== brainUrl && "brainUrl",
+        previous.harnessVersion !== HARNESS_VERSION && "harnessVersion",
+        previous.generationId !== generationId && "generationId",
+        (previous.model ?? CHAT_MODEL_ID) !== expectedModel && "model",
+        previous.questionSetDigest !== digest && "questionSetDigest",
+        (previous.scoreUnavailable ?? false) !== scoreUnavailable && "scoreUnavailable",
+      ].filter(Boolean);
+      if (differs.length > 0) {
+        process.stderr.write(`--resume: checkpoint differs in ${differs.join(", ")}; starting over\n`);
+      } else {
         // Unavailable rows are not answers: drop them so those questions are asked again.
         results = previous.results.filter((result) => result.answerType !== "unavailable");
         latenciesMs = previous.latenciesMs ?? {};
