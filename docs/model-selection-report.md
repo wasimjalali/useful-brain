@@ -1,8 +1,10 @@
 # Cloudflare-hosted model selection
 
-Date: 2026-08-28; bake-off evidence added 2026-08-31
+Date: 2026-08-28; bake-off evidence added 2026-08-31; chat model switched 2026-10-25
 
-Wasim selected GLM 5.3 Flash for chat. Embeddings and reranking stay on the locked Workers AI models from earlier phases. The 2026-08-31 bake-off below confirms that choice with measured evidence.
+**Current chat model (2026-10-25): DeepSeek V4.1 Flash**, `@cf/deepseek-ai/deepseek-v4.1-flash-1017`, $0.30 / $1.20 per M tokens. Wasim switched from GLM 5.3 Flash after the 120-question Northwind battery on the current build: DeepSeek 118/120 at p50 7.5 s and p95 20.4 s, GLM 117/120 at 14.3 s and 41.4 s (write-up: `evals/model-evals/2026-10-25-workers-ai-chat-models.md`). Production uses the same descriptor (`workersAiChatModel`) and extraction decoding the eval measured: DeepSeek keeps the thinking toggle off with the 1,024-token extraction cap. The Chat table and bake-off below are the 2026-08 record for GLM 5.3 Flash, which stays an eval candidate.
+
+Wasim selected GLM 5.3 Flash for chat (2026-08-28). Embeddings and reranking stay on the locked Workers AI models from earlier phases. The 2026-08-31 bake-off below confirms that choice with measured evidence.
 
 ## Chat
 

@@ -14,7 +14,7 @@ vi.mock("@/app/settings-actions", () => ({
 
 const adminData = {
   config: {
-    answerModel: "@cf/zai-org/glm-5.3-flash",
+    answerModel: "@cf/deepseek-ai/deepseek-v4.1-flash-1017",
     embeddingModel: "@cf/qwen/qwen3-embedding-0.6b",
     rerankerModel: "@cf/baai/bge-reranker-base",
     retrieval: "Hybrid, keyword and vector",

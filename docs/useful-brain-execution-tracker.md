@@ -424,6 +424,10 @@ Plan: `docs/design/2026-10-08-redesign-implementation-plan.md` (decisions D1-D20
 - [x] D20: draft reconciliation lists the full Vectorize index (orphan detection) when `VECTORIZE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` are set as Ingestion worker secrets; binding-only otherwise. Code and migration `0006_draft_inventory.sql` are done. [ ] Left for Wasim: create the Vectorize Read token and run the two `wrangler secret put` commands in `docs/runbooks/operations.md`, then apply corpus migration 0006 to staging.
 - Deviation D16: validated answers are revealed, not streamed.
 
+### Chat model switch (2026-10-25)
+
+- [x] Production chat model switched from GLM 5.3 Flash to DeepSeek V4.1 Flash (`@cf/deepseek-ai/deepseek-v4.1-flash-1017`), decided by Wasim on 2026-10-25. Evidence: on the current build, the 120-question Northwind battery scored DeepSeek 118/120 at p50 7.5 s and p95 20.4 s against GLM 117/120 at 14.3 s and 41.4 s. List price rises from $0.15/$0.50 to $0.30/$1.20 per M tokens. Write-up: `evals/model-evals/2026-10-25-workers-ai-chat-models.md` (lands in the eval PR). The production request is built by the same `workersAiChatModel` the eval override used, so it matches what the eval measured. GLM 5.3 Flash stays an approved eval candidate.
+
 ### Phase 7B: production launch and retirement
 
 Requires one final explicit Wasim approval. Do not start. This is not a commercial launch and must not add billing, public signup or required Cloudflare Access.

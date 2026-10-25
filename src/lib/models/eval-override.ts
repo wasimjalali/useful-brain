@@ -1,7 +1,7 @@
 import type { Model } from "@earendil-works/pi-ai";
 
 import type { IdentityMode } from "../auth/identity-mode";
-import { glm53FlashModel } from "./glm-5-3-flash";
+import { GLM_5_3_FLASH_ID, workersAiChatModel } from "./glm-5-3-flash";
 import { CHAT_MODEL_ID } from "./selection";
 
 export class EvalModelOverrideForbidden extends Error {
@@ -20,11 +20,12 @@ export class EvalModelOverrideInvalid extends Error {
 
 /**
  * Cloudflare-hosted chat candidates approved for eval-only comparison runs.
- * This list gates the loopback `evalModel` turn field; the locked production
- * selection stays `CHAT_MODEL_ID` in `selection.ts` and is not changed here.
+ * This list gates the loopback `evalModel` turn field; the production
+ * selection is `CHAT_MODEL_ID` in `selection.ts` and stays first here.
  */
 export const EVAL_CHAT_MODELS = [
   CHAT_MODEL_ID,
+  GLM_5_3_FLASH_ID,
   "@cf/google/gemma-4-26b-a4b-it",
   "@cf/deepseek-ai/deepseek-v4-flash-0731",
   "@cf/meta/llama-4-scout-17b-16e-instruct",
@@ -47,7 +48,7 @@ export const MODELS_WITHOUT_THINKING_TOGGLE: ReadonlySet<string> = new Set([
  * most extraction calls (finish_reason "length", empty content).
  */
 export const MODELS_WITH_MANDATORY_REASONING: ReadonlySet<string> = new Set([
-  "@cf/zai-org/glm-5.3-flash",
+  GLM_5_3_FLASH_ID,
   "@cf/zai-org/glm-5.3",
 ]);
 
@@ -79,10 +80,8 @@ export function parseEvalModelOverride(
 }
 
 /**
- * The runtime model descriptor for an eval override. Identity fields switch
- * to the candidate; transport and API shape stay those of the locked chat
- * model, which every approved candidate shares (OpenAI-compatible chat
- * completions on Workers AI).
+ * The runtime model descriptor for an eval override, built by the same
+ * `workersAiChatModel` the production path uses.
  */
 export function evalChatModel(id: string): Model<"openai-completions"> {
   // The HTTP edge validates too; this re-assertion keeps a future caller
@@ -92,9 +91,5 @@ export function evalChatModel(id: string): Model<"openai-completions"> {
       "evalModel must be an approved Cloudflare-hosted chat model",
     );
   }
-  const base = glm53FlashModel();
-  if (id === base.id) {
-    return base;
-  }
-  return { ...base, id, name: id };
+  return workersAiChatModel(id);
 }

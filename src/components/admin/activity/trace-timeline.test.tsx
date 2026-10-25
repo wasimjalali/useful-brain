@@ -16,7 +16,7 @@ const steps: TraceStepView[] = [
   { step: "rerank", detail: "floor: 0.05 · chunk1: c-1 · score1: 0.064 · wobble: 3", duration: "-" },
   {
     step: "generate",
-    detail: "model: @cf/zai-org/glm-5.3-flash · citations: 0 · toolProposals: 0",
+    detail: "model: @cf/deepseek-ai/deepseek-v4.1-flash-1017 · citations: 0 · toolProposals: 0",
     duration: "43200 ms",
   },
   { step: "result", detail: "answerType: insufficient_evidence", duration: "-" },
@@ -47,7 +47,7 @@ describe("TraceTimeline", () => {
   it("shortens the generation and the model, keeping the raw ids in titles", () => {
     render(<TraceTimeline steps={steps} />);
     expect(screen.getByText("g-55d7d6cf")).toHaveAttribute("title", GEN);
-    expect(screen.getByText("GLM 5.3 Flash")).toHaveAttribute("title", "@cf/zai-org/glm-5.3-flash");
+    expect(screen.getByText("DeepSeek V4.1 Flash")).toHaveAttribute("title", "@cf/deepseek-ai/deepseek-v4.1-flash-1017");
   });
 
   it("formats durations in seconds, scales the bars", () => {

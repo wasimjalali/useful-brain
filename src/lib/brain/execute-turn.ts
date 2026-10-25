@@ -38,7 +38,7 @@ import {
 import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL } from "../embeddings/instructions";
 import type { WorkersAiRunner, WorkersAiRunOptions } from "../embeddings/workers-ai-embed";
 import { evalChatModel } from "../models/eval-override";
-import { glm53FlashModel } from "../models/glm-5-3-flash";
+import { workersAiChatModel } from "../models/glm-5-3-flash";
 import { createWorkersAiChatStream } from "../models/workers-ai-chat";
 import {
   createWorkersAiCitationRepair,
@@ -563,7 +563,7 @@ function liveRuntime(
   if (!ai) {
     return undefined;
   }
-  const model = evalModelOverride ? evalChatModel(evalModelOverride) : glm53FlashModel();
+  const model = evalModelOverride ? evalChatModel(evalModelOverride) : workersAiChatModel(CHAT_MODEL_ID);
   const runner = {
     run: (id: string, payload: Record<string, unknown>, options?: WorkersAiRunOptions) =>
       ai.run(id, payload, options),

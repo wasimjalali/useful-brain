@@ -90,10 +90,10 @@ describe("FailuresList", () => {
 
 describe("footer and chip", () => {
   it("shows the read-only note and command", () => {
-    render(<><ModelChip model="@cf/zai-org/glm-5.3-flash" /><EvalsFooter /></>);
-    expect(screen.getByText("GLM 5.3 Flash")).toBeInTheDocument();
-    expect(screen.queryByText("@cf/zai-org/glm-5.3-flash")).toBeNull();
-    expect(screen.getByTitle("@cf/zai-org/glm-5.3-flash")).toBeInTheDocument();
+    render(<><ModelChip model="@cf/deepseek-ai/deepseek-v4.1-flash-1017" /><EvalsFooter /></>);
+    expect(screen.getByText("DeepSeek V4.1 Flash")).toBeInTheDocument();
+    expect(screen.queryByText("@cf/deepseek-ai/deepseek-v4.1-flash-1017")).toBeNull();
+    expect(screen.getByTitle("@cf/deepseek-ai/deepseek-v4.1-flash-1017")).toBeInTheDocument();
     expect(screen.getByText("Read-only here. Run the suite from the repo:")).toBeInTheDocument();
     expect(screen.getByText("npm run eval:northwind")).toHaveClass("font-mono");
   });
