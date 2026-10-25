@@ -321,6 +321,7 @@ export async function runKnowledgeAgent(input: {
   // a later message is a budget failure and ends the run as unavailable.
   const budgetBlockedCallIds = new Set<string>();
   let searchCapFirstMessage: object | undefined;
+  let turnLimitStopped = false;
   const tools: AgentTool[] =
     input.tools ??
     [
@@ -470,6 +471,7 @@ export async function runKnowledgeAgent(input: {
         return false;
       } catch (error) {
         if (error instanceof BudgetExceededError) {
+          turnLimitStopped ||= error.code === "TURN_LIMIT";
           return true;
         }
         throw error;
@@ -539,6 +541,19 @@ export async function runKnowledgeAgent(input: {
     }
   }
 
+  // A turn-limit stop sets no budget error by itself. After a soft cap block
+  // the model was told to answer, so a stop that cut it off with tool results
+  // still unanswered is a budget failure, not a draft to ground. A turn limit
+  // reached on the answering turn itself leaves an assistant message last and
+  // is untouched, as are runs without a soft cap block.
+  if (
+    turnLimitStopped &&
+    budgetBlockedCallIds.size > 0 &&
+    agent.state.messages[agent.state.messages.length - 1]?.role === "toolResult"
+  ) {
+    budgetErrorMessage ??= "turn budget exhausted";
+  }
+
   const transcript = toTranscript(agent.state.messages);
   const lastAssistant = [...transcript].reverse().find((message) => message.role === "assistant");
   const rawFinal =
@@ -557,13 +572,22 @@ export async function runKnowledgeAgent(input: {
   let grounded = enforce(rawFinal);
   const evidence = evidenceFromLedger(evidenceLedger);
   let refusalReason: KnowledgeRunResult["refusalReason"];
+  // After a soft search cap block the run had fewer searches than the model
+  // wanted, so no host pass may create or rewrite an answer: a related
+  // document must not answer a question it does not state. The final is the
+  // model's own draft only when it validates as grounded as it stands;
+  // anything else, a refusal in any wording included, is the not-enough-
+  // evidence refusal. Citation completion, quote salvage, citation repair,
+  // identifier recovery, the abstention recheck and the coverage pass all
+  // stay off.
+  const refusalFinal = budgetBlockedCallIds.size > 0;
   const isRefusal = (value: string | null | undefined) =>
     typeof value === "string" && value.trim() === BRAIN_NOT_ENOUGH_EVIDENCE;
 
   // Host-side citation completion runs first: an under-cited draft whose
   // sentences are verbatim ledger evidence is repaired deterministically
   // before any refusal or model-repair decision.
-  if (grounded === BRAIN_INVALID_CITATION && evidence.length > 0) {
+  if (grounded === BRAIN_INVALID_CITATION && evidence.length > 0 && !refusalFinal) {
     const completed = completeProseCitations(rawFinal, evidenceLedger);
     if (completed !== rawFinal) {
       grounded = enforce(completed);
@@ -582,6 +606,7 @@ export async function runKnowledgeAgent(input: {
   if (
     grounded === BRAIN_INVALID_CITATION &&
     evidence.length > 0 &&
+    !refusalFinal &&
     !modelSignalsInsufficientEvidence(rawFinal) &&
     !(citedMarkerIndexes(rawFinal).length === 0 && sentenceSignalsInsufficientEvidence(rawFinal))
   ) {
@@ -595,7 +620,10 @@ export async function runKnowledgeAgent(input: {
   // the draft. Honor the refusal instead of repairing citations, which
   // could turn it into an off-topic grounded answer, and record why the
   // refusal was kept.
-  if (grounded === BRAIN_INVALID_CITATION && modelSignalsInsufficientEvidence(rawFinal)) {
+  if (
+    grounded === BRAIN_INVALID_CITATION &&
+    (refusalFinal || modelSignalsInsufficientEvidence(rawFinal))
+  ) {
     grounded = BRAIN_NOT_ENOUGH_EVIDENCE;
     refusalReason = evidence.length > 0 ? "model_abstained_with_evidence" : "model_abstained";
   } else if (isRefusal(grounded) && evidence.length > 0) {
@@ -628,12 +656,6 @@ export async function runKnowledgeAgent(input: {
     resultIdCounts.get(message.toolCallId) === 1 &&
     message.content.map((part) => (part.type === "text" ? part.text : "")).join("") ===
       SEARCH_LIMIT_REASON;
-  // After a soft cap block a refusal is final: the model refused with fewer
-  // searches than it wanted, and a host pass that swaps a refusal for any
-  // model-selected quote would let a related document answer a question it
-  // does not state. Passes that only repair or extend an answer the model
-  // chose to give stay on.
-  const refusalFinal = budgetBlockedCallIds.size > 0;
   const searchFailed =
     evidenceLedger.searchError ||
     toolCallsFromMessages(runMessages.filter((message) => !isCapBlockResult(message))).some(
@@ -653,6 +675,7 @@ export async function runKnowledgeAgent(input: {
     !input.abort?.signal.aborted &&
     !wall.aborted &&
     !searchFailed &&
+    !refusalFinal &&
     evidence.length > 0;
   if (grounded === BRAIN_INVALID_CITATION && canRepair()) {
     try {
@@ -686,7 +709,7 @@ export async function runKnowledgeAgent(input: {
   // valid grounded answer, so one can never be replaced.
   if (
     canRepair() &&
-    ((refusalReason === "model_abstained_with_evidence" && isRefusal(grounded) && !refusalFinal) ||
+    ((refusalReason === "model_abstained_with_evidence" && isRefusal(grounded)) ||
       grounded === BRAIN_INVALID_CITATION)
   ) {
     const asked = identifierTokens(input.question);
@@ -735,7 +758,6 @@ export async function runKnowledgeAgent(input: {
   // the repair model itself returns an evidence-supported quote.
   if (
     canRepair() &&
-    !refusalFinal &&
     isRefusal(grounded) &&
     refusalReason === "model_abstained_with_evidence"
   ) {
@@ -787,6 +809,7 @@ export async function runKnowledgeAgent(input: {
     !input.abort?.signal.aborted &&
     !wall.aborted &&
     !searchFailed &&
+    !refusalFinal &&
     evidence.length > 0;
   if (
     canCover &&

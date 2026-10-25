@@ -2006,7 +2006,7 @@ describe("retrieval availability", () => {
       expect(result.finalResponse).toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
     }, 20_000);
 
-    it("honors a model refusal on a permission trap and sends it a plain status", async () => {
+    it("sends the model a plain status when the cap blocks a search", async () => {
       const pipeline = await tinyPipeline();
       const seen: string[] = [];
       const runtime = scriptedRuntime("useful-brain-search-cap-trap", [
@@ -2073,11 +2073,8 @@ describe("retrieval availability", () => {
       return new KnowledgePipeline({ store, embedder });
     }
 
-    it("keeps a refusal after the cap final: the abstention recheck and coverage never run", async () => {
+    it("keeps a refusal after the cap final: the abstention recheck never runs", async () => {
       const repairGroundedAnswer = vi
-        .fn()
-        .mockResolvedValue("Employees accrue 1.5 days of leave per month.[1]");
-      const coverAnswerParts = vi
         .fn()
         .mockResolvedValue("Employees accrue 1.5 days of leave per month.[1]");
       const result = await runKnowledgeAgent({
@@ -2092,13 +2089,11 @@ describe("retrieval availability", () => {
             finalText(BRAIN_NOT_ENOUGH_EVIDENCE),
           ]),
           repairGroundedAnswer,
-          coverAnswerParts,
         },
       });
 
       expect(result.finalResponse).toBe(BRAIN_NOT_ENOUGH_EVIDENCE);
       expect(repairGroundedAnswer).not.toHaveBeenCalled();
-      expect(coverAnswerParts).not.toHaveBeenCalled();
     }, 20_000);
 
     it("keeps a refusal after the cap final: identifier recovery never runs", async () => {
@@ -2124,7 +2119,7 @@ describe("retrieval availability", () => {
       expect(repairGroundedAnswer).not.toHaveBeenCalled();
     }, 20_000);
 
-    it("still repairs an answer the model chose after a capped turn", async () => {
+    it("ends an invalid-citation draft after a cap as a refusal, with no host repair", async () => {
       const repairGroundedAnswer = vi
         .fn()
         .mockResolvedValue("Employees accrue 1.5 days of leave per month.[1]");
@@ -2133,9 +2128,9 @@ describe("retrieval availability", () => {
         pipeline: await tinyPipeline(),
         principal,
         policyPrincipal,
-        conversationId: "c-search-cap-repair-kept",
+        conversationId: "c-search-cap-invalid-draft",
         runtime: {
-          ...scriptedRuntime("useful-brain-search-cap-repair-kept", [
+          ...scriptedRuntime("useful-brain-search-cap-invalid-draft", [
             ...fiveSearches,
             finalText("Employees get about a day and a half of leave each month.[1]"),
           ]),
@@ -2143,8 +2138,121 @@ describe("retrieval availability", () => {
         },
       });
 
-      expect(repairGroundedAnswer).toHaveBeenCalledTimes(1);
-      expect(result.finalResponse).toBe("Employees accrue 1.5 days of leave per month.[1]");
+      expect(repairGroundedAnswer).not.toHaveBeenCalled();
+      expect(result.finalResponse).toBe(BRAIN_NOT_ENOUGH_EVIDENCE);
+      expect(result.refusalReason).toBe("model_abstained_with_evidence");
+    }, 20_000);
+
+    it.each([
+      "The search budget is exhausted, so I cannot answer this question.",
+      "I couldn't find final pay rules in the documents I was able to search.",
+      `${"I looked through everything the search budget allowed and could not establish a rule for this. ".repeat(4)}Please ask again.`,
+    ])("keeps a refusal in the model's own words final after a cap: %s", async (refusal) => {
+      const repairGroundedAnswer = vi
+        .fn()
+        .mockResolvedValue("Employees accrue 1.5 days of leave per month.[1]");
+      const result = await runKnowledgeAgent({
+        question: "What are the final pay rules for an engineer who leaves?",
+        pipeline: await tinyPipeline(),
+        principal,
+        policyPrincipal,
+        conversationId: "c-search-cap-own-words",
+        runtime: {
+          ...scriptedRuntime("useful-brain-search-cap-own-words", [
+            ...fiveSearches,
+            finalText(refusal),
+          ]),
+          repairGroundedAnswer,
+        },
+      });
+
+      expect(repairGroundedAnswer).not.toHaveBeenCalled();
+      expect(result.finalResponse).toBe(BRAIN_NOT_ENOUGH_EVIDENCE);
+    }, 20_000);
+
+    it("skips the coverage pass on a capped turn even for a validated answer", async () => {
+      const coverAnswerParts = vi
+        .fn()
+        .mockResolvedValue("ESC-3 complaints are owned by the VP of Support. [2]");
+      const result = await runKnowledgeAgent({
+        question: "How do billing disputes and complaints interact?",
+        pipeline: await escalationPipeline(),
+        principal,
+        policyPrincipal,
+        conversationId: "c-search-cap-coverage",
+        runtime: {
+          ...scriptedRuntime("useful-brain-search-cap-coverage", [
+            ...fiveSearches,
+            finalText("Billing disputes open more than 30 days move to ESC-3.[1]"),
+          ]),
+          coverAnswerParts,
+        },
+      });
+
+      // The same draft on an uncapped turn is extended (see the multi-part
+      // coverage tests); after a cap no host pass rewrites the answer.
+      expect(coverAnswerParts).not.toHaveBeenCalled();
+      expect(result.finalResponse).toBe("Billing disputes open more than 30 days move to ESC-3.[1]");
+    }, 20_000);
+
+    it("ends unavailable when the turn limit stops a run that had a soft cap block", async () => {
+      const { tool } = echoTool();
+      const echoTurn = () =>
+        fauxAssistantMessage([fauxText("Echoing."), echoCall()], { stopReason: "toolUse" });
+      // Searches 1 to 4, three echo turns, then search 5 in message 8: the cap
+      // block is soft and the turn budget ends the loop right after it.
+      const { counter, runtime } = countedRuntime("useful-brain-search-cap-turn-limit", [
+        ...fiveSearches.slice(0, 4),
+        echoTurn(),
+        echoTurn(),
+        echoTurn(),
+        searchCall("e"),
+        finalText("Employees accrue 1.5 days of leave per month.[1]"),
+      ]);
+      const result = await runKnowledgeAgent({
+        question: "How much leave accrues each month?",
+        pipeline: await tinyPipeline(),
+        principal,
+        policyPrincipal,
+        conversationId: "c-search-cap-turn-limit",
+        extraTools: [tool],
+        runtime,
+      });
+
+      expect(counter.modelCalls).toBe(AGENT_BUDGETS.maxTurns);
+      expect(result.finalResponse).toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
+      expect(result.aborted).toBe(true);
+      expect(result.errorMessage).toContain("turn budget exhausted");
+    }, 20_000);
+
+    it("counts a capped call whose result text is not the cap reason", async () => {
+      // Pi can replace a tool result (for example an aborted-operation swap).
+      // The exclusion needs the cap reason text, not just the id.
+      const runtime = scriptedRuntime("useful-brain-search-cap-swapped", [
+        ...fiveSearches,
+        finalText(BRAIN_NOT_ENOUGH_EVIDENCE),
+      ]);
+      const stream = runtime.stream!;
+      const result = await runKnowledgeAgent({
+        question: "How much leave accrues each month?",
+        pipeline: await tinyPipeline(),
+        principal,
+        policyPrincipal,
+        conversationId: "c-search-cap-swapped",
+        runtime: {
+          ...runtime,
+          stream: ((model, context, options) => {
+            const last = context.messages[context.messages.length - 1];
+            if (last?.role === "toolResult" && last.content.some((part) => part.type === "text" && part.text.includes("budget exhausted"))) {
+              last.content = [{ type: "text", text: "Operation aborted" }];
+            }
+            return stream(model, context, options);
+          }) as NonNullable<Parameters<typeof runKnowledgeAgent>[0]["runtime"]>["stream"],
+        },
+      });
+
+      expect(result.toolCalls[4]?.redactedResult).toContain("Operation aborted");
+      expect(result.finalResponse).toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
     }, 20_000);
 
     it("counts a capped call whose id an ok result also carries", async () => {
