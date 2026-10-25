@@ -1940,6 +1940,72 @@ describe("retrieval availability", () => {
       expect(result.refusalReason).toBeUndefined();
     }, 20_000);
 
+    it("answers when one message crosses the cap with several parallel searches", async () => {
+      const pipeline = await tinyPipeline();
+      let calls = 0;
+      // Turn one issues two searches, turn two two more, turn three three:
+      // searches 5 to 7 are capped together in one message.
+      const parallel = (queries: string[]) =>
+        fauxAssistantMessage(
+          [fauxText("Searching."), ...queries.map((query) => fauxToolCall(SEARCH_KNOWLEDGE_TOOL, { query }))],
+          { stopReason: "toolUse" },
+        );
+      const { counter, runtime } = countedRuntime("useful-brain-search-cap-parallel", [
+        parallel(["a", "b"]),
+        parallel(["c", "d"]),
+        parallel(["e", "f", "g"]),
+        finalText("Employees accrue 1.5 days of leave per month.[1]"),
+      ]);
+      const result = await runKnowledgeAgent({
+        question: "How much leave accrues each month?",
+        pipeline: {
+          search: async (input) => {
+            calls += 1;
+            return pipeline.search(input);
+          },
+        },
+        principal,
+        policyPrincipal,
+        conversationId: "c-search-cap-parallel",
+        runtime,
+      });
+
+      expect(calls).toBe(AGENT_BUDGETS.maxSearchKnowledge);
+      expect(counter.modelCalls).toBe(4);
+      expect(result.toolCalls.map((call) => call.status)).toEqual([
+        "ok", "ok", "ok", "ok", "error", "error", "error",
+      ]);
+      expect(result.finalResponse).toBe("Employees accrue 1.5 days of leave per month.[1]");
+      expect(result.aborted).toBe(false);
+    }, 20_000);
+
+    it("ends unavailable when a later message searches again after a parallel cap block", async () => {
+      const pipeline = await tinyPipeline();
+      const parallel = (queries: string[]) =>
+        fauxAssistantMessage(
+          [fauxText("Searching."), ...queries.map((query) => fauxToolCall(SEARCH_KNOWLEDGE_TOOL, { query }))],
+          { stopReason: "toolUse" },
+        );
+      const { counter, runtime } = countedRuntime("useful-brain-search-cap-parallel-again", [
+        parallel(["a", "b"]),
+        parallel(["c", "d"]),
+        parallel(["e", "f"]),
+        parallel(["g"]),
+        finalText("Employees accrue 1.5 days of leave per month.[1]"),
+      ]);
+      const result = await runKnowledgeAgent({
+        question: "How much leave accrues each month?",
+        pipeline,
+        principal,
+        policyPrincipal,
+        conversationId: "c-search-cap-parallel-again",
+        runtime,
+      });
+
+      expect(counter.modelCalls).toBe(4);
+      expect(result.finalResponse).toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
+    }, 20_000);
+
     it("hands the model a refusal instruction and honors its refusal on a permission trap", async () => {
       const pipeline = await tinyPipeline();
       const seen: string[] = [];

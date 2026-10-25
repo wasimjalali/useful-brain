@@ -311,12 +311,14 @@ export async function runKnowledgeAgent(input: {
   const repairExtractionCache = new Map<string, unknown>();
   let firstSearchCompleted = false;
   let pendingApprovalBinding: ApprovalBinding | undefined;
-  // The one search_knowledge call the cap softly blocked this run. A cap is
-  // not a backend failure, so that call stays out of the search-failure check
-  // below. Only the first block is soft: a model that keeps searching past it
-  // is a budget failure and ends the run as unavailable.
+  // The search_knowledge calls the cap softly blocked this run. A cap is not
+  // a backend failure, so these stay out of the search-failure check below.
+  // Only the assistant message that first crosses the cap gets soft blocks
+  // (a model may issue several parallel searches in it). A model that keeps
+  // searching in a later message is a budget failure and ends the run as
+  // unavailable.
   const budgetBlockedCallIds = new Set<string>();
-  let searchCapSoftBlockUsed = false;
+  let searchCapSoftMessage: object | undefined;
   const tools: AgentTool[] =
     input.tools ??
     [
@@ -385,22 +387,24 @@ export async function runKnowledgeAgent(input: {
         budgets.noteToolCall(context.toolCall.name);
       } catch (error) {
         if (error instanceof BudgetExceededError) {
-          // The first search cap block ends searching, not the turn: the model
-          // reads the cap reason and must answer or refuse from the searches
-          // it already has. It stays hard (terminate, counted as a failed
-          // search) when the same assistant message holds any other tool
-          // call, because pi ends a batch only when every call in it
-          // terminates, and a soft cap beside a pending approval would give
-          // the model another turn to propose a second one. A repeated cap
-          // block is hard too. Every other budget code terminates.
+          // Every search cap block in the first assistant message that crosses
+          // the cap ends searching, not the turn: the model reads the cap
+          // reason and must answer or refuse from the searches it already has.
+          // A block stays hard (terminate, counted as a failed search) when
+          // that message holds any other tool call, because pi ends a batch
+          // only when every call in it terminates, and a soft cap beside a
+          // pending approval would give the model another turn to propose a
+          // second one. A block in a later message is hard too. Every other
+          // budget code terminates.
           if (
             error.code === "SEARCH_LIMIT" &&
-            !searchCapSoftBlockUsed &&
+            (searchCapSoftMessage === undefined ||
+              searchCapSoftMessage === context.assistantMessage) &&
             context.assistantMessage.content.every(
               (part) => part.type !== "toolCall" || part.name === SEARCH_KNOWLEDGE_TOOL,
             )
           ) {
-            searchCapSoftBlockUsed = true;
+            searchCapSoftMessage = context.assistantMessage;
             budgetBlockedCallIds.add(context.toolCall.id);
             return { block: true, reason: SEARCH_LIMIT_REASON, terminate: false };
           }
@@ -602,10 +606,10 @@ export async function runKnowledgeAgent(input: {
   // valid draft: the failed search may have held the evidence for another
   // part of the question (a second hop) or a fact that would change the
   // answer, so a cited draft beside it cannot be trusted as complete. The
-  // client retries the turn instead. The one call the search budget softly
-  // blocked is a cap, not a failed search: it never ran, so it is left out and
-  // the answer rests on the searches that did. Tool-call ids come from the
-  // model and can repeat, so the call is left out only when exactly one result
+  // client retries the turn instead. A call the search budget softly blocked
+  // is a cap, not a failed search: it never ran, so it is left out and the
+  // answer rests on the searches that did. Tool-call ids come from the model
+  // and can repeat, so a call is left out only when exactly one result
   // carries its id and that result is the cap reason; any other result
   // sharing the id is counted, failing closed.
   const runMessages = agent.state.messages.slice(priorMessageCount);
