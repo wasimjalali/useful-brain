@@ -356,7 +356,9 @@ async function runLiveLayer(
         previous.brainUrl === brainUrl &&
         previous.harnessVersion === HARNESS_VERSION &&
         previous.generationId === generationId &&
-        (previous.model ?? CHAT_MODEL_ID) === expectedModel &&
+        // A checkpoint without a model field predates model tagging; fail closed.
+        previous.model !== undefined &&
+        previous.model === expectedModel &&
         previous.questionSetDigest === digest
       ) {
         results = previous.results;

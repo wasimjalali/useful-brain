@@ -38,7 +38,7 @@ import {
 import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL } from "../embeddings/instructions";
 import type { WorkersAiRunner, WorkersAiRunOptions } from "../embeddings/workers-ai-embed";
 import { evalChatModel } from "../models/eval-override";
-import { workersAiChatModel } from "../models/glm-5-3-flash";
+import { workersAiChatModel } from "../models/workers-ai-chat-model";
 import { createWorkersAiChatStream } from "../models/workers-ai-chat";
 import {
   createWorkersAiCitationRepair,
@@ -556,7 +556,7 @@ function emptyPipeline(): ScopableSearch {
   };
 }
 
-function liveRuntime(
+export function liveRuntime(
   ai: WorkersAiRunner | undefined,
   evalModelOverride?: string,
 ): AgentRuntime | undefined {

@@ -1,7 +1,8 @@
 import type { Model } from "@earendil-works/pi-ai";
 
 import type { IdentityMode } from "../auth/identity-mode";
-import { GLM_5_3_FLASH_ID, workersAiChatModel } from "./glm-5-3-flash";
+import { GLM_5_3_FLASH_ID } from "./glm-5-3-flash";
+import { workersAiChatModel } from "./workers-ai-chat-model";
 import { CHAT_MODEL_ID } from "./selection";
 
 export class EvalModelOverrideForbidden extends Error {
