@@ -47,7 +47,6 @@ live 41/120 q041
 live 42/120 q042
 live 43/120 q043
 live 44/120 q044
-/Users/wasimjalali/.agents/tools/heavy-lock.sh: child setpgid (92320 to 92320): Operation not permitted
 live 45/120 q045
 live 46/120 q046
 live 47/120 q047
@@ -93,7 +92,6 @@ live 86/120 q086
 live 87/120 q087
 live 88/120 q088
 live 89/120 q089
-/Users/wasimjalali/.agents/tools/heavy-lock.sh: child setpgid (42848 to 42848): Operation not permitted
 live 90/120 q090
 live 91/120 q091
 live 92/120 q092
@@ -117,7 +115,6 @@ live 109/120 q109
 live 110/120 q110
 live 111/120 q111
 live 112/120 q112
-/Users/wasimjalali/.agents/tools/heavy-lock.sh: child setpgid (77205 to 77205): Operation not permitted
 live 113/120 q113
 live 114/120 q114
 live 115/120 q115

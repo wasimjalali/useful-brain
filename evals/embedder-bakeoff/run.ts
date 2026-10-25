@@ -9,7 +9,6 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import { canAccessChunk } from "../../src/lib/acl/access";
-import { embeddingPayload } from "../../src/lib/embeddings/instructions";
 import { chunkDocument } from "../../src/lib/ingest/chunker";
 import { mean, ndcg, rankedDocumentIds, recall, reciprocalRank } from "../../src/lib/eval/metrics";
 import {
@@ -42,14 +41,19 @@ function arg(name: string): string {
   return value;
 }
 
-// Production payloads for Qwen3 (documents raw, queries with the instruction).
-// BGE-M3 has no instruction field; its `query` field switches it to scoring
-// mode, so queries go in as plain contexts too.
+// Payloads exactly as measured. Qwen3 (the former production embedder):
+// documents raw, queries with the instruction. They are inlined because
+// production now embeds with BGE-M3. BGE-M3 has no instruction field; its
+// `query` field switches it to scoring mode, so queries go in as plain
+// contexts too.
+const QWEN_QUERY_INSTRUCTION =
+  "Given a web search query, retrieve relevant passages that answer the query";
+
 function payload(model: Model, kind: "documents" | "query", texts: string[]): Record<string, unknown> {
   if (model === QWEN) {
     return kind === "documents"
-      ? embeddingPayload({ kind: "documents", texts })
-      : embeddingPayload({ kind: "query", text: texts[0] });
+      ? { documents: texts }
+      : { queries: [texts[0]], instruction: QWEN_QUERY_INSTRUCTION };
   }
   return { contexts: texts.map((text) => ({ text })) };
 }

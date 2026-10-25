@@ -21,7 +21,24 @@ evals/
   README.md            this index
   model-evals/         one report per model comparison campaign
   system-evals/        one report per application improvement campaign
+  embedder-bakeoff/    harness for the dense-retrieval embedder comparison (eval-only Worker plus script)
   results/<date>/      frozen findings JSON backing each report
+```
+
+The 2026-10-25 results are split by build:
+
+```
+results/2026-10-25-chat-models/
+  (top level)                  pre-fix full runs, d9a0203, prompt v13: findings, checkpoint, summary and logs per model, plus the 10-question smoke
+  fix-build-full/              final full runs on the fix build, e1e0432, prompt v14
+  search-budget-fix-check/
+    questions.json             the 19-question check set
+    round1/                    soft cap only, 0cd4689
+    strict/                    a later cap is hard, 5c61bea
+    softcap/                   final rules, f050672
+results/2026-10-25-embedder-bakeoff/
+  summary.json, raw-*.json     Stage 1, dense retrieval per embedder
+  full-battery-bge-m3/         Stage 2, full battery on a BGE-M3 index (d9a0203, dirty tree)
 ```
 
 Conventions: reports are date-prefixed markdown, one file per campaign. Each report carries a TL;DR, the setup, results, what changed and why, honest caveats and exact reproduce commands. Never edit a published report's numbers; a new campaign gets a new file.
@@ -34,7 +51,8 @@ The live Northwind eval needs the isolated eval worker and the seeded corpus gen
 npx wrangler dev --config workers/brain/wrangler.jsonc --port 8789 --persist-to .wrangler/state-eval
 npm run eval:northwind -- --live http://127.0.0.1:8789                 # locked production model
 npm run eval:northwind -- --live http://127.0.0.1:8789 --model <id>    # loopback-only candidate override
+npm run eval:northwind -- --live http://127.0.0.1:8789 --model <id> --score-unavailable   # score a turn that stays 503 as a failure instead of stopping
 npm run eval:northwind -- --live http://127.0.0.1:8789 --questions content/northwind/tuning-questions.json   # tuning set, not the locked 120
 ```
 
-Results land in `eval-output/findings*.json`. A `--questions` run lands in `eval-output/tuning/<file>/` so it can never be mistaken for, or resumed into, the locked run.
+Results land in `eval-output/findings*.json`. `--score-unavailable` is recorded in the checkpoint and the findings; `--resume` only continues a run that used the same setting and asks the unavailable questions again. A `--questions` run lands in `eval-output/tuning/<file>/` so it can never be mistaken for, or resumed into, the locked run.

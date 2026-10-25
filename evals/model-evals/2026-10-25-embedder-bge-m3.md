@@ -28,11 +28,15 @@ On paper Qwen3 0.6B should win: it is newer (June 2025 against January 2024) and
 
 **Stage 1, dense retrieval only.** A small eval-only Worker forwards embedding calls to the remote Workers AI binding and times them. A script chunks the 65 Northwind documents with the production chunker (300 tokens, 30 overlap), embeds every chunk and every question with both models, applies each question's principal ACL before ranking (as production does), ranks chunks by cosine similarity, collapses to documents and scores against the locked gold set. Qwen3 gets its production query instruction; BGE-M3 has no instruction field. The 23 permission and unanswerable questions have no gold documents, so 97 questions are scored. No Vectorize index, no product code, a fraction of a cent.
 
-Per question, the two models disagreed on four recall@3 results: BGE-M3 found q055 (trap), q100 (an identifier lookup every chat model failed in August) and the second hop of q120; Qwen3 found the second hop of q090. Neither leaked a forbidden document.
+Per question, the two models disagreed on four recall@3 results: BGE-M3 found q055 (trap), q100 (an identifier lookup every chat model failed in August) and the second hop of q120; Qwen3 found the second hop of q090. That makes BGE-M3's multi-hop recall@3 lower on the five original multi-hop questions (0.90 against 1.00, q090) and higher on the five expanded ones (0.90 against 0.80, q120).
 
-**Stage 2, the full product.** Dense wins can vanish inside a hybrid system, so BGE-M3 ran the full 120-question live battery. A new dev Vectorize index (`useful-brain-development-bge-m3`, 1024 dimensions, cosine, with the `acl_group` metadata index) received Northwind embedded with BGE-M3 through the Brain's own seed path, on a fresh local D1. The harness waited until Vectorize reported all 808 vectors processed, then asked every question with GLM 5.3 Flash, the production chat model. Everything else matched the Qwen3 baseline run from the same day: same code, same prompt version (v13), same reranker and fusion weights.
+Recall@8 is where Qwen3 comes out ahead, by one document. On q116 (a SEV-1 postmortem deadline plus log retention) BGE-M3 ranks the incident-escalation document first but the log-retention document outside its top 8; Qwen3 has both inside the top 8. That one hop is the whole difference between 1.000 and 0.995.
 
-Result: 118/120 for both. Qwen3 missed q073 and q085; BGE-M3 missed q073 and q074. q073 fails for every model we have tried; q074 and q085 are permission questions where the model sometimes answers from readable but off-topic documents. Zero leaks, zero vector-degraded turns.
+Neither model leaked a forbidden document, but that is true by construction: the ACL filter runs before ranking, so a forbidden chunk is never a candidate. The zero is a check that the filter was applied, not a measure of the embedder.
+
+**Stage 2, the full product.** Dense wins can vanish inside a hybrid system, so BGE-M3 ran the full 120-question live battery. A new dev Vectorize index (`useful-brain-development-bge-m3`, 1024 dimensions, cosine, with the `acl_group` metadata index) received Northwind embedded with BGE-M3 through the Brain's own seed path, on a fresh local D1. The harness waited until Vectorize reported all 808 vectors processed, then asked every question with GLM 5.3 Flash, the production chat model. Everything else matched the Qwen3 baseline run from the same day: same code, same prompt version (v13), same reranker and fusion weights. Both runs were at commit d9a0203 with a dirty working tree (`harnessDirty: true` in the findings). The Qwen3 baseline's uncommitted changes were the DeepSeek allowlist line and the `--score-unavailable` flag, committed afterwards in 9efc7ab; the BGE-M3 run's tree also carried the embedder switch that later merged as PR #73 (inferred from the commits that followed, the dirty diff itself was not saved).
+
+Result: 118/120 for both. Qwen3 missed q073 and q085; BGE-M3 missed q073 and q074. q073 (a permission question) failed for GLM 5.3 Flash in every full run of the day and for DeepSeek on its pre-fix run, though DeepSeek passed it on the fix build, so it is a model-and-run effect, not a retrieval one. q074 is a permission question and q085 an unanswerable one; in both the model sometimes answers from readable but off-topic documents. Zero leaks, zero vector-degraded turns.
 
 ## Latency, read carefully
 
@@ -45,6 +49,7 @@ Wasim's rule: replace it if it wins on the benchmarks and brings a positive retu
 ## Honest caveats
 
 - One full-battery run per embedder. Category totals have been stable across runs, but single questions flip between runs (q074 and q085 especially).
+- Stage 1 embedded Qwen3 first and BGE-M3 second against the remote binding, in one run. Cold-start effects on Qwen3's 4.0 s p95 are not ruled out; its p50 (400 ms) is the fairer comparison.
 - The BGE-M3 dense numbers come from the same chunks and ACLs as production but not through Vectorize's ANN index; the full battery is the end-to-end check.
 - The embedder's retrieval win (about two questions of 97 at recall@3) did not show up as a pass-rate win because the hybrid pipeline (keyword channel, keyword rescue, reranker) already recovered those documents for Qwen3.
 - Pass and latency numbers for the Qwen3 baseline come from the same day's GLM 5.3 Flash run, documented in the [Workers AI chat model report](2026-10-25-workers-ai-chat-models.md).
@@ -58,13 +63,20 @@ Stage 1 embedded about 808 chunks and 120 questions twice: under one cent. Stage
 ```bash
 # Stage 1: dense retrieval only
 npx wrangler dev -c evals/embedder-bakeoff/wrangler.jsonc --port 8791 --ip 127.0.0.1
-npx jiti evals/embedder-bakeoff/run.ts --url http://127.0.0.1:8791 --out evals/results/2026-10-25-embedder-bakeoff
+# --out is gitignored scratch: the frozen copy lives in evals/results/ and must not be overwritten
+npx jiti evals/embedder-bakeoff/run.ts --url http://127.0.0.1:8791 --out eval-output/embedder-bakeoff
 
-# Stage 2: full battery on a BGE-M3 index (after the switch, development already points at it)
+# Stage 2: full battery on a BGE-M3 index (after the switch, development already points at it).
+# The measured run was prompt v13 at commit d9a0203; current main is prompt v14, so a rerun is
+# not the same build. Use a fresh local D1 (the migrations below create it). The harness seeds
+# Northwind through the Brain's /knowledge/seed and promotes the generation on its first call.
+# Vectorize indexes asynchronously: the measured run waited until
+# `npx wrangler vectorize info useful-brain-development-bge-m3` showed all 808 vectors processed
+# before the questions counted (see the frozen vectorize-wait.log).
 CI=true npx wrangler d1 migrations apply useful-brain-corpus-development --local --persist-to .wrangler/state-eval-bge -c workers/brain/wrangler.jsonc
 CI=true npx wrangler d1 migrations apply useful-brain-operations-development --local --persist-to .wrangler/state-eval-bge -c workers/brain/wrangler.jsonc
 npx wrangler dev --config workers/brain/wrangler.jsonc --port 8789 --ip 127.0.0.1 --persist-to .wrangler/state-eval-bge
-npm run eval:northwind -- --live http://127.0.0.1:8789 --score-unavailable
+npm run eval:northwind -- --live http://127.0.0.1:8789 --score-unavailable --model "@cf/zai-org/glm-5.3-flash"
 ```
 
 Frozen evidence: [`results/2026-10-25-embedder-bakeoff/`](../results/2026-10-25-embedder-bakeoff/) (`summary.json`, per-question `raw-*.json`, and `full-battery-bge-m3/`).

@@ -29,7 +29,6 @@ live 95/120 q095
 live 96/120 q096
 live 97/120 q097
 live 98/120 q098
-/Users/wasimjalali/.agents/tools/heavy-lock.sh: child setpgid (11984 to 11984): Operation not permitted
 live 99/120 q099
 live 100/120 q100
 live 101/120 q101

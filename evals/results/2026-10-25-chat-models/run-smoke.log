@@ -1,7 +1,7 @@
 ok
 
 > useful-brain@0.1.0 eval:northwind
-> jiti src/lib/eval/live-northwind-eval.ts --live http://127.0.0.1:8789 --model @cf/deepseek-ai/deepseek-v4.1-flash-1017 --questions /private/tmp/claude-501/-Users-wasimjalali-Desktop-Personal-Project-useful-brain/74cb950c-c7be-42ec-81ad-8e7f661742cb/scratchpad/smoke-10.json
+> jiti src/lib/eval/live-northwind-eval.ts --live http://127.0.0.1:8789 --model @cf/deepseek-ai/deepseek-v4.1-flash-1017 --questions <scratchpad>/smoke-10.json
 
 live 1/10 q001
 live 2/10 q002
@@ -15,7 +15,7 @@ live 9/10 q100
 live 10/10 q116
 {
   "model": "@cf/deepseek-ai/deepseek-v4.1-flash-1017",
-  "questionsFile": "../../../../../../../../private/tmp/claude-501/-Users-wasimjalali-Desktop-Personal-Project-useful-brain/74cb950c-c7be-42ec-81ad-8e7f661742cb/scratchpad/smoke-10.json",
+  "questionsFile": "<scratchpad>/smoke-10.json",
   "harnessGitSha": "d9a020398a8446ec4d26219952e7d365a59ff4f7",
   "harnessDirty": true,
   "pipelineVersion": "grounded-answer.v13|real-stack|300/30|0.70/0.30|kw6|kr3|cb0.05|rr20|@cf/baai/bge-reranker-base|floor0.05|top8|fts-stopword-or-v1",

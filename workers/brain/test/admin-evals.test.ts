@@ -4,7 +4,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 import questions from "../../../content/northwind/questions.json";
 import passOne from "../../../evals/results/2026-08-31/findings.pass1.json";
 import passTwo from "../../../evals/results/2026-08-31/findings.glm-5.3-flash.json";
-import latest from "../../../evals/results/2026-09-06/findings.glm-5.3-flash.json";
+import coverage from "../../../evals/results/2026-09-06/findings.glm-5.3-flash.json";
+import latest from "../../../evals/results/2026-10-25-chat-models/fix-build-full/findings.deepseek-ai-deepseek-v4.1-flash-1017.json";
 import type { EvalsAdminView } from "../../../src/lib/contracts/admin-metrics";
 import { NORTHWIND_CAMPAIGN, campaignRun } from "../../../src/lib/eval/campaign-snapshot";
 import { call, personaCookies } from "./admin-helpers";
@@ -39,7 +40,8 @@ describe("campaign snapshot constants match the committed eval results", () => {
   const cases: [string, Findings][] = [
     ["pass1", passOne as Findings],
     ["final", passTwo as Findings],
-    ["coverage", latest as Findings],
+    ["coverage", coverage as Findings],
+    ["latest", latest as Findings],
   ];
   for (const [key, findings] of cases) {
     it(`${key} totals, categories and failing ids`, () => {
@@ -99,7 +101,7 @@ describe("GET /evaluations?view=campaign", () => {
     const response = await call("/evaluations?view=campaign", cookies["member-jordan"]);
     expect(response.status).toBe(200);
     const body = (await response.json()) as EvalsAdminView;
-    expect(body.runs.map((run) => run.key)).toEqual(["baseline", "pass1", "final", "coverage", "redesign", "latest"]);
+    expect(body.runs.map((run) => run.key)).toEqual(["baseline", "pass1", "final", "coverage", "redesign", "redesignFix", "latest"]);
     expect(body.latestKey).toBe("latest");
     expect(body.categories.map((category) => category.id)).toEqual([
       "factual",
@@ -109,25 +111,16 @@ describe("GET /evaluations?view=campaign", () => {
       "multi_hop",
     ]);
     expect(body.retrieval.aclLeaks).toBe(0);
-    expect(body.failures.map((failure) => failure.id)).toEqual(["q073", "q086", "q090"]);
-    const [first, second, third] = body.failures;
-    expect(first.askedAs).toBe("eng_ic");
+    expect(body.failures.map((failure) => failure.id)).toEqual(["q071", "q090"]);
+    const [first, second] = body.failures;
+    expect(first.askedAs).toBe("hr_generalist");
     expect(first.expected).toEqual([]);
-    expect(second.askedAs).toBe("eng_lead");
-    expect(second.expected.map((item) => item.documentId)).toEqual([
-      "nw_engineering_change_management",
-      "nw_engineering_deployment",
-    ]);
+    expect(second.askedAs).toBe("support_agent");
     expect(second.expected.map((item) => item.title)).toEqual([
-      "Change Management Policy",
-      "Code Deployment Policy",
-    ]);
-    expect(third.askedAs).toBe("support_agent");
-    expect(third.expected.map((item) => item.title)).toEqual([
       "Refund Policy",
       "Customer Data Access Requests",
     ]);
-    expect(third.expected.map((item) => item.section)).toEqual([
+    expect(second.expected.map((item) => item.section)).toEqual([
       "Refund and Data",
       "Response Windows",
     ]);
@@ -143,7 +136,7 @@ describe("GET /evaluations?view=campaign", () => {
       .run();
     const response = await call("/evaluations?view=campaign", cookies["member-jordan"]);
     const body = (await response.json()) as EvalsAdminView;
-    expect(body.failures[2].expected.map((item) => item.title)).toEqual([
+    expect(body.failures[1].expected.map((item) => item.title)).toEqual([
       "Refund Policy",
       "Catalog DSAR Title",
     ]);
@@ -157,7 +150,7 @@ describe("GET /evaluations?view=campaign", () => {
     const raw = await response.text();
     expect(raw).not.toContain("SECRET OWNER TITLE");
     const body = JSON.parse(raw) as EvalsAdminView;
-    expect(body.failures[2].expected.map((item) => item.title)).toEqual([
+    expect(body.failures[1].expected.map((item) => item.title)).toEqual([
       "Refund Policy",
       "Private document",
     ]);

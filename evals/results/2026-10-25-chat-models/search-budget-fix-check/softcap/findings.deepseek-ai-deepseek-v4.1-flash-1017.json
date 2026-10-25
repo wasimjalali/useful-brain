@@ -1,6 +1,6 @@
 {
   "model": "@cf/deepseek-ai/deepseek-v4.1-flash-1017",
-  "questionsFile": "../../../../../../../../private/tmp/claude-501/-Users-wasimjalali-Desktop-Personal-Project-useful-brain/74cb950c-c7be-42ec-81ad-8e7f661742cb/scratchpad/budget-fix-check.json",
+  "questionsFile": "<scratchpad>/budget-fix-check.json",
   "harnessGitSha": "f050672a9be9c9b2a93e06f366fcef70fc4b66d2",
   "harnessDirty": false,
   "pipelineVersion": "grounded-answer.v14|real-stack|300/30|0.70/0.30|kw6|kr3|cb0.05|rr20|@cf/baai/bge-reranker-base|floor0.05|top8|fts-stopword-or-v1",
