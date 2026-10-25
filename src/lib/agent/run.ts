@@ -1,4 +1,9 @@
-import { Agent, type AgentMessage, type AgentTool } from "@earendil-works/pi-agent-core";
+import {
+  Agent,
+  type AgentMessage,
+  type AgentTool,
+  type BeforeToolCallContext,
+} from "@earendil-works/pi-agent-core";
 import {
   fauxAssistantMessage,
   fauxProvider,
@@ -61,7 +66,7 @@ export type KnowledgeRunResult = {
   /** Quote-extraction calls that ran out of completion budget before answering. */
   extractionTruncatedCount: number;
   /** Why an insufficient-evidence answer was kept despite retrieved evidence. */
-  refusalReason?: "model_abstained" | "model_abstained_with_evidence";
+  refusalReason?: "model_abstained" | "model_abstained_with_evidence" | "search_cap_invalid_draft";
 };
 
 export type AgentRuntime = {
@@ -129,8 +134,15 @@ export const LIVE_KNOWLEDGE_SYSTEM_PROMPT = [
   "Answer only the exact fact the question asks. A sentence about a different program, plan, metric, document or policy than the one asked is not an answer, even when it looks similar. A number, timeframe or rule stated for one named process is not evidence for a different process: a patch-availability window for supported product versions does not answer an internal remediation deadline, a hiring referral bonus does not answer a customer referral payout, and a neighboring policy restating another document's rule does not replace that document. When evidence states that two similar-sounding programs, policies or processes are different, treat them as different: answer each only from its own document, never from the other's numbers or rules. A deadline that tells customers what they receive is not our internal deadline to act. Follow attribution pointers: when a document says its rule or window comes from another policy, quote and cite that policy, not the restating document. When the evidence states the asked number or rule only for a different program or process than the one asked about, reply exactly with the not-enough-evidence sentence.",
   "When the user asks you to open a support ticket, first call search_knowledge for the rule that decides the priority, then call create_ticket in the same message as the cited sentences that explain the priority. Never invent create_ticket arguments: use only the customer, priority and subject the user gave or the evidence states, and if one is missing do not call create_ticket. Never call create_ticket for a question.",
   `Do not invent facts. A related or similar document is not evidence for a fact it does not state. If no evidence states the specific program, benefit, policy, amount or rule the question asks about, reply exactly: ${BRAIN_NOT_ENOUGH_EVIDENCE}`,
+  `When a search reports that the search budget is exhausted, stop searching and answer only with evidence already returned that directly states the asked fact, otherwise reply exactly: ${BRAIN_NOT_ENOUGH_EVIDENCE}`,
   `Prompt version ${PROMPT_VERSION}.`,
 ].join(" ");
+
+// What the model reads when the search cap blocks a call. A plain status with
+// no instruction: tool results are data, so the rule for answering after the
+// cap lives in the system prompt. The exclusion in searchFailed matches it
+// exactly.
+const SEARCH_LIMIT_REASON = "search_knowledge budget exhausted: no more searches run in this turn.";
 
 /** Write tools that may only be proposed after a successful current-turn search. */
 const SEARCH_FIRST_TOOLS: ReadonlySet<string> = new Set(["create_ticket"]);
@@ -306,6 +318,22 @@ export async function runKnowledgeAgent(input: {
   const repairExtractionCache = new Map<string, unknown>();
   let firstSearchCompleted = false;
   let pendingApprovalBinding: ApprovalBinding | undefined;
+  // The search_knowledge calls the cap softly blocked this run. A cap is not
+  // a backend failure, so these stay out of the search-failure check below.
+  // Only a search-only assistant message gets soft blocks (a model may issue
+  // several parallel searches in it, and may search again in a later message).
+  const budgetBlockedCallIds = new Set<string>();
+  let turnLimitStopped = false;
+  // Hook results with terminate: true, counted per assistant message (by
+  // identity, never by the model-supplied tool-call id, which can repeat). A
+  // batch where every call terminated ended on its own and is not a cut-off by
+  // the turn budget.
+  const terminatedCalls = new WeakMap<object, number>();
+  // The first hard BudgetExceededError block a call met: the total tool-call
+  // cap, or a search cap block in a message that also holds another tool.
+  // After a soft search cap block it marks the run as a budget failure,
+  // because only search calls are otherwise counted as failed.
+  let hardBudgetBlockMessage: string | undefined;
   const tools: AgentTool[] =
     input.tools ??
     [
@@ -345,6 +373,84 @@ export async function runKnowledgeAgent(input: {
           streamOptions?.signal,
         ),
       }));
+  const decideToolCall = async (context: BeforeToolCallContext, signal?: AbortSignal) => {
+    signal?.throwIfAborted();
+    budgets.assertWithinWallTime();
+    try {
+      budgets.noteToolCall(context.toolCall.name);
+    } catch (error) {
+      if (error instanceof BudgetExceededError) {
+        // A search cap block in a message that holds only search_knowledge
+        // calls is soft (terminate false, id recorded): the model reads the
+        // status and answers or refuses from the searches it already has. A
+        // model that searches again in a later message gets the same status;
+        // each blocked call still spends the total tool-call budget, so a
+        // looper ends at the tool-call cap (hard) or the turn limit. The block
+        // is hard (terminate, counted as a failed search) when the message
+        // holds any other tool call, because pi ends a batch only when every
+        // call in it terminates, and a soft cap beside a pending approval
+        // would give the model another turn to propose a second one. Every
+        // other budget code terminates.
+        if (
+          error.code === "SEARCH_LIMIT" &&
+          context.assistantMessage.content.every(
+            (part) => part.type !== "toolCall" || part.name === SEARCH_KNOWLEDGE_TOOL,
+          )
+        ) {
+          budgetBlockedCallIds.add(context.toolCall.id);
+          return { block: true, reason: SEARCH_LIMIT_REASON, terminate: false };
+        }
+        hardBudgetBlockMessage ??= error.message;
+        return { block: true, reason: error.message, terminate: true };
+      }
+      throw error;
+    }
+    if (!allowed.has(context.toolCall.name)) {
+      return { block: true, reason: "tool is not enabled for this run", terminate: true };
+    }
+    // A ticket proposal needs evidence from a search that already succeeded
+    // in this turn: an invented priority or subject must never reach an
+    // approval. The model may search and propose again.
+    if (SEARCH_FIRST_TOOLS.has(context.toolCall.name) && evidenceLedger.byLabel.size === 0) {
+      return {
+        block: true,
+        reason: `${context.toolCall.name} is blocked until search_knowledge has returned evidence in this turn`,
+      };
+    }
+    try {
+      const registered = toolPolicy(context.toolCall.name);
+      const idempotencyKey =
+        registered.risk === "read"
+          ? "read-only"
+          : await mutatingIdempotencyKey(
+              context.toolCall.name,
+              context.args,
+              `${input.policyPrincipal.id}-${input.conversationId}-${context.toolCall.id}`,
+            );
+      const decision = policyGateway({
+        tool: context.toolCall.name,
+        principal: input.policyPrincipal,
+        conversationId: input.conversationId,
+        args: context.args,
+        idempotencyKey,
+        now: input.now ?? Date.now(),
+        approval: input.approval,
+      });
+      if (decision.action === "pending_approval") {
+        pendingApprovalBinding = decision.binding;
+        return { block: true, reason: "pending_approval", terminate: true };
+      }
+      if (decision.action === "deny") {
+        return { block: true, reason: decision.reason, terminate: true };
+      }
+      return undefined;
+    } catch (error) {
+      if (error instanceof PolicyError) {
+        return { block: true, reason: "tool denied by policy", terminate: true };
+      }
+      throw error;
+    }
+  };
   const agent = new Agent({
     initialState: {
       systemPrompt:
@@ -368,61 +474,14 @@ export async function runKnowledgeAgent(input: {
       }),
     toolExecution: "sequential",
     beforeToolCall: async (context, signal) => {
-      signal?.throwIfAborted();
-      budgets.assertWithinWallTime();
-      try {
-        budgets.noteToolCall(context.toolCall.name);
-      } catch (error) {
-        if (error instanceof BudgetExceededError) {
-          return { block: true, reason: error.message, terminate: true };
-        }
-        throw error;
+      const decision = await decideToolCall(context, signal);
+      if (decision?.terminate === true) {
+        terminatedCalls.set(
+          context.assistantMessage,
+          (terminatedCalls.get(context.assistantMessage) ?? 0) + 1,
+        );
       }
-      if (!allowed.has(context.toolCall.name)) {
-        return { block: true, reason: "tool is not enabled for this run", terminate: true };
-      }
-      // A ticket proposal needs evidence from a search that already succeeded
-      // in this turn: an invented priority or subject must never reach an
-      // approval. The model may search and propose again.
-      if (SEARCH_FIRST_TOOLS.has(context.toolCall.name) && evidenceLedger.byLabel.size === 0) {
-        return {
-          block: true,
-          reason: `${context.toolCall.name} is blocked until search_knowledge has returned evidence in this turn`,
-        };
-      }
-      try {
-        const registered = toolPolicy(context.toolCall.name);
-        const idempotencyKey =
-          registered.risk === "read"
-            ? "read-only"
-            : await mutatingIdempotencyKey(
-                context.toolCall.name,
-                context.args,
-                `${input.policyPrincipal.id}-${input.conversationId}-${context.toolCall.id}`,
-              );
-        const decision = policyGateway({
-          tool: context.toolCall.name,
-          principal: input.policyPrincipal,
-          conversationId: input.conversationId,
-          args: context.args,
-          idempotencyKey,
-          now: input.now ?? Date.now(),
-          approval: input.approval,
-        });
-        if (decision.action === "pending_approval") {
-          pendingApprovalBinding = decision.binding;
-          return { block: true, reason: "pending_approval", terminate: true };
-        }
-        if (decision.action === "deny") {
-          return { block: true, reason: decision.reason, terminate: true };
-        }
-        return undefined;
-      } catch (error) {
-        if (error instanceof PolicyError) {
-          return { block: true, reason: "tool denied by policy", terminate: true };
-        }
-        throw error;
-      }
+      return decision;
     },
     shouldStopAfterTurn: async (context) => {
       try {
@@ -433,6 +492,7 @@ export async function runKnowledgeAgent(input: {
         return false;
       } catch (error) {
         if (error instanceof BudgetExceededError) {
+          turnLimitStopped ||= error.code === "TURN_LIMIT";
           return true;
         }
         throw error;
@@ -502,6 +562,43 @@ export async function runKnowledgeAgent(input: {
     }
   }
 
+  // After a soft cap block the model was told to answer, so a run that a
+  // budget then cut off is a budget failure, not a draft to ground. A hard
+  // tool-call cap block is one (only search calls are otherwise counted as
+  // failed). A turn-limit stop sets no budget error by itself; it counts when
+  // it left tool results unanswered, not when the limit lands on the
+  // answering turn itself (an assistant message is last) or when the last
+  // batch ended the run on its own (every call in that message terminated: a
+  // pending approval, a hard block). A last batch that mixes a terminating
+  // call with one that did not terminate (say a pending approval beside an
+  // invalid-arguments call) is a cut-off: pi would not have ended it and the
+  // model never read the sibling's error, so the turn fails closed as
+  // unavailable, retryable, and the approval is not recorded. Runs without a
+  // soft cap block keep the behaviour they had without the cap.
+  if (budgetBlockedCallIds.size > 0 && hardBudgetBlockMessage) {
+    budgetErrorMessage ??= hardBudgetBlockMessage;
+  }
+  const lastMessage = agent.state.messages[agent.state.messages.length - 1];
+  const lastAssistantMessage = [...agent.state.messages]
+    .reverse()
+    .find((message) => message.role === "assistant");
+  const lastBatchCalls =
+    lastAssistantMessage?.role === "assistant"
+      ? lastAssistantMessage.content.filter((part) => part.type === "toolCall")
+      : [];
+  const lastBatchEndedItself =
+    lastAssistantMessage !== undefined &&
+    lastBatchCalls.length > 0 &&
+    terminatedCalls.get(lastAssistantMessage) === lastBatchCalls.length;
+  if (
+    turnLimitStopped &&
+    budgetBlockedCallIds.size > 0 &&
+    lastMessage?.role === "toolResult" &&
+    !lastBatchEndedItself
+  ) {
+    budgetErrorMessage ??= "turn budget exhausted";
+  }
+
   const transcript = toTranscript(agent.state.messages);
   const lastAssistant = [...transcript].reverse().find((message) => message.role === "assistant");
   const rawFinal =
@@ -520,13 +617,22 @@ export async function runKnowledgeAgent(input: {
   let grounded = enforce(rawFinal);
   const evidence = evidenceFromLedger(evidenceLedger);
   let refusalReason: KnowledgeRunResult["refusalReason"];
+  // After a soft search cap block the run had fewer searches than the model
+  // wanted, so no host pass may create or rewrite an answer: a related
+  // document must not answer a question it does not state. The final is the
+  // model's own draft only when it validates as grounded as it stands;
+  // anything else, a refusal in any wording included, is the not-enough-
+  // evidence refusal. Citation completion, quote salvage, citation repair,
+  // identifier recovery, the abstention recheck and the coverage pass all
+  // stay off.
+  const refusalFinal = budgetBlockedCallIds.size > 0;
   const isRefusal = (value: string | null | undefined) =>
     typeof value === "string" && value.trim() === BRAIN_NOT_ENOUGH_EVIDENCE;
 
   // Host-side citation completion runs first: an under-cited draft whose
   // sentences are verbatim ledger evidence is repaired deterministically
   // before any refusal or model-repair decision.
-  if (grounded === BRAIN_INVALID_CITATION && evidence.length > 0) {
+  if (grounded === BRAIN_INVALID_CITATION && evidence.length > 0 && !refusalFinal) {
     const completed = completeProseCitations(rawFinal, evidenceLedger);
     if (completed !== rawFinal) {
       grounded = enforce(completed);
@@ -545,6 +651,7 @@ export async function runKnowledgeAgent(input: {
   if (
     grounded === BRAIN_INVALID_CITATION &&
     evidence.length > 0 &&
+    !refusalFinal &&
     !modelSignalsInsufficientEvidence(rawFinal) &&
     !(citedMarkerIndexes(rawFinal).length === 0 && sentenceSignalsInsufficientEvidence(rawFinal))
   ) {
@@ -558,9 +665,20 @@ export async function runKnowledgeAgent(input: {
   // the draft. Honor the refusal instead of repairing citations, which
   // could turn it into an off-topic grounded answer, and record why the
   // refusal was kept.
-  if (grounded === BRAIN_INVALID_CITATION && modelSignalsInsufficientEvidence(rawFinal)) {
+  if (
+    grounded === BRAIN_INVALID_CITATION &&
+    (refusalFinal || modelSignalsInsufficientEvidence(rawFinal))
+  ) {
     grounded = BRAIN_NOT_ENOUGH_EVIDENCE;
-    refusalReason = evidence.length > 0 ? "model_abstained_with_evidence" : "model_abstained";
+    // After a cap, a draft without refusal wording (a cited or uncited answer
+    // attempt, or the text of a tool-call turn) was not an abstention: label
+    // it apart so it stays out of the refused-with-evidence count.
+    refusalReason =
+      refusalFinal && !modelSignalsInsufficientEvidence(rawFinal)
+        ? "search_cap_invalid_draft"
+        : evidence.length > 0
+          ? "model_abstained_with_evidence"
+          : "model_abstained";
   } else if (isRefusal(grounded) && evidence.length > 0) {
     refusalReason = "model_abstained_with_evidence";
   }
@@ -572,10 +690,28 @@ export async function runKnowledgeAgent(input: {
   // valid draft: the failed search may have held the evidence for another
   // part of the question (a second hop) or a fact that would change the
   // answer, so a cited draft beside it cannot be trusted as complete. The
-  // client retries the turn instead.
+  // client retries the turn instead. A call the search budget softly blocked
+  // is a cap, not a failed search: it never ran, so it is left out and the
+  // answer rests on the searches that did. Tool-call ids come from the model
+  // and can repeat, so a call is left out only when exactly one result
+  // carries its id and that result is the cap reason; any other result
+  // sharing the id is counted, failing closed.
+  const runMessages = agent.state.messages.slice(priorMessageCount);
+  const resultIdCounts = new Map<string, number>();
+  for (const message of runMessages) {
+    if (message.role === "toolResult") {
+      resultIdCounts.set(message.toolCallId, (resultIdCounts.get(message.toolCallId) ?? 0) + 1);
+    }
+  }
+  const isCapBlockResult = (message: AgentMessage) =>
+    message.role === "toolResult" &&
+    budgetBlockedCallIds.has(message.toolCallId) &&
+    resultIdCounts.get(message.toolCallId) === 1 &&
+    message.content.map((part) => (part.type === "text" ? part.text : "")).join("") ===
+      SEARCH_LIMIT_REASON;
   const searchFailed =
     evidenceLedger.searchError ||
-    toolCallsFromMessages(agent.state.messages.slice(priorMessageCount)).some(
+    toolCallsFromMessages(runMessages.filter((message) => !isCapBlockResult(message))).some(
       (call) => call.tool === SEARCH_KNOWLEDGE_TOOL && call.status === "error",
     );
 
@@ -592,6 +728,7 @@ export async function runKnowledgeAgent(input: {
     !input.abort?.signal.aborted &&
     !wall.aborted &&
     !searchFailed &&
+    !refusalFinal &&
     evidence.length > 0;
   if (grounded === BRAIN_INVALID_CITATION && canRepair()) {
     try {
@@ -725,6 +862,7 @@ export async function runKnowledgeAgent(input: {
     !input.abort?.signal.aborted &&
     !wall.aborted &&
     !searchFailed &&
+    !refusalFinal &&
     evidence.length > 0;
   if (
     canCover &&
