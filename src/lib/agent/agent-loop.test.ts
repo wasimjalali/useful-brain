@@ -29,7 +29,6 @@ import { ExtractionTruncatedError } from "./extraction-truncated";
 import { redactToolResultForStorage } from "./redact-tool-result";
 import { createWorkersAiCitationRepair } from "../models/workers-ai-citation-repair";
 import {
-  BRAIN_INVALID_CITATION,
   BRAIN_KNOWLEDGE_UNAVAILABLE,
   BRAIN_MUST_RETRIEVE,
   BRAIN_NOT_ENOUGH_EVIDENCE,
@@ -1855,6 +1854,7 @@ describe("retrieval availability", () => {
       // The blocked call stays recorded, with the reason the model saw.
       expect(result.toolCalls[4]?.status).toBe("error");
       expect(result.toolCalls[4]?.redactedResult).toContain("search_knowledge budget exhausted");
+      expect(result.toolCalls[4]?.redactedResult).toContain(BRAIN_NOT_ENOUGH_EVIDENCE);
     }, 20_000);
 
     it("keeps an honest refusal when every allowed search was weak and a fifth is blocked", async () => {
@@ -1909,16 +1909,12 @@ describe("retrieval availability", () => {
       expect(result.refusalReason).toBeUndefined();
     }, 20_000);
 
-    it("bounds a model that keeps searching after the block by the turn budget", async () => {
+    it("makes a second cap block in one run hard, so the turn is unavailable", async () => {
       const pipeline = await tinyPipeline();
       let calls = 0;
       const { counter, runtime } = countedRuntime("useful-brain-search-cap-loop", [
         ...fiveSearches,
         searchCall("leave again"),
-        searchCall("leave again 2"),
-        searchCall("leave again 3"),
-        searchCall("leave again 4"),
-        searchCall("leave again 5"),
         finalText("Employees accrue 1.5 days of leave per month.[1]"),
       ]);
       const result = await runKnowledgeAgent({
@@ -1935,13 +1931,146 @@ describe("retrieval availability", () => {
         runtime,
       });
 
+      // The first block was soft and the model searched again anyway: the
+      // second block ends the run before any answer is drafted.
       expect(calls).toBe(AGENT_BUDGETS.maxSearchKnowledge);
-      expect(counter.modelCalls).toBeLessThanOrEqual(AGENT_BUDGETS.maxTurns);
-      expect(result.toolCalls.length).toBeLessThanOrEqual(AGENT_BUDGETS.maxToolCalls);
-      // The turn budget ended the loop before any answer was drafted. The turn
-      // is refused (the last assistant text carries no citation), never answered.
-      expect(result.finalResponse).toBe(BRAIN_INVALID_CITATION);
-      expect(counter.modelCalls).toBe(AGENT_BUDGETS.maxTurns);
+      expect(counter.modelCalls).toBe(6);
+      expect(result.toolCalls).toHaveLength(6);
+      expect(result.finalResponse).toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
+      expect(result.refusalReason).toBeUndefined();
+    }, 20_000);
+
+    it("hands the model a refusal instruction and honors its refusal on a permission trap", async () => {
+      const pipeline = await tinyPipeline();
+      const seen: string[] = [];
+      const runtime = scriptedRuntime("useful-brain-search-cap-trap", [
+        ...fiveSearches,
+        finalText(BRAIN_NOT_ENOUGH_EVIDENCE),
+      ]);
+      const stream = runtime.stream!;
+      const result = await runKnowledgeAgent({
+        question: "What are the final pay rules for an engineer who leaves?",
+        pipeline,
+        principal,
+        policyPrincipal,
+        conversationId: "c-search-cap-trap",
+        runtime: {
+          ...runtime,
+          stream: ((model, context, options) => {
+            const last = context.messages[context.messages.length - 1];
+            if (last?.role === "toolResult") {
+              seen.push(last.content.map((part) => (part.type === "text" ? part.text : "")).join(""));
+            }
+            return stream(model, context, options);
+          }) as NonNullable<Parameters<typeof runKnowledgeAgent>[0]["runtime"]>["stream"],
+        },
+      });
+
+      const reason = seen[seen.length - 1] ?? "";
+      expect(reason).toContain("search_knowledge budget exhausted");
+      expect(reason).toContain("directly states the asked fact");
+      expect(reason).toContain(BRAIN_NOT_ENOUGH_EVIDENCE);
+      // No retrieved content rides along in the host instruction.
+      expect(reason).not.toContain("1.5 days");
+      expect(result.finalResponse).toBe(BRAIN_NOT_ENOUGH_EVIDENCE);
+      expect(result.aborted).toBe(false);
+    }, 20_000);
+
+    it("counts a real error that shares a tool-call id with the capped call", async () => {
+      // A model or adapter that reuses one id (workers-ai-chat falls back to
+      // "tool-1") must not let the cap exclusion hide a real tool failure.
+      let executions = 0;
+      const sharedId = (query: string) =>
+        fauxAssistantMessage(
+          [fauxText("Searching."), fauxToolCall(SEARCH_KNOWLEDGE_TOOL, { query }, { id: "tool-1" })],
+          { stopReason: "toolUse" },
+        );
+      const result = await runKnowledgeAgent({
+        question: "How much leave accrues each month?",
+        pipeline: { search: async ({ query }) => emptySearch(query) },
+        principal,
+        policyPrincipal,
+        conversationId: "c-search-cap-shared-id",
+        tools: [
+          {
+            name: SEARCH_KNOWLEDGE_TOOL,
+            label: "Search knowledge",
+            description: "Search tool that throws once, then succeeds.",
+            parameters: Type.Object({ query: Type.String() }),
+            execute: async () => {
+              executions += 1;
+              if (executions === 1) {
+                throw new Error("search tool crashed");
+              }
+              return { content: [{ type: "text" as const, text: "ok" }], details: {} };
+            },
+          },
+        ],
+        runtime: scriptedRuntime("useful-brain-search-cap-shared-id", [
+          sharedId("a"),
+          sharedId("b"),
+          sharedId("c"),
+          sharedId("d"),
+          sharedId("e"),
+          finalText(BRAIN_NOT_ENOUGH_EVIDENCE),
+        ]),
+      });
+
+      expect(executions).toBe(AGENT_BUDGETS.maxSearchKnowledge);
+      expect(result.toolCalls[0]?.status).toBe("error");
+      expect(result.toolCalls[4]?.status).toBe("error");
+      expect(result.finalResponse).toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
+    }, 20_000);
+
+    it("keeps the search cap hard beside a pending approval in the same batch", async () => {
+      const effects: string[] = [];
+      const pipeline = await tinyPipeline();
+      const mixed = fauxAssistantMessage(
+        [
+          fauxText("Searching, then filing."),
+          fauxToolCall(SEARCH_KNOWLEDGE_TOOL, { query: "leave one more time" }),
+          fauxToolCall("create_ticket", { query: "file it" }),
+        ],
+        { stopReason: "toolUse" },
+      );
+      const { counter, runtime } = countedRuntime("useful-brain-search-cap-mixed", [
+        ...fiveSearches.slice(0, 4),
+        mixed,
+        fauxAssistantMessage(
+          [fauxText("Again."), fauxToolCall("create_ticket", { query: "file it again" })],
+          { stopReason: "toolUse" },
+        ),
+        finalText("Employees accrue 1.5 days of leave per month.[1]"),
+      ]);
+      const result = await runKnowledgeAgent({
+        question: "How much leave accrues each month? Then file a ticket.",
+        pipeline,
+        principal,
+        policyPrincipal,
+        conversationId: "c-search-cap-mixed",
+        extraTools: [
+          {
+            name: "create_ticket",
+            label: "Create ticket",
+            description: "Ticket tool whose execute path omits the policy gateway.",
+            parameters: Type.Object({ query: Type.String() }),
+            executionMode: "sequential",
+            execute: async (_id, params: unknown) => {
+              effects.push((params as { query: string }).query);
+              return { content: [{ type: "text" as const, text: "filed" }], details: {} };
+            },
+          },
+        ],
+        runtime,
+      });
+
+      // The batch ended at the pending approval: no second model turn, so no
+      // second proposal, and no ticket side effect.
+      expect(counter.modelCalls).toBe(5);
+      expect(effects).toEqual([]);
+      expect(result.pendingApproval).toBe(true);
+      expect(result.toolCalls.filter((call) => call.status === "pending_approval")).toHaveLength(1);
+      expect(result.finalResponse).toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
     }, 20_000);
 
     const echoCall = () =>
