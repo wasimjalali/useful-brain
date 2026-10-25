@@ -24,6 +24,7 @@ describe("modelDisplayName", () => {
   it("names known models and passes unknown ids through", () => {
     expect(modelDisplayName("@cf/zai-org/glm-5.3-flash")).toBe("GLM 5.3 Flash");
     expect(modelDisplayName("@cf/zai-org/glm-5.3")).toBe("GLM 5.3");
+    expect(modelDisplayName("@cf/baai/bge-m3")).toBe("BGE-M3");
     expect(modelDisplayName("@cf/qwen/qwen3-embedding-0.6b")).toBe("Qwen3 Embedding 0.6B");
     expect(modelDisplayName("@cf/baai/bge-reranker-base")).toBe("BGE Reranker Base");
     expect(modelDisplayName("@cf/acme/unknown")).toBe("@cf/acme/unknown");

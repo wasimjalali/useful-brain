@@ -35,6 +35,8 @@ describe("locked retrieval fingerprint", () => {
     expect(fingerprintId(REAL_STACK_FINGERPRINT)).toContain("300/30");
     expect(fingerprintId(REAL_STACK_FINGERPRINT)).toContain("0.70/0.30");
     expect(fingerprintId(REAL_STACK_FINGERPRINT)).toContain("kr3");
+    expect(fingerprintId(REAL_STACK_FINGERPRINT)).toContain("emb-@cf/baai/bge-m3");
+    expect(fingerprintId(FAKE_PROVIDER_FINGERPRINT)).not.toContain("emb-");
     expect(fingerprintId(FAKE_PROVIDER_FINGERPRINT)).toContain("fts-stopword-or-v1");
     expect(fingerprintId(REAL_STACK_FINGERPRINT)).toContain("fts-stopword-or-v1");
     expect(fingerprintId(REAL_STACK_FINGERPRINT)).not.toBe(fingerprintId(FAKE_PROVIDER_FINGERPRINT));

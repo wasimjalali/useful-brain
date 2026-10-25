@@ -187,7 +187,7 @@ const ADMIN_ACCOUNT: SettingsAccount = {
 
 const MODEL_CONFIG: SettingsModelConfig = {
   answerModel: "@cf/zai-org/glm-5.3-flash",
-  embeddingModel: "@cf/qwen/qwen3-embedding-0.6b",
+  embeddingModel: "@cf/baai/bge-m3",
   rerankerModel: "@cf/baai/bge-reranker-base",
   retrieval: "Hybrid, 0.70 vector and 0.30 keyword",
   passagesPerAnswer: 8,

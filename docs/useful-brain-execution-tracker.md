@@ -211,7 +211,7 @@ Goal: reproduce the approved corpus lifecycle with D1 as authority and Vectorize
 - [x] Add stable IDs and content digests. Evidence: `src/lib/ingest/digests.ts`.
 - [x] Add direct R2 upload finalization without buffering whole files in a Worker. Evidence: `src/lib/ingest/r2-finalize.ts` streams a bounded object by key; client upload is to R2, not the Worker request body.
 - [x] Stream and bound Markdown, text, HTML and PDF parsing under the 128 MB Worker limit. Evidence: `src/lib/ingest/parsers.ts` (25 MiB source cap, 8 MiB PDF cap, HTML text extraction).
-- [x] Implement separate query and document embedding instructions. Evidence: `src/lib/embeddings/instructions.ts`.
+- [x] Implement separate query and document embedding instructions. Evidence: `src/lib/embeddings/instructions.ts`. Superseded 2026-10-25: BGE-M3 takes no instruction, see "Embedder switch (2026-10-25)".
 - [x] Use cosine Vectorize indexes and generation namespaces. Evidence: `src/lib/embeddings/instructions.ts` (`cosine`, 1024), `generationNamespace`.
 - [x] Store only fixed-width `acl_group` as indexed ACL metadata. Evidence: `src/lib/acl/acl-group.ts`, chunks table `CHECK (length(acl_group) = 32)`.
 - [x] Create metadata indexes before vector upserts and require re-upsert before filtered queries. Evidence: `assertMetadataIndexReady`, `canMarkReady`.
@@ -361,7 +361,7 @@ Exit: staging is the release candidate with restore, incident and budget evidenc
 
 Authorized separately from commercial Phase 7B. Loopback + existing staging skeleton. No real company data. No new production resource set.
 
-- [x] Select GLM 5.3 Flash for chat; keep Qwen 0.6b embeddings and BGE rerank. Evidence: [model-selection-report.md](model-selection-report.md), `src/lib/models/selection.ts`.
+- [x] Select GLM 5.3 Flash for chat; keep Qwen 0.6b embeddings and BGE rerank. Embeddings superseded 2026-10-25 by BGE-M3, see "Embedder switch (2026-10-25)". Evidence: [model-selection-report.md](model-selection-report.md), `src/lib/models/selection.ts`.
 - [x] Point Next.js UI at Brain over the Service Binding. Evidence: `src/app/actions.ts`, `src/lib/cf/brain-client.ts`, `workers/brain/src/index.ts`, `workers/brain/test/ui-api.test.ts`.
 - [x] Northwind eval battery and sample questions. Evidence: `src/lib/eval/manual-eval-set.ts`, `src/lib/eval/northwind.test.ts`.
 - [x] Remove Convex from the live path and `package.json`.
@@ -423,6 +423,11 @@ Plan: `docs/design/2026-10-08-redesign-implementation-plan.md` (decisions D1-D20
 - [x] Detail layouts (approved by Wasim from two mockup rounds, 2026-10-08): evidence retrieval details collapse under Open document; Settings Model and retrieval and Connectors use grouped lists with readable model names (raw ids stay in Settings only, elsewhere in tooltips); Account shows a profile header and an access meter; Activity traces read as a step timeline; the approval card shows customer, subject and time instead of the tool name; Evals shows readable model and role names and today's runs (117/120); Overview health dots carry color; Cmd+K groups chats with identical titles. Screenshots: `verify/detail-layouts/` (local).
 - [x] D20: draft reconciliation lists the full Vectorize index (orphan detection) when `VECTORIZE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` are set as Ingestion worker secrets; binding-only otherwise. Code and migration `0006_draft_inventory.sql` are done. [ ] Left for Wasim: create the Vectorize Read token and run the two `wrangler secret put` commands in `docs/runbooks/operations.md`, then apply corpus migration 0006 to staging.
 - Deviation D16: validated answers are revealed, not streamed.
+
+### Embedder switch (2026-10-25)
+
+- [x] `@cf/qwen/qwen3-embedding-0.6b` replaced by `@cf/baai/bge-m3` (1024 dimensions, cosine, same price), decided by Wasim after evals on Northwind: dense retrieval recall@3 0.990 vs 0.969, MRR 0.957 vs 0.945, query embed p95 133 ms vs 4,042 ms, indexing 15 s vs 193 s, full battery 118/120 for both. The write-up lands in the eval PR.
+- [x] Runtime: payload is `contexts` with no instruction. New Vectorize indexes `useful-brain-development-bge-m3` and `useful-brain-staging-bge-m3` (staging created by the operator before deploy). The retrieval configuration version now includes the embedder. Generations record their embedding model, and retrieval, promote, rollback and draft reopening fail closed on a mismatch. Staging needs a reindex and promote: `docs/runbooks/operations.md`.
 
 ### Phase 7B: production launch and retirement
 

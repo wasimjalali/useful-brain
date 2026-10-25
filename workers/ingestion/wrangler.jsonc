@@ -18,7 +18,7 @@
     "RESOURCES_PROVISIONED": "false",
     "WRANGLER_ACCESS_DEV": "false",
     "LOOPBACK_RUNTIME": "true",
-    "VECTORIZE_INDEX_NAME": "useful-brain-development"
+    "VECTORIZE_INDEX_NAME": "useful-brain-development-bge-m3"
   },
   "d1_databases": [
     {
@@ -38,7 +38,7 @@
   "vectorize": [
     {
       "binding": "VECTORIZE",
-      "index_name": "useful-brain-development",
+      "index_name": "useful-brain-development-bge-m3",
       "remote": true
     }
   ],
@@ -72,7 +72,7 @@
         "RESOURCES_PROVISIONED": "false",
         "WRANGLER_ACCESS_DEV": "false",
         "LOOPBACK_RUNTIME": "true",
-        "VECTORIZE_INDEX_NAME": "useful-brain-development"
+        "VECTORIZE_INDEX_NAME": "useful-brain-development-bge-m3"
       },
       "d1_databases": [
         {
@@ -89,7 +89,7 @@
           "jurisdiction": "eu"
         }
       ],
-      "vectorize": [{ "binding": "VECTORIZE", "index_name": "useful-brain-development", "remote": true }],
+      "vectorize": [{ "binding": "VECTORIZE", "index_name": "useful-brain-development-bge-m3", "remote": true }],
       "ai": { "binding": "AI", "remote": true },
       "queues": {
         "consumers": [
@@ -121,7 +121,7 @@
         "RESOURCES_PROVISIONED": "true",
         "WRANGLER_ACCESS_DEV": "false",
         "LOOPBACK_RUNTIME": "false",
-        "VECTORIZE_INDEX_NAME": "useful-brain-staging"
+        "VECTORIZE_INDEX_NAME": "useful-brain-staging-bge-m3"
       },
       "d1_databases": [
         {
@@ -138,7 +138,7 @@
           "jurisdiction": "eu"
         }
       ],
-      "vectorize": [{ "binding": "VECTORIZE", "index_name": "useful-brain-staging" }],
+      "vectorize": [{ "binding": "VECTORIZE", "index_name": "useful-brain-staging-bge-m3" }],
       "ai": { "binding": "AI" },
       "queues": {
         "consumers": [
