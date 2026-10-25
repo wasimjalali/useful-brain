@@ -324,9 +324,15 @@ export async function runKnowledgeAgent(input: {
   // several parallel searches in it, and may search again in a later message).
   const budgetBlockedCallIds = new Set<string>();
   let turnLimitStopped = false;
-  // Calls whose hook result ended the batch (terminate: true). A batch that
-  // ended on its own is not a cut-off by the turn budget.
-  const terminatingCallIds = new Set<string>();
+  // Hook results with terminate: true, counted per assistant message (by
+  // identity, never by the model-supplied tool-call id, which can repeat). A
+  // batch where every call terminated ended on its own and is not a cut-off by
+  // the turn budget.
+  const terminatedCalls = new WeakMap<object, number>();
+  // The first hard budget block (the total tool-call cap) a call met. After a
+  // soft search cap block it marks the run as a budget failure, because only
+  // search calls are otherwise counted as failed.
+  let hardBudgetBlockMessage: string | undefined;
   const tools: AgentTool[] =
     input.tools ??
     [
@@ -393,6 +399,7 @@ export async function runKnowledgeAgent(input: {
           budgetBlockedCallIds.add(context.toolCall.id);
           return { block: true, reason: SEARCH_LIMIT_REASON, terminate: false };
         }
+        hardBudgetBlockMessage ??= error.message;
         return { block: true, reason: error.message, terminate: true };
       }
       throw error;
@@ -468,7 +475,10 @@ export async function runKnowledgeAgent(input: {
     beforeToolCall: async (context, signal) => {
       const decision = await decideToolCall(context, signal);
       if (decision?.terminate === true) {
-        terminatingCallIds.add(context.toolCall.id);
+        terminatedCalls.set(
+          context.assistantMessage,
+          (terminatedCalls.get(context.assistantMessage) ?? 0) + 1,
+        );
       }
       return decision;
     },
@@ -551,13 +561,18 @@ export async function runKnowledgeAgent(input: {
     }
   }
 
-  // A turn-limit stop sets no budget error by itself. After a soft cap block
-  // the model was told to answer, so a stop that cut it off with tool results
-  // still unanswered is a budget failure, not a draft to ground. It does not
-  // apply when the turn limit lands on the answering turn itself (an
-  // assistant message is last), when the last batch ended the run on its own
-  // (a pending approval, a hard block: every call in it terminated), or on
-  // runs without a soft cap block.
+  // After a soft cap block the model was told to answer, so a run that a
+  // budget then cut off is a budget failure, not a draft to ground. A hard
+  // tool-call cap block is one (only search calls are otherwise counted as
+  // failed). A turn-limit stop sets no budget error by itself; it counts when
+  // it left tool results unanswered, not when the limit lands on the
+  // answering turn itself (an assistant message is last) or when the last
+  // batch ended the run on its own (every call in that message terminated: a
+  // pending approval, a hard block). Runs without a soft cap block keep the
+  // behaviour they had without the cap.
+  if (budgetBlockedCallIds.size > 0 && hardBudgetBlockMessage) {
+    budgetErrorMessage ??= hardBudgetBlockMessage;
+  }
   const lastMessage = agent.state.messages[agent.state.messages.length - 1];
   const lastAssistantMessage = [...agent.state.messages]
     .reverse()
@@ -567,8 +582,9 @@ export async function runKnowledgeAgent(input: {
       ? lastAssistantMessage.content.filter((part) => part.type === "toolCall")
       : [];
   const lastBatchEndedItself =
-    pendingApprovalBinding !== undefined ||
-    (lastBatchCalls.length > 0 && lastBatchCalls.every((call) => terminatingCallIds.has(call.id)));
+    lastAssistantMessage !== undefined &&
+    lastBatchCalls.length > 0 &&
+    terminatedCalls.get(lastAssistantMessage) === lastBatchCalls.length;
   if (
     turnLimitStopped &&
     budgetBlockedCallIds.size > 0 &&
@@ -649,13 +665,11 @@ export async function runKnowledgeAgent(input: {
     (refusalFinal || modelSignalsInsufficientEvidence(rawFinal))
   ) {
     grounded = BRAIN_NOT_ENOUGH_EVIDENCE;
-    // After a cap, a draft that carries citation markers and no refusal
-    // wording was an attempt to answer, not an abstention: label it apart so
-    // it stays out of the refused-with-evidence count.
+    // After a cap, a draft without refusal wording (a cited or uncited answer
+    // attempt, or the text of a tool-call turn) was not an abstention: label
+    // it apart so it stays out of the refused-with-evidence count.
     refusalReason =
-      refusalFinal &&
-      !modelSignalsInsufficientEvidence(rawFinal) &&
-      citedMarkerIndexes(rawFinal).length > 0
+      refusalFinal && !modelSignalsInsufficientEvidence(rawFinal)
         ? "search_cap_invalid_draft"
         : evidence.length > 0
           ? "model_abstained_with_evidence"

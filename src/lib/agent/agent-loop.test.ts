@@ -2217,6 +2217,25 @@ describe("retrieval availability", () => {
 
       expect(repairGroundedAnswer).not.toHaveBeenCalled();
       expect(result.finalResponse).toBe(BRAIN_NOT_ENOUGH_EVIDENCE);
+      // The host does not recognize these wordings as refusals, so the label
+      // is decided on wording alone: not an abstention.
+      expect(result.refusalReason).toBe("search_cap_invalid_draft");
+    }, 20_000);
+
+    it("labels a recognized refusal in the model's own words as an abstention after a cap", async () => {
+      const result = await runKnowledgeAgent({
+        question: "What are the final pay rules for an engineer who leaves?",
+        pipeline: await tinyPipeline(),
+        principal,
+        policyPrincipal,
+        conversationId: "c-search-cap-recognized-refusal",
+        runtime: scriptedRuntime("useful-brain-search-cap-recognized-refusal", [
+          ...fiveSearches,
+          finalText("The documents do not contain information about final pay rules."),
+        ]),
+      });
+
+      expect(result.finalResponse).toBe(BRAIN_NOT_ENOUGH_EVIDENCE);
       expect(result.refusalReason).toBe("model_abstained_with_evidence");
     }, 20_000);
 
@@ -2323,6 +2342,166 @@ describe("retrieval availability", () => {
       expect(result.aborted).toBe(false);
       expect(result.errorMessage).toBeUndefined();
       expect(result.finalResponse).not.toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
+    }, 20_000);
+
+    it("ends unavailable when the tool-call cap stops a looper on a non-search call", async () => {
+      const parallel = (queries: string[]) =>
+        fauxAssistantMessage(
+          [fauxText("Searching."), ...queries.map((query) => fauxToolCall(SEARCH_KNOWLEDGE_TOOL, { query }))],
+          { stopReason: "toolUse" },
+        );
+      // Four searches, four soft cap blocks, then call 9 is a ticket proposal:
+      // the total cap blocks it hard. Nothing counts that as a failed search,
+      // so the run itself must be marked as a budget failure.
+      const result = await runKnowledgeAgent({
+        question: "How much leave accrues each month? Then file a ticket.",
+        pipeline: await tinyPipeline(),
+        principal,
+        policyPrincipal,
+        conversationId: "c-search-cap-tool-cap-ticket",
+        extraTools: [
+          {
+            name: "create_ticket",
+            label: "Create ticket",
+            description: "Ticket tool whose execute path omits the policy gateway.",
+            parameters: Type.Object({ query: Type.String() }),
+            executionMode: "sequential" as const,
+            execute: async () => ({
+              content: [{ type: "text" as const, text: "filed" }],
+              details: {},
+            }),
+          },
+        ],
+        runtime: scriptedRuntime("useful-brain-search-cap-tool-cap-ticket", [
+          parallel(["a", "b", "c", "d"]),
+          parallel(["e", "f", "g", "h"]),
+          fauxAssistantMessage(
+            [fauxText("Filing."), fauxToolCall("create_ticket", { query: "file it" })],
+            { stopReason: "toolUse" },
+          ),
+          finalText(BRAIN_NOT_ENOUGH_EVIDENCE),
+        ]),
+      });
+
+      expect(result.finalResponse).toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
+      expect(result.aborted).toBe(true);
+      expect(result.errorMessage).toContain("tool-call budget exhausted");
+    }, 20_000);
+
+    it("ends unavailable on a turn-limit stop even when an earlier batch held a pending approval", async () => {
+      const { tool } = echoTool();
+      const search = (query: string) => searchCall(query);
+      // Turn 2 proposes a ticket (pending approval) beside an echo call with
+      // invalid arguments, which never reaches the hook and never terminates,
+      // so the run continues. The later turn-limit stop still cut a looper
+      // off: only the last batch decides whether it ended on its own.
+      const { runtime } = countedRuntime("useful-brain-search-cap-old-approval", [
+        search("a"),
+        fauxAssistantMessage(
+          [
+            fauxText("Filing."),
+            fauxToolCall("create_ticket", { query: "file it" }),
+            fauxToolCall("plugin_echo", {} as { query: string }),
+          ],
+          { stopReason: "toolUse" },
+        ),
+        search("b"),
+        search("c"),
+        search("d"),
+        search("e"),
+        search("f"),
+        search("g"),
+        finalText(BRAIN_NOT_ENOUGH_EVIDENCE),
+      ]);
+      const result = await runKnowledgeAgent({
+        question: "How much leave accrues each month? Then file a ticket.",
+        pipeline: await tinyPipeline(),
+        principal,
+        policyPrincipal,
+        conversationId: "c-search-cap-old-approval",
+        extraTools: [
+          tool,
+          {
+            name: "create_ticket",
+            label: "Create ticket",
+            description: "Ticket tool whose execute path omits the policy gateway.",
+            parameters: Type.Object({ query: Type.String() }),
+            executionMode: "sequential" as const,
+            execute: async () => ({
+              content: [{ type: "text" as const, text: "filed" }],
+              details: {},
+            }),
+          },
+        ],
+        runtime,
+      });
+
+      expect(result.pendingApproval).toBe(true);
+      expect(result.aborted).toBe(true);
+      expect(result.errorMessage).toContain("turn budget exhausted");
+    }, 20_000);
+
+    it("records the turn-eight ticket approval when every call reuses one tool-call id", async () => {
+      const { tool } = echoTool();
+      const sameId = (name: string, args: Record<string, unknown>) =>
+        fauxToolCall(name, args, { id: "tool-1" });
+      const turn = (name: string, args: Record<string, unknown>) =>
+        fauxAssistantMessage([fauxText("Working."), sameId(name, args)], { stopReason: "toolUse" });
+      // Ids repeat across batches (the adapter fallback). Batch termination is
+      // read per assistant message, not per id.
+      const result = await runKnowledgeAgent({
+        question: "How much leave accrues each month? Then file a ticket.",
+        pipeline: await tinyPipeline(),
+        principal,
+        policyPrincipal,
+        conversationId: "c-search-cap-same-id-ticket",
+        extraTools: [
+          tool,
+          {
+            name: "create_ticket",
+            label: "Create ticket",
+            description: "Ticket tool whose execute path omits the policy gateway.",
+            parameters: Type.Object({ query: Type.String() }),
+            executionMode: "sequential" as const,
+            execute: async () => ({
+              content: [{ type: "text" as const, text: "filed" }],
+              details: {},
+            }),
+          },
+        ],
+        runtime: scriptedRuntime("useful-brain-search-cap-same-id-ticket", [
+          turn(SEARCH_KNOWLEDGE_TOOL, { query: "a" }),
+          turn(SEARCH_KNOWLEDGE_TOOL, { query: "b" }),
+          turn(SEARCH_KNOWLEDGE_TOOL, { query: "c" }),
+          turn(SEARCH_KNOWLEDGE_TOOL, { query: "d" }),
+          turn(SEARCH_KNOWLEDGE_TOOL, { query: "e" }),
+          turn("plugin_echo", { query: "echo" }),
+          turn("plugin_echo", { query: "echo" }),
+          turn("create_ticket", { query: "file it" }),
+          finalText("unused"),
+        ]),
+      });
+
+      expect(result.pendingApproval).toBe(true);
+      expect(result.aborted).toBe(false);
+      expect(result.errorMessage).toBeUndefined();
+    }, 20_000);
+
+    it("labels an uncited answer attempt after a cap as an invalid draft, not an abstention", async () => {
+      const result = await runKnowledgeAgent({
+        question: "How much leave accrues each month?",
+        pipeline: await tinyPipeline(),
+        principal,
+        policyPrincipal,
+        conversationId: "c-search-cap-uncited",
+        runtime: scriptedRuntime("useful-brain-search-cap-uncited", [
+          ...fiveSearches,
+          finalText("Employees accrue about a day and a half of leave each month."),
+        ]),
+      });
+
+      expect(result.finalResponse).toBe(BRAIN_NOT_ENOUGH_EVIDENCE);
+      expect(result.refusalReason).toBe("search_cap_invalid_draft");
     }, 20_000);
 
     it("counts a capped call whose result text is not the cap reason", async () => {
