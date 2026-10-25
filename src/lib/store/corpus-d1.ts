@@ -5,7 +5,7 @@ import {
   GenerationTransitionError,
   type GenerationState,
 } from "./generations";
-import { EMBEDDING_DIMENSIONS } from "../embeddings/instructions";
+import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL } from "../embeddings/instructions";
 
 export type SqlRunResult = {
   meta?: { changes?: number };
@@ -41,12 +41,12 @@ export async function ensureDraftGeneration(
     .run();
   await db
     .prepare(
-      `INSERT INTO corpus_generations (id, state, created_at, updated_at)
-       VALUES (?, 'draft', ?, ?)
+      `INSERT INTO corpus_generations (id, state, embedding_model, embedding_dimensions, created_at, updated_at)
+       VALUES (?, 'draft', ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET updated_at = excluded.updated_at
        WHERE corpus_generations.state IN ('draft', 'indexing', 'reconciling', 'failed')`,
     )
-    .bind(generationId, now, now)
+    .bind(generationId, EMBEDDING_MODEL, EMBEDDING_DIMENSIONS, now, now)
     .run();
   const row = await getGeneration(db, generationId);
   if (!row) {

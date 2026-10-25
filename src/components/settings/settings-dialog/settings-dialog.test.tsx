@@ -13,7 +13,7 @@ const account = {
 };
 const config: SettingsModelConfig = {
   answerModel: "@cf/zai-org/glm-5.3-flash",
-  embeddingModel: "@cf/qwen/qwen3-embedding-0.6b",
+  embeddingModel: "@cf/baai/bge-m3",
   rerankerModel: "@cf/baai/bge-reranker-base",
   retrieval: "Hybrid, keyword and vector",
   passagesPerAnswer: 8,
@@ -101,8 +101,8 @@ describe("SettingsDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "Model and retrieval" }));
     expect(screen.getByText("Read-only")).toBeInTheDocument();
     expect(screen.queryByText("Read-only. Changes go through evals.")).toBeNull();
-    expect(screen.getByText("Qwen3 Embedding 0.6B")).toBeInTheDocument();
-    expect(screen.getByText("@cf/qwen/qwen3-embedding-0.6b")).toBeInTheDocument();
+    expect(screen.getByText("BGE-M3")).toBeInTheDocument();
+    expect(screen.getByText("@cf/baai/bge-m3")).toBeInTheDocument();
     expect(screen.getByText("GLM 5.3 Flash")).toBeInTheDocument();
     expect(screen.getByText("Models")).toBeInTheDocument();
     expect(screen.getByText("Retrieval")).toBeInTheDocument();

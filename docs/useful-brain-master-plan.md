@@ -247,7 +247,7 @@ The starting retrieval profile is inherited from the measured Burooj stack, then
 9. Apply an eval-calibrated absolute reranker relevance floor.
 10. Return up to eight chunks. Parent expansion ships off.
 
-The first embedding candidate is Workers AI `@cf/qwen/qwen3-embedding-0.6b` at 1024 dimensions because Burooj already measured it on the real D1 and Vectorize stack. It remains a measured default, not an irreversible choice. Changing the model or dimension creates a new Vectorize index and corpus generation.
+The first embedding candidate was Workers AI `@cf/qwen/qwen3-embedding-0.6b` at 1024 dimensions because Burooj already measured it on the real D1 and Vectorize stack. It was replaced on 2026-10-25 by `@cf/baai/bge-m3` (1024 dimensions, cosine) after Northwind evals. The model is a measured default, not a measured default, not an irreversible choice. Changing the model or dimension creates a new Vectorize index and corpus generation.
 
 ### ACL and trace contract
 

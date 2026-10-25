@@ -94,7 +94,8 @@ export function fakeAi() {
   return {
     embedded,
     run: async (_model: string, input: Record<string, unknown>) => {
-      const documents = (input.documents as string[] | undefined) ?? [];
+      const contexts = (input.contexts as Array<{ text: string }> | undefined) ?? [];
+      const documents = contexts.map((context) => context.text);
       embedded.push(...documents);
       return { data: documents.map((text) => vectorFor(text)) };
     },

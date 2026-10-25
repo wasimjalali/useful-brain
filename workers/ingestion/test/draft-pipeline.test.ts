@@ -25,6 +25,7 @@ import {
   writeDocumentChunks,
   type DocumentToIndex,
 } from "../../../src/lib/ingest/draft-index";
+import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL } from "../../../src/lib/embeddings/instructions";
 import { generationNamespace, vectorIdForChunk } from "../../../src/lib/ingest/digests";
 import { inventoryFromSettings, VectorInventoryError, type VectorInventory } from "../../../src/lib/ingest/vector-inventory";
 import { ensureDraftGeneration } from "../../../src/lib/store/corpus-d1";
@@ -178,6 +179,17 @@ describe("base copy embedding compatibility", () => {
     await copyBaseDocuments(db(), { draftGenerationId: draft.generationId, baseGenerationId: active.generationId });
     return { vectors, ai, active, draft };
   }
+
+  it("records the current embedding model on a new draft generation, so Qwen-era rows never match", async () => {
+    const draft = await newDraft();
+    const row = await env.CORPUS_DB.prepare(
+      "SELECT embedding_model, embedding_dimensions FROM corpus_generations WHERE id = ?",
+    )
+      .bind(draft.generationId)
+      .first<{ embedding_model: string; embedding_dimensions: number }>();
+    expect(row).toEqual({ embedding_model: EMBEDDING_MODEL, embedding_dimensions: EMBEDDING_DIMENSIONS });
+    expect(EMBEDDING_MODEL).not.toBe("@cf/qwen/qwen3-embedding-0.6b");
+  });
 
   it("re-embeds base chunks instead of copying vectors from another embedding model", async () => {
     const { vectors, ai, active, draft } = await incompatibleBase();
@@ -1148,10 +1160,11 @@ describe("retrieval and ACL guard on a draft", () => {
   // Embeds and reranks without a model: every candidate gets a descending score.
   const ai = {
     run: async (_model: string, input: Record<string, unknown>) => {
-      if (Array.isArray(input.contexts)) {
+      // The reranker takes a `query` beside its contexts; BGE-M3 embedding takes contexts only.
+      if (typeof input.query === "string" && Array.isArray(input.contexts)) {
         return { response: (input.contexts as unknown[]).map((_, id) => ({ id, score: 0.9 - id * 0.01 })) };
       }
-      const count = Array.isArray(input.documents) ? input.documents.length : 1;
+      const count = Array.isArray(input.contexts) ? input.contexts.length : 1;
       return { data: Array.from({ length: count }, () => Array.from({ length: 1024 }, () => 0.1)) };
     },
   };
