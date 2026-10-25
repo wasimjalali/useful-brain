@@ -1909,10 +1909,11 @@ describe("retrieval availability", () => {
       expect(result.refusalReason).toBeUndefined();
     }, 20_000);
 
-    it("makes a second cap block in one run hard, so the turn is unavailable", async () => {
+    it("answers when the model searches again in a later message after the cap", async () => {
       const pipeline = await tinyPipeline();
       let calls = 0;
-      const { counter, runtime } = countedRuntime("useful-brain-search-cap-loop", [
+      // DeepSeek ignores the status and searches once more before answering.
+      const { counter, runtime } = countedRuntime("useful-brain-search-cap-later", [
         ...fiveSearches,
         searchCall("leave again"),
         finalText("Employees accrue 1.5 days of leave per month.[1]"),
@@ -1927,17 +1928,36 @@ describe("retrieval availability", () => {
         },
         principal,
         policyPrincipal,
-        conversationId: "c-search-cap-loop",
+        conversationId: "c-search-cap-later",
         runtime,
       });
 
-      // The first block was soft and the model searched again anyway: the
-      // second block ends the run before any answer is drafted.
       expect(calls).toBe(AGENT_BUDGETS.maxSearchKnowledge);
-      expect(counter.modelCalls).toBe(6);
-      expect(result.toolCalls).toHaveLength(6);
-      expect(result.finalResponse).toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
-      expect(result.refusalReason).toBeUndefined();
+      expect(counter.modelCalls).toBe(7);
+      expect(result.toolCalls.map((call) => call.status)).toEqual([
+        "ok", "ok", "ok", "ok", "error", "error",
+      ]);
+      expect(result.finalResponse).toBe("Employees accrue 1.5 days of leave per month.[1]");
+      expect(result.aborted).toBe(false);
+    }, 20_000);
+
+    it("refuses honestly when the model searches again after the cap and then refuses", async () => {
+      const result = await runKnowledgeAgent({
+        question: "What are the final pay rules for an engineer who leaves?",
+        pipeline: await tinyPipeline(),
+        principal,
+        policyPrincipal,
+        conversationId: "c-search-cap-later-refusal",
+        runtime: scriptedRuntime("useful-brain-search-cap-later-refusal", [
+          ...fiveSearches,
+          searchCall("final pay"),
+          searchCall("final pay rules"),
+          finalText(BRAIN_NOT_ENOUGH_EVIDENCE),
+        ]),
+      });
+
+      expect(result.finalResponse).toBe(BRAIN_NOT_ENOUGH_EVIDENCE);
+      expect(result.aborted).toBe(false);
     }, 20_000);
 
     it("answers when one message crosses the cap with several parallel searches", async () => {
@@ -1979,18 +1999,21 @@ describe("retrieval availability", () => {
       expect(result.aborted).toBe(false);
     }, 20_000);
 
-    it("ends unavailable when a later message searches again after a parallel cap block", async () => {
+    it("ends unavailable when a model keeps searching until the tool-call budget runs out", async () => {
       const pipeline = await tinyPipeline();
       const parallel = (queries: string[]) =>
         fauxAssistantMessage(
           [fauxText("Searching."), ...queries.map((query) => fauxToolCall(SEARCH_KNOWLEDGE_TOOL, { query }))],
           { stopReason: "toolUse" },
         );
-      const { counter, runtime } = countedRuntime("useful-brain-search-cap-parallel-again", [
+      // Calls 5 to 8 are soft cap blocks, call 9 is the total cap (hard, in a
+      // batch that still continues), and call 10 ends the run on its own.
+      const { counter, runtime } = countedRuntime("useful-brain-search-cap-tool-loop", [
         parallel(["a", "b"]),
         parallel(["c", "d"]),
-        parallel(["e", "f"]),
-        parallel(["g"]),
+        parallel(["e", "f", "g"]),
+        parallel(["h", "i"]),
+        parallel(["j"]),
         finalText("Employees accrue 1.5 days of leave per month.[1]"),
       ]);
       const result = await runKnowledgeAgent({
@@ -1998,12 +2021,36 @@ describe("retrieval availability", () => {
         pipeline,
         principal,
         policyPrincipal,
-        conversationId: "c-search-cap-parallel-again",
+        conversationId: "c-search-cap-tool-loop",
         runtime,
       });
 
-      expect(counter.modelCalls).toBe(4);
+      expect(counter.modelCalls).toBe(5);
+      expect(result.toolCalls).toHaveLength(AGENT_BUDGETS.maxToolCalls + 2);
       expect(result.finalResponse).toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
+    }, 20_000);
+
+    it("ends unavailable when a model keeps searching until the turn limit", async () => {
+      const { counter, runtime } = countedRuntime("useful-brain-search-cap-turn-loop", [
+        ...fiveSearches,
+        searchCall("f"),
+        searchCall("g"),
+        searchCall("h"),
+        finalText("Employees accrue 1.5 days of leave per month.[1]"),
+      ]);
+      const result = await runKnowledgeAgent({
+        question: "How much leave accrues each month?",
+        pipeline: await tinyPipeline(),
+        principal,
+        policyPrincipal,
+        conversationId: "c-search-cap-turn-loop",
+        runtime,
+      });
+
+      expect(counter.modelCalls).toBe(AGENT_BUDGETS.maxTurns);
+      expect(result.finalResponse).toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
+      expect(result.aborted).toBe(true);
+      expect(result.errorMessage).toContain("turn budget exhausted");
     }, 20_000);
 
     it("sends the model a plain status when the cap blocks a search", async () => {
@@ -2352,7 +2399,7 @@ describe("retrieval availability", () => {
       expect(result.finalResponse).toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
     }, 20_000);
 
-    it("keeps a later message's cap block hard when the first cap-crossing message was mixed", async () => {
+    it("keeps the cap block hard in a message that also holds another tool", async () => {
       const { executed, tool } = echoTool();
       const mixed = fauxAssistantMessage(
         [
@@ -2362,27 +2409,23 @@ describe("retrieval availability", () => {
         ],
         { stopReason: "toolUse" },
       );
-      const { counter, runtime } = countedRuntime("useful-brain-search-cap-mixed-first", [
-        ...fiveSearches.slice(0, 4),
-        mixed,
-        searchCall("f"),
-        finalText(BRAIN_NOT_ENOUGH_EVIDENCE),
-      ]);
       const result = await runKnowledgeAgent({
         question: "How much leave accrues each month?",
         pipeline: await tinyPipeline(),
         principal,
         policyPrincipal,
-        conversationId: "c-search-cap-mixed-first",
+        conversationId: "c-search-cap-mixed-hard",
         extraTools: [tool],
-        runtime,
+        runtime: scriptedRuntime("useful-brain-search-cap-mixed-hard", [
+          ...fiveSearches.slice(0, 4),
+          mixed,
+          finalText("Employees accrue 1.5 days of leave per month.[1]"),
+        ]),
       });
 
-      // The mixed message's cap block was hard but its sibling did not
-      // terminate, so the model got a turn; its search in that later message
-      // is a hard block and ends the run: no seventh model call.
+      // The capped search sits beside an echo call, so its block is hard and
+      // counted as a failed search even though the run continued.
       expect(executed).toHaveLength(1);
-      expect(counter.modelCalls).toBe(6);
       expect(result.finalResponse).toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
     }, 20_000);
 

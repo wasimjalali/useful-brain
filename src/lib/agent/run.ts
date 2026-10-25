@@ -320,12 +320,9 @@ export async function runKnowledgeAgent(input: {
   let pendingApprovalBinding: ApprovalBinding | undefined;
   // The search_knowledge calls the cap softly blocked this run. A cap is not
   // a backend failure, so these stay out of the search-failure check below.
-  // Only the assistant message that first crosses the cap can get soft blocks
-  // (a model may issue several parallel searches in it), and only when it
-  // holds nothing but search_knowledge calls. A model that keeps searching in
-  // a later message is a budget failure and ends the run as unavailable.
+  // Only a search-only assistant message gets soft blocks (a model may issue
+  // several parallel searches in it, and may search again in a later message).
   const budgetBlockedCallIds = new Set<string>();
-  let searchCapFirstMessage: object | undefined;
   let turnLimitStopped = false;
   // Calls whose hook result ended the batch (terminate: true). A batch that
   // ended on its own is not a cut-off by the turn budget.
@@ -376,27 +373,25 @@ export async function runKnowledgeAgent(input: {
       budgets.noteToolCall(context.toolCall.name);
     } catch (error) {
       if (error instanceof BudgetExceededError) {
-        // The first assistant message to hit the search cap is remembered,
-        // whether its block ends up soft or hard. Every cap block in that
-        // message is soft (terminate false, id recorded) when the message
-        // holds only search_knowledge calls: the model reads the status and
-        // answers or refuses from the searches it already has. It is hard
-        // (terminate, counted as a failed search) when the message holds any
-        // other tool call, because pi ends a batch only when every call in
-        // it terminates, and a soft cap beside a pending approval would give
-        // the model another turn to propose a second one. A cap block in a
-        // later message is hard too. Every other budget code terminates.
-        if (error.code === "SEARCH_LIMIT") {
-          searchCapFirstMessage ??= context.assistantMessage;
-          if (
-            searchCapFirstMessage === context.assistantMessage &&
-            context.assistantMessage.content.every(
-              (part) => part.type !== "toolCall" || part.name === SEARCH_KNOWLEDGE_TOOL,
-            )
-          ) {
-            budgetBlockedCallIds.add(context.toolCall.id);
-            return { block: true, reason: SEARCH_LIMIT_REASON, terminate: false };
-          }
+        // A search cap block in a message that holds only search_knowledge
+        // calls is soft (terminate false, id recorded): the model reads the
+        // status and answers or refuses from the searches it already has. A
+        // model that searches again in a later message gets the same status;
+        // each blocked call still spends the total tool-call budget, so a
+        // looper ends at the tool-call cap (hard) or the turn limit. The block
+        // is hard (terminate, counted as a failed search) when the message
+        // holds any other tool call, because pi ends a batch only when every
+        // call in it terminates, and a soft cap beside a pending approval
+        // would give the model another turn to propose a second one. Every
+        // other budget code terminates.
+        if (
+          error.code === "SEARCH_LIMIT" &&
+          context.assistantMessage.content.every(
+            (part) => part.type !== "toolCall" || part.name === SEARCH_KNOWLEDGE_TOOL,
+          )
+        ) {
+          budgetBlockedCallIds.add(context.toolCall.id);
+          return { block: true, reason: SEARCH_LIMIT_REASON, terminate: false };
         }
         return { block: true, reason: error.message, terminate: true };
       }
