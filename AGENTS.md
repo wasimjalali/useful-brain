@@ -116,10 +116,11 @@ Useful Brain is a local portfolio product. Keep the existing left-aligned worksp
 
 Verify UI changes in the running app, never from code alone. Everything below runs in the background and never takes Wasim's pointer or focus.
 
-Maintainers: the `mac-app-verify` skill has the full recipe.
+Drive and capture the app with the global `mac-computer-use` skill (`references/verify.md` covers
+live checks): cua-driver in the background, screenshots of every step, and `winrec` or `screenrec`
+plus `framesheet` for anything that moves. The skill tracks the installed cua-driver version, so
+don't copy its commands here.
 
-- **cua-driver** (`~/.local/bin/cua-driver`): window screenshots and accessibility trees without disturbing the session. Start it with `cua-driver serve --socket ~/Library/Caches/cua-driver/cua-driver.sock` if `list_windows` reports the daemon is not running. `call list_windows '{}'` finds windows; `call get_window_state '{"window_id": N, "pid": PID}'` (both fields required, pid from `list_windows`) returns a base64 PNG plus the AX tree. Take a fresh snapshot before every click. Never target the `cua-driver` process itself; it refuses self-targeting by design.
-- **Anything that moves is verified frame by frame.** `winrec <windowId> <seconds> <outDir> [fps]` records one window at 30 fps or more, even when covered, without touching the pointer. Then `framesheet <outDir> <sheet.jpg>` tiles every frame that changed (up to 24) into one reviewable image. Spaced screenshots miss states that last a few milliseconds.
 - **The perf-guard rig** (the `perf/` folder in the Useful Bot repo, portable template at `~/.claude/skills/perf-regression-guard/template/`) is the reference technique for measurable UI performance verification: in-app launch-argument harness instead of accessibility clicks, one `CLOCK_UPTIME_RAW` clock across app marks and frame recorder, judged pixels with the app's own mark as a second number, landing reasons recorded, frozen fixtures, 30+ samples for the tail, preflight for locked screen/Low Power Mode/busy machine, `open -g` background launches, per-case budgets that fail a PR before merge, and every run's record kept under `evals/results/<date>-perf-<kind>-<sha>/`. Adapt it into this repo's `perf/` before making any perf budget a merge gate here.
 - Verification screenshots, recordings and frame sheets go in `verify/<branch>/` (gitignored). Measurements that shaped a decision go in `evals/results/`. For WKWebView app checks, build and install with `make -C macos test|bundle|install` (see `docs/macos-app.md`) and re-run the affected flows in the app window using the same background tools.
 
