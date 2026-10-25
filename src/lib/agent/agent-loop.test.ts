@@ -2140,7 +2140,9 @@ describe("retrieval availability", () => {
 
       expect(repairGroundedAnswer).not.toHaveBeenCalled();
       expect(result.finalResponse).toBe(BRAIN_NOT_ENOUGH_EVIDENCE);
-      expect(result.refusalReason).toBe("model_abstained_with_evidence");
+      // The model tried to answer with a bad citation: not a model refusal, so
+      // it must not feed the refused-with-evidence count.
+      expect(result.refusalReason).toBe("search_cap_invalid_draft");
     }, 20_000);
 
     it.each([
@@ -2168,6 +2170,7 @@ describe("retrieval availability", () => {
 
       expect(repairGroundedAnswer).not.toHaveBeenCalled();
       expect(result.finalResponse).toBe(BRAIN_NOT_ENOUGH_EVIDENCE);
+      expect(result.refusalReason).toBe("model_abstained_with_evidence");
     }, 20_000);
 
     it("skips the coverage pass on a capped turn even for a validated answer", async () => {
@@ -2223,6 +2226,56 @@ describe("retrieval availability", () => {
       expect(result.finalResponse).toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
       expect(result.aborted).toBe(true);
       expect(result.errorMessage).toContain("turn budget exhausted");
+    }, 20_000);
+
+    it("records a ticket approval proposed on the turn-limit turn after a soft cap", async () => {
+      const { tool } = echoTool();
+      const effects: string[] = [];
+      const echoTurn = () =>
+        fauxAssistantMessage([fauxText("Echoing."), echoCall()], { stopReason: "toolUse" });
+      // Searches 1 to 4, a soft-capped search 5, two echo turns, then the
+      // ticket proposal on turn 8. Its pending approval ends the batch on its
+      // own, so the turn-limit stop must not turn it into unavailable.
+      const { counter, runtime } = countedRuntime("useful-brain-search-cap-turn-eight-ticket", [
+        ...fiveSearches,
+        echoTurn(),
+        echoTurn(),
+        fauxAssistantMessage(
+          [fauxText("Filing."), fauxToolCall("create_ticket", { query: "file it" })],
+          { stopReason: "toolUse" },
+        ),
+        finalText("unused"),
+      ]);
+      const result = await runKnowledgeAgent({
+        question: "How much leave accrues each month? Then file a ticket.",
+        pipeline: await tinyPipeline(),
+        principal,
+        policyPrincipal,
+        conversationId: "c-search-cap-turn-eight-ticket",
+        extraTools: [
+          tool,
+          {
+            name: "create_ticket",
+            label: "Create ticket",
+            description: "Ticket tool whose execute path omits the policy gateway.",
+            parameters: Type.Object({ query: Type.String() }),
+            executionMode: "sequential",
+            execute: async (_id, params: unknown) => {
+              effects.push((params as { query: string }).query);
+              return { content: [{ type: "text" as const, text: "filed" }], details: {} };
+            },
+          },
+        ],
+        runtime,
+      });
+
+      expect(counter.modelCalls).toBe(AGENT_BUDGETS.maxTurns);
+      expect(effects).toEqual([]);
+      expect(result.pendingApproval).toBe(true);
+      expect(result.pendingApprovalBinding).toBeDefined();
+      expect(result.aborted).toBe(false);
+      expect(result.errorMessage).toBeUndefined();
+      expect(result.finalResponse).not.toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
     }, 20_000);
 
     it("counts a capped call whose result text is not the cap reason", async () => {
