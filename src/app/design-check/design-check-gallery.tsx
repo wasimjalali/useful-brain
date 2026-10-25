@@ -187,7 +187,7 @@ const ADMIN_ACCOUNT: SettingsAccount = {
 
 const MODEL_CONFIG: SettingsModelConfig = {
   answerModel: "@cf/deepseek-ai/deepseek-v4.1-flash-1017",
-  embeddingModel: "@cf/qwen/qwen3-embedding-0.6b",
+  embeddingModel: "@cf/baai/bge-m3",
   rerankerModel: "@cf/baai/bge-reranker-base",
   retrieval: "Hybrid, 0.70 vector and 0.30 keyword",
   passagesPerAnswer: 8,

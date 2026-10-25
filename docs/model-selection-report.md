@@ -23,11 +23,11 @@ Gemma remains eligible. It was not chosen because the operator named GLM 5.3 Fla
 
 | Field | Choice |
 | --- | --- |
-| Model | `@cf/qwen/qwen3-embedding-0.6b` |
+| Model | `@cf/baai/bge-m3` |
 | Dimensions | 1024 |
 | Metric | cosine |
 
-Locked in Phase 2. Changing it requires a Vectorize rebuild.
+Locked in Phase 2 as `@cf/qwen/qwen3-embedding-0.6b`. Replaced on 2026-10-25 after evals on Northwind: dense recall@3 0.990 vs 0.969, MRR 0.957 vs 0.945, query embed p95 133 ms vs 4,042 ms, indexing 15 s vs 193 s, full battery 118/120 for both. BGE-M3 takes documents and queries the same way (`contexts`, no instruction). Changing the model requires a Vectorize rebuild (see the operations runbook).
 
 ## Rerank
 

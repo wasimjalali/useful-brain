@@ -33,6 +33,7 @@ const MODEL_NAMES: Record<string, string> = {
   "@cf/deepseek-ai/deepseek-v4.1-flash-1017": "DeepSeek V4.1 Flash",
   "@cf/zai-org/glm-5.3-flash": "GLM 5.3 Flash",
   "@cf/zai-org/glm-5.3": "GLM 5.3",
+  "@cf/baai/bge-m3": "BGE-M3",
   "@cf/qwen/qwen3-embedding-0.6b": "Qwen3 Embedding 0.6B",
   "@cf/baai/bge-reranker-base": "BGE Reranker Base",
 };

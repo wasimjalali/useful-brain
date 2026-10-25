@@ -15,7 +15,7 @@ vi.mock("@/app/settings-actions", () => ({
 const adminData = {
   config: {
     answerModel: "@cf/deepseek-ai/deepseek-v4.1-flash-1017",
-    embeddingModel: "@cf/qwen/qwen3-embedding-0.6b",
+    embeddingModel: "@cf/baai/bge-m3",
     rerankerModel: "@cf/baai/bge-reranker-base",
     retrieval: "Hybrid, keyword and vector",
     passagesPerAnswer: 8,
@@ -55,7 +55,7 @@ describe("SettingsHost", () => {
     fireEvent.click(screen.getByRole("button", { name: "Account" }));
     expect(screen.getByText("34 of 62")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Model and retrieval" }));
-    expect(screen.getByText("@cf/qwen/qwen3-embedding-0.6b")).toBeInTheDocument();
+    expect(screen.getByText("@cf/baai/bge-m3")).toBeInTheDocument();
     expect(screen.getByText("g-c305cf57")).toBeInTheDocument();
   });
 

@@ -141,16 +141,16 @@ describe("protected Worker configuration", () => {
     const config = readJsonc("workers/brain/wrangler.jsonc");
     expect(config.ai).toEqual({ binding: "AI", remote: true });
     expect(config.vectorize).toEqual([
-      { binding: "VECTORIZE", index_name: "useful-brain-development", remote: true },
+      { binding: "VECTORIZE", index_name: "useful-brain-development-bge-m3", remote: true },
     ]);
     const environments = config.env as Record<string, Record<string, unknown>>;
     expect(environments.development.ai).toEqual({ binding: "AI", remote: true });
     expect(environments.development.vectorize).toEqual([
-      { binding: "VECTORIZE", index_name: "useful-brain-development", remote: true },
+      { binding: "VECTORIZE", index_name: "useful-brain-development-bge-m3", remote: true },
     ]);
     expect(environments.staging.ai).toEqual({ binding: "AI" });
     expect(environments.staging.vectorize).toEqual([
-      { binding: "VECTORIZE", index_name: "useful-brain-staging" },
+      { binding: "VECTORIZE", index_name: "useful-brain-staging-bge-m3" },
     ]);
     expect(environments.production.ai).toEqual({ binding: "AI" });
     expect(environments.production.vectorize).toEqual([

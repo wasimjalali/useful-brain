@@ -91,6 +91,17 @@ function memoizedAclShapes(
 
 export class CloudflareKnowledgePipeline {
   private readonly aclShapes: Map<string, Promise<AclShape[]>> = new Map();
+  private embedderMatch: Promise<boolean> | null = null;
+
+  /** True when the generation's vectors were made by the model that embeds queries now. */
+  private generationEmbedderMatches(): Promise<boolean> {
+    this.embedderMatch ??= this.input.db
+      .prepare(`SELECT embedding_model FROM corpus_generations WHERE id = ?`)
+      .bind(this.input.generationId)
+      .first<{ embedding_model: string }>()
+      .then((row) => row?.embedding_model === EMBEDDING_MODEL);
+    return this.embedderMatch;
+  }
 
   constructor(
     private readonly input: {
@@ -164,6 +175,12 @@ export class CloudflareKnowledgePipeline {
     if (this.input.vectorize && aclKeys.length > 0) {
       const vectorQuery = await buildVectorizeQuery({ generationId, aclGroupKeys: aclKeys });
       try {
+        // Vectors of another embedder are meaningless against this query
+        // vector: skip the channel (recorded as degraded below), never query
+        // the index.
+        if (!(await this.generationEmbedderMatches())) {
+          throw new Error("generation was embedded with another model");
+        }
         const queryEmbedding = await embedWithWorkersAi(
           this.input.ai,
           EMBEDDING_MODEL,

@@ -23,6 +23,21 @@ describe("Workers AI embedding parser", () => {
     expect(parsed[0][0]).toBe(0.3);
   });
 
+  it("reads the BGE-M3 response shape", () => {
+    const parsed = parseEmbeddingVectors(
+      { response: [vector(0.4), vector(0.5)], shape: [2, EMBEDDING_DIMENSIONS], pooling: "cls" },
+      2,
+    );
+    expect(parsed).toHaveLength(2);
+    expect(parsed[1][0]).toBe(0.5);
+  });
+
+  it("rejects BGE-M3 scoring-mode output instead of reading it as vectors", () => {
+    expect(() => parseEmbeddingVectors({ response: [{ id: 0, score: 0.9 }] }, 1)).toThrow(
+      "embedding entry 0 is not a vector",
+    );
+  });
+
   it("fails closed on the wrong count or width", () => {
     expect(() => parseEmbeddingVectors({ data: [{ embedding: vector(1) }] }, 2)).toThrow(
       /returned 1 vectors for 2/,

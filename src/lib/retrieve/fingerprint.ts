@@ -1,3 +1,5 @@
+import { EMBEDDING_MODEL } from "../embeddings/instructions";
+
 export const REAL_STACK_FINGERPRINT = {
   name: "real-stack",
   maxTokens: 300,
@@ -13,6 +15,9 @@ export const REAL_STACK_FINGERPRINT = {
   // (Equal 0.50/0.50 weights were measured first and fixed the same misses,
   // but promoted keyword junk corpus-wide and destabilized other questions.)
   keywordRescue: 3,
+  // Part of the recorded configuration version: runs before and after an
+  // embedder change must stay distinguishable (2026-10-25: Qwen3 -> BGE-M3).
+  embedder: EMBEDDING_MODEL,
   keywordCandidates: 6,
   channelOverlapBonus: 0.05,
   rerankCandidates: 20,
@@ -66,6 +71,8 @@ export type RetrievalFingerprint = {
   overlapTokens: number;
   vectorWeight: number;
   keywordWeight: number;
+  /** Embedding model behind the vector channel; absent for fake providers. */
+  embedder?: string;
   literalVectorWeight?: number;
   literalKeywordWeight?: number;
   keywordCandidates: number;
@@ -86,6 +93,7 @@ export function fingerprintId(fingerprint: RetrievalFingerprint): string {
     fingerprint.name,
     `${fingerprint.maxTokens}/${fingerprint.overlapTokens}`,
     `${fingerprint.vectorWeight.toFixed(2)}/${fingerprint.keywordWeight.toFixed(2)}`,
+    ...(fingerprint.embedder ? [`emb-${fingerprint.embedder}`] : []),
     `kw${fingerprint.keywordCandidates}`,
     `kr${fingerprint.keywordRescue ?? 0}`,
     `cb${fingerprint.channelOverlapBonus.toFixed(2)}`,

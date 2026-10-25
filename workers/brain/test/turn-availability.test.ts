@@ -143,18 +143,18 @@ function aiStub(options: {
       chatCalls += 1;
       return script[Math.min(chatCalls, script.length) - 1];
     }
-    if ("queries" in input) {
-      if (options.embeddingFails) {
-        throw new Error("internal error; reference = vvq7gr6iva7kmnjkv45q2svp");
-      }
-      return { data: [Array.from({ length: 1024 }, () => 0.1)] };
-    }
-    if ("contexts" in input) {
+    if (typeof input.query === "string" && "contexts" in input) {
       options.onRerank?.();
       if (options.rerankFails) {
         throw new Error("internal error; reference = 6h7skgod0dt04a0cdq6holq4");
       }
       return { response: [{ id: 0, score: 0.95 }] };
+    }
+    if ("contexts" in input) {
+      if (options.embeddingFails) {
+        throw new Error("internal error; reference = vvq7gr6iva7kmnjkv45q2svp");
+      }
+      return { response: [Array.from({ length: 1024 }, () => 0.1)], shape: [1, 1024], pooling: "cls" };
     }
     if (options.extractionTruncated) {
       // Reasoning used the whole completion budget: no content at all.

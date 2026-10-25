@@ -14,7 +14,7 @@ export const SELECTED_MODELS = {
   },
   embedding: {
     id: EMBEDDING_MODEL,
-    name: "Qwen3 Embedding 0.6B",
+    name: "BGE-M3",
     provider: CHAT_MODEL_PROVIDER,
     role: "embedding",
     dimensions: EMBEDDING_DIMENSIONS,
