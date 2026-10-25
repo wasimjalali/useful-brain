@@ -1854,7 +1854,7 @@ describe("retrieval availability", () => {
       // The blocked call stays recorded, with the reason the model saw.
       expect(result.toolCalls[4]?.status).toBe("error");
       expect(result.toolCalls[4]?.redactedResult).toContain("search_knowledge budget exhausted");
-      expect(result.toolCalls[4]?.redactedResult).toContain(BRAIN_NOT_ENOUGH_EVIDENCE);
+      expect(result.toolCalls[4]?.redactedResult).toContain("no more searches run in this turn");
     }, 20_000);
 
     it("keeps an honest refusal when every allowed search was weak and a fifth is blocked", async () => {
@@ -2006,7 +2006,7 @@ describe("retrieval availability", () => {
       expect(result.finalResponse).toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
     }, 20_000);
 
-    it("hands the model a refusal instruction and honors its refusal on a permission trap", async () => {
+    it("honors a model refusal on a permission trap and sends it a plain status", async () => {
       const pipeline = await tinyPipeline();
       const seen: string[] = [];
       const runtime = scriptedRuntime("useful-brain-search-cap-trap", [
@@ -2032,14 +2032,197 @@ describe("retrieval availability", () => {
         },
       });
 
+      // The block reason is a plain status: tool results are data, so the
+      // instruction lives in the system prompt, not in the result.
       const reason = seen[seen.length - 1] ?? "";
-      expect(reason).toContain("search_knowledge budget exhausted");
-      expect(reason).toContain("directly states the asked fact");
-      expect(reason).toContain(BRAIN_NOT_ENOUGH_EVIDENCE);
-      // No retrieved content rides along in the host instruction.
-      expect(reason).not.toContain("1.5 days");
+      expect(reason).toBe("search_knowledge budget exhausted: no more searches run in this turn.");
+      expect(reason).not.toContain(BRAIN_NOT_ENOUGH_EVIDENCE);
+      expect(LIVE_KNOWLEDGE_SYSTEM_PROMPT).toContain("budget is exhausted");
+      expect(LIVE_KNOWLEDGE_SYSTEM_PROMPT).toContain("directly states the asked fact");
+      expect(LIVE_KNOWLEDGE_SYSTEM_PROMPT).toContain(
+        `otherwise reply exactly: ${BRAIN_NOT_ENOUGH_EVIDENCE}`,
+      );
       expect(result.finalResponse).toBe(BRAIN_NOT_ENOUGH_EVIDENCE);
       expect(result.aborted).toBe(false);
+    }, 20_000);
+
+    async function identifierPipeline() {
+      const store = new MemoryChunkStore();
+      const embedder = new FakeEmbeddingProvider(8);
+      const text = "ERR-7702 means the export queue is stalled.";
+      const embeddings = await embedder.embedTexts([text]);
+      store.upsert([
+        {
+          chunkId: "errors__body__000",
+          documentId: "error-codes",
+          title: "Error Codes",
+          sourceName: "Error Codes",
+          sourcePath: "error-codes.md",
+          sectionHeading: "Export Errors",
+          content: text,
+          chunkIndex: 0,
+          charStart: 0,
+          charEnd: text.length,
+          accessScope: "public" as const,
+          allowedRoles: [],
+          allowedDepartments: [],
+          ownerUserId: "",
+          embedding: embeddings[0],
+        },
+      ]);
+      return new KnowledgePipeline({ store, embedder });
+    }
+
+    it("keeps a refusal after the cap final: the abstention recheck and coverage never run", async () => {
+      const repairGroundedAnswer = vi
+        .fn()
+        .mockResolvedValue("Employees accrue 1.5 days of leave per month.[1]");
+      const coverAnswerParts = vi
+        .fn()
+        .mockResolvedValue("Employees accrue 1.5 days of leave per month.[1]");
+      const result = await runKnowledgeAgent({
+        question: "What are the final pay rules for an engineer who leaves?",
+        pipeline: await tinyPipeline(),
+        principal,
+        policyPrincipal,
+        conversationId: "c-search-cap-refusal-final",
+        runtime: {
+          ...scriptedRuntime("useful-brain-search-cap-refusal-final", [
+            ...fiveSearches,
+            finalText(BRAIN_NOT_ENOUGH_EVIDENCE),
+          ]),
+          repairGroundedAnswer,
+          coverAnswerParts,
+        },
+      });
+
+      expect(result.finalResponse).toBe(BRAIN_NOT_ENOUGH_EVIDENCE);
+      expect(repairGroundedAnswer).not.toHaveBeenCalled();
+      expect(coverAnswerParts).not.toHaveBeenCalled();
+    }, 20_000);
+
+    it("keeps a refusal after the cap final: identifier recovery never runs", async () => {
+      const repairGroundedAnswer = vi
+        .fn()
+        .mockResolvedValue("ERR-7702 means the export queue is stalled.[1]");
+      const result = await runKnowledgeAgent({
+        question: "What does error code ERR-7702 indicate?",
+        pipeline: await identifierPipeline(),
+        principal,
+        policyPrincipal,
+        conversationId: "c-search-cap-identifier-final",
+        runtime: {
+          ...scriptedRuntime("useful-brain-search-cap-identifier-final", [
+            ...fiveSearches,
+            finalText("The evidence does not mention this error code."),
+          ]),
+          repairGroundedAnswer,
+        },
+      });
+
+      expect(result.finalResponse).toBe(BRAIN_NOT_ENOUGH_EVIDENCE);
+      expect(repairGroundedAnswer).not.toHaveBeenCalled();
+    }, 20_000);
+
+    it("still repairs an answer the model chose after a capped turn", async () => {
+      const repairGroundedAnswer = vi
+        .fn()
+        .mockResolvedValue("Employees accrue 1.5 days of leave per month.[1]");
+      const result = await runKnowledgeAgent({
+        question: "How much leave accrues each month?",
+        pipeline: await tinyPipeline(),
+        principal,
+        policyPrincipal,
+        conversationId: "c-search-cap-repair-kept",
+        runtime: {
+          ...scriptedRuntime("useful-brain-search-cap-repair-kept", [
+            ...fiveSearches,
+            finalText("Employees get about a day and a half of leave each month.[1]"),
+          ]),
+          repairGroundedAnswer,
+        },
+      });
+
+      expect(repairGroundedAnswer).toHaveBeenCalledTimes(1);
+      expect(result.finalResponse).toBe("Employees accrue 1.5 days of leave per month.[1]");
+    }, 20_000);
+
+    it("counts a capped call whose id an ok result also carries", async () => {
+      // One ok result shares the capped call's id, so the exclusion does not
+      // apply and the cap result counts as a failed search. An adapter that
+      // omits ids (workers-ai-chat falls back to "tool-1") gets no soft-cap
+      // benefit and fails closed, by design.
+      const call = (query: string, id: string) =>
+        fauxAssistantMessage(
+          [fauxText("Searching."), fauxToolCall(SEARCH_KNOWLEDGE_TOOL, { query }, { id })],
+          { stopReason: "toolUse" },
+        );
+      const result = await runKnowledgeAgent({
+        question: "How much leave accrues each month?",
+        pipeline: { search: async ({ query }) => emptySearch(query) },
+        principal,
+        policyPrincipal,
+        conversationId: "c-search-cap-ok-shared-id",
+        tools: [
+          {
+            name: SEARCH_KNOWLEDGE_TOOL,
+            label: "Search knowledge",
+            description: "Search tool that always succeeds.",
+            parameters: Type.Object({ query: Type.String() }),
+            execute: async () => ({
+              content: [{ type: "text" as const, text: "ok" }],
+              details: {},
+            }),
+          },
+        ],
+        runtime: scriptedRuntime("useful-brain-search-cap-ok-shared-id", [
+          call("a", "dup"),
+          call("b", "b"),
+          call("c", "c"),
+          call("d", "d"),
+          call("e", "dup"),
+          finalText(BRAIN_NOT_ENOUGH_EVIDENCE),
+        ]),
+      });
+
+      expect(result.toolCalls.map((entry) => entry.status)).toEqual([
+        "ok", "ok", "ok", "ok", "error",
+      ]);
+      expect(result.finalResponse).toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
+    }, 20_000);
+
+    it("keeps a later message's cap block hard when the first cap-crossing message was mixed", async () => {
+      const { executed, tool } = echoTool();
+      const mixed = fauxAssistantMessage(
+        [
+          fauxText("Searching and echoing."),
+          fauxToolCall(SEARCH_KNOWLEDGE_TOOL, { query: "e" }),
+          fauxToolCall("plugin_echo", { query: "echo" }),
+        ],
+        { stopReason: "toolUse" },
+      );
+      const { counter, runtime } = countedRuntime("useful-brain-search-cap-mixed-first", [
+        ...fiveSearches.slice(0, 4),
+        mixed,
+        searchCall("f"),
+        finalText(BRAIN_NOT_ENOUGH_EVIDENCE),
+      ]);
+      const result = await runKnowledgeAgent({
+        question: "How much leave accrues each month?",
+        pipeline: await tinyPipeline(),
+        principal,
+        policyPrincipal,
+        conversationId: "c-search-cap-mixed-first",
+        extraTools: [tool],
+        runtime,
+      });
+
+      // The mixed message's cap block was hard but its sibling did not
+      // terminate, so the model got a turn; its search in that later message
+      // is a hard block and ends the run: no seventh model call.
+      expect(executed).toHaveLength(1);
+      expect(counter.modelCalls).toBe(6);
+      expect(result.finalResponse).toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
     }, 20_000);
 
     it("counts a real error that shares a tool-call id with the capped call", async () => {

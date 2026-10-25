@@ -129,13 +129,15 @@ export const LIVE_KNOWLEDGE_SYSTEM_PROMPT = [
   "Answer only the exact fact the question asks. A sentence about a different program, plan, metric, document or policy than the one asked is not an answer, even when it looks similar. A number, timeframe or rule stated for one named process is not evidence for a different process: a patch-availability window for supported product versions does not answer an internal remediation deadline, a hiring referral bonus does not answer a customer referral payout, and a neighboring policy restating another document's rule does not replace that document. When evidence states that two similar-sounding programs, policies or processes are different, treat them as different: answer each only from its own document, never from the other's numbers or rules. A deadline that tells customers what they receive is not our internal deadline to act. Follow attribution pointers: when a document says its rule or window comes from another policy, quote and cite that policy, not the restating document. When the evidence states the asked number or rule only for a different program or process than the one asked about, reply exactly with the not-enough-evidence sentence.",
   "When the user asks you to open a support ticket, first call search_knowledge for the rule that decides the priority, then call create_ticket in the same message as the cited sentences that explain the priority. Never invent create_ticket arguments: use only the customer, priority and subject the user gave or the evidence states, and if one is missing do not call create_ticket. Never call create_ticket for a question.",
   `Do not invent facts. A related or similar document is not evidence for a fact it does not state. If no evidence states the specific program, benefit, policy, amount or rule the question asks about, reply exactly: ${BRAIN_NOT_ENOUGH_EVIDENCE}`,
+  `When a search reports that the search budget is exhausted, stop searching and answer only with evidence already returned that directly states the asked fact, otherwise reply exactly: ${BRAIN_NOT_ENOUGH_EVIDENCE}`,
   `Prompt version ${PROMPT_VERSION}.`,
 ].join(" ");
 
-// What the model reads when the search cap blocks a call. It is a host
-// instruction with no retrieved content: a related document is still not
-// evidence, so the only other way out is the exact refusal sentence.
-const SEARCH_LIMIT_REASON = `search_knowledge budget exhausted. Answer only with evidence already returned that directly states the asked fact. If none does, reply exactly: ${BRAIN_NOT_ENOUGH_EVIDENCE}`;
+// What the model reads when the search cap blocks a call. A plain status with
+// no instruction: tool results are data, so the rule for answering after the
+// cap lives in the system prompt. The exclusion in searchFailed matches it
+// exactly.
+const SEARCH_LIMIT_REASON = "search_knowledge budget exhausted: no more searches run in this turn.";
 
 /** Write tools that may only be proposed after a successful current-turn search. */
 const SEARCH_FIRST_TOOLS: ReadonlySet<string> = new Set(["create_ticket"]);
@@ -313,12 +315,12 @@ export async function runKnowledgeAgent(input: {
   let pendingApprovalBinding: ApprovalBinding | undefined;
   // The search_knowledge calls the cap softly blocked this run. A cap is not
   // a backend failure, so these stay out of the search-failure check below.
-  // Only the assistant message that first crosses the cap gets soft blocks
-  // (a model may issue several parallel searches in it). A model that keeps
-  // searching in a later message is a budget failure and ends the run as
-  // unavailable.
+  // Only the assistant message that first crosses the cap can get soft blocks
+  // (a model may issue several parallel searches in it), and only when it
+  // holds nothing but search_knowledge calls. A model that keeps searching in
+  // a later message is a budget failure and ends the run as unavailable.
   const budgetBlockedCallIds = new Set<string>();
-  let searchCapSoftMessage: object | undefined;
+  let searchCapFirstMessage: object | undefined;
   const tools: AgentTool[] =
     input.tools ??
     [
@@ -387,26 +389,27 @@ export async function runKnowledgeAgent(input: {
         budgets.noteToolCall(context.toolCall.name);
       } catch (error) {
         if (error instanceof BudgetExceededError) {
-          // Every search cap block in the first assistant message that crosses
-          // the cap ends searching, not the turn: the model reads the cap
-          // reason and must answer or refuse from the searches it already has.
-          // A block stays hard (terminate, counted as a failed search) when
-          // that message holds any other tool call, because pi ends a batch
-          // only when every call in it terminates, and a soft cap beside a
-          // pending approval would give the model another turn to propose a
-          // second one. A block in a later message is hard too. Every other
-          // budget code terminates.
-          if (
-            error.code === "SEARCH_LIMIT" &&
-            (searchCapSoftMessage === undefined ||
-              searchCapSoftMessage === context.assistantMessage) &&
-            context.assistantMessage.content.every(
-              (part) => part.type !== "toolCall" || part.name === SEARCH_KNOWLEDGE_TOOL,
-            )
-          ) {
-            searchCapSoftMessage = context.assistantMessage;
-            budgetBlockedCallIds.add(context.toolCall.id);
-            return { block: true, reason: SEARCH_LIMIT_REASON, terminate: false };
+          // The first assistant message to hit the search cap is remembered,
+          // whether its block ends up soft or hard. Every cap block in that
+          // message is soft (terminate false, id recorded) when the message
+          // holds only search_knowledge calls: the model reads the status and
+          // answers or refuses from the searches it already has. It is hard
+          // (terminate, counted as a failed search) when the message holds any
+          // other tool call, because pi ends a batch only when every call in
+          // it terminates, and a soft cap beside a pending approval would give
+          // the model another turn to propose a second one. A cap block in a
+          // later message is hard too. Every other budget code terminates.
+          if (error.code === "SEARCH_LIMIT") {
+            searchCapFirstMessage ??= context.assistantMessage;
+            if (
+              searchCapFirstMessage === context.assistantMessage &&
+              context.assistantMessage.content.every(
+                (part) => part.type !== "toolCall" || part.name === SEARCH_KNOWLEDGE_TOOL,
+              )
+            ) {
+              budgetBlockedCallIds.add(context.toolCall.id);
+              return { block: true, reason: SEARCH_LIMIT_REASON, terminate: false };
+            }
           }
           return { block: true, reason: error.message, terminate: true };
         }
@@ -625,6 +628,12 @@ export async function runKnowledgeAgent(input: {
     resultIdCounts.get(message.toolCallId) === 1 &&
     message.content.map((part) => (part.type === "text" ? part.text : "")).join("") ===
       SEARCH_LIMIT_REASON;
+  // After a soft cap block a refusal is final: the model refused with fewer
+  // searches than it wanted, and a host pass that swaps a refusal for any
+  // model-selected quote would let a related document answer a question it
+  // does not state. Passes that only repair or extend an answer the model
+  // chose to give stay on.
+  const refusalFinal = budgetBlockedCallIds.size > 0;
   const searchFailed =
     evidenceLedger.searchError ||
     toolCallsFromMessages(runMessages.filter((message) => !isCapBlockResult(message))).some(
@@ -677,7 +686,7 @@ export async function runKnowledgeAgent(input: {
   // valid grounded answer, so one can never be replaced.
   if (
     canRepair() &&
-    ((refusalReason === "model_abstained_with_evidence" && isRefusal(grounded)) ||
+    ((refusalReason === "model_abstained_with_evidence" && isRefusal(grounded) && !refusalFinal) ||
       grounded === BRAIN_INVALID_CITATION)
   ) {
     const asked = identifierTokens(input.question);
@@ -726,6 +735,7 @@ export async function runKnowledgeAgent(input: {
   // the repair model itself returns an evidence-supported quote.
   if (
     canRepair() &&
+    !refusalFinal &&
     isRefusal(grounded) &&
     refusalReason === "model_abstained_with_evidence"
   ) {
