@@ -17,7 +17,7 @@ const chunkRow = {
   path: "refund.md",
 };
 
-function keywordDatabase(): CorpusSql {
+function keywordDatabase(embeddingModel = "@cf/baai/bge-m3"): CorpusSql {
   return {
     prepare(sql) {
       return {
@@ -46,6 +46,9 @@ function keywordDatabase(): CorpusSql {
               return { results: rows as T[] };
             },
             async first<T>() {
+              if (sql.includes("SELECT embedding_model")) {
+                return { embedding_model: embeddingModel } as T;
+              }
               return null as T | null;
             },
           };
@@ -93,6 +96,24 @@ describe("CloudflareKnowledgePipeline failures", () => {
 
     const result = await pipeline.search({ query: "refund window", principal });
     expect(result.trace.vectorChannelError).toBe(true);
+    expect(result.hits[0]?.chunkId).toBe(chunkRow.chunk_id);
+  });
+
+  it("skips the vector channel and records it when the generation was embedded by another model", async () => {
+    const vectorizeQuery = vi.fn(async () => ({ matches: [] }));
+    const aiRun = vi.fn(async () => ({ response: [Array.from({ length: 1024 }, () => 0.1)] }));
+    const pipeline = new CloudflareKnowledgePipeline({
+      db: keywordDatabase("@cf/qwen/qwen3-embedding-0.6b"),
+      vectorize: { query: vectorizeQuery },
+      ai: { run: aiRun },
+      reranker: { rerank: async (_query, passages) => passages.map(() => 0.9) },
+      generationId: "g-1",
+    });
+
+    const result = await pipeline.search({ query: "refund window", principal });
+    expect(result.trace.vectorChannelError).toBe(true);
+    expect(vectorizeQuery).not.toHaveBeenCalled();
+    expect(aiRun).not.toHaveBeenCalled();
     expect(result.hits[0]?.chunkId).toBe(chunkRow.chunk_id);
   });
 

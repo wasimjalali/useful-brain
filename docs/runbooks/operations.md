@@ -55,7 +55,9 @@ Verify after setting the secrets: upload one file on staging, let the draft fini
 
 ## Moving an environment to a new embedding model or index
 
-Vectors from different embedding models are never mixed. A generation records its embedding model, and draft building re-embeds every chunk unless the base generation used the current model. The retrieval configuration version includes the embedder, so runs before and after the change are distinguishable. Staging moved from Qwen3 to BGE-M3 on 2026-10-25:
+Vectors from different embedding models are never mixed. A generation records its embedding model, and draft building re-embeds every chunk unless the base generation used the current model. The retrieval configuration version includes the embedder, so runs before and after the change are distinguishable. Generations from before the switch keep the Qwen label (the migration default). Brain skips the vector channel for a generation whose label differs from the current model (recorded as a degraded vector channel), and promote and rollback refuse such a generation. Staging moved from Qwen3 to BGE-M3 on 2026-10-25.
+
+Preconditions: discard any open draft first (reopening a draft from before the switch fails), and deploy Brain and Ingestion together so both name the same index.
 
 1. Create the index with the `acl_group` metadata index (name per `workers/brain/wrangler.jsonc`):
 
@@ -65,10 +67,17 @@ Vectors from different embedding models are never mixed. A generation records it
    ```
 
 2. Deploy Brain and Ingestion with the new `index_name` and matching `VECTORIZE_INDEX_NAME`.
-3. Reindex, then promote, as the operator: Brain `/knowledge/reindex` and `/knowledge/promote`. The old active generation keeps serving until the promote succeeds, but its vectors live in the old index, so vector search returns nothing from the new index until the promote.
+3. Reindex, then promote, as the operator: Brain `/knowledge/reindex` and `/knowledge/promote`. Between the deploy and the promote, retrieval is keyword-only: the old active generation is Qwen-labelled, so the vector channel is skipped and traces show it as degraded.
 4. Delete the old index only after a promoted generation passes the retrieval and ACL checks.
 
-Development already points at `useful-brain-development-bge-m3`. Production has no index yet.
+Development already points at `useful-brain-development-bge-m3`, created on 2026-10-25 with the `acl_group` metadata index and Northwind loaded. On a fresh account, create it the same way:
+
+```bash
+npx wrangler vectorize create useful-brain-development-bge-m3 --dimensions=1024 --metric=cosine
+npx wrangler vectorize create-metadata-index useful-brain-development-bge-m3 --propertyName=acl_group --type=string
+```
+
+Production has no index yet.
 
 ## Incidents (fail closed)
 

@@ -84,6 +84,9 @@ describe("corpus seed merge", () => {
               const id = String(statement.values[0]);
               return { id, state: states.get(id) ?? "draft" };
             }
+            if (sql.includes("SELECT embedding_model FROM corpus_generations")) {
+              return { embedding_model: "@cf/baai/bge-m3" };
+            }
             return null;
           },
           async all() {
@@ -138,6 +141,9 @@ describe("corpus seed merge", () => {
             if (sql.includes("SELECT id, state FROM corpus_generations")) {
               const id = String(statement.values[0]);
               return { id, state: states.get(id) ?? "draft" };
+            }
+            if (sql.includes("SELECT embedding_model FROM corpus_generations")) {
+              return { embedding_model: "@cf/baai/bge-m3" };
             }
             return null;
           },

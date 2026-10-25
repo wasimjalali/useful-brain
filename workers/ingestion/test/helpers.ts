@@ -94,6 +94,11 @@ export function fakeAi() {
   return {
     embedded,
     run: async (_model: string, input: Record<string, unknown>) => {
+      if (typeof input.query === "string") {
+        // The reranker takes a `query` beside its contexts.
+        const scored = (input.contexts as unknown[] | undefined) ?? [];
+        return { response: scored.map((_, id) => ({ id, score: 0.9 - id * 0.01 })) };
+      }
       const contexts = (input.contexts as Array<{ text: string }> | undefined) ?? [];
       const documents = contexts.map((context) => context.text);
       embedded.push(...documents);

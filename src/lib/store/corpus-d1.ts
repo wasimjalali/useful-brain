@@ -52,7 +52,35 @@ export async function ensureDraftGeneration(
   if (!row) {
     throw new Error("draft generation was not recorded");
   }
+  // The upsert never rewrites the label, so an open draft from before an
+  // embedder change would keep vectors of the old model under the new one.
+  await assertGenerationEmbedder(db, generationId, "draft generation");
   return { generationId: row.id, state: row.state };
+}
+
+export async function generationEmbeddingModel(
+  db: SqlExecutor,
+  generationId: string,
+): Promise<string | null> {
+  const row = await db
+    .prepare(`SELECT embedding_model FROM corpus_generations WHERE id = ?`)
+    .bind(generationId)
+    .first<{ embedding_model: string }>();
+  return row?.embedding_model ?? null;
+}
+
+/** Fail closed: a generation built with another embedder can't serve or be built on here. */
+export async function assertGenerationEmbedder(
+  db: SqlExecutor,
+  generationId: string,
+  what: string,
+): Promise<void> {
+  const model = await generationEmbeddingModel(db, generationId);
+  if (model !== EMBEDDING_MODEL) {
+    throw new GenerationTransitionError(
+      `${what} ${generationId} was embedded with ${model ?? "an unknown model"}, not ${EMBEDDING_MODEL}; reindex instead`,
+    );
+  }
 }
 
 export async function getGeneration(
@@ -111,6 +139,7 @@ export async function promoteGeneration(
   if (!row || row.state !== "ready") {
     throw new GenerationTransitionError("only a ready generation can be promoted");
   }
+  await assertGenerationEmbedder(db, generationId, "generation");
   const statements: SqlStatement[] = [
     db
       .prepare(`UPDATE corpus_generations SET state = 'active', updated_at = ? WHERE id = ? AND state = 'ready'`)
@@ -149,6 +178,7 @@ export async function rollbackGeneration(
   if (current === previousId) {
     throw new GenerationTransitionError("rollback target is already active");
   }
+  await assertGenerationEmbedder(db, previousId, "rollback target");
   const statements: SqlStatement[] = [
     db
       .prepare(`UPDATE corpus_generations SET state = 'active', updated_at = ? WHERE id = ? AND state IN ('ready', 'archived')`)

@@ -6,6 +6,8 @@ Sanad source commit: `630ba08dc7cad6aa71942d6842ce6d8d55a26873`
 Sibling checkout: deleted 2026-08-28 (was `/Users/wasimjalali/Desktop/Personal Project/Burooj`)  
 Checkout note: HEAD matched the locked commit at archive time. Restore from the local git bundle if needed.
 
+Note: the embedder changed from Qwen3 to `@cf/baai/bge-m3` on 2026-10-25; this ledger stays as the historical record.
+
 Target contract tests named below are planned Useful Brain files unless Status is Ported.
 
 ## Named eval slices
