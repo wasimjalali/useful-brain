@@ -2441,6 +2441,57 @@ describe("retrieval availability", () => {
       expect(result.errorMessage).toContain("turn budget exhausted");
     }, 20_000);
 
+    it("ends unavailable when the turn-eight approval batch also holds an invalid-args call", async () => {
+      const { tool } = echoTool();
+      const effects: string[] = [];
+      const echoTurn = () =>
+        fauxAssistantMessage([fauxText("Echoing."), echoCall()], { stopReason: "toolUse" });
+      // Pinned decision: pi would not have ended this batch (the invalid-args
+      // call never terminates and the model never read its error), so the
+      // turn-limit stop cuts it off. It fails closed and the client retries;
+      // the approval is not recorded.
+      const result = await runKnowledgeAgent({
+        question: "How much leave accrues each month? Then file a ticket.",
+        pipeline: await tinyPipeline(),
+        principal,
+        policyPrincipal,
+        conversationId: "c-search-cap-turn-eight-mixed-ticket",
+        extraTools: [
+          tool,
+          {
+            name: "create_ticket",
+            label: "Create ticket",
+            description: "Ticket tool whose execute path omits the policy gateway.",
+            parameters: Type.Object({ query: Type.String() }),
+            executionMode: "sequential",
+            execute: async (_id, params: unknown) => {
+              effects.push((params as { query: string }).query);
+              return { content: [{ type: "text" as const, text: "filed" }], details: {} };
+            },
+          },
+        ],
+        runtime: scriptedRuntime("useful-brain-search-cap-turn-eight-mixed-ticket", [
+          ...fiveSearches,
+          echoTurn(),
+          echoTurn(),
+          fauxAssistantMessage(
+            [
+              fauxText("Filing."),
+              fauxToolCall("create_ticket", { query: "file it" }),
+              fauxToolCall("plugin_echo", {} as { query: string }),
+            ],
+            { stopReason: "toolUse" },
+          ),
+          finalText("unused"),
+        ]),
+      });
+
+      expect(effects).toEqual([]);
+      expect(result.finalResponse).toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
+      expect(result.aborted).toBe(true);
+      expect(result.errorMessage).toContain("turn budget exhausted");
+    }, 20_000);
+
     it("records the turn-eight ticket approval when every call reuses one tool-call id", async () => {
       const { tool } = echoTool();
       const sameId = (name: string, args: Record<string, unknown>) =>

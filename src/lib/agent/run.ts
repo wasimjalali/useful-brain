@@ -329,9 +329,10 @@ export async function runKnowledgeAgent(input: {
   // batch where every call terminated ended on its own and is not a cut-off by
   // the turn budget.
   const terminatedCalls = new WeakMap<object, number>();
-  // The first hard budget block (the total tool-call cap) a call met. After a
-  // soft search cap block it marks the run as a budget failure, because only
-  // search calls are otherwise counted as failed.
+  // The first hard BudgetExceededError block a call met: the total tool-call
+  // cap, or a search cap block in a message that also holds another tool.
+  // After a soft search cap block it marks the run as a budget failure,
+  // because only search calls are otherwise counted as failed.
   let hardBudgetBlockMessage: string | undefined;
   const tools: AgentTool[] =
     input.tools ??
@@ -568,8 +569,12 @@ export async function runKnowledgeAgent(input: {
   // it left tool results unanswered, not when the limit lands on the
   // answering turn itself (an assistant message is last) or when the last
   // batch ended the run on its own (every call in that message terminated: a
-  // pending approval, a hard block). Runs without a soft cap block keep the
-  // behaviour they had without the cap.
+  // pending approval, a hard block). A last batch that mixes a terminating
+  // call with one that did not terminate (say a pending approval beside an
+  // invalid-arguments call) is a cut-off: pi would not have ended it and the
+  // model never read the sibling's error, so the turn fails closed as
+  // unavailable, retryable, and the approval is not recorded. Runs without a
+  // soft cap block keep the behaviour they had without the cap.
   if (budgetBlockedCallIds.size > 0 && hardBudgetBlockMessage) {
     budgetErrorMessage ??= hardBudgetBlockMessage;
   }
