@@ -306,6 +306,9 @@ export async function runKnowledgeAgent(input: {
   const repairExtractionCache = new Map<string, unknown>();
   let firstSearchCompleted = false;
   let pendingApprovalBinding: ApprovalBinding | undefined;
+  // Calls the search_knowledge cap blocked this run. A cap is not a backend
+  // failure, so these stay out of the search-failure check below.
+  const budgetBlockedCallIds = new Set<string>();
   const tools: AgentTool[] =
     input.tools ??
     [
@@ -374,6 +377,13 @@ export async function runKnowledgeAgent(input: {
         budgets.noteToolCall(context.toolCall.name);
       } catch (error) {
         if (error instanceof BudgetExceededError) {
+          // The search cap ends searching, not the turn: the model sees the
+          // error and must answer from the searches it already has. Every
+          // other budget keeps ending the run.
+          if (error.code === "SEARCH_LIMIT") {
+            budgetBlockedCallIds.add(context.toolCall.id);
+            return { block: true, reason: error.message, terminate: false };
+          }
           return { block: true, reason: error.message, terminate: true };
         }
         throw error;
@@ -572,12 +582,19 @@ export async function runKnowledgeAgent(input: {
   // valid draft: the failed search may have held the evidence for another
   // part of the question (a second hop) or a fact that would change the
   // answer, so a cited draft beside it cannot be trusted as complete. The
-  // client retries the turn instead.
+  // client retries the turn instead. A call the search budget blocked is a
+  // cap, not a failed search: it never ran, so it is left out and the answer
+  // rests on the searches that did.
   const searchFailed =
     evidenceLedger.searchError ||
-    toolCallsFromMessages(agent.state.messages.slice(priorMessageCount)).some(
-      (call) => call.tool === SEARCH_KNOWLEDGE_TOOL && call.status === "error",
-    );
+    toolCallsFromMessages(
+      agent.state.messages
+        .slice(priorMessageCount)
+        .filter(
+          (message) =>
+            !(message.role === "toolResult" && budgetBlockedCallIds.has(message.toolCallId)),
+        ),
+    ).some((call) => call.tool === SEARCH_KNOWLEDGE_TOOL && call.status === "error");
 
   // Re-evaluated before every repair attempt: an abort landing between
   // passes must not start another model call.

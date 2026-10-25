@@ -29,6 +29,7 @@ import { ExtractionTruncatedError } from "./extraction-truncated";
 import { redactToolResultForStorage } from "./redact-tool-result";
 import { createWorkersAiCitationRepair } from "../models/workers-ai-citation-repair";
 import {
+  BRAIN_INVALID_CITATION,
   BRAIN_KNOWLEDGE_UNAVAILABLE,
   BRAIN_MUST_RETRIEVE,
   BRAIN_NOT_ENOUGH_EVIDENCE,
@@ -1795,6 +1796,242 @@ describe("retrieval availability", () => {
     expect(result.toolCalls[0]?.status).toBe("error");
     expect(result.finalResponse).toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
   }, 20_000);
+
+  describe("search_knowledge budget cap", () => {
+    // A cap is not a backend failure: the blocked call comes back to the model
+    // as a tool error, and the model answers from the searches it already has.
+    const countedRuntime = (
+      provider: string,
+      replies: ReturnType<typeof fauxAssistantMessage>[],
+    ) => {
+      const runtime = scriptedRuntime(provider, replies);
+      const counter = { modelCalls: 0 };
+      const stream = runtime.stream;
+      return {
+        counter,
+        runtime: {
+          ...runtime,
+          stream: ((model, context, options) => {
+            counter.modelCalls += 1;
+            return stream!(model, context, options);
+          }) as NonNullable<Parameters<typeof runKnowledgeAgent>[0]["runtime"]>["stream"],
+        },
+      };
+    };
+    const fiveSearches = [
+      searchCall("leave accrual"),
+      searchCall("monthly leave"),
+      searchCall("leave days"),
+      searchCall("leave policy"),
+      searchCall("leave one more time"),
+    ];
+
+    it("answers from the first four searches when a fifth is blocked by the cap", async () => {
+      const pipeline = await tinyPipeline();
+      let calls = 0;
+      const result = await runKnowledgeAgent({
+        question: "How much leave accrues each month?",
+        pipeline: {
+          search: async (input) => {
+            calls += 1;
+            return pipeline.search(input);
+          },
+        },
+        principal,
+        policyPrincipal,
+        conversationId: "c-search-cap-grounded",
+        runtime: scriptedRuntime("useful-brain-search-cap-grounded", [
+          ...fiveSearches,
+          finalText("Employees accrue 1.5 days of leave per month.[1]"),
+        ]),
+      });
+
+      expect(calls).toBe(AGENT_BUDGETS.maxSearchKnowledge);
+      expect(result.finalResponse).toBe("Employees accrue 1.5 days of leave per month.[1]");
+      expect(result.aborted).toBe(false);
+      expect(result.evidence.length).toBeGreaterThan(0);
+      expect(result.toolCalls).toHaveLength(5);
+      expect(result.toolCalls.slice(0, 4).every((call) => call.status === "ok")).toBe(true);
+      // The blocked call stays recorded, with the reason the model saw.
+      expect(result.toolCalls[4]?.status).toBe("error");
+      expect(result.toolCalls[4]?.redactedResult).toContain("search_knowledge budget exhausted");
+    }, 20_000);
+
+    it("keeps an honest refusal when every allowed search was weak and a fifth is blocked", async () => {
+      let calls = 0;
+      const result = await runKnowledgeAgent({
+        question: "Does the company offer a stock purchase plan?",
+        pipeline: {
+          search: async ({ query }) => {
+            calls += 1;
+            return emptySearch(query);
+          },
+        },
+        principal,
+        policyPrincipal,
+        conversationId: "c-search-cap-weak",
+        runtime: scriptedRuntime("useful-brain-search-cap-weak", [
+          ...fiveSearches,
+          finalText(BRAIN_NOT_ENOUGH_EVIDENCE),
+        ]),
+      });
+
+      expect(calls).toBe(AGENT_BUDGETS.maxSearchKnowledge);
+      expect(result.finalResponse).toBe(BRAIN_NOT_ENOUGH_EVIDENCE);
+      expect(result.toolCalls[4]?.status).toBe("error");
+    }, 20_000);
+
+    it("still fails closed on a real search error beside a blocked fifth search", async () => {
+      const pipeline = await tinyPipeline();
+      let calls = 0;
+      const result = await runKnowledgeAgent({
+        question: "How much leave accrues each month?",
+        pipeline: {
+          search: async (input) => {
+            calls += 1;
+            if (calls === 2) {
+              throw new Error("search deadline exceeded");
+            }
+            return pipeline.search(input);
+          },
+        },
+        principal,
+        policyPrincipal,
+        conversationId: "c-search-cap-real-error",
+        runtime: scriptedRuntime("useful-brain-search-cap-real-error", [
+          ...fiveSearches,
+          finalText("Employees accrue 1.5 days of leave per month.[1]"),
+        ]),
+      });
+
+      expect(calls).toBe(AGENT_BUDGETS.maxSearchKnowledge);
+      expect(result.finalResponse).toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
+      expect(result.refusalReason).toBeUndefined();
+    }, 20_000);
+
+    it("bounds a model that keeps searching after the block by the turn budget", async () => {
+      const pipeline = await tinyPipeline();
+      let calls = 0;
+      const { counter, runtime } = countedRuntime("useful-brain-search-cap-loop", [
+        ...fiveSearches,
+        searchCall("leave again"),
+        searchCall("leave again 2"),
+        searchCall("leave again 3"),
+        searchCall("leave again 4"),
+        searchCall("leave again 5"),
+        finalText("Employees accrue 1.5 days of leave per month.[1]"),
+      ]);
+      const result = await runKnowledgeAgent({
+        question: "How much leave accrues each month?",
+        pipeline: {
+          search: async (input) => {
+            calls += 1;
+            return pipeline.search(input);
+          },
+        },
+        principal,
+        policyPrincipal,
+        conversationId: "c-search-cap-loop",
+        runtime,
+      });
+
+      expect(calls).toBe(AGENT_BUDGETS.maxSearchKnowledge);
+      expect(counter.modelCalls).toBeLessThanOrEqual(AGENT_BUDGETS.maxTurns);
+      expect(result.toolCalls.length).toBeLessThanOrEqual(AGENT_BUDGETS.maxToolCalls);
+      // The turn budget ended the loop before any answer was drafted. The turn
+      // is refused (the last assistant text carries no citation), never answered.
+      expect(result.finalResponse).toBe(BRAIN_INVALID_CITATION);
+      expect(counter.modelCalls).toBe(AGENT_BUDGETS.maxTurns);
+    }, 20_000);
+
+    const echoCall = () =>
+      fauxToolCall("plugin_echo", { query: "echo" });
+    const echoTool = () => {
+      const executed: string[] = [];
+      return {
+        executed,
+        tool: {
+          name: "plugin_echo",
+          label: "Echo",
+          description: "Read tool for budget probes.",
+          parameters: Type.Object({ query: Type.String() }),
+          execute: async () => {
+            executed.push("plugin_echo");
+            return { content: [{ type: "text" as const, text: "ok" }], details: {} };
+          },
+        },
+      };
+    };
+
+    it("still terminates the run when the total tool-call cap is crossed", async () => {
+      const { executed, tool } = echoTool();
+      // Turn one spends the whole tool-call budget. Turn two asks for a search:
+      // the total cap is checked first, so it ends the run (terminate) and,
+      // as a failed search call, the turn is unavailable as before.
+      const { counter, runtime } = countedRuntime("useful-brain-tool-cap", [
+        fauxAssistantMessage(
+          [fauxText("Echoing."), ...Array.from({ length: AGENT_BUDGETS.maxToolCalls }, echoCall)],
+          { stopReason: "toolUse" },
+        ),
+        searchCall("leave accrual"),
+        finalText("Employees accrue 1.5 days of leave per month.[1]"),
+      ]);
+      const result = await runKnowledgeAgent({
+        question: "How much leave accrues each month?",
+        pipeline: await tinyPipeline(),
+        principal,
+        policyPrincipal,
+        conversationId: "c-tool-cap",
+        extraTools: [tool],
+        runtime,
+      });
+
+      expect(executed).toHaveLength(AGENT_BUDGETS.maxToolCalls);
+      expect(counter.modelCalls).toBe(2);
+      expect(result.toolCalls).toHaveLength(AGENT_BUDGETS.maxToolCalls + 1);
+      expect(result.finalResponse).toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
+    }, 20_000);
+
+    it("never runs a search past either cap when one batch crosses both", async () => {
+      const pipeline = await tinyPipeline();
+      let calls = 0;
+      // Calls 5 to 8 hit the search cap, call 9 hits the total cap. Pi ends a
+      // batch only when every call in it terminates, so the model gets one
+      // more turn here; nothing past the caps executes either way.
+      const burst = fauxAssistantMessage(
+        [
+          fauxText("Searching."),
+          ...["a", "b", "c", "d", "e"].map((query) => fauxToolCall(SEARCH_KNOWLEDGE_TOOL, { query })),
+        ],
+        { stopReason: "toolUse" },
+      );
+      const result = await runKnowledgeAgent({
+        question: "How much leave accrues each month?",
+        pipeline: {
+          search: async (input) => {
+            calls += 1;
+            return pipeline.search(input);
+          },
+        },
+        principal,
+        policyPrincipal,
+        conversationId: "c-both-caps",
+        runtime: scriptedRuntime("useful-brain-both-caps", [
+          ...fiveSearches.slice(0, 4),
+          burst,
+          finalText("Employees accrue 1.5 days of leave per month.[1]"),
+        ]),
+      });
+
+      expect(calls).toBe(AGENT_BUDGETS.maxSearchKnowledge);
+      expect(result.toolCalls).toHaveLength(AGENT_BUDGETS.maxToolCalls + 1);
+      expect(result.toolCalls.filter((call) => call.status === "ok")).toHaveLength(
+        AGENT_BUDGETS.maxSearchKnowledge,
+      );
+      // The total cap blocked a search that is not a search-cap block: unavailable.
+      expect(result.finalResponse).toBe(BRAIN_KNOWLEDGE_UNAVAILABLE);
+    }, 20_000);
+  });
 
   it("keeps a vector-degraded empty search an honest refusal with a recorded count", async () => {
     const result = await runKnowledgeAgent({
