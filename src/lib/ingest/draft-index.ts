@@ -246,8 +246,8 @@ type StoredChunk = {
 
 /**
  * True when vectors of this generation can be copied into a new one: same
- * embedding model and dimensions as the current configuration. The document
- * instruction is a constant, so it cannot differ. Every reuse path asks this.
+ * embedding model and dimensions as the current configuration. Every reuse
+ * path asks this.
  */
 async function embeddingsReusableFrom(db: SqlExecutor, generationId: string): Promise<boolean> {
   const source = await db

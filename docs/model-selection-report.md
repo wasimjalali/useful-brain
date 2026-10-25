@@ -1,10 +1,12 @@
 # Cloudflare-hosted model selection
 
-Date: 2026-08-28; bake-off evidence added 2026-08-31
+Date: 2026-08-28; bake-off evidence added 2026-08-31; chat model switched 2026-10-25
 
-Wasim selected GLM 5.3 Flash for chat. Embeddings and reranking stay on the locked Workers AI models from earlier phases. The 2026-08-31 bake-off below confirms that choice with measured evidence.
+**Current chat model (2026-10-25): DeepSeek V4.1 Flash**, `@cf/deepseek-ai/deepseek-v4.1-flash-1017`, $0.30 / $1.20 per M tokens. Wasim switched from GLM 5.3 Flash after the 120-question Northwind battery on the current build: DeepSeek 118/120 at p50 7.5 s and p95 20.4 s, GLM 117/120 at 14.3 s and 41.4 s (write-up: `evals/model-evals/2026-10-25-workers-ai-chat-models.md`). Production uses the same descriptor (`workersAiChatModel`) and extraction decoding the eval measured: DeepSeek keeps the thinking toggle off with the 1,024-token extraction cap. The Chat table and bake-off below are the 2026-08 record for GLM 5.3 Flash, which stays an eval candidate.
 
-## Chat
+Wasim selected GLM 5.3 Flash for chat (2026-08-28). Embeddings and reranking stay on the locked Workers AI models from earlier phases. The 2026-08-31 bake-off below confirms that choice with measured evidence.
+
+## Chat (2026-08 selection, superseded 2026-10-25)
 
 | Field | Choice |
 | --- | --- |
@@ -13,7 +15,7 @@ Wasim selected GLM 5.3 Flash for chat. Embeddings and reranking stay on the lock
 | Context | 1,048,576 tokens |
 | Pricing | $0.15 / $0.50 / $0.03 cached per M tokens ([Workers AI pricing](https://developers.cloudflare.com/workers-ai/platform/pricing/)) |
 | Access | Workers Paid or AI Gateway credits |
-| Pi catalog | Pi 0.84.3 has GLM-4.7-flash and GLM-5.2, not 5.3-flash. Useful Brain clones the 4.7-flash OpenAI-completions shape and overrides id, cost, and context. |
+| Pi catalog | Historical (Pi 0.84.3 had no 5.3-flash entry). Production now builds every chat model with `workersAiChatModel` in `src/lib/models/workers-ai-chat-model.ts`: the GLM 5.3 Flash descriptor with only id and name swapped. |
 
 Gemma remains eligible. It was not chosen because the operator named GLM 5.3 Flash.
 
@@ -21,11 +23,11 @@ Gemma remains eligible. It was not chosen because the operator named GLM 5.3 Fla
 
 | Field | Choice |
 | --- | --- |
-| Model | `@cf/qwen/qwen3-embedding-0.6b` |
+| Model | `@cf/baai/bge-m3` |
 | Dimensions | 1024 |
 | Metric | cosine |
 
-Locked in Phase 2. Changing it requires a Vectorize rebuild.
+Locked in Phase 2 as `@cf/qwen/qwen3-embedding-0.6b`. Replaced on 2026-10-25 after evals on Northwind: dense recall@3 0.990 vs 0.969, MRR 0.957 vs 0.945, query embed p95 133 ms vs 4,042 ms, indexing 15 s vs 193 s, full battery 118/120 for both. BGE-M3 takes documents and queries the same way (`contexts`, no instruction). Changing the model requires a Vectorize rebuild (see the operations runbook).
 
 ## Rerank
 
@@ -39,7 +41,7 @@ Locked in Phase 3.
 
 Brain calls `env.AI.run()` for chat, embeddings, and rerank. Local `wrangler dev` uses `"ai": { "binding": "AI", "remote": true }` on the development Worker. Staging and production use the same binding without `remote`.
 
-## Chat model bake-off (2026-08-31)
+## Chat model bake-off (2026-08-31, historical)
 
 Method: every candidate verified live in the account catalog (`npx wrangler ai models`), schema-checked for function calling, then run through the same grounded-citation loop. A loopback-only `evalModel` override on `POST /turns` (allowlisted in `src/lib/models/eval-override.ts`, 403 outside loopback, 400 off-allowlist) selects the chat model per turn; the harness fails closed when the response's `answerModel` differs from the requested model. Identical decoding everywhere: temperature 0, seed 7, thinking disabled on extraction calls. All full runs used the same corpus generation `g-8ee33d45`, hybrid retrieval, all 120 questions under each question's principal, zero skips and zero forbidden-document retrievals. One turn in the DeepSeek V4 Flash run degraded to keyword-only retrieval after a vector-channel error; the harness flags that run as not baseline-comparable on retrieval. Every other run had zero degraded turns. Scorers unchanged: multi-hop requires every gold document cited; abstention categories require `insufficient_evidence`.
 
@@ -55,7 +57,7 @@ Full 120-question results (run in parallel against one local worker, so latency 
 
 | Model | Pass | Factual | Trap | Permission | Unanswerable | Multi-hop | Retrieved recall | Latency p50 / p95 | Price $/M in / out |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `@cf/zai-org/glm-5.3-flash` (locked) | **114/120 (95.0%)** | 66/70 | 17/17 | 12/13 | 10/10 | 9/10 | 0.974 | 15.6s / 56.3s | 0.15 / 0.50 |
+| `@cf/zai-org/glm-5.3-flash` (2026-08 production choice, historical) | **114/120 (95.0%)** | 66/70 | 17/17 | 12/13 | 10/10 | 9/10 | 0.974 | 15.6s / 56.3s | 0.15 / 0.50 |
 | `@cf/zai-org/glm-5.3` | 114/120 (95.0%) | 67/70 | 17/17 | 12/13 | 10/10 | 8/10 | 0.969 | 15.3s / 56.0s | 1.40 / 4.40 |
 | `@cf/deepseek-ai/deepseek-v4-flash-0731` | 109/120 (90.8%) | 64/70 | 17/17 | 12/13 | 10/10 | 6/10 | 0.943 | 11.2s / 35.9s | 0.44 / 1.32 |
 | `@cf/google/gemma-4-26b-a4b-it` | 105/120 (87.5%) | 62/70 | 16/17 | 11/13 | 10/10 | 6/10 | 0.928 | 17.9s / 56.8s | 0.10 / 0.30 |

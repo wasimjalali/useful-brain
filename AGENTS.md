@@ -12,7 +12,7 @@ The target architecture lives in `docs/useful-brain-master-plan.md`. Execute fro
 
 Phase 0 is merged ([PR #10](https://github.com/wasimjalali/useful-brain/pull/10)). Phase 1 code is merged ([PR #11](https://github.com/wasimjalali/useful-brain/pull/11), follow-up `40f89d7`). Phases 2–7A are merged. Staging resources are provisioned. Operator identity is loopback on 127.0.0.1. Cloudflare Access is optional ported code, not a launch requirement.
 
-Phases 1 through 7A and the local Cloudflare UI cutover (wire Brain to the Next.js UI, remove Convex and Azure, use Workers AI GLM 5.3 Flash for chat, delete Burooj after Northwind is in this repo) were executed under standing authorizations Wasim recorded on 2026-08-26 and 2026-08-28. Those authorizations do **not** cover real company data, a new production resource set, or commercial launch.
+Phases 1 through 7A and the local Cloudflare UI cutover (wire Brain to the Next.js UI, remove Convex and Azure, use Workers AI GLM 5.3 Flash for chat (switched to DeepSeek V4.1 Flash on 2026-10-25), delete Burooj after Northwind is in this repo) were executed under standing authorizations Wasim recorded on 2026-08-26 and 2026-08-28. Those authorizations do **not** cover real company data, a new production resource set, or commercial launch.
 
 Phase 7B (production launch with real company data and a production resource set) still requires one final explicit Wasim approval.
 

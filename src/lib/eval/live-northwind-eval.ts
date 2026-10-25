@@ -406,7 +406,8 @@ export async function runLiveLayer(
         previous.brainUrl !== brainUrl && "brainUrl",
         previous.harnessVersion !== HARNESS_VERSION && "harnessVersion",
         previous.generationId !== generationId && "generationId",
-        (previous.model ?? CHAT_MODEL_ID) !== expectedModel && "model",
+        // A checkpoint without a model field predates model tagging; fail closed.
+        previous.model !== expectedModel && "model",
         previous.questionSetDigest !== digest && "questionSetDigest",
         (previous.scoreUnavailable ?? false) !== scoreUnavailable && "scoreUnavailable",
       ].filter(Boolean);

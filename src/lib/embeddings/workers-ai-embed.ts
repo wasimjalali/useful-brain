@@ -55,14 +55,17 @@ function readVectors(payload: unknown): number[][] {
   }
   const body = payload as {
     data?: unknown;
+    response?: unknown;
     result?: { data?: unknown; shape?: unknown };
     shape?: unknown;
   };
   const data = Array.isArray(body.data)
     ? body.data
-    : Array.isArray(body.result?.data)
-      ? body.result.data
-      : null;
+    : Array.isArray(body.response)
+      ? body.response
+      : Array.isArray(body.result?.data)
+        ? body.result.data
+        : null;
   if (!data) {
     throw new EmbeddingError("embedding response missing data[]");
   }

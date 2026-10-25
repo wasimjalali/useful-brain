@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { glm53FlashModel } from "./glm-5-3-flash";
-import { CHAT_MODEL_ID, CHAT_MODEL_PROVIDER } from "./selection";
+import { GLM_5_3_FLASH_ID, glm53FlashModel } from "./glm-5-3-flash";
+import { CHAT_MODEL_PROVIDER } from "./selection";
 
 describe("GLM 5.3 Flash Pi model", () => {
   it("clones the Cloudflare-hosted Workers AI catalog entry", () => {
     const model = glm53FlashModel();
-    expect(model.id).toBe(CHAT_MODEL_ID);
+    expect(model.id).toBe(GLM_5_3_FLASH_ID);
     expect(model.provider).toBe(CHAT_MODEL_PROVIDER);
     expect(model.api).toBe("openai-completions");
     expect(model.reasoning).toBe(true);

@@ -44,7 +44,7 @@
   "vectorize": [
     {
       "binding": "VECTORIZE",
-      "index_name": "useful-brain-development",
+      "index_name": "useful-brain-development-bge-m3",
       "remote": true
     }
   ],
@@ -139,7 +139,7 @@
       "vectorize": [
         {
           "binding": "VECTORIZE",
-          "index_name": "useful-brain-development",
+          "index_name": "useful-brain-development-bge-m3",
           "remote": true
         }
       ],
@@ -218,7 +218,7 @@
           "jurisdiction": "eu"
         }
       ],
-      "vectorize": [{ "binding": "VECTORIZE", "index_name": "useful-brain-staging" }],
+      "vectorize": [{ "binding": "VECTORIZE", "index_name": "useful-brain-staging-bge-m3" }],
       "ai": { "binding": "AI" },
       "queues": {
         "producers": [

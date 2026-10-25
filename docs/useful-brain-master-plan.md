@@ -102,7 +102,7 @@ The preservation target is behavior, not filenames. The TypeScript port must ret
 - ACL candidate generation happens over allowed content only. `acl_group` is a length-prefixed, injective canonical form hashed to a fixed 32-character digest. Comma-joined values are forbidden.
 - Grant lists are bounded. An over-wide principal raises an explicit `AclTooWide` policy error instead of truncating permissions.
 - Private owners must be non-empty strings. D1 owner extraction checks JSON type and fails closed on any other value.
-- Query and document embedding instructions remain distinct. Vectorize uses cosine distance only.
+- BGE-M3 takes documents and queries the same way (`contexts`, no instruction field). Vectorize uses cosine distance only.
 - External-content FTS5 uses `INTEGER PRIMARY KEY AUTOINCREMENT`, synchronized insert, update and delete triggers and `ON CONFLICT DO UPDATE`. `INSERT OR REPLACE` is forbidden.
 - Vectorize mutation identifiers are opaque. Wait for exact equality on the newest mutation identifier, then audit a paginated ID inventory. Any D1 or Vectorize movement during the audit makes the result partial and blocks promotion.
 - GitHub truncated listings fail the sync. Arbitrary HTTP fetching must pin a validated public address through every redirect hop, including IPv4-mapped, NAT64 and Teredo forms, or remain disabled in favor of explicit origin allowlists.
@@ -198,7 +198,7 @@ Vectorize stores only vector IDs, embeddings and indexed metadata needed for fil
 1. Create an immutable draft generation in D1.
 2. Resolve sources to immutable R2 objects and document-version rows.
 3. Parse and chunk with stable IDs and content digests.
-4. Reuse embeddings only when model, dimensions, instruction, chunk text and normalization version all match.
+4. Reuse embeddings only when model, dimensions, chunk text and normalization version all match.
 5. Write staged D1 rows, then enqueue Vectorize upserts in a fixed-width generation namespace with only the fixed-width `acl_group` as indexed metadata. Vector IDs are SHA-256 digests no longer than 64 bytes, map uniquely to chunk IDs in corpus D1 and have a unique database constraint.
 6. Record every returned mutation identifier and wait for exact equality on the newest identifier. Mutation identifiers are opaque and are never compared with ordering operators.
 7. Enumerate the complete paginated Vectorize ID snapshot and compare it with the complete D1 vector ledger. `vectorCount` is diagnostic only, never exact inventory.
@@ -247,7 +247,7 @@ The starting retrieval profile is inherited from the measured Burooj stack, then
 9. Apply an eval-calibrated absolute reranker relevance floor.
 10. Return up to eight chunks. Parent expansion ships off.
 
-The first embedding candidate is Workers AI `@cf/qwen/qwen3-embedding-0.6b` at 1024 dimensions because Burooj already measured it on the real D1 and Vectorize stack. It remains a measured default, not an irreversible choice. Changing the model or dimension creates a new Vectorize index and corpus generation.
+The first embedding candidate was Workers AI `@cf/qwen/qwen3-embedding-0.6b` at 1024 dimensions because Burooj already measured it on the real D1 and Vectorize stack. It was replaced on 2026-10-25 by `@cf/baai/bge-m3` (1024 dimensions, cosine) after Northwind evals. The model is a measured default, not an irreversible choice. Changing the model or dimension creates a new Vectorize index and corpus generation.
 
 ### ACL and trace contract
 

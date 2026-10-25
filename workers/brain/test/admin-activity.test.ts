@@ -116,7 +116,7 @@ describe("recordTurnSteps and the trace", () => {
   it("is idempotent for the same message and sequence", async () => {
     const steps = [
       { step: "retrieve" as const, detail: { candidates: 12, passages: 5, topScore: 0.83 }, durationMs: 120 },
-      { step: "generate" as const, detail: { model: "@cf/zai-org/glm-5.3-flash", outputTokens: 300 }, durationMs: 900 },
+      { step: "generate" as const, detail: { model: "@cf/deepseek-ai/deepseek-v4.1-flash-1017", outputTokens: 300 }, durationMs: 900 },
     ];
     await recordTurnSteps(env.OPERATIONS_DB, "ac-0", steps);
     await recordTurnSteps(env.OPERATIONS_DB, "ac-0", steps);

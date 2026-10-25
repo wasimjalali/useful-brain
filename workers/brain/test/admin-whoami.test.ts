@@ -123,8 +123,8 @@ describe("GET /config", () => {
       connectors: Array<{ id: string; kind: string; approval: boolean; status: string }>;
     };
     expect(body.models).toEqual({
-      answer: "@cf/zai-org/glm-5.3-flash",
-      embedding: "@cf/qwen/qwen3-embedding-0.6b",
+      answer: "@cf/deepseek-ai/deepseek-v4.1-flash-1017",
+      embedding: "@cf/baai/bge-m3",
       reranker: "@cf/baai/bge-reranker-base",
     });
     expect(body.retrieval).toMatchObject({ mode: "keyword", passages: 8, rerankFloor: 0.05 });

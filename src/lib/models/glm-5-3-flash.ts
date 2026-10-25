@@ -1,11 +1,13 @@
 import type { Model } from "@earendil-works/pi-ai";
 
-import { CHAT_MODEL_ID, CHAT_MODEL_NAME, CHAT_MODEL_PROVIDER } from "./selection";
+import { CHAT_MODEL_PROVIDER } from "./selection";
+
+export const GLM_5_3_FLASH_ID = "@cf/zai-org/glm-5.3-flash";
 
 export function glm53FlashModel(): Model<"openai-completions"> {
   return {
-    id: CHAT_MODEL_ID,
-    name: CHAT_MODEL_NAME,
+    id: GLM_5_3_FLASH_ID,
+    name: "GLM-5.3 Flash",
     api: "openai-completions",
     provider: CHAT_MODEL_PROVIDER,
     baseUrl: "https://api.cloudflare.com/client/v4/accounts/{CLOUDFLARE_ACCOUNT_ID}/ai/v1",
