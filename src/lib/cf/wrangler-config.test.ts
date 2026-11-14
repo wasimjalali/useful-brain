@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -226,18 +226,15 @@ describe("protected Worker configuration", () => {
     expect(pkg.scripts["eval:northwind"]).toMatch(/live-northwind-eval/);
   });
 
-  it("reserves public usefulbuild hostnames on landing workers, not the operator app", () => {
+  it("reserves the public Brain hostname on the landing worker, not the operator app", () => {
     const brain = readJsonc("workers/public-hosts/brain/wrangler.jsonc");
-    const voice = readJsonc("workers/public-hosts/voice/wrangler.jsonc");
     expect(brain.name).toBe("useful-brain-open");
-    expect(voice.name).toBe("useful-voice");
     expect(brain.routes).toEqual([{ pattern: "brain.usefulbuild.com", custom_domain: true }]);
-    expect(voice.routes).toEqual([{ pattern: "voice.usefulbuild.com", custom_domain: true }]);
     expect(brain.vars).toBeUndefined();
-    expect(voice.vars).toBeUndefined();
-    // Custom domains only: no duplicate *.workers.dev copies of the pages.
+    // Custom domain only: no duplicate *.workers.dev copy of the page.
     expect(brain.workers_dev).toBe(false);
-    expect(voice.workers_dev).toBe(false);
+    // voice.usefulbuild.com belongs to the useful-voice repo (site/), never this one.
+    expect(existsSync(path.join(process.cwd(), "workers/public-hosts/voice"))).toBe(false);
   });
 
   it("ships the designed Brain landing on the public host", () => {
@@ -264,21 +261,6 @@ describe("protected Worker configuration", () => {
     expect(html).toContain("View the code on GitHub");
     expect(html).not.toContain(">Kursfind</a>");
     expect(html).not.toMatch(/LOOPBACK|Cloudflare Access|href=["']\/chat/i);
-  });
-
-  it("ships the Useful Build family system on the Voice landing", () => {
-    const html = readFileSync(
-      path.join(process.cwd(), "workers/public-hosts/voice/public/index.html"),
-      "utf8",
-    );
-    expect(html).toContain("/brand/useful-voice-mark.svg");
-    expect(html).toContain("Useful Voice, by Useful Build");
-    expect(html).toContain('class="sheet-grid"');
-    expect(html).toContain("Deepgram");
-    expect(html).toContain("/open/dictate-live.png");
-    expect(html).toContain('aria-current="page">Useful Voice');
-    expect(html).toContain("https://usefulbuild.com");
-    expect(html).not.toContain(">Kursfind</a>");
   });
 
   it("starts Cloud Agent terminals on Brain, not a Convex Next.js server", () => {
