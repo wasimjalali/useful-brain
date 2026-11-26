@@ -94,7 +94,13 @@ function safeDestination(raw: string | null, base: URL): URL {
   if (!raw || !raw.startsWith("/")) {
     return home;
   }
-  const destination = new URL(raw, base);
+  let destination: URL;
+  try {
+    destination = new URL(raw, base);
+  } catch {
+    // A value that does not parse as a URL is refused, not followed.
+    return home;
+  }
   if (destination.origin !== base.origin || destination.pathname.startsWith(DEMO_LANDED_PATH)) {
     return home;
   }

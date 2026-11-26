@@ -294,7 +294,11 @@ export async function createDemoVisitor(
       )
       .bind(newBoundedId("s"), principalId, hashedToken, expiresAt, now, principalId),
   ])) as Array<{ meta?: { changes?: number } }>;
-  if ((results[0]?.meta?.changes ?? 0) !== 1) {
+  const inserted = results[0]?.meta?.changes;
+  if (typeof inserted !== "number") {
+    throw new Error("D1 batch result has no change count for the demo visitor insert");
+  }
+  if (inserted !== 1) {
     return null;
   }
   return {

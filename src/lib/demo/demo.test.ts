@@ -195,7 +195,7 @@ describe("demoLandedResponse", () => {
     expect(await response.text()).toContain("needs cookies");
   });
 
-  it.each(["//evil.example/x", "/\\evil.example", "/\t/evil.example", "https://evil.example", "/api/demo/landed?to=/x"])(
+  it.each(["//evil.example/x", "/\\evil.example", "/\t/evil.example", "https://evil.example", "/api/demo/landed?to=/x", "//["])(
     "never forwards %s off the site or back into itself",
     (to) => {
       const location = demoLandedResponse(landed(to, "usefulbrain.session=abc"), env).headers.get("location");
