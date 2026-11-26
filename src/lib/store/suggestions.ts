@@ -72,9 +72,13 @@ export async function loadSuggestions(
   db: SqlExecutor,
   generationId: string,
   principal: Principal,
+  options: {
+    curated: ReadonlyArray<{ text: string; department: string; documentId: string }>;
+    max: number;
+  } = { curated: CURATED_SUGGESTIONS, max: MAX_SUGGESTIONS },
 ): Promise<Suggestion[]> {
   const { sql, params } = aclSqlAndParams(aclFilterFor(principal));
-  const ids = CURATED_SUGGESTIONS.map((item) => item.documentId);
+  const ids = options.curated.map((item) => item.documentId);
   const rows = await db
     .prepare(
       `SELECT c.document_id FROM document_catalog c
@@ -83,7 +87,7 @@ export async function loadSuggestions(
     .bind(generationId, ...ids, ...params)
     .all<{ document_id: string }>();
   const readable = new Set(rows.results.map((row) => row.document_id));
-  return CURATED_SUGGESTIONS.filter((item) => readable.has(item.documentId))
-    .slice(0, MAX_SUGGESTIONS)
+  return options.curated.filter((item) => readable.has(item.documentId))
+    .slice(0, options.max)
     .map(({ text, department }) => ({ text, department }));
 }

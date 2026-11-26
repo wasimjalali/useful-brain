@@ -30,8 +30,9 @@ import type { OperationsDatabase } from "../../../../src/lib/store/conversations
 import { loadLatestServiceHealth } from "../../../../src/lib/store/service-health";
 import { loadTurnSteps } from "../../../../src/lib/store/turn-steps";
 import { WORKERS_AI_SERVICE } from "../../../../src/lib/models/ai-health";
+import { isDemoMode } from "../../../../src/lib/demo/demo-mode";
 
-type MetricsEnv = { CORPUS_DB?: unknown; OPERATIONS_DB: unknown };
+type MetricsEnv = { CORPUS_DB?: unknown; OPERATIONS_DB: unknown; DEMO_MODE?: string };
 
 function json(body: unknown, requestId: string): Response {
   const response = Response.json(body, { headers: withRequestId(new Headers(), requestId) });
@@ -105,6 +106,11 @@ async function corpusHealth(corpus: SqlExecutor | undefined): Promise<HealthRow[
 
 async function loadHealth(env: MetricsEnv): Promise<HealthResponse> {
   const operations = env.OPERATIONS_DB as OperationsDatabase;
+  if (isDemoMode(env)) {
+    // The demo has no model, gateway or vector index: it reports only what it runs.
+    const [corpusRow] = await corpusHealth(env.CORPUS_DB as SqlExecutor | undefined);
+    return { services: [{ service: "brain", status: "ok", detail: "ok" }, corpusRow] };
+  }
   const [corpusRows, aiEvent] = await Promise.all([
     corpusHealth(env.CORPUS_DB as SqlExecutor | undefined),
     loadLatestServiceHealth(operations, WORKERS_AI_SERVICE),
@@ -248,6 +254,8 @@ export async function handleAdminMetricsRoute(input: {
   const url = new URL(request.url);
   const operations = env.OPERATIONS_DB as OperationsDatabase;
   const now = Date.now();
+  // Demo visitors are all admins: each sees only their own questions and traces.
+  const owner = isDemoMode(env) ? principal.id : null;
   const done = (operation: string) =>
     writeOperationalLog({
       requestId,
@@ -259,14 +267,14 @@ export async function handleAdminMetricsRoute(input: {
 
   if (path === "/admin/overview") {
     requireSevenDays(url);
-    const body = await loadOverview(operations, now);
+    const body = await loadOverview(operations, now, owner);
     done("admin-overview");
     return json(body, requestId);
   }
 
   if (path === "/admin/unanswered") {
     requireSevenDays(url);
-    const questions = await loadUnanswered(operations, now);
+    const questions = await loadUnanswered(operations, now, owner);
     done("admin-unanswered");
     return json({ range: "7d", questions }, requestId);
   }
@@ -303,6 +311,7 @@ export async function handleAdminMetricsRoute(input: {
       outcome: outcomeParam ? (outcomeParam as ActivityOutcome) : null,
       cursor,
       limit,
+      owner,
     });
     done("admin-activity");
     return json(body, requestId);
@@ -317,7 +326,7 @@ export async function handleAdminMetricsRoute(input: {
     }
     throw error;
   }
-  if (!(await assistantMessageExists(operations, messageId))) {
+  if (!(await assistantMessageExists(operations, messageId, owner))) {
     throw new WorkerNotFoundError();
   }
   const steps = await loadTurnSteps(operations, messageId);

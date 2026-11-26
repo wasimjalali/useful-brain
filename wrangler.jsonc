@@ -84,6 +84,48 @@
         }
       ]
     },
+    "demo": {
+      "workers_dev": false,
+      "preview_urls": false,
+      "routes": [
+        {
+          "pattern": "brain.usefulbuild.com",
+          "custom_domain": true
+        }
+      ],
+      "vars": {
+        "RUNTIME_ENV": "staging",
+        "IDENTITY_MODE": "session",
+        "RESOURCES_PROVISIONED": "true",
+        "WRANGLER_ACCESS_DEV": "false",
+        "LOOPBACK_RUNTIME": "false",
+        "DEMO_MODE": "true"
+      },
+      "ratelimits": [
+        {
+          "name": "DEMO_SIGN_IN_LIMIT",
+          "namespace_id": "4101",
+          "simple": {
+            "limit": 10,
+            "period": 60
+          }
+        }
+      ],
+      "assets": {
+        "directory": ".open-next/assets",
+        "binding": "ASSETS"
+      },
+      "services": [
+        {
+          "binding": "WORKER_SELF_REFERENCE",
+          "service": "useful-brain-demo"
+        },
+        {
+          "binding": "BRAIN",
+          "service": "useful-brain-brain-demo"
+        }
+      ]
+    },
     "production": {
       "workers_dev": false,
       "preview_urls": false,

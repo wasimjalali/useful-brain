@@ -19,22 +19,37 @@ export function EmptyState({
         Every answer cites the documents you can read.
       </p>
       <div className="mt-7">{composer}</div>
-      <ul className="m-0 mt-6 flex list-none flex-col p-0">
-        {suggestions.map((suggestion) => (
-          <li key={suggestion.question}>
-            <button
-              className="ub-ring group flex h-11 w-full items-center gap-4 rounded-[10px] px-3 text-left transition-colors duration-[120ms] hover:bg-sunken"
-              onClick={() => onPick(suggestion.question)}
-              type="button"
-            >
-              <span className="flex-1 truncate text-sm text-ink-muted group-hover:text-ink">
-                {suggestion.question}
-              </span>
-              <span className="shrink-0 text-xs text-ink-faint-text">{suggestion.department}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
+      <SuggestionList className="mt-6" onPick={onPick} suggestions={suggestions} />
     </div>
+  );
+}
+
+/** Starter questions; picking one fills the composer. */
+export function SuggestionList({
+  suggestions,
+  onPick,
+  className = "",
+}: {
+  suggestions: SuggestionView[];
+  onPick: (question: string) => void;
+  className?: string;
+}) {
+  return (
+    <ul className={`m-0 flex list-none flex-col p-0 ${className}`}>
+      {suggestions.map((suggestion) => (
+        <li key={suggestion.question}>
+          <button
+            className="ub-ring group flex h-11 w-full items-center gap-4 rounded-[10px] px-3 text-left transition-colors duration-[120ms] hover:bg-sunken"
+            onClick={() => onPick(suggestion.question)}
+            type="button"
+          >
+            <span className="flex-1 truncate text-sm text-ink-muted group-hover:text-ink">
+              {suggestion.question}
+            </span>
+            <span className="shrink-0 text-xs text-ink-faint-text">{suggestion.department}</span>
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }

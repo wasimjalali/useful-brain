@@ -65,6 +65,8 @@ export type ChatViewProps = {
   loadError?: string | null;
   scopeDocumentId?: string | null;
   suggestions?: SuggestionView[];
+  /** The public demo keeps its sample questions under the answers, so a visitor can always ask another. */
+  suggestionsAfterAnswers?: boolean;
 };
 
 /**
@@ -166,6 +168,7 @@ function ChatView({
   loadError = null,
   scopeDocumentId = null,
   suggestions = [],
+  suggestionsAfterAnswers = false,
   viewAsId,
   seedFromUrl,
   onExitViewAs,
@@ -521,6 +524,7 @@ function ChatView({
         stopError={chat.stopError}
         stopping={chat.isStopping}
         suggestions={suggestions}
+        suggestionsAfterAnswers={suggestionsAfterAnswers}
         title={title}
       >
         {visibleTurns.map((turn) => (
