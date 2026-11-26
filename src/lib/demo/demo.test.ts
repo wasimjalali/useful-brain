@@ -6,7 +6,7 @@ import { CURATED_SUGGESTIONS } from "../store/suggestions";
 import { assertDemoConfiguration, demoRequestAllowed, isDemoMode } from "./demo-mode";
 import { scriptedAnswer } from "./demo-runtime";
 import { DEMO_QUESTIONS, matchDemoQuestion } from "./demo-script";
-import { demoSignInRedirect } from "./demo-sign-in";
+import { demoLandedResponse, demoSignInRedirect } from "./demo-sign-in";
 
 describe("demo script", () => {
   const documents = new Map(northwindSeedDocuments().map((doc) => [doc.documentId, doc]));
@@ -121,7 +121,9 @@ describe("demoSignInRedirect", () => {
     const limit = limiter();
     const response = await demoSignInRedirect(page("/admin/people?x=1"), demoEnv(brainReturning(), limit));
     expect(response?.status).toBe(303);
-    expect(response?.headers.get("location")).toBe("https://brain.usefulbuild.com/admin/people?x=1");
+    expect(response?.headers.get("location")).toBe(
+      `https://brain.usefulbuild.com/api/demo/landed?to=${encodeURIComponent("/admin/people?x=1")}`,
+    );
     expect(response?.headers.get("set-cookie")).toContain("usefulbrain.session=token-1");
     expect(response?.headers.get("set-cookie")).toContain("Secure");
     expect(limit.limit).toHaveBeenCalledWith({ key: "203.0.113.7" });
@@ -129,7 +131,7 @@ describe("demoSignInRedirect", () => {
 
   it("replaces the sign-in pages with a fresh visitor and the home page", async () => {
     const response = await demoSignInRedirect(page("/login?fresh=1", { cookie: "usefulbrain.session=old" }), demoEnv());
-    expect(response?.headers.get("location")).toBe("https://brain.usefulbuild.com/");
+    expect(response?.headers.get("location")).toBe("https://brain.usefulbuild.com/api/demo/landed?to=%2F");
   });
 
   it("leaves signed-in visitors, API calls, crawlers and data fetches alone", async () => {
@@ -171,5 +173,38 @@ describe("demoSignInRedirect", () => {
     await expect(
       demoSignInRedirect(page("/chat"), { DEMO_MODE: "true", BRAIN: brainReturning() }),
     ).rejects.toThrow(/DEMO_SIGN_IN_LIMIT/);
+  });
+});
+
+describe("demoLandedResponse", () => {
+  const landed = (to: string, cookie?: string) =>
+    new Request(`https://brain.usefulbuild.com/api/demo/landed?to=${encodeURIComponent(to)}`, {
+      headers: cookie ? { cookie } : {},
+    });
+  const env = { DEMO_MODE: "true" };
+
+  it("forwards a visitor whose cookie stuck to the page they asked for", () => {
+    const response = demoLandedResponse(landed("/chat?c=1", "usefulbrain.session=abc"), env);
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("https://brain.usefulbuild.com/chat?c=1");
+  });
+
+  it("shows a cookie notice, not another sign-in, when the cookie was dropped", async () => {
+    const response = demoLandedResponse(landed("/chat"), env);
+    expect(response.status).toBe(400);
+    expect(await response.text()).toContain("needs cookies");
+  });
+
+  it.each(["//evil.example/x", "/\\evil.example", "/\t/evil.example", "https://evil.example", "/api/demo/landed?to=/x"])(
+    "never forwards %s off the site or back into itself",
+    (to) => {
+      const location = demoLandedResponse(landed(to, "usefulbrain.session=abc"), env).headers.get("location");
+      expect(new URL(location!).origin).toBe("https://brain.usefulbuild.com");
+      expect(new URL(location!).pathname.startsWith("/api/demo/landed")).toBe(false);
+    },
+  );
+
+  it("is not found outside the demo", () => {
+    expect(demoLandedResponse(landed("/chat", "usefulbrain.session=abc"), {}).status).toBe(404);
   });
 });

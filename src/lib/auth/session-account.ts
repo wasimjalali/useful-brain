@@ -243,55 +243,60 @@ export const DEMO_VISITOR_NAME = "Demo Admin";
 /** New demo visitors allowed per rolling hour across everyone; beyond it sign-in waits. */
 export const DEMO_VISITORS_PER_HOUR = 300;
 
-export async function demoVisitorsSince(db: OperationsDatabase, since: number): Promise<number> {
-  const row = await db
-    .prepare(`SELECT COUNT(*) AS n FROM principals WHERE id LIKE ? AND created_at >= ?`)
-    .bind(`${DEMO_VISITOR_ID_PREFIX}%`, since)
-    .first<{ n: number }>();
-  return Number(row?.n ?? 0);
-}
-
 /**
  * Demo only (the Brain route checks DEMO_MODE): a fresh principal with the
  * given grants and a session for it. Each visitor gets their own, so chats
- * never mix; the scheduled cleanup removes visitors a day later.
+ * never mix; the scheduled cleanup removes visitors a day later. The hourly
+ * ceiling is checked inside the same transaction as the writes, so concurrent
+ * sign-ins cannot pass it together. Returns null when the ceiling is reached.
  */
 export async function createDemoVisitor(
   db: OperationsDatabase,
   grants: { roles: readonly string[]; departments: readonly string[] },
   now = Date.now(),
-): Promise<AuthSessionResult> {
+): Promise<AuthSessionResult | null> {
   const suffix = newSessionToken().slice(0, 16);
   const principalId = `${DEMO_VISITOR_ID_PREFIX}${suffix}`;
   const email = `visitor-${suffix}@demo.invalid`;
   const sessionToken = newSessionToken();
   const hashedToken = await tokenHash(sessionToken);
   const expiresAt = now + SESSION_TTL_SECONDS * 1000;
-  await db.batch([
+  // Every row after the first is written only if the principal row was.
+  const created = `EXISTS (SELECT 1 FROM principals WHERE id = ?)`;
+  const results = (await db.batch([
     db
-      .prepare(`INSERT INTO principals (id, kind, subject, created_at) VALUES (?, 'user', ?, ?)`)
-      .bind(principalId, email, now),
+      .prepare(
+        `INSERT INTO principals (id, kind, subject, created_at)
+         SELECT ?, 'user', ?, ?
+         WHERE (SELECT COUNT(*) FROM principals WHERE id LIKE ? AND created_at >= ?) < ?`,
+      )
+      .bind(principalId, email, now, `${DEMO_VISITOR_ID_PREFIX}%`, now - 60 * 60 * 1000, DEMO_VISITORS_PER_HOUR),
     db
       .prepare(
         `INSERT INTO auth_users (id, email, name, password_hash, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+         SELECT ?, ?, ?, ?, ?, ? WHERE ${created}`,
       )
-      .bind(principalId, email, DEMO_VISITOR_NAME, DEMO_VISITOR_PASSWORD_HASH, now, now),
+      .bind(principalId, email, DEMO_VISITOR_NAME, DEMO_VISITOR_PASSWORD_HASH, now, now, principalId),
     ...grants.roles.map((role) =>
-      db.prepare(`INSERT INTO roles (principal_id, role) VALUES (?, ?)`).bind(principalId, role),
+      db
+        .prepare(`INSERT INTO roles (principal_id, role) SELECT ?, ? WHERE ${created}`)
+        .bind(principalId, role, principalId),
     ),
     ...grants.departments.map((department) =>
       db
-        .prepare(`INSERT INTO departments (principal_id, department) VALUES (?, ?)`)
-        .bind(principalId, department),
+        .prepare(`INSERT INTO departments (principal_id, department) SELECT ?, ? WHERE ${created}`)
+        .bind(principalId, department, principalId),
     ),
     db
       .prepare(
         `INSERT INTO auth_sessions (id, user_id, token_hash, expires_at, created_at)
-         VALUES (?, ?, ?, ?, ?)`,
+         SELECT ?, ?, ?, ?, ? WHERE ${created}`,
       )
-      .bind(newBoundedId("s"), principalId, hashedToken, expiresAt, now),
-  ]);
+      .bind(newBoundedId("s"), principalId, hashedToken, expiresAt, now, principalId),
+  ])) as Array<{ meta?: { changes?: number } }>;
+  if ((results[0]?.meta?.changes ?? 0) !== 1) {
+    return null;
+  }
   return {
     user: { id: principalId, email, name: DEMO_VISITOR_NAME },
     sessionToken,

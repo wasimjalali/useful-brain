@@ -224,6 +224,36 @@ describe("demo auth routes", () => {
     await env.OPERATIONS_DB.prepare(`DELETE FROM principals WHERE id LIKE 'demo-visitor-flood-%'`).run();
     expect((await call("/auth/demo", undefined, { method: "POST", json: {} })).status).toBe(201);
   });
+
+  it("lets concurrent sign-ins fill the ceiling exactly, never past it", async () => {
+    const hourAgo = Date.now() - 60 * 60 * 1000;
+    const recent = await env.OPERATIONS_DB.prepare(
+      `SELECT COUNT(*) AS n FROM principals WHERE id LIKE 'demo-visitor-%' AND created_at >= ?`,
+    )
+      .bind(hourAgo)
+      .first<{ n: number }>();
+    const fill = DEMO_VISITORS_PER_HOUR - Number(recent?.n ?? 0) - 2;
+    const now = Date.now();
+    await env.OPERATIONS_DB.batch(
+      Array.from({ length: fill }, (_, index) =>
+        env.OPERATIONS_DB.prepare(`INSERT INTO principals (id, kind, subject, created_at) VALUES (?, 'user', ?, ?)`).bind(
+          `demo-visitor-race-${index}`,
+          `race-${index}@demo.invalid`,
+          now,
+        ),
+      ),
+    );
+    const statuses = await Promise.all(
+      Array.from({ length: 6 }, () => call("/auth/demo", undefined, { method: "POST", json: {} }).then((r) => r.status)),
+    );
+    expect(statuses.filter((status) => status === 201)).toHaveLength(2);
+    expect(statuses.filter((status) => status === 503)).toHaveLength(4);
+    const orphans = await env.OPERATIONS_DB.prepare(
+      `SELECT COUNT(*) AS n FROM auth_users u WHERE NOT EXISTS (SELECT 1 FROM principals p WHERE p.id = u.id)`,
+    ).first<{ n: number }>();
+    expect(Number(orphans?.n)).toBe(0);
+    await env.OPERATIONS_DB.prepare(`DELETE FROM principals WHERE id LIKE 'demo-visitor-race-%'`).run();
+  });
 });
 
 describe("demo admin pages without a model", () => {

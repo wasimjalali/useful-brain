@@ -43,8 +43,6 @@ import {
 import { handlePublicAuthRoute, isPublicAuthPath } from "../../../src/lib/auth/session-routes";
 import {
   createDemoVisitor,
-  DEMO_VISITORS_PER_HOUR,
-  demoVisitorsSince,
   resolveSessionPrincipal,
 } from "../../../src/lib/auth/session-account";
 import {
@@ -236,19 +234,19 @@ function turnDeps(env: BrainEnv, principal: DirectoryRecord) {
 async function demoVisitorResponse(env: BrainEnv, requestId: string): Promise<Response> {
   const db = env.OPERATIONS_DB as OperationsDatabase;
   await db.prepare("PRAGMA foreign_keys = ON").run();
-  // A hard ceiling behind the web Worker's per-address rate limit: a flood
-  // fills this, not the database.
-  if ((await demoVisitorsSince(db, Date.now() - 60 * 60 * 1000)) >= DEMO_VISITORS_PER_HOUR) {
+  const result = await createDemoVisitor(db, {
+    roles: LOOPBACK_ROLES,
+    departments: LOOPBACK_DEPARTMENTS,
+  });
+  // A hard hourly ceiling behind the web Worker's per-address rate limit: a
+  // flood fills this, not the database.
+  if (!result) {
     return json(
       { code: "UNAVAILABLE", message: "The demo is busy. Try again in a few minutes." },
       requestId,
       503,
     );
   }
-  const result = await createDemoVisitor(db, {
-    roles: LOOPBACK_ROLES,
-    departments: LOOPBACK_DEPARTMENTS,
-  });
   return json({ user: result.user, sessionToken: result.sessionToken }, requestId, 201);
 }
 
@@ -1300,6 +1298,7 @@ const brainWorker = {
     }
     if (isDemoMode(env)) {
       try {
+        assertDemoConfiguration(env);
         await cleanupDemoVisitors(env.OPERATIONS_DB as OperationsDatabase);
       } catch (error) {
         console.error("demo_visitor_cleanup_failed", error instanceof Error ? error.message : String(error));

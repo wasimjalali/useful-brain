@@ -2,6 +2,9 @@ import { readSessionToken, requestIsSecure, serializeSessionCookie } from "../au
 import { createBrainServiceRequest, type BrainService } from "../cf/service-binding-identity";
 import { isDemoMode } from "./demo-mode";
 
+/** The route the sign-in redirect lands on (src/app/api/demo/landed/route.ts). */
+export const DEMO_LANDED_PATH = "/api/demo/landed";
+
 /** In the demo these pages have nothing to show: a visitor is always signed in. */
 const SIGN_IN_PAGES = new Set(["/login", "/signup"]);
 
@@ -71,13 +74,50 @@ export async function demoSignInRedirect(request: Request, env: DemoSignInEnv): 
   if (typeof sessionToken !== "string" || !sessionToken) {
     throw new Error("demo sign-in returned no session");
   }
-  const target = signInPage ? new URL("/", url) : url;
+  // Land on a check first: a browser that drops the cookie gets a notice
+  // there instead of coming back here for another visitor.
+  const target = signInPage ? "/" : `${url.pathname}${url.search}`;
+  const landing = new URL(`${DEMO_LANDED_PATH}?to=${encodeURIComponent(target)}`, url);
   return new Response(null, {
     status: 303,
     headers: {
-      location: target.toString(),
+      location: landing.toString(),
       "cache-control": "no-store",
       "set-cookie": serializeSessionCookie(sessionToken, { secure: requestIsSecure(request) }),
+    },
+  });
+}
+
+/** Only a path on this site is a valid destination: anything that parses to another origin goes home. */
+function safeDestination(raw: string | null, base: URL): URL {
+  const home = new URL("/", base);
+  if (!raw || !raw.startsWith("/")) {
+    return home;
+  }
+  const destination = new URL(raw, base);
+  if (destination.origin !== base.origin || destination.pathname.startsWith(DEMO_LANDED_PATH)) {
+    return home;
+  }
+  return destination;
+}
+
+/**
+ * After the sign-in redirect: with the session cookie, on to the page; without
+ * it (cookies blocked), a notice, so no second visitor is made.
+ */
+export function demoLandedResponse(request: Request, env: { DEMO_MODE?: string }): Response {
+  if (!isDemoMode(env)) {
+    return new Response("Not found", { status: 404 });
+  }
+  const url = new URL(request.url);
+  if (!readSessionToken(request.headers)) {
+    return notice(400, "The demo needs cookies turned on for this site.");
+  }
+  return new Response(null, {
+    status: 303,
+    headers: {
+      location: safeDestination(url.searchParams.get("to"), url).toString(),
+      "cache-control": "no-store",
     },
   });
 }
