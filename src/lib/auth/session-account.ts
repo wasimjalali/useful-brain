@@ -235,6 +235,59 @@ export async function authenticateAccount(
   };
 }
 
+/** Every demo visitor's principal id starts with this; People lists leave them out. */
+export const DEMO_VISITOR_ID_PREFIX = "demo-visitor-";
+/** Not a password hash, so no password ever signs a demo visitor in. */
+const DEMO_VISITOR_PASSWORD_HASH = "disabled";
+export const DEMO_VISITOR_NAME = "Demo Admin";
+
+/**
+ * Demo only (the Brain route checks DEMO_MODE): a fresh principal with the
+ * given grants and a session for it. Each visitor gets their own, so chats
+ * never mix; the scheduled cleanup removes visitors a day later.
+ */
+export async function createDemoVisitor(
+  db: OperationsDatabase,
+  grants: { roles: readonly string[]; departments: readonly string[] },
+  now = Date.now(),
+): Promise<AuthSessionResult> {
+  const suffix = newSessionToken().slice(0, 16);
+  const principalId = `${DEMO_VISITOR_ID_PREFIX}${suffix}`;
+  const email = `visitor-${suffix}@demo.invalid`;
+  const sessionToken = newSessionToken();
+  const hashedToken = await tokenHash(sessionToken);
+  const expiresAt = now + SESSION_TTL_SECONDS * 1000;
+  await db.batch([
+    db
+      .prepare(`INSERT INTO principals (id, kind, subject, created_at) VALUES (?, 'user', ?, ?)`)
+      .bind(principalId, email, now),
+    db
+      .prepare(
+        `INSERT INTO auth_users (id, email, name, password_hash, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(principalId, email, DEMO_VISITOR_NAME, DEMO_VISITOR_PASSWORD_HASH, now, now),
+    ...grants.roles.map((role) =>
+      db.prepare(`INSERT INTO roles (principal_id, role) VALUES (?, ?)`).bind(principalId, role),
+    ),
+    ...grants.departments.map((department) =>
+      db
+        .prepare(`INSERT INTO departments (principal_id, department) VALUES (?, ?)`)
+        .bind(principalId, department),
+    ),
+    db
+      .prepare(
+        `INSERT INTO auth_sessions (id, user_id, token_hash, expires_at, created_at)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+      .bind(newBoundedId("s"), principalId, hashedToken, expiresAt, now),
+  ]);
+  return {
+    user: { id: principalId, email, name: DEMO_VISITOR_NAME },
+    sessionToken,
+  };
+}
+
 export async function revokeSession(
   db: OperationsDatabase,
   token: string | null,

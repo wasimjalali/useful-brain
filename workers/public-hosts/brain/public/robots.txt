@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://brain.usefulbuild.com/sitemap.xml

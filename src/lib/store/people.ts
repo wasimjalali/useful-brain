@@ -8,6 +8,12 @@ import {
 } from "../contracts/people";
 import { ADMIN_ROLE } from "../auth/admin";
 import type { OperationsDatabase } from "./conversations";
+import { DEMO_VISITOR_ID_PREFIX } from "../auth/session-account";
+
+/** Demo visitors are sessions, not people: People and its counts leave them out. */
+function notDemoVisitor(column: string): string {
+  return `${column} NOT LIKE '${DEMO_VISITOR_ID_PREFIX}%'`;
+}
 
 type CorpusCounter = Parameters<typeof countReadableDocuments>[0];
 
@@ -38,14 +44,14 @@ export async function listPeople(
                             WHERE c.owner_principal_id = p.id AND m.role = 'user'), 0)
                 ) AS last_active
          FROM principals p JOIN auth_users u ON u.id = p.id
-         WHERE p.kind = 'user'
+         WHERE p.kind = 'user' AND ${notDemoVisitor("p.id")}
          ORDER BY u.name COLLATE NOCASE, u.email
          LIMIT ?`,
       )
       .bind(PEOPLE_LIST_CAP)
       .all<PersonRow>(),
     operations
-      .prepare(`SELECT COUNT(*) AS n FROM principals p JOIN auth_users u ON u.id = p.id WHERE p.kind = 'user'`)
+      .prepare(`SELECT COUNT(*) AS n FROM principals p JOIN auth_users u ON u.id = p.id WHERE p.kind = 'user' AND ${notDemoVisitor("p.id")}`)
       .first<{ n: number }>(),
   ]);
   const people: PersonView[] = [];
@@ -93,18 +99,18 @@ export async function listGroups(
   const everyone = await probe([], []);
   const [totalRow, departmentRows, roleRows] = await Promise.all([
     operations
-      .prepare(`SELECT COUNT(*) AS n FROM principals p JOIN auth_users u ON u.id = p.id WHERE p.kind = 'user'`)
+      .prepare(`SELECT COUNT(*) AS n FROM principals p JOIN auth_users u ON u.id = p.id WHERE p.kind = 'user' AND ${notDemoVisitor("p.id")}`)
       .first<{ n: number }>(),
     operations
       .prepare(
         `SELECT d.department AS key, COUNT(DISTINCT d.principal_id) AS n
-         FROM departments d JOIN auth_users u ON u.id = d.principal_id GROUP BY d.department`,
+         FROM departments d JOIN auth_users u ON u.id = d.principal_id WHERE ${notDemoVisitor("d.principal_id")} GROUP BY d.department`,
       )
       .all<{ key: string; n: number }>(),
     operations
       .prepare(
         `SELECT r.role AS key, COUNT(DISTINCT r.principal_id) AS n
-         FROM roles r JOIN auth_users u ON u.id = r.principal_id GROUP BY r.role`,
+         FROM roles r JOIN auth_users u ON u.id = r.principal_id WHERE ${notDemoVisitor("r.principal_id")} GROUP BY r.role`,
       )
       .all<{ key: string; n: number }>(),
   ]);

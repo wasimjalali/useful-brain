@@ -32,9 +32,22 @@ import {
 } from "../../../../src/lib/store/feedback";
 import type { OperationsDatabase } from "../../../../src/lib/store/conversations";
 import { loadSuggestions } from "../../../../src/lib/store/suggestions";
+import { isDemoMode } from "../../../../src/lib/demo/demo-mode";
+import { DEMO_QUESTIONS } from "../../../../src/lib/demo/demo-script";
+
+/** The demo offers exactly its scripted questions, all of them. */
+const DEMO_SUGGESTIONS = {
+  curated: DEMO_QUESTIONS.map(({ question, department, documentId }) => ({
+    text: question,
+    department,
+    documentId,
+  })),
+  max: DEMO_QUESTIONS.length,
+};
 
 /** The slice of the Brain env the chat routes read. */
 export type ChatRouteEnv = {
+  DEMO_MODE?: string;
   OPERATIONS_DB: unknown;
   CORPUS_DB?: unknown;
   CONVERSATION: {
@@ -216,7 +229,12 @@ export async function handleChatRoute(context: ChatRouteContext): Promise<Respon
       const corpus = env.CORPUS_DB as SqlExecutor;
       const generationId = await activeGenerationId(corpus);
       if (generationId) {
-        suggestions = await loadSuggestions(corpus, generationId, principalOf(principal));
+        suggestions = await loadSuggestions(
+          corpus,
+          generationId,
+          principalOf(principal),
+          isDemoMode(env) ? DEMO_SUGGESTIONS : undefined,
+        );
       }
     }
     log("suggestions");

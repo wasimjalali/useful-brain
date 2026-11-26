@@ -41,10 +41,22 @@ import {
   parseEvalModelOverride,
 } from "../../../src/lib/models/eval-override";
 import { handlePublicAuthRoute } from "../../../src/lib/auth/session-routes";
-import { resolveSessionPrincipal } from "../../../src/lib/auth/session-account";
+import { createDemoVisitor, resolveSessionPrincipal } from "../../../src/lib/auth/session-account";
+import {
+  assertDemoConfiguration,
+  DEMO_READ_ONLY_MESSAGE,
+  demoRequestAllowed,
+  isDemoMode,
+} from "../../../src/lib/demo/demo-mode";
+import { cleanupDemoVisitors } from "../../../src/lib/demo/demo-cleanup";
+import { createDemoRuntime } from "../../../src/lib/demo/demo-runtime";
 import { executeTurn } from "../../../src/lib/brain/execute-turn";
 import { runManualEvaluations } from "../../../src/lib/brain/eval-run";
-import { ensureLoopbackPrincipal } from "../../../src/lib/store/loopback-principal";
+import {
+  ensureLoopbackPrincipal,
+  LOOPBACK_DEPARTMENTS,
+  LOOPBACK_ROLES,
+} from "../../../src/lib/store/loopback-principal";
 import {
   deleteConversation,
   listRecentConversations,
@@ -96,6 +108,7 @@ export type BrainEnv = {
   ACCESS_AUD?: string;
   SIGNUP_CODE?: string;
   LOOPBACK_SUBJECT?: string;
+  DEMO_MODE?: string;
   OPERATIONS_DB: {
     prepare(query: string): {
       bind(...values: unknown[]): {
@@ -207,9 +220,22 @@ function turnDeps(env: BrainEnv, principal: DirectoryRecord) {
     corpus: env.CORPUS_DB as CorpusSql | undefined,
     vectorize: env.VECTORIZE,
     ai: env.AI,
+    // The demo has no model binding: the scripted runtime answers instead.
+    runtime: isDemoMode(env) ? createDemoRuntime() : undefined,
     lockFor: (conversationId: string) => env.CONVERSATION.getByName(conversationId),
     principal,
   };
+}
+
+/** The demo's public sign-in: a new visitor with full read grants and a session. */
+async function demoVisitorResponse(env: BrainEnv, requestId: string): Promise<Response> {
+  const db = env.OPERATIONS_DB as OperationsDatabase;
+  await db.prepare("PRAGMA foreign_keys = ON").run();
+  const result = await createDemoVisitor(db, {
+    roles: LOOPBACK_ROLES,
+    departments: LOOPBACK_DEPARTMENTS,
+  });
+  return json({ user: result.user, sessionToken: result.sessionToken }, requestId, 201);
 }
 
 const SERVICE_HEALTH_RETENTION_MS = 24 * 60 * 60 * 1000;
@@ -221,6 +247,8 @@ const brainWorker = {
     let operation = "fetch";
     try {
       const { identityMode } = assertWorkerStartup(env);
+      assertDemoConfiguration(env);
+      const demo = isDemoMode(env);
       const path = new URL(request.url).pathname;
       const publicHealth = request.method === "GET" && path === "/health";
       if (publicHealth) {
@@ -232,6 +260,16 @@ const brainWorker = {
           durationMs: Date.now() - started,
         });
         return new Response("ok", { headers: withRequestId(new Headers(), requestId) });
+      }
+
+      if (path === "/auth/demo" && request.method === "POST") {
+        operation = "auth-demo";
+        if (!demo) {
+          throw new WorkerForbiddenError();
+        }
+        const response = await demoVisitorResponse(env, requestId);
+        writeOperationalLog({ requestId, operation, status: "ok", durationMs: Date.now() - started });
+        return response;
       }
 
       const authResponse = await handlePublicAuthRoute({
@@ -279,6 +317,22 @@ const brainWorker = {
       // a handler added later cannot forget it.
       if (path === "/admin" || path.startsWith("/admin/")) {
         requireAdmin(principal);
+      }
+
+      // The demo is read-only for shared data: a visitor may read everything
+      // and write only their own chats. A write route added later is refused
+      // until it joins the allowlist.
+      if (demo && !demoRequestAllowed(request.method, path)) {
+        operation = "demo-read-only";
+        writeOperationalLog({
+          requestId,
+          principalKind: principal.kind,
+          operation,
+          status: "error",
+          durationMs: Date.now() - started,
+          errorCode: "FORBIDDEN",
+        });
+        return json({ code: "FORBIDDEN", message: DEMO_READ_ONLY_MESSAGE }, requestId, 403);
       }
 
       if (path === "/admin/catalog/backfill" && request.method === "POST") {
@@ -1207,6 +1261,9 @@ const brainWorker = {
         .run();
     } catch {
       console.error("service_health_prune_failed");
+    }
+    if (isDemoMode(env)) {
+      await cleanupDemoVisitors(env.OPERATIONS_DB as OperationsDatabase);
     }
     // Self-heal legacy active generations that predate the document catalog.
     // Idempotent and paged; never on a request path (see plan D19).

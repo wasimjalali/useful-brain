@@ -96,6 +96,7 @@ describe("protected Worker configuration", () => {
     const environments = config.env as Record<string, Record<string, unknown>>;
     inspect(environments.development, ["*/5 * * * *"]);
     inspect(environments.staging, ["*/5 * * * *"]);
+    inspect(environments.demo, ["17 3 * * *"]);
     inspect(environments.production, []);
   });
 
@@ -105,6 +106,7 @@ describe("protected Worker configuration", () => {
     const environments = config.env as Record<string, Record<string, unknown>>;
     expectInternalWorker(environments.development);
     expectInternalWorker(environments.production);
+    expect(environments.demo.workers_dev).toBe(false);
     expect(environments.staging.workers_dev).toBe(true);
     expect(environments.staging.preview_urls).toBe(false);
     expect(environments.staging.route).toBeUndefined();
@@ -226,41 +228,50 @@ describe("protected Worker configuration", () => {
     expect(pkg.scripts["eval:northwind"]).toMatch(/live-northwind-eval/);
   });
 
-  it("reserves the public Brain hostname on the landing worker, not the operator app", () => {
-    const brain = readJsonc("workers/public-hosts/brain/wrangler.jsonc");
-    expect(brain.name).toBe("useful-brain-open");
-    expect(brain.routes).toEqual([{ pattern: "brain.usefulbuild.com", custom_domain: true }]);
-    expect(brain.vars).toBeUndefined();
-    // Custom domain only: no duplicate *.workers.dev copy of the page.
-    expect(brain.workers_dev).toBe(false);
-    // voice.usefulbuild.com belongs to the useful-voice repo (site/), never this one.
-    expect(existsSync(path.join(process.cwd(), "workers/public-hosts/voice"))).toBe(false);
+  it("serves the demo on brain.usefulbuild.com with no model, no vectors and no uploads", () => {
+    const web = (readJsonc("wrangler.jsonc").env as Record<string, Record<string, unknown>>).demo;
+    expect(web.workers_dev).toBe(false);
+    expect(web.preview_urls).toBe(false);
+    expect(web.routes).toEqual([{ pattern: "brain.usefulbuild.com", custom_domain: true }]);
+    const webVars = web.vars as Record<string, string>;
+    expect(webVars).toMatchObject({ DEMO_MODE: "true", IDENTITY_MODE: "session", LOOPBACK_RUNTIME: "false" });
+    expect(web.services).toEqual([
+      { binding: "WORKER_SELF_REFERENCE", service: "useful-brain-demo" },
+      { binding: "BRAIN", service: "useful-brain-brain-demo" },
+    ]);
+
+    const brain = (readJsonc("workers/brain/wrangler.jsonc").env as Record<string, Record<string, unknown>>).demo;
+    expectInternalWorker(brain);
+    const vars = brain.vars as Record<string, string>;
+    expect(vars).toMatchObject({
+      DEMO_MODE: "true",
+      IDENTITY_MODE: "session",
+      LOOPBACK_RUNTIME: "false",
+      LOOPBACK_SUBJECT: "",
+      RESOURCES_PROVISIONED: "true",
+    });
+    // No model of any kind can be reached from the demo, and nothing writes outside D1.
+    for (const binding of ["ai", "vectorize", "r2_buckets", "queues", "workflows"]) {
+      expect(brain[binding]).toBeUndefined();
+    }
+    const databases = brain.d1_databases as Array<{ database_id: string; database_name: string }>;
+    expect(databases.map((db) => db.database_name).sort()).toEqual([
+      "useful-brain-corpus-demo",
+      "useful-brain-operations-demo",
+    ]);
+    for (const db of databases) {
+      expect(db.database_id).not.toMatch(/^00000000-/);
+    }
+    // Only the demo env sets DEMO_MODE.
+    for (const [name, env] of Object.entries(readJsonc("workers/brain/wrangler.jsonc").env as Record<string, Record<string, unknown>>)) {
+      if (name !== "demo") {
+        expect((env.vars as Record<string, string>).DEMO_MODE).toBeUndefined();
+      }
+    }
   });
 
-  it("ships the designed Brain landing on the public host", () => {
-    const html = readFileSync(
-      path.join(process.cwd(), "workers/public-hosts/brain/public/index.html"),
-      "utf8",
-    );
-    expect(html).toContain("/brand/useful-brain-mark.svg");
-    // The old chat capture showed a raw table row; the answer is now a real
-    // capture of a cited answer with its evidence panel.
-    expect(html).not.toContain("/open/chat.png");
-    expect(html).toContain("/open/answer.png");
-    expect(html).toContain("/open/sources.png");
-    expect(html).toContain("/open/evals.png");
-    // The benchmark names the run the screenshot shows and the latest run.
-    expect(html).toContain("The latest run passed 118 of 120");
-    expect(html).toContain("/fonts/geist-variable.woff2");
-    expect(html).toContain("https://usefulbuild.com");
-    expect(html).toContain("https://cal.com/usefulbuild/free-audit");
-    expect(html).toContain("Useful Brain, by Useful Build");
-    expect(html).toContain('class="sheet-grid"');
-    expect(html).toContain('aria-current="page">Useful Brain');
-    expect(html).toContain("https://github.com/wasimjalali/useful-brain");
-    expect(html).toContain("View the code on GitHub");
-    expect(html).not.toContain(">Kursfind</a>");
-    expect(html).not.toMatch(/LOOPBACK|Cloudflare Access|href=["']\/chat/i);
+  it("keeps no marketing landing page in this repo", () => {
+    expect(existsSync(path.join(process.cwd(), "workers/public-hosts"))).toBe(false);
   });
 
   it("starts Cloud Agent terminals on Brain, not a Convex Next.js server", () => {

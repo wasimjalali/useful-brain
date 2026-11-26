@@ -113,9 +113,9 @@ npm test
 npm run build
 ```
 
-## Public landing page
+## Public demo
 
-`workers/public-hosts/brain/public` serves the static Brain landing page on `brain.usefulbuild.com`, built on the Useful Build design system. It is the only landing page this repo owns: `voice.usefulbuild.com` lives in the [useful-voice](https://github.com/wasimjalali/useful-voice) repo (`site/`), `bot.usefulbuild.com` in the Useful Bot repo and `usefulbuild.com` in the [useful-build](https://github.com/wasimjalali/useful-build) repo. Brain is presented with sample-data proof: the benchmark its evals screenshot shows (114/120) and the latest recorded run (118/120), both on synthetic documents. A company setup is a separately scoped Useful Build service, not a public multi-company Brain subscription. This marketing page does not change the local/staging product scope or authorize a commercial launch.
+[brain.usefulbuild.com](https://brain.usefulbuild.com) is the interactive demo: the real app on the synthetic Northwind corpus, with no model behind it. Every visitor is signed in as their own demo admin. Six starter questions answer with verbatim, cited sentences from the right document, other questions get the not-enough-evidence answer, and nothing a visitor does changes the shared data. Setup and deploy steps are in [docs/runbooks/demo.md](docs/runbooks/demo.md).
 
 ## Repo map
 

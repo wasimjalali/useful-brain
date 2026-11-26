@@ -126,6 +126,7 @@ Maintainers: the `mac-app-verify` skill has the full recipe.
 ## Deployment model
 
 - One application and one Cloudflare resource set for this local/staging portfolio deployment.
+- The public demo (`--env demo`, `brain.usefulbuild.com`) is the same app on synthetic data with `DEMO_MODE=true`: no Workers AI or Vectorize binding, scripted answers, a demo admin per visitor and read-only shared data. Keep it model-free; see `docs/runbooks/demo.md`.
 - Keep company terminology in `src/lib/useful-brain-config.ts`.
 - Do not add billing, SSO onboarding or tenant switching.
 - Local operator identity is loopback on 127.0.0.1 with `LOOPBACK_RUNTIME`. Never enable loopback on a public `workers.dev` URL. Staging and production use `IDENTITY_MODE=session` (email/password, operations D1). Cloudflare Access is optional demonstration code, not a required production perimeter.

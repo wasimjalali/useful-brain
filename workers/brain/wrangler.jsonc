@@ -258,6 +258,48 @@
         "crons": ["*/5 * * * *"]
       }
     },
+    "demo": {
+      "workers_dev": false,
+      "preview_urls": false,
+      "observability": {
+        "enabled": true,
+        "head_sampling_rate": 0.1
+      },
+      "vars": {
+        "RUNTIME_ENV": "staging",
+        "IDENTITY_MODE": "session",
+        "RESOURCES_PROVISIONED": "true",
+        "WRANGLER_ACCESS_DEV": "false",
+        "LOOPBACK_RUNTIME": "false",
+        "LOOPBACK_SUBJECT": "",
+        "DEMO_MODE": "true"
+      },
+      "d1_databases": [
+        {
+          "binding": "CORPUS_DB",
+          "database_name": "useful-brain-corpus-demo",
+          "database_id": "63634f06-a5db-43c4-ad3a-f00db3dc5038",
+          "migrations_dir": "../../migrations/corpus"
+        },
+        {
+          "binding": "OPERATIONS_DB",
+          "database_name": "useful-brain-operations-demo",
+          "database_id": "2e379951-31b4-4b94-b41d-eb633c71880c",
+          "migrations_dir": "../../migrations/operations"
+        }
+      ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "CONVERSATION",
+            "class_name": "ConversationRunLock"
+          }
+        ]
+      },
+      "triggers": {
+        "crons": ["17 3 * * *"]
+      }
+    },
     "production": {
       "workers_dev": false,
       "preview_urls": false,

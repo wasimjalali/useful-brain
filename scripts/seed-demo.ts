@@ -3,7 +3,8 @@
  *   npm run seed:demo -- --dry-run     print counts only
  *   DEMO_PASSWORD=... npm run seed:demo
  *   DEMO_PASSWORD=... npm run seed:demo -- --remote --env staging
- * --remote needs an explicit --env <name> (development or staging). It is passed
+ *   DEMO_PASSWORD=... npm run seed:demo -- --remote --env demo
+ * --remote needs an explicit --env <name> (development, staging or demo). It is passed
  * to wrangler, so the environment's own database is used. production is refused.
  * DEMO_PASSWORD must meet the signup rules (8 to 128 characters).
  * DEMO_PASSWORD is read from the environment, never printed, never written to disk.
@@ -37,7 +38,7 @@ const DEPARTMENT_MANAGER_ROLE: Record<string, string> = {
 };
 const UNUSABLE_HASH = "disabled";
 const OPERATIONS_BINDING = "OPERATIONS_DB";
-const REMOTE_ENVIRONMENTS = new Set(["development", "staging"]);
+const REMOTE_ENVIRONMENTS = new Set(["development", "staging", "demo"]);
 
 const FIRST = [
   "Aisha", "Ben", "Carla", "Dev", "Elena", "Farid", "Grace", "Hugo", "Ines", "Jamal",
