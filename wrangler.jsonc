@@ -101,6 +101,16 @@
         "LOOPBACK_RUNTIME": "false",
         "DEMO_MODE": "true"
       },
+      "ratelimits": [
+        {
+          "name": "DEMO_SIGN_IN_LIMIT",
+          "namespace_id": "4101",
+          "simple": {
+            "limit": 10,
+            "period": 60
+          }
+        }
+      ],
       "assets": {
         "directory": ".open-next/assets",
         "binding": "ASSETS"

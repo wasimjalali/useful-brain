@@ -3,8 +3,12 @@ import type { OperationsDatabase } from "../store/conversations";
 
 /** Visitors are removed one day after they arrive, with everything they made. */
 export const DEMO_VISITOR_LIFETIME_MS = 24 * 60 * 60 * 1000;
+/** Visitors removed per transaction, and transactions per run: bounded work whatever the backlog. */
+export const DEMO_CLEANUP_BATCH = 100;
+const MAX_BATCHES_PER_RUN = 20;
 
-const VISITORS = `SELECT id FROM principals WHERE id LIKE '${DEMO_VISITOR_ID_PREFIX}%' AND created_at < ?1`;
+/** ?1 is a JSON array of the batch's visitor ids. */
+const VISITORS = `SELECT value FROM json_each(?1)`;
 const CONVERSATIONS = `SELECT id FROM conversations WHERE owner_principal_id IN (${VISITORS})`;
 const MESSAGES = `SELECT id FROM messages WHERE conversation_id IN (${CONVERSATIONS})`;
 const RUNS = `SELECT id FROM agent_runs WHERE conversation_id IN (${CONVERSATIONS}) OR principal_id IN (${VISITORS})`;
@@ -50,9 +54,26 @@ export const DEMO_CLEANUP_STATEMENTS: ReadonlyArray<{ table: string; sql: string
   { table: "principals", sql: `DELETE FROM principals WHERE id IN (${VISITORS})` },
 ];
 
-/** Removes demo visitors older than a day, in one transaction. Seeded people are never touched. */
-export async function cleanupDemoVisitors(db: OperationsDatabase, now = Date.now()): Promise<void> {
+/**
+ * Removes demo visitors older than a day, oldest first, one bounded
+ * transaction per batch. Seeded people are never touched: only ids with the
+ * visitor prefix are selected. Returns how many visitors were removed.
+ */
+export async function cleanupDemoVisitors(db: OperationsDatabase, now = Date.now()): Promise<number> {
   const cutoff = now - DEMO_VISITOR_LIFETIME_MS;
   await db.prepare("PRAGMA foreign_keys = ON").run();
-  await db.batch(DEMO_CLEANUP_STATEMENTS.map(({ sql }) => db.prepare(sql).bind(cutoff)));
+  let removed = 0;
+  for (let batch = 0; batch < MAX_BATCHES_PER_RUN; batch += 1) {
+    const { results } = await db
+      .prepare(`SELECT id FROM principals WHERE id LIKE ? AND created_at < ? ORDER BY created_at, id LIMIT ?`)
+      .bind(`${DEMO_VISITOR_ID_PREFIX}%`, cutoff, DEMO_CLEANUP_BATCH)
+      .all<{ id: string }>();
+    if (results.length === 0) {
+      break;
+    }
+    const ids = JSON.stringify(results.map((row) => row.id));
+    await db.batch(DEMO_CLEANUP_STATEMENTS.map(({ sql }) => db.prepare(sql).bind(ids)));
+    removed += results.length;
+  }
+  return removed;
 }

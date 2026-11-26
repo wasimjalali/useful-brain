@@ -16,7 +16,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   }
   const demoSignIn = await demoSignInRedirect(request, env as Parameters<typeof demoSignInRedirect>[1]);
   if (demoSignIn) {
-    return new NextResponse(null, { status: demoSignIn.status, headers: demoSignIn.headers });
+    return new NextResponse(demoSignIn.body, { status: demoSignIn.status, headers: demoSignIn.headers });
   }
   return NextResponse.next();
 }

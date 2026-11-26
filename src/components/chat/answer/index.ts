@@ -1,7 +1,7 @@
 export { AnswerActions } from "./answer-actions";
 export { AnswerText } from "./answer-text";
 export { ApprovalCard } from "./approval-card";
-export { EmptyState } from "./empty-state";
+export { EmptyState, SuggestionList } from "./empty-state";
 export { ErrorAlert } from "./error-alert";
 export { NoEvidence } from "./no-evidence";
 export { RestrictedNote } from "./restricted-note";

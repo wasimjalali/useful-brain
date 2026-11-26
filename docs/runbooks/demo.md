@@ -6,7 +6,8 @@ The public demo is the real Useful Brain app on synthetic Northwind data, with n
 - **Scripted answers.** Six starter questions (`src/lib/demo/demo-script.ts`) run the real keyword search, then answer with sentences copied verbatim from the right Northwind document, cited with the labels search returned. Any other question gets the app's own not-enough-evidence answer. The scripted runtime is `src/lib/demo/demo-runtime.ts`.
 - **No sign-in.** A page visit without a session gets a new demo admin (`src/lib/demo/demo-sign-in.ts` in the web proxy, Brain `POST /auth/demo`). Each visitor has their own chats. Visitors are left out of People.
 - **Read-only.** Brain refuses every write except a visitor's own chat writes (`demoRequestAllowed`): uploads, invites, corpus changes, evaluations and approvals return `403` with "Changes are turned off in this demo."
-- **Daily cleanup.** A cron (`17 3 * * *`) removes visitors older than a day with everything they made (`src/lib/demo/demo-cleanup.ts`).
+- **Hourly cleanup.** A cron (`17 * * * *`) removes visitors older than a day with everything they made, in bounded batches (`src/lib/demo/demo-cleanup.ts`).
+- **Abuse limits.** The web Worker rate-limits new demo sign-ins to 10 a minute per address (`DEMO_SIGN_IN_LIMIT`), only real browser page loads (`Sec-Fetch-Mode: navigate`) sign in, and Brain caps new visitors at 300 an hour.
 
 ## Resources
 

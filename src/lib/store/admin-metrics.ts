@@ -93,16 +93,28 @@ function latestAttempt(alias: string): string {
 }
 
 /** Completed or failed assistant turns only, one per question. Pending turns are not yet an outcome. */
-export async function loadOverview(db: OperationsDatabase, now: number): Promise<OverviewResponse> {
+/**
+ * `owner` limits a read to one principal's own chats (the public demo, where
+ * every visitor is an admin but must not see other visitors' questions); null
+ * reads every chat.
+ */
+const OWNED_BY = `(? IS NULL OR m.conversation_id IN (SELECT id FROM conversations WHERE owner_principal_id = ?))`;
+
+export async function loadOverview(
+  db: OperationsDatabase,
+  now: number,
+  owner: string | null = null,
+): Promise<OverviewResponse> {
   const { results } = await db
     .prepare(
       `SELECT m.created_at AS created_at, m.answer_type AS answer_type, m.latency_ms AS latency_ms
        FROM messages m
        WHERE m.role = 'assistant' AND m.status IN ('completed', 'failed')
          AND m.created_at >= ? AND m.created_at <= ?
-         AND ${latestAttempt("m")}`,
+         AND ${latestAttempt("m")}
+         AND ${OWNED_BY}`,
     )
-    .bind(windowStart(now) - DAYS * DAY_MS, now)
+    .bind(windowStart(now) - DAYS * DAY_MS, now, owner, owner)
     .all<TurnMetricRow>();
   return computeOverview(results, now);
 }
@@ -116,6 +128,7 @@ type UnansweredRow = {
 export async function loadUnanswered(
   db: OperationsDatabase,
   now: number,
+  owner: string | null = null,
 ): Promise<UnansweredQuestion[]> {
   const { results } = await db
     .prepare(
@@ -126,9 +139,10 @@ export async function loadUnanswered(
        WHERE m.role = 'assistant' AND m.status = 'completed'
          AND m.answer_type = 'insufficient_evidence'
          AND m.created_at >= ? AND m.created_at <= ?
+         AND ${OWNED_BY}
        ORDER BY m.created_at DESC, m.id DESC`,
     )
-    .bind(windowStart(now), now)
+    .bind(windowStart(now), now, owner, owner)
     .all<UnansweredRow>();
 
   const groups = new Map<string, UnansweredQuestion>();
@@ -169,9 +183,10 @@ export async function loadUnanswered(
       .prepare(
         `SELECT question_normalized AS key, COUNT(*) AS n FROM document_requests
          WHERE question_normalized IN (${batch.map(() => "?").join(",")})
+           AND (? IS NULL OR principal_id = ?)
          GROUP BY question_normalized`,
       )
-      .bind(...batch)
+      .bind(...batch, owner, owner)
       .all<{ key: string; n: number }>();
     for (const item of counted.results) {
       requestCounts.set(item.key, item.n);
@@ -223,6 +238,7 @@ const ACTIVITY_CTE = `
     WHERE m.role = 'assistant' AND m.status IN ('completed', 'failed')
       AND m.created_at >= ? AND m.created_at <= ?
       AND ${latestAttempt("m")}
+      AND (? IS NULL OR c.owner_principal_id = ?)
   )`;
 
 type ActivitySqlRow = {
@@ -253,9 +269,11 @@ export async function loadActivity(
     outcome: ActivityOutcome | null;
     cursor: { createdAt: number; id: string } | null;
     limit: number;
+    owner?: string | null;
   },
 ): Promise<ActivityResponse> {
-  const window = [windowStart(input.now), input.now];
+  const owner = input.owner ?? null;
+  const window = [windowStart(input.now), input.now, owner, owner];
   const countRows = await db
     .prepare(`${ACTIVITY_CTE} SELECT outcome, COUNT(*) AS n FROM activity GROUP BY outcome`)
     .bind(...window)
@@ -311,10 +329,11 @@ export async function loadActivity(
 export async function assistantMessageExists(
   db: OperationsDatabase,
   messageId: string,
+  owner: string | null = null,
 ): Promise<boolean> {
   const row = await db
-    .prepare(`SELECT 1 AS present FROM messages WHERE id = ? AND role = 'assistant'`)
-    .bind(messageId)
+    .prepare(`SELECT 1 AS present FROM messages m WHERE m.id = ? AND m.role = 'assistant' AND ${OWNED_BY}`)
+    .bind(messageId, owner, owner)
     .first<{ present: number }>();
   return row !== null;
 }

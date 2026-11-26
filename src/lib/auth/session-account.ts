@@ -240,6 +240,16 @@ export const DEMO_VISITOR_ID_PREFIX = "demo-visitor-";
 /** Not a password hash, so no password ever signs a demo visitor in. */
 const DEMO_VISITOR_PASSWORD_HASH = "disabled";
 export const DEMO_VISITOR_NAME = "Demo Admin";
+/** New demo visitors allowed per rolling hour across everyone; beyond it sign-in waits. */
+export const DEMO_VISITORS_PER_HOUR = 300;
+
+export async function demoVisitorsSince(db: OperationsDatabase, since: number): Promise<number> {
+  const row = await db
+    .prepare(`SELECT COUNT(*) AS n FROM principals WHERE id LIKE ? AND created_at >= ?`)
+    .bind(`${DEMO_VISITOR_ID_PREFIX}%`, since)
+    .first<{ n: number }>();
+  return Number(row?.n ?? 0);
+}
 
 /**
  * Demo only (the Brain route checks DEMO_MODE): a fresh principal with the

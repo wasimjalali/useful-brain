@@ -7,7 +7,7 @@ import { Button, IconButton } from "@/components/ui/button";
 import type { ChatProgressView, SuggestionView } from "@/lib/contracts/chat-view";
 import { DEFAULT_USEFUL_BRAIN_CONFIG } from "@/lib/useful-brain-config";
 
-import { EmptyState, StatusLine, UserBubble } from "./answer";
+import { EmptyState, StatusLine, SuggestionList, UserBubble } from "./answer";
 import { ChatComposer } from "./chat-composer";
 
 type ChatWorkspaceProps = {
@@ -23,6 +23,7 @@ type ChatWorkspaceProps = {
   onOpenKnowledge?: () => void;
   placeholder: string;
   suggestions: SuggestionView[];
+  suggestionsAfterAnswers?: boolean;
   onSubmit: (value: string) => void;
   onStop?: () => void;
   pendingQuestion: string | null;
@@ -41,6 +42,7 @@ export function ChatWorkspace({
   onOpenKnowledge = () => {},
   placeholder,
   suggestions,
+  suggestionsAfterAnswers = false,
   onSubmit,
   onStop,
   pendingQuestion,
@@ -131,6 +133,9 @@ export function ChatWorkspace({
                     </p>
                   ) : null}
                 </div>
+              ) : null}
+              {suggestionsAfterAnswers && !pendingQuestion && suggestions.length > 0 ? (
+                <SuggestionList onPick={(picked) => setQuestion(picked)} suggestions={suggestions} />
               ) : null}
               <div aria-hidden="true" ref={bottomRef} />
             </div>

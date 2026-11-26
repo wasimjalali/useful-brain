@@ -17,13 +17,16 @@ export function isDemoMode(env: { DEMO_MODE?: string }): boolean {
 }
 
 /**
- * Fails closed on a demo that could reach a model or skip sign-in: the demo
- * runs only on session identity and never with a Workers AI binding.
+ * Fails closed on a demo that could reach a model, skip sign-in or run as
+ * production: the demo runs only on session identity, never in production and
+ * never with a Workers AI or Vectorize binding.
  */
 export function assertDemoConfiguration(env: {
   DEMO_MODE?: string;
   IDENTITY_MODE?: string;
+  RUNTIME_ENV?: string;
   AI?: unknown;
+  VECTORIZE?: unknown;
 }): void {
   if (env.DEMO_MODE !== undefined && env.DEMO_MODE !== "true" && env.DEMO_MODE !== "false") {
     throw new DemoConfigError("DEMO_MODE must be true or false");
@@ -34,8 +37,14 @@ export function assertDemoConfiguration(env: {
   if (env.IDENTITY_MODE !== "session") {
     throw new DemoConfigError("the demo runs only with session identity");
   }
+  if (env.RUNTIME_ENV === "production") {
+    throw new DemoConfigError("the demo never runs as production");
+  }
   if (env.AI !== undefined) {
     throw new DemoConfigError("the demo must not bind Workers AI");
+  }
+  if (env.VECTORIZE !== undefined) {
+    throw new DemoConfigError("the demo must not bind Vectorize");
   }
 }
 

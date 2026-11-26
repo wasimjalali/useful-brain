@@ -68,6 +68,10 @@ describe("demo mode guard", () => {
     expect(() => assertDemoConfiguration({ DEMO_MODE: "true", IDENTITY_MODE: "session", AI: {} })).toThrow(/Workers AI/);
     expect(() => assertDemoConfiguration({ DEMO_MODE: "true", IDENTITY_MODE: "loopback" })).toThrow(/session/);
     expect(() => assertDemoConfiguration({ DEMO_MODE: "yes", IDENTITY_MODE: "session" })).toThrow(/DEMO_MODE/);
+    expect(() => assertDemoConfiguration({ DEMO_MODE: "true", IDENTITY_MODE: "session", VECTORIZE: {} })).toThrow(/Vectorize/);
+    expect(() =>
+      assertDemoConfiguration({ DEMO_MODE: "true", IDENTITY_MODE: "session", RUNTIME_ENV: "production" }),
+    ).toThrow(/production/);
     expect(() => assertDemoConfiguration({ DEMO_MODE: "true", IDENTITY_MODE: "session" })).not.toThrow();
     expect(() => assertDemoConfiguration({ IDENTITY_MODE: "loopback", AI: {} })).not.toThrow();
   });
@@ -87,7 +91,9 @@ describe("demo mode guard", () => {
 
 describe("demoSignInRedirect", () => {
   const page = (path: string, headers: Record<string, string> = {}) =>
-    new Request(`https://brain.usefulbuild.com${path}`, { headers: { accept: "text/html", ...headers } });
+    new Request(`https://brain.usefulbuild.com${path}`, {
+      headers: { accept: "text/html", "sec-fetch-mode": "navigate", "cf-connecting-ip": "203.0.113.7", ...headers },
+    });
 
   function brainReturning(status = 201) {
     return {
@@ -96,43 +102,74 @@ describe("demoSignInRedirect", () => {
       ),
     };
   }
+  function limiter(success = true) {
+    return { limit: vi.fn(async () => ({ success })) };
+  }
+  const demoEnv = (brain = brainReturning(), limit = limiter()) => ({
+    DEMO_MODE: "true",
+    BRAIN: brain,
+    DEMO_SIGN_IN_LIMIT: limit,
+  });
 
   it("does nothing outside the demo", async () => {
     const brain = brainReturning();
-    expect(await demoSignInRedirect(page("/chat"), { DEMO_MODE: "false", BRAIN: brain })).toBeNull();
+    expect(await demoSignInRedirect(page("/chat"), { ...demoEnv(brain), DEMO_MODE: "false" })).toBeNull();
     expect(brain.fetch).not.toHaveBeenCalled();
   });
 
   it("signs a visitor without a session in and sends them back to the page", async () => {
-    const brain = brainReturning();
-    const response = await demoSignInRedirect(page("/admin/people?x=1"), { DEMO_MODE: "true", BRAIN: brain });
+    const limit = limiter();
+    const response = await demoSignInRedirect(page("/admin/people?x=1"), demoEnv(brainReturning(), limit));
     expect(response?.status).toBe(303);
     expect(response?.headers.get("location")).toBe("https://brain.usefulbuild.com/admin/people?x=1");
     expect(response?.headers.get("set-cookie")).toContain("usefulbrain.session=token-1");
     expect(response?.headers.get("set-cookie")).toContain("Secure");
+    expect(limit.limit).toHaveBeenCalledWith({ key: "203.0.113.7" });
   });
 
   it("replaces the sign-in pages with a fresh visitor and the home page", async () => {
-    const brain = brainReturning();
-    const response = await demoSignInRedirect(page("/login", { cookie: "usefulbrain.session=old" }), {
-      DEMO_MODE: "true",
-      BRAIN: brain,
-    });
+    const response = await demoSignInRedirect(page("/login?fresh=1", { cookie: "usefulbrain.session=old" }), demoEnv());
     expect(response?.headers.get("location")).toBe("https://brain.usefulbuild.com/");
   });
 
-  it("leaves signed-in visitors, API calls and non-page requests alone", async () => {
+  it("leaves signed-in visitors, API calls, crawlers and data fetches alone", async () => {
     const brain = brainReturning();
-    const env = { DEMO_MODE: "true", BRAIN: brain };
+    const env = demoEnv(brain);
     expect(await demoSignInRedirect(page("/chat", { cookie: "usefulbrain.session=abc" }), env)).toBeNull();
     expect(await demoSignInRedirect(page("/api/turns/1"), env)).toBeNull();
     expect(await demoSignInRedirect(new Request("https://brain.usefulbuild.com/chat"), env)).toBeNull();
+    // A link preview or crawler asks for HTML but is not a browser navigation.
+    expect(
+      await demoSignInRedirect(new Request("https://brain.usefulbuild.com/chat", { headers: { accept: "text/html" } }), env),
+    ).toBeNull();
+    // A client-side (RSC) request to the login page is handled by the page's reload, not here.
+    expect(
+      await demoSignInRedirect(
+        new Request("https://brain.usefulbuild.com/login", { headers: { accept: "text/x-component", "sec-fetch-mode": "cors" } }),
+        env,
+      ),
+    ).toBeNull();
     expect(brain.fetch).not.toHaveBeenCalled();
   });
 
-  it("fails loudly when Brain refuses", async () => {
+  it("answers a rate-limited address with a notice and makes no visitor", async () => {
+    const brain = brainReturning();
+    const response = await demoSignInRedirect(page("/chat"), demoEnv(brain, limiter(false)));
+    expect(response?.status).toBe(429);
+    expect(await response?.text()).toContain("Too many new demo sessions");
+    expect(brain.fetch).not.toHaveBeenCalled();
+  });
+
+  it("shows a busy notice when Brain is at its visitor ceiling", async () => {
+    const response = await demoSignInRedirect(page("/chat"), demoEnv(brainReturning(503)));
+    expect(response?.status).toBe(503);
+    expect(await response?.text()).toContain("The demo is busy");
+  });
+
+  it("fails loudly when Brain refuses or a binding is missing", async () => {
+    await expect(demoSignInRedirect(page("/chat"), demoEnv(brainReturning(500)))).rejects.toThrow(/500/);
     await expect(
-      demoSignInRedirect(page("/chat"), { DEMO_MODE: "true", BRAIN: brainReturning(500) }),
-    ).rejects.toThrow(/500/);
+      demoSignInRedirect(page("/chat"), { DEMO_MODE: "true", BRAIN: brainReturning() }),
+    ).rejects.toThrow(/DEMO_SIGN_IN_LIMIT/);
   });
 });

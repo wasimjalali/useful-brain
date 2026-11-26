@@ -5,15 +5,30 @@ import { isDemoMode } from "./demo-mode";
 /** In the demo these pages have nothing to show: a visitor is always signed in. */
 const SIGN_IN_PAGES = new Set(["/login", "/signup"]);
 
+export type DemoSignInEnv = {
+  DEMO_MODE?: string;
+  BRAIN?: BrainService;
+  DEMO_SIGN_IN_LIMIT?: { limit(input: { key: string }): Promise<{ success: boolean }> };
+};
+
+function notice(status: number, message: string): Response {
+  return new Response(
+    `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Useful Brain demo</title><p style="font:15px/1.5 system-ui,sans-serif;max-width:32rem;margin:20vh auto;padding:0 1rem">${message}</p>`,
+    {
+      status,
+      headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "retry-after": "60" },
+    },
+  );
+}
+
 /**
- * Demo only: a page visit without a session (or to a sign-in page) gets a new
- * demo admin from Brain and comes straight back with its cookie set. Returns
- * null when the request needs nothing.
+ * Demo only: a browser page load without a session (or of a sign-in page)
+ * gets a new demo admin from Brain and comes straight back with its cookie
+ * set. Only real navigations sign in (crawlers and link previews send no
+ * `Sec-Fetch-Mode: navigate`), each address is rate-limited, and Brain caps
+ * new visitors per hour. Returns null when the request needs nothing.
  */
-export async function demoSignInRedirect(
-  request: Request,
-  env: { DEMO_MODE?: string; BRAIN?: BrainService },
-): Promise<Response | null> {
+export async function demoSignInRedirect(request: Request, env: DemoSignInEnv): Promise<Response | null> {
   if (!isDemoMode(env) || request.method !== "GET") {
     return null;
   }
@@ -21,16 +36,22 @@ export async function demoSignInRedirect(
   if (url.pathname.startsWith("/api/")) {
     return null;
   }
-  // Only a browser page load signs in; assets and data fetches never do.
-  if (!(request.headers.get("accept") ?? "").includes("text/html")) {
+  if (
+    request.headers.get("sec-fetch-mode") !== "navigate" ||
+    !(request.headers.get("accept") ?? "").includes("text/html")
+  ) {
     return null;
   }
   const signInPage = SIGN_IN_PAGES.has(url.pathname);
   if (readSessionToken(request.headers) && !signInPage) {
     return null;
   }
-  if (!env.BRAIN) {
-    throw new Error("Brain is not bound to this web worker");
+  if (!env.BRAIN || !env.DEMO_SIGN_IN_LIMIT) {
+    throw new Error("the demo web Worker needs its BRAIN and DEMO_SIGN_IN_LIMIT bindings");
+  }
+  const address = request.headers.get("cf-connecting-ip") ?? "unknown";
+  if (!(await env.DEMO_SIGN_IN_LIMIT.limit({ key: address })).success) {
+    return notice(429, "Too many new demo sessions from your network. Try again in a minute.");
   }
   const response = await env.BRAIN.fetch(
     createBrainServiceRequest({
@@ -40,6 +61,9 @@ export async function demoSignInRedirect(
       body: "{}",
     }),
   );
+  if (response.status === 503) {
+    return notice(503, "The demo is busy. Try again in a few minutes.");
+  }
   if (!response.ok) {
     throw new Error(`demo sign-in failed with ${response.status}`);
   }

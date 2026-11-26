@@ -6,6 +6,7 @@ import worker from "../src";
 import { BRAIN_NOT_ENOUGH_EVIDENCE } from "../../../src/lib/agent/host-grounding";
 import { DEMO_CLEANUP_STATEMENTS, DEMO_VISITOR_LIFETIME_MS, cleanupDemoVisitors } from "../../../src/lib/demo/demo-cleanup";
 import { DEMO_READ_ONLY_MESSAGE } from "../../../src/lib/demo/demo-mode";
+import { DEMO_VISITORS_PER_HOUR } from "../../../src/lib/auth/session-account";
 import { DEMO_QUESTIONS } from "../../../src/lib/demo/demo-script";
 import { northwindSeedDocuments } from "../../../src/lib/eval/northwind-seed";
 import { promoteGeneration } from "../../../src/lib/store/corpus-d1";
@@ -100,10 +101,16 @@ describe("demo sign-in", () => {
     expect(JSON.stringify(await response.json())).not.toContain("demo-visitor-");
   });
 
-  it("refuses to start when a model is bound", async () => {
-    const withModel = { ...demoEnv, AI: { run: async () => ({}) } } as unknown as typeof env;
-    const response = await call("/whoami", visitor.cookie, { workerEnv: withModel });
-    expect(response.status).toBeGreaterThanOrEqual(500);
+  it.each([
+    ["a Workers AI binding", { AI: { run: async () => ({}) } }],
+    ["a Vectorize binding", { VECTORIZE: { query: async () => ({ matches: [] }) } }],
+    ["the production runtime", { RUNTIME_ENV: "production", RESOURCES_PROVISIONED: "true" }],
+  ])("refuses to serve with %s", async (_label, extra) => {
+    const broken = { ...demoEnv, ...extra } as unknown as typeof env;
+    const response = await call("/whoami", visitor.cookie, { workerEnv: broken });
+    expect(response.status).toBe(500);
+    const health = await call("/conversations", visitor.cookie, { workerEnv: broken });
+    expect(health.status).toBe(500);
   });
 });
 
@@ -116,6 +123,11 @@ describe("demo read-only guard", () => {
     ["POST", "/admin/invites"],
     ["POST", "/evaluations/run"],
     ["POST", "/approvals/start"],
+    ["POST", "/admin/uploads"],
+    ["POST", "/admin/reindex"],
+    ["POST", "/admin/catalog/backfill"],
+    ["PATCH", "/admin/people/demo-maya-chen"],
+    ["PUT", "/admin/uploads/u-1"],
   ])("refuses %s %s with the demo message", async (method, path) => {
     const response = await call(path, visitor.cookie, { method, json: {} });
     expect(response.status).toBe(403);
@@ -165,11 +177,104 @@ describe("demo answers", () => {
   });
 
   it("keeps each visitor's chats to themselves", async () => {
+    await ask(visitor.cookie, DEMO_QUESTIONS[2].question, "demo-own-chat");
     const other = await newVisitor();
     const mine = (await (await call("/conversations", visitor.cookie)).json()) as unknown[];
     const theirs = (await (await call("/conversations", other.cookie)).json()) as unknown[];
     expect(mine.length).toBeGreaterThan(0);
     expect(theirs).toEqual([]);
+  });
+});
+
+describe("demo auth routes", () => {
+  it.each(["/auth/login", "/auth/signup", "/auth/invite/accept"])("closes %s", async (path) => {
+    const response = await call(path, undefined, {
+      json: { email: "jordan.ellis@northwind.example", password: "whatever-password", name: "X", token: "t" },
+    });
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ code: "FORBIDDEN", message: DEMO_READ_ONLY_MESSAGE });
+  });
+
+  it("writes no failed-login rows", async () => {
+    const before = await env.OPERATIONS_DB.prepare(`SELECT COUNT(*) AS n FROM auth_login_attempts`).first<{ n: number }>();
+    await call("/auth/login", undefined, { json: { email: "nobody@northwind.example", password: "wrong-password" } });
+    const after = await env.OPERATIONS_DB.prepare(`SELECT COUNT(*) AS n FROM auth_login_attempts`).first<{ n: number }>();
+    expect(after?.n).toBe(before?.n);
+  });
+
+  it("keeps sign out open and revokes only the caller's session", async () => {
+    const leaving = await newVisitor();
+    expect((await call("/auth/logout", leaving.cookie, { json: {} })).status).toBe(200);
+    expect((await call("/whoami", leaving.cookie)).status).toBe(401);
+    expect((await call("/whoami", visitor.cookie)).status).toBe(200);
+  });
+
+  it("stops making visitors past the hourly ceiling", async () => {
+    const now = Date.now();
+    const rows = Array.from({ length: DEMO_VISITORS_PER_HOUR }, (_, index) =>
+      env.OPERATIONS_DB.prepare(`INSERT INTO principals (id, kind, subject, created_at) VALUES (?, 'user', ?, ?)`).bind(
+        `demo-visitor-flood-${index}`,
+        `flood-${index}@demo.invalid`,
+        now,
+      ),
+    );
+    await env.OPERATIONS_DB.batch(rows);
+    const response = await call("/auth/demo", undefined, { method: "POST", json: {} });
+    expect(response.status).toBe(503);
+    await env.OPERATIONS_DB.prepare(`DELETE FROM principals WHERE id LIKE 'demo-visitor-flood-%'`).run();
+    expect((await call("/auth/demo", undefined, { method: "POST", json: {} })).status).toBe(201);
+  });
+});
+
+describe("demo admin pages without a model", () => {
+  it.each([
+    "/admin/overview?range=7d",
+    "/admin/unanswered?range=7d",
+    "/admin/activity?range=7d",
+    "/admin/health",
+    "/admin/sources",
+    "/admin/people",
+    "/knowledge",
+    "/library",
+    "/config",
+    "/evaluations",
+    "/whoami",
+  ])("serves %s", async (path) => {
+    const response = await call(path, visitor.cookie);
+    expect(response.status).toBe(200);
+  });
+
+  it("reports the demo script, not the live model stack", async () => {
+    const config = (await (await call("/config", visitor.cookie)).json()) as {
+      models: Record<string, string>;
+      retrieval: { mode: string };
+      connectors: Array<{ kind: string; status: string }>;
+    };
+    expect(config.models).toEqual({ answer: "useful-brain-demo-script", embedding: "none", reranker: "none" });
+    expect(config.retrieval.mode).toBe("keyword");
+    expect(config.connectors.filter((item) => item.kind === "action" && item.status === "connected")).toEqual([]);
+    const health = (await (await call("/admin/health", visitor.cookie)).json()) as {
+      services: Array<{ service: string; status: string }>;
+    };
+    expect(health.services.map((row) => row.service)).toEqual(["brain", "corpus_db"]);
+    expect(health.services.every((row) => row.status === "ok")).toBe(true);
+  });
+
+  it("shows each visitor only their own questions and traces", async () => {
+    const author = await newVisitor();
+    const reader = await newVisitor();
+    const secret = "Is my private salary 123456 visible to anyone?";
+    const turn = await ask(author.cookie, secret, "demo-private-q");
+    const asAuthor = JSON.stringify(await (await call("/admin/activity?range=7d", author.cookie)).json());
+    expect(asAuthor).toContain("123456");
+    for (const path of ["/admin/activity?range=7d", "/admin/unanswered?range=7d"]) {
+      const body = JSON.stringify(await (await call(path, reader.cookie)).json());
+      expect(body).not.toContain("123456");
+    }
+    const overview = (await (await call("/admin/overview?range=7d", reader.cookie)).json()) as Record<string, unknown>;
+    expect(JSON.stringify(overview)).not.toContain("123456");
+    expect((await call(`/admin/activity/${turn.assistantMessageId}`, reader.cookie)).status).toBe(404);
+    expect((await call(`/admin/activity/${turn.assistantMessageId}`, author.cookie)).status).toBe(200);
   });
 });
 

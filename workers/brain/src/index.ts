@@ -40,8 +40,13 @@ import {
   EvalModelOverrideInvalid,
   parseEvalModelOverride,
 } from "../../../src/lib/models/eval-override";
-import { handlePublicAuthRoute } from "../../../src/lib/auth/session-routes";
-import { createDemoVisitor, resolveSessionPrincipal } from "../../../src/lib/auth/session-account";
+import { handlePublicAuthRoute, isPublicAuthPath } from "../../../src/lib/auth/session-routes";
+import {
+  createDemoVisitor,
+  DEMO_VISITORS_PER_HOUR,
+  demoVisitorsSince,
+  resolveSessionPrincipal,
+} from "../../../src/lib/auth/session-account";
 import {
   assertDemoConfiguration,
   DEMO_READ_ONLY_MESSAGE,
@@ -49,7 +54,7 @@ import {
   isDemoMode,
 } from "../../../src/lib/demo/demo-mode";
 import { cleanupDemoVisitors } from "../../../src/lib/demo/demo-cleanup";
-import { createDemoRuntime } from "../../../src/lib/demo/demo-runtime";
+import { createDemoRuntime, DEMO_MODEL_ID } from "../../../src/lib/demo/demo-runtime";
 import { executeTurn } from "../../../src/lib/brain/execute-turn";
 import { runManualEvaluations } from "../../../src/lib/brain/eval-run";
 import {
@@ -231,6 +236,15 @@ function turnDeps(env: BrainEnv, principal: DirectoryRecord) {
 async function demoVisitorResponse(env: BrainEnv, requestId: string): Promise<Response> {
   const db = env.OPERATIONS_DB as OperationsDatabase;
   await db.prepare("PRAGMA foreign_keys = ON").run();
+  // A hard ceiling behind the web Worker's per-address rate limit: a flood
+  // fills this, not the database.
+  if ((await demoVisitorsSince(db, Date.now() - 60 * 60 * 1000)) >= DEMO_VISITORS_PER_HOUR) {
+    return json(
+      { code: "UNAVAILABLE", message: "The demo is busy. Try again in a few minutes." },
+      requestId,
+      503,
+    );
+  }
   const result = await createDemoVisitor(db, {
     roles: LOOPBACK_ROLES,
     departments: LOOPBACK_DEPARTMENTS,
@@ -268,8 +282,26 @@ const brainWorker = {
           throw new WorkerForbiddenError();
         }
         const response = await demoVisitorResponse(env, requestId);
-        writeOperationalLog({ requestId, operation, status: "ok", durationMs: Date.now() - started });
+        writeOperationalLog({
+          requestId,
+          operation,
+          status: response.ok ? "ok" : "error",
+          durationMs: Date.now() - started,
+        });
         return response;
+      }
+
+      // Demo visitors are signed in by /auth/demo only: password sign-in,
+      // sign-up and invites are closed. Sign out stays open.
+      if (demo && isPublicAuthPath(request.method, path) && path !== "/auth/logout") {
+        writeOperationalLog({
+          requestId,
+          operation: "demo-read-only",
+          status: "error",
+          durationMs: Date.now() - started,
+          errorCode: "FORBIDDEN",
+        });
+        return json({ code: "FORBIDDEN", message: DEMO_READ_ONLY_MESSAGE }, requestId, 403);
       }
 
       const authResponse = await handlePublicAuthRoute({
@@ -431,8 +463,9 @@ const brainWorker = {
             approval: decision.action === "pending_approval",
             // Connected only when policy allows it and the durable
             // approval-resume dispatcher can execute it.
+            // The demo binds no approval workflow, so no action tool is connected there.
             status:
-              decision.action !== "deny" && DURABLE_RESUME_TOOLS.has(tool.name)
+              !demo && decision.action !== "deny" && DURABLE_RESUME_TOOLS.has(tool.name)
                 ? "connected"
                 : "not_connected",
           });
@@ -446,11 +479,14 @@ const brainWorker = {
         });
         return json(
           {
-            models: {
-              answer: SELECTED_MODELS.chat.id,
-              embedding: SELECTED_MODELS.embedding.id,
-              reranker: SELECTED_MODELS.rerank.id,
-            },
+            // The demo runs no model: Settings says so instead of naming the live stack.
+            models: demo
+              ? { answer: DEMO_MODEL_ID, embedding: "none", reranker: "none" }
+              : {
+                  answer: SELECTED_MODELS.chat.id,
+                  embedding: SELECTED_MODELS.embedding.id,
+                  reranker: SELECTED_MODELS.rerank.id,
+                },
             retrieval: {
               mode: env.VECTORIZE ? "hybrid" : "keyword",
               passages: REAL_STACK_FINGERPRINT.topK,
@@ -1263,7 +1299,11 @@ const brainWorker = {
       console.error("service_health_prune_failed");
     }
     if (isDemoMode(env)) {
-      await cleanupDemoVisitors(env.OPERATIONS_DB as OperationsDatabase);
+      try {
+        await cleanupDemoVisitors(env.OPERATIONS_DB as OperationsDatabase);
+      } catch (error) {
+        console.error("demo_visitor_cleanup_failed", error instanceof Error ? error.message : String(error));
+      }
     }
     // Self-heal legacy active generations that predate the document catalog.
     // Idempotent and paged; never on a request path (see plan D19).

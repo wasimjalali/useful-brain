@@ -96,7 +96,7 @@ describe("protected Worker configuration", () => {
     const environments = config.env as Record<string, Record<string, unknown>>;
     inspect(environments.development, ["*/5 * * * *"]);
     inspect(environments.staging, ["*/5 * * * *"]);
-    inspect(environments.demo, ["17 3 * * *"]);
+    inspect(environments.demo, ["17 * * * *"]);
     inspect(environments.production, []);
   });
 
@@ -262,12 +262,20 @@ describe("protected Worker configuration", () => {
     for (const db of databases) {
       expect(db.database_id).not.toMatch(/^00000000-/);
     }
-    // Only the demo env sets DEMO_MODE.
-    for (const [name, env] of Object.entries(readJsonc("workers/brain/wrangler.jsonc").env as Record<string, Record<string, unknown>>)) {
-      if (name !== "demo") {
-        expect((env.vars as Record<string, string>).DEMO_MODE).toBeUndefined();
+    // Only the demo env sets DEMO_MODE, in Brain, Web and Ingestion alike.
+    for (const file of ["wrangler.jsonc", "workers/brain/wrangler.jsonc", "workers/ingestion/wrangler.jsonc"]) {
+      const config = readJsonc(file);
+      expect((config.vars as Record<string, string> | undefined)?.DEMO_MODE).toBeUndefined();
+      for (const [name, env] of Object.entries((config.env ?? {}) as Record<string, Record<string, unknown>>)) {
+        if (name !== "demo") {
+          expect((env.vars as Record<string, string> | undefined)?.DEMO_MODE).toBeUndefined();
+        }
       }
     }
+    // The web Worker rate-limits demo sign-ins per address.
+    expect(web.ratelimits).toEqual([
+      { name: "DEMO_SIGN_IN_LIMIT", namespace_id: "4101", simple: { limit: 10, period: 60 } },
+    ]);
   });
 
   it("keeps no marketing landing page in this repo", () => {
